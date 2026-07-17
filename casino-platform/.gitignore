@@ -1,0 +1,17 @@
+node_modules
+.pnpm-store
+dist
+build
+.next
+out
+.env
+.env*.local
+*.log
+logs
+.DS_Store
+.idea
+.vscode
+coverage
+.turbo
+uploads/*
+!uploads/.gitkeep

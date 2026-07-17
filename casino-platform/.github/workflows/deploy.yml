@@ -1,0 +1,29 @@
+name: Deploy to VPS
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['apps/**', 'packages/**', 'infra/**', 'docker-compose.prod.yml']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/casino-platform
+            git pull origin main
+            docker compose -f docker-compose.prod.yml pull || true
+            docker compose -f docker-compose.prod.yml build --pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml exec -T api npx prisma migrate deploy
+            docker compose -f docker-compose.prod.yml ps
+            echo "Deploy OK $(date)"

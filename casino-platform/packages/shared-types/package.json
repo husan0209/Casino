@@ -1,0 +1,1 @@
+{"name":"@casino/shared-types","version":"0.0.0","private":true,"main":"./src/index.ts","scripts":{"build":"tsc -p tsconfig.json --emitDeclarationOnly false","typecheck":"tsc --noEmit","clean":"rm -rf dist"},"devDependencies":{"@casino/tsconfig":"workspace:*","typescript":"^5.5.4"}}

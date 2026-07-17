@@ -1,0 +1,1 @@
+export default function Page(){ return <div><h1 className="text-xl font-bold mb-4">users</h1><div className="bg-[#141420] rounded-2xl p-4 border border-white/5 text-[#8b8ba7]">Раздел админки — Часть 6.</div></div> }

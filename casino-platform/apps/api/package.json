@@ -1,0 +1,40 @@
+{
+  "name": "@casino/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "dev": "nest start --watch",
+    "start": "node dist/main",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@casino/database": "workspace:*",
+    "@casino/shared-config": "workspace:*",
+    "@casino/shared-types": "workspace:*",
+    "@casino/shared-utils": "workspace:*",
+    "@nestjs/common": "^10.4.1",
+    "@nestjs/core": "^10.4.1",
+    "@nestjs/platform-express": "^10.4.1",
+    "@nestjs/config": "^3.2.3",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "zod": "^3.23.8",
+    "decimal.js": "^10.4.3",
+    "argon2": "^0.31.2",
+    "uuid": "^10.0.0",
+    "bullmq": "^5.20.2",
+    "ioredis": "^5.4.1",
+    "cookie-parser": "^1.4.6"
+  },
+  "devDependencies": {
+    "@casino/tsconfig": "workspace:*",
+    "@nestjs/cli": "^10.4.5",
+    "@types/node": "^20.14.9",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5",
+    "@types/cookie-parser": "^1.4.7"
+  }
+}

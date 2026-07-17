@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root { color-scheme: dark; }
+body { @apply bg-bg text-white antialiased; }
+.container-1 { @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
+.btn { @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 font-medium transition bg-brand hover:bg-brand-600 text-white disabled:opacity-50; }
+.btn-ghost { @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 font-medium transition bg-surface hover:bg-surface2 text-white border border-white/10; }
+.card { @apply bg-surface rounded-2xl border border-white/5 p-4; }
+.input { @apply w-full bg-surface2 border border-white/10 rounded-xl px-3 py-2.5 outline-none focus:border-brand/50 text-sm; }
+.badge { @apply text-xs bg-white/10 rounded-full px-2 py-1 text-muted; }
+.table { @apply w-full text-sm; }
+.table th { @apply text-left text-muted font-normal py-2 border-b border-white/5; }
+.table td { @apply py-3 border-b border-white/5; }

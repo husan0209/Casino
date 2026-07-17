@@ -1,0 +1,8 @@
+{
+  "extends": "@casino/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [],
+  "exclude": ["node_modules", "dist", "build", ".next", "out"]
+}

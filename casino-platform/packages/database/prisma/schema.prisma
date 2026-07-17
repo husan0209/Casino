@@ -1,0 +1,539 @@
+// casino-platform — Prisma Schema
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+
+model User {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email          String?  @unique @db.VarChar(255)
+  emailVerified  Boolean  @default(false) @map("email_verified")
+  username       String?  @unique @db.VarChar(64)
+  passwordHash   String?  @map("password_hash") @db.Text
+  status         UserStatus @default(active)
+  role           UserRole   @default(user)
+  referralCode   String     @unique @map("referral_code") @db.VarChar(32)
+  referredBy     String?    @map("referred_by") @db.Uuid
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+  lastLoginAt    DateTime?  @map("last_login_at") @db.Timestamptz
+  referrer       User?  @relation("UserReferrals", fields: [referredBy], references: [id])
+  referrals      User[] @relation("UserReferrals")
+  authProviders    AuthProvider[]
+  sessions         Session[]
+  emailVerifications EmailVerification[]
+  passwordResets     PasswordReset[]
+  profile          UserProfile?
+  settings         UserSettings?
+  kycProfile       KycProfile?
+  walletAccounts   WalletAccount[]
+  ledgerEntries    LedgerEntry[]
+  paymentRequests  PaymentRequest[]
+  gameSessions     GameSession[]
+  gameRounds       GameRound[]
+  gameTransactions GameTransaction[]
+  gameFavorites    GameFavorite[]
+  supportTickets   SupportTicket[]
+  notifications    Notification[]
+  referralRewardsAsReferrer ReferralReward[] @relation("Referrer")
+  referralRewardsAsReferred ReferralReward[] @relation("Referred")
+  @@map("users")
+}
+enum UserStatus { active blocked suspended }
+enum UserRole { user admin superadmin }
+
+model AuthProvider {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String       @map("user_id") @db.Uuid
+  provider         AuthProviderType
+  providerUserId   String?      @map("provider_user_id") @db.Text
+  providerEmail    String?      @map("provider_email") @db.Text
+  providerData     Json?        @map("provider_data") @db.JsonB
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerUserId])
+  @@map("auth_providers")
+}
+enum AuthProviderType { email google telegram }
+
+model Session {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @map("refresh_token_hash") @db.Text
+  ipAddress        String?   @map("ip_address") @db.VarChar(64)
+  userAgent        String?   @map("user_agent") @db.Text
+  deviceInfo       Json?     @map("device_info") @db.JsonB
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@map("sessions")
+}
+
+model EmailVerification {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  token     String    @unique @db.VarChar(128)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("email_verifications")
+}
+
+model PasswordReset {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  token     String    @unique @db.VarChar(128)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  usedAt    DateTime? @map("used_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("password_resets")
+}
+
+model UserProfile {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String    @unique @map("user_id") @db.Uuid
+  firstName          String?   @map("first_name") @db.VarChar(128)
+  lastName           String?   @map("last_name") @db.VarChar(128)
+  dateOfBirth        DateTime? @map("date_of_birth") @db.Date
+  phone              String?   @db.VarChar(32)
+  phoneVerified      Boolean   @default(false) @map("phone_verified")
+  country            String?   @db.VarChar(2)
+  city               String?   @db.VarChar(128)
+  avatarUrl          String?   @map("avatar_url") @db.Text
+  currencyPreference String    @default("RUB") @map("currency_preference") @db.VarChar(10)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("user_profiles")
+}
+
+model UserSettings {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String   @unique @map("user_id") @db.Uuid
+  notificationsEmail Boolean  @default(true) @map("notifications_email")
+  notificationsPush  Boolean  @default(true) @map("notifications_push")
+  twoFaEnabled       Boolean  @default(false) @map("two_fa_enabled")
+  twoFaSecret        String?  @map("two_fa_secret") @db.Text
+  language           String   @default("ru") @db.VarChar(8)
+  timezone           String   @default("Europe/Moscow") @db.VarChar(64)
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("user_settings")
+}
+
+model KycProfile {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String           @unique @map("user_id") @db.Uuid
+  status           KycStatus        @default(not_started)
+  firstName        String?          @map("first_name") @db.VarChar(128)
+  lastName         String?          @map("last_name") @db.VarChar(128)
+  dateOfBirth      DateTime?        @map("date_of_birth") @db.Date
+  country          String?          @db.VarChar(2)
+  documentType     KycDocumentType? @map("document_type")
+  documentNumber   String?          @map("document_number") @db.VarChar(64)
+  documentExpiry   DateTime?        @map("document_expiry") @db.Date
+  rejectionReason  String?          @map("rejection_reason") @db.Text
+  approvedAt       DateTime?        @map("approved_at") @db.Timestamptz
+  rejectedAt       DateTime?        @map("rejected_at") @db.Timestamptz
+  submittedAt      DateTime?        @map("submitted_at") @db.Timestamptz
+  reviewedBy       String?          @map("reviewed_by") @db.Uuid
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer  AdminUser?      @relation("KycReviewer", fields: [reviewedBy], references: [id])
+  documents KycDocument[]
+  @@map("kyc_profiles")
+}
+enum KycStatus { not_started pending approved rejected requires_resubmission }
+enum KycDocumentType { passport id_card drivers_license }
+
+model KycDocument {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kycProfileId   String          @map("kyc_profile_id") @db.Uuid
+  documentType   KycFileType     @map("document_type")
+  fileUrl        String          @map("file_url") @db.Text
+  fileName       String?         @map("file_name") @db.Text
+  fileSize       Int?            @map("file_size")
+  mimeType       String?         @map("mime_type") @db.VarChar(64)
+  uploadedAt     DateTime        @default(now()) @map("uploaded_at") @db.Timestamptz
+  kycProfile KycProfile @relation(fields: [kycProfileId], references: [id], onDelete: Cascade)
+  @@map("kyc_documents")
+}
+enum KycFileType { front back selfie proof_of_address }
+
+model AdminUser {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email       String    @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.Text
+  role        AdminRole
+  firstName   String?   @map("first_name") @db.VarChar(128)
+  lastName    String?   @map("last_name") @db.VarChar(128)
+  isActive    Boolean   @default(true) @map("is_active")
+  createdBy   String?   @map("created_by") @db.Uuid
+  lastLoginAt DateTime? @map("last_login_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  creator     AdminUser? @relation("AdminCreator", fields: [createdBy], references: [id])
+  createdAdmins AdminUser[] @relation("AdminCreator")
+  kycReviews  KycProfile[] @relation("KycReviewer")
+  assignedTickets SupportTicket[] @relation("TicketAssignee")
+  @@map("admin_users")
+}
+enum AdminRole { admin superadmin }
+
+model AuditLog {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorType  ActorType @map("actor_type")
+  actorId    String    @map("actor_id") @db.Uuid
+  action     String    @db.VarChar(128)
+  targetType String?   @map("target_type") @db.VarChar(64)
+  targetId   String?   @map("target_id") @db.Uuid
+  payload    Json?     @db.JsonB
+  ipAddress  String?   @map("ip_address") @db.VarChar(64)
+  userAgent  String?   @map("user_agent") @db.Text
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  @@index([actorType, actorId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+enum ActorType { user admin system }
+
+model WalletAccount {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  currency  String   @db.VarChar(16)
+  balance   Decimal  @default(0) @db.Decimal(20, 8)
+  locked    Decimal  @default(0) @db.Decimal(20, 8)
+  version   BigInt   @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ledgerEntries LedgerEntry[]
+  @@unique([userId, currency])
+  @@index([userId])
+  @@map("wallet_accounts")
+}
+
+model LedgerEntry {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  transactionId   String           @map("transaction_id") @db.Uuid
+  walletAccountId String           @map("wallet_account_id") @db.Uuid
+  type            LedgerEntryType
+  amount          Decimal          @db.Decimal(20, 8)
+  balanceBefore   Decimal          @map("balance_before") @db.Decimal(20, 8)
+  balanceAfter    Decimal          @map("balance_after") @db.Decimal(20, 8)
+  idempotencyKey  String?          @unique @map("idempotency_key") @db.VarChar(255)
+  description     String?          @db.Text
+  metadata        Json             @default("{}") @db.JsonB
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  walletAccount   WalletAccount    @relation(fields: [walletAccountId], references: [id], onDelete: Cascade)
+  user            User?            @relation(fields: [userId], references: [id])
+  userId          String?          @map("user_id") @db.Uuid
+  gameTransaction GameTransaction?
+  @@index([walletAccountId])
+  @@index([createdAt])
+  @@index([type])
+  @@map("ledger_entries")
+}
+enum LedgerEntryType { DEPOSIT WITHDRAWAL WITHDRAWAL_LOCK WITHDRAWAL_UNLOCK WITHDRAWAL_CONFIRM BET WIN ROLLBACK BONUS ADMIN_CREDIT ADMIN_DEBIT REFERRAL_REWARD CONVERSION_DEBIT CONVERSION_CREDIT }
+
+model PaymentRequest {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String            @map("user_id") @db.Uuid
+  type            PaymentType
+  status          PaymentStatus     @default(pending)
+  provider        PaymentProvider
+  method          String?           @db.VarChar(64)
+  currency        String            @db.VarChar(16)
+  amount          Decimal           @db.Decimal(20, 8)
+  amountRub       Decimal?          @map("amount_rub") @db.Decimal(20, 2)
+  fee             Decimal           @default(0) @db.Decimal(20, 8)
+  externalId      String?           @map("external_id") @db.VarChar(255)
+  externalStatus  String?           @map("external_status") @db.VarChar(64)
+  paymentUrl      String?           @map("payment_url") @db.Text
+  destination     Json?             @db.JsonB
+  idempotencyKey  String            @unique @map("idempotency_key") @db.VarChar(255)
+  metadata        Json              @default("{}") @db.JsonB
+  errorMessage    String?           @map("error_message") @db.Text
+  expiresAt       DateTime?         @map("expires_at") @db.Timestamptz
+  completedAt     DateTime?         @map("completed_at") @db.Timestamptz
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  callbacks PaymentCallback[]
+  @@index([userId])
+  @@index([status])
+  @@map("payment_requests")
+}
+enum PaymentType { deposit withdrawal }
+enum PaymentStatus { pending processing completed failed cancelled expired }
+enum PaymentProvider { rukassa nowpayments manual }
+
+model PaymentCallback {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider          String          @db.VarChar(32)
+  externalId        String?         @map("external_id") @db.VarChar(255)
+  paymentRequestId  String?         @map("payment_request_id") @db.Uuid
+  rawHeaders        Json?           @map("raw_headers") @db.JsonB
+  rawBody           String?         @map("raw_body") @db.Text
+  ipAddress         String?         @map("ip_address") @db.VarChar(64)
+  processed         Boolean         @default(false)
+  processingResult  String?         @map("processing_result") @db.Text
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  paymentRequest PaymentRequest? @relation(fields: [paymentRequestId], references: [id])
+  @@map("payment_callbacks")
+}
+
+model ExchangeRate {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  currencyFrom String   @map("currency_from") @db.VarChar(16)
+  currencyTo   String   @map("currency_to") @db.VarChar(16)
+  rate         Decimal  @db.Decimal(20, 8)
+  source       String?  @db.VarChar(32)
+  fetchedAt    DateTime @default(now()) @map("fetched_at") @db.Timestamptz
+  @@index([currencyFrom, currencyTo])
+  @@map("exchange_rates")
+}
+
+model GameProvider {
+  id          String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug        String               @unique @db.VarChar(64)
+  name        String               @db.VarChar(128)
+  type        GameProviderType
+  isEnabled   Boolean              @default(true) @map("is_enabled")
+  apiUrl      String?              @map("api_url") @db.Text
+  apiKey      String?              @map("api_key") @db.Text
+  apiSecret   String?              @map("api_secret") @db.Text
+  config      Json                 @default("{}") @db.JsonB
+  logoUrl     String?              @map("logo_url") @db.Text
+  sortOrder   Int                  @default(0) @map("sort_order")
+  gameCount   Int                  @default(0) @map("game_count")
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+  games            Game[]
+  gameSessions     GameSession[]
+  gameRounds       GameRound[]
+  gameTransactions GameTransaction[]
+  @@map("game_providers")
+}
+enum GameProviderType { slots live_casino table_games other }
+
+model Game {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerId        String          @map("provider_id") @db.Uuid
+  externalGameId    String          @map("external_game_id") @db.VarChar(255)
+  slug              String          @unique @db.VarChar(255)
+  name              String          @db.VarChar(255)
+  nameRu            String?         @map("name_ru") @db.VarChar(255)
+  type              GameType
+  category          GameCategory
+  subcategory       String?         @db.VarChar(64)
+  thumbnailUrl      String?         @map("thumbnail_url") @db.Text
+  bannerUrl         String?         @map("banner_url") @db.Text
+  isEnabled         Boolean         @default(true) @map("is_enabled")
+  isFeatured        Boolean         @default(false) @map("is_featured")
+  isNew             Boolean         @default(false) @map("is_new")
+  isPopular         Boolean         @default(false) @map("is_popular")
+  hasDemo           Boolean         @default(true) @map("has_demo")
+  rtp               Decimal?        @db.Decimal(5, 2)
+  volatility        GameVolatility?
+  maxWinMultiplier  Decimal?        @map("max_win_multiplier") @db.Decimal(10, 2)
+  minBet            Decimal?        @map("min_bet") @db.Decimal(20, 8)
+  maxBet            Decimal?        @map("max_bet") @db.Decimal(20, 8)
+  supportedCurrencies Json          @default("[]") @map("supported_currencies") @db.JsonB
+  tags              Json            @default("[]") @db.JsonB
+  sortOrder         Int             @default(0) @map("sort_order")
+  launchCount       Int             @default(0) @map("launch_count")
+  metadata          Json            @default("{}") @db.JsonB
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+  provider         GameProvider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  gameSessions     GameSession[]
+  gameRounds       GameRound[]
+  gameFavorites    GameFavorite[]
+  @@unique([providerId, externalGameId])
+  @@index([slug])
+  @@index([category])
+  @@map("games")
+}
+enum GameType { slot live_roulette live_blackjack live_baccarat live_poker live_game_show table_game crash dice other }
+enum GameCategory { slots live_casino table_games instant_games other }
+enum GameVolatility { low medium high very_high }
+
+model GameSession {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String            @map("user_id") @db.Uuid
+  gameId         String            @map("game_id") @db.Uuid
+  providerId     String            @map("provider_id") @db.Uuid
+  sessionToken   String            @unique @map("session_token") @db.VarChar(255)
+  currency       String            @db.VarChar(16)
+  isDemo         Boolean           @default(false) @map("is_demo")
+  status         GameSessionStatus @default(active)
+  ipAddress      String?           @map("ip_address") @db.VarChar(64)
+  userAgent      String?           @map("user_agent") @db.Text
+  startedAt      DateTime          @default(now()) @map("started_at") @db.Timestamptz
+  lastActivityAt DateTime          @default(now()) @map("last_activity_at") @db.Timestamptz
+  closedAt       DateTime?         @map("closed_at") @db.Timestamptz
+  totalBet       Decimal           @default(0) @map("total_bet") @db.Decimal(20, 8)
+  totalWin       Decimal           @default(0) @map("total_win") @db.Decimal(20, 8)
+  roundsPlayed   Int               @default(0) @map("rounds_played")
+  metadata       Json              @default("{}") @db.JsonB
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game             Game              @relation(fields: [gameId], references: [id])
+  provider         GameProvider      @relation(fields: [providerId], references: [id])
+  gameRounds       GameRound[]
+  gameTransactions GameTransaction[]
+  @@map("game_sessions")
+}
+enum GameSessionStatus { active closed expired }
+
+model GameRound {
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId        String          @map("session_id") @db.Uuid
+  userId           String          @map("user_id") @db.Uuid
+  gameId           String          @map("game_id") @db.Uuid
+  providerId       String          @map("provider_id") @db.Uuid
+  externalRoundId  String          @map("external_round_id") @db.VarChar(255)
+  status           GameRoundStatus @default(open)
+  currency         String          @db.VarChar(16)
+  totalBet         Decimal         @default(0) @map("total_bet") @db.Decimal(20, 8)
+  totalWin         Decimal         @default(0) @map("total_win") @db.Decimal(20, 8)
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  closedAt         DateTime?       @map("closed_at") @db.Timestamptz
+  session          GameSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game             Game              @relation(fields: [gameId], references: [id])
+  provider         GameProvider      @relation(fields: [providerId], references: [id])
+  gameTransactions GameTransaction[]
+  @@unique([providerId, externalRoundId])
+  @@map("game_rounds")
+}
+enum GameRoundStatus { open closed rolled_back }
+
+model GameTransaction {
+  id                     String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  roundId                String              @map("round_id") @db.Uuid
+  sessionId              String              @map("session_id") @db.Uuid
+  userId                 String              @map("user_id") @db.Uuid
+  providerId             String              @map("provider_id") @db.Uuid
+  type                   GameTransactionType
+  externalTransactionId  String              @map("external_transaction_id") @db.VarChar(255)
+  amount                 Decimal             @db.Decimal(20, 8)
+  currency               String              @db.VarChar(16)
+  balanceAfter           Decimal             @map("balance_after") @db.Decimal(20, 8)
+  processed              Boolean             @default(true)
+  ledgerEntryId          String?             @unique @map("ledger_entry_id") @db.Uuid
+  metadata               Json                @default("{}") @db.JsonB
+  createdAt              DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  round       GameRound     @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  session     GameSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    GameProvider  @relation(fields: [providerId], references: [id])
+  ledgerEntry LedgerEntry?  @relation(fields: [ledgerEntryId], references: [id])
+  @@unique([providerId, externalTransactionId])
+  @@map("game_transactions")
+}
+enum GameTransactionType { bet win rollback }
+
+model GameFavorite {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  gameId    String   @map("game_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  @@unique([userId, gameId])
+  @@map("game_favorites")
+}
+
+model SupportTicket {
+  id         String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String               @map("user_id") @db.Uuid
+  subject    String               @db.VarChar(255)
+  category   SupportTicketCategory
+  status     SupportTicketStatus  @default(open)
+  priority   SupportTicketPriority @default(normal)
+  assignedTo String?              @map("assigned_to") @db.Uuid
+  closedAt   DateTime?            @map("closed_at") @db.Timestamptz
+  closedBy   SupportClosedBy?     @map("closed_by")
+  createdAt  DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignee AdminUser?        @relation("TicketAssignee", fields: [assignedTo], references: [id])
+  messages SupportMessage[]
+  @@map("support_tickets")
+}
+enum SupportTicketCategory { payments games technical account other }
+enum SupportTicketStatus { open in_progress waiting_user closed }
+enum SupportTicketPriority { low normal high urgent }
+enum SupportClosedBy { user admin }
+
+model SupportMessage {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId    String            @map("ticket_id") @db.Uuid
+  senderType  SupportSenderType @map("sender_type")
+  senderId    String            @map("sender_id") @db.Uuid
+  message     String            @db.Text
+  attachments Json              @default("[]") @db.JsonB
+  isInternal  Boolean           @default(false) @map("is_internal")
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  @@map("support_messages")
+}
+enum SupportSenderType { user admin }
+
+model ReferralReward {
+  id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  referrerId     String               @map("referrer_id") @db.Uuid
+  referredId     String               @map("referred_id") @db.Uuid
+  type           ReferralRewardType   @default(ggr_share)
+  periodStart    DateTime             @map("period_start") @db.Date
+  periodEnd      DateTime             @map("period_end") @db.Date
+  ggrAmount      Decimal              @map("ggr_amount") @db.Decimal(20, 8)
+  rewardRate     Decimal              @map("reward_rate") @db.Decimal(5, 4)
+  rewardAmount   Decimal              @map("reward_amount") @db.Decimal(20, 8)
+  currency       String               @db.VarChar(16)
+  status         ReferralRewardStatus @default(pending)
+  creditedAt     DateTime?            @map("credited_at") @db.Timestamptz
+  ledgerEntryId  String?              @map("ledger_entry_id") @db.Uuid
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  referrer User @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred User @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+  @@map("referral_rewards")
+}
+enum ReferralRewardType { ggr_share first_deposit_bonus }
+enum ReferralRewardStatus { pending credited zero }
+
+model Notification {
+  id        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String              @map("user_id") @db.Uuid
+  type      String              @db.VarChar(64)
+  channel   NotificationChannel
+  title     String              @db.VarChar(255)
+  message   String              @db.Text
+  data      Json                @default("{}") @db.JsonB
+  isRead    Boolean             @default(false) @map("is_read")
+  sentAt    DateTime?           @map("sent_at") @db.Timestamptz
+  readAt    DateTime?           @map("read_at") @db.Timestamptz
+  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@map("notifications")
+}
+enum NotificationChannel { email internal }
+
+model SystemSetting {
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key         String              @unique @db.VarChar(128)
+  value       String              @db.Text
+  type        SystemSettingType
+  category    String?             @db.VarChar(64)
+  description String?             @db.Text
+  updatedBy   String?             @map("updated_by") @db.Uuid
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+  @@map("system_settings")
+}
+enum SystemSettingType { string number boolean json }
