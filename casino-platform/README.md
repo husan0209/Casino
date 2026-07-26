@@ -41,6 +41,14 @@ Seed admin: superadmin@casino.example.com / dev_superadmin_password_123
 - Optimistic locking `wallet_accounts.version`, retry ×3
 - All financial ops in `prisma.$transaction()`
 
+## Payment security (fail-closed)
+- **Production**: Requires `RUKASSA_SECRET_KEY` + `NOWPAYMENTS_IPN_SECRET` for startup
+- **No placeholders in production**: Dev prefixes (`dev_*`, `your_*`, `change_me`) are rejected
+- **Demo provider disabled by default**: Requires explicit `DEMO_PROVIDER_ENABLED=true` + dev/staging only
+- **Stub verification throws in production**: Prevents accidental acceptance of unverified payments
+- **Signature verification**: HMAC-SHA256 (Rukassa), HMAC-SHA512 (NOWPayments), constant-time comparison
+- See `docs/SECURITY_BASELINE.md` for detailed threat model
+
 ## Docs
 `docs/` – 20 files: ARCHITECTURE, STACK, API_CONVENTIONS, CONVENTIONS, SECURITY_BASELINE, PAYMENT_OVERVIEW, PROVIDER_INTEGRATION_STRATEGY, ENVIRONMENT_VARIABLES, AI_DEVELOPMENT_RULES, MODULE_BOUNDARIES, MODULE_TEMPLATE, AGENT_INSTRUCTIONS, SECURITY_CHECKLIST, QA_CHECKLIST, DEPLOY, + 7× tz-part
 
