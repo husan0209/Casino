@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
 import { CreateFiatDepositUseCase } from '../../application/use-cases/create-fiat-deposit.use-case'

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { prisma } from '@casino/database'
-import type { MoneyAmount, Currency } from '@casino/shared-types'
+import { ZERO, type Currency, type MoneyAmount } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 import { IWalletRepository, IWalletLedger, CreditInput, CreditResult, WalletAccount } from '../../domain/repositories/wallet.repository'
 import { InsufficientFundsError, OptimisticLockError } from '../../domain/errors'
@@ -33,7 +33,7 @@ export class PrismaWalletLedger implements IWalletLedger {
         return await prisma.$transaction(async (tx) => {
           let wallet = await tx.walletAccount.findUnique({ where: { userId_currency: { userId: input.userId, currency: input.currency }}})
           if (!wallet) {
-            wallet = await tx.walletAccount.create({ data: { userId: input.userId, currency: input.currency, balance: 0, locked: 0, version: 0n }})
+            wallet = await tx.walletAccount.create({ data: { userId: input.userId, currency: input.currency, balance: ZERO[input.currency], locked: ZERO[input.currency], version: 0n }})
           }
           const balanceBefore = toMoney(wallet.balance)
           const available = money.subtract(balanceBefore, toMoney(wallet.locked))

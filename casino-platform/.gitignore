@@ -10,8 +10,12 @@ out
 logs
 .DS_Store
 .idea
-.vscode
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 coverage
 .turbo
 uploads/*
 !uploads/.gitkeep
+
+*.tsbuildinfo

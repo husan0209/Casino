@@ -1,8 +1,9 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
 import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
-import Link from 'next/link'
+import { money } from '@casino/shared-utils'
 
 export default function WalletPage(){
   const { user } = useAuth()
@@ -30,8 +31,8 @@ export default function WalletPage(){
         {(balances||[]).map((b:any)=>(
           <div key={b.currency} className="card">
             <div className="text-muted text-sm">{b.currency}</div>
-            <div className="text-2xl font-bold">{Number(b.available).toFixed(b.currency==='RUB'?2:8)}</div>
-            <div className="text-xs text-muted">Заблокировано: {Number(b.locked).toFixed(2)}</div>
+            <div className="text-2xl font-bold">{money.toDisplay(b.available, b.currency)}</div>
+            <div className="text-xs text-muted">Заблокировано: {money.toDisplay(b.locked, b.currency)}</div>
           </div>
         ))}
         {(!balances || balances.length===0) && <div className="text-muted">Нет активных балансов</div>}
@@ -45,7 +46,7 @@ export default function WalletPage(){
               <tr key={t.id}>
                 <td>{new Date(t.created_at).toLocaleString('ru')}</td>
                 <td><span className="badge">{t.type}</span></td>
-                <td className={parseFloat(t.amount) >= 0 ? 'text-emerald-400' : 'text-red-400'}>{t.amount} {t.currency}</td>
+                <td className={money.isGreaterOrEqual(t.amount, '0') ? 'text-emerald-400' : 'text-red-400'}>{t.amount} {t.currency}</td>
                 <td>{t.balance_after}</td>
                 <td className="text-muted">{t.description}</td>
               </tr>

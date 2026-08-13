@@ -1,0 +1,12 @@
+#!/bin/sh
+
+# Проверка на утечку секретов (если gitleaks установлен)
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks detect --source . --verbose
+  if [ $? -ne 0 ]; then
+    echo "SECRETS_FOUND: potential secrets detected, aborting commit"
+    exit 1
+  fi
+fi
+
+pnpm exec lint-staged

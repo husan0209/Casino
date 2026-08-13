@@ -19,8 +19,8 @@ export class CreateCryptoDepositUseCase {
     if (!allowed.includes(currency)) throw new Error('INVALID_CURRENCY')
     // estimate RUB for KYC
     const est = await this.np.getEstimatePrice({ amount, currencyFrom: currency, currencyTo: 'RUB' })
-    const amountRub = parseFloat(est.estimatedAmount || '0')
-    await this.kycCheck.assertCanDeposit(userId, amountRub)
+    const estimatedRub = est.estimatedAmount || '0'
+    await this.kycCheck.assertCanDeposit(userId, estimatedRub)
     const idempotencyKey = `dep_${randomUUID()}`
     const ipn = this.config.get('NOWPAYMENTS_WEBHOOK_URL') || 'http://localhost:3001/api/v1/payments/webhooks/nowpayments'
     try {
@@ -31,7 +31,7 @@ export class CreateCryptoDepositUseCase {
       })
       const pr = await this.repo.create({
         userId, type: 'deposit', status: 'pending', provider: 'nowpayments',
-        currency, amount, amountRub,
+        currency, amount, amountRub: estimatedRub,
         externalId: npRes.paymentId,
         idempotencyKey,
         expiresAt: new Date(npRes.expirationEstimateDate),

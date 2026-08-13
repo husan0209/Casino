@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { prisma } from '@casino/database'
+import { money } from '@casino/shared-utils'
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
 import { ParsedProviderCallback } from '../../domain/provider-adapter.interface'
 
 @Injectable()
 export class GameCallbackService {
-  private logger = new Logger(GameCallbackService.name)
   constructor(private wallet: WalletFacade) {}
 
   async authenticate(sessionToken: string) {
@@ -93,7 +93,7 @@ export class GameCallbackService {
     }
     let balanceAfter = '0'
     let ledgerEntryId: string | null = null
-    if (parseFloat(winAmount) > 0) {
+    if (money.isPositive(winAmount)) {
       const res = await this.wallet.credit({
         userId: session.userId, currency: session.currency as any, amount: winAmount,
         type: 'WIN',
@@ -119,7 +119,7 @@ export class GameCallbackService {
         metadata: cb.rawRequest ?? {}
       }
     })
-    if (parseFloat(winAmount) > 0) {
+    if (money.isPositive(winAmount)) {
       await prisma.gameRound.update({ where: { id: round.id }, data: { totalWin: { increment: winAmount }, status: 'closed', closedAt: new Date() }})
       await prisma.gameSession.update({ where: { id: session.id }, data: { totalWin: { increment: winAmount }, lastActivityAt: new Date() }})
     }

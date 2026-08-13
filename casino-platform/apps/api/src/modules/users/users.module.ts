@@ -10,14 +10,17 @@ import { PrismaUserProfileRepository } from './infrastructure/repositories/user-
 import { PrismaUserSessionRepository } from './infrastructure/repositories/user-session.prisma'
 import { USER_PROFILE_REPOSITORY } from './domain/repositories/user-profile.repository'
 import { USER_SESSION_REPOSITORY } from './domain/repositories/user-session.repository'
+import { SelfExclusionUseCase } from './application/use-cases/self-exclusion.use-case'
 
 @Module({
   imports: [AuthModule],
   controllers: [UsersController],
   providers: [
     GetMeUseCase, UpdateProfileUseCase, UpdateSettingsUseCase, ListSessionsUseCase, RevokeSessionUseCase,
+    SelfExclusionUseCase,
     { provide: USER_PROFILE_REPOSITORY, useClass: PrismaUserProfileRepository },
     { provide: USER_SESSION_REPOSITORY, useClass: PrismaUserSessionRepository },
   ],
+  exports: [SelfExclusionUseCase]
 })
 export class UsersModule {}

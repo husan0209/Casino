@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import Decimal from 'decimal.js'
 import { prisma } from '@casino/database'
 @Injectable()
 export class FavoritesUseCase {
@@ -55,7 +56,7 @@ export class FavoritesUseCase {
       currency: r.currency,
       total_bet: r.totalBet.toString(),
       total_win: r.totalWin.toString(),
-      profit: (Number(r.totalWin) - Number(r.totalBet)).toFixed(2),
+      profit: new Decimal(r.totalWin).minus(r.totalBet).toFixed(2),
       status: r.status,
       created_at: r.createdAt,
     }))

@@ -26,6 +26,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://casino:casino_test@localhost:5432/casino_test
       - run: pnpm lint || true
+      - name: Commitlint
+        run: pnpm exec commitlint --from HEAD~1 --to HEAD
       - run: pnpm typecheck || true
       - run: pnpm test || true
       - name: Build

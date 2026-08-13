@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { randomUUID } from 'crypto'
+import Decimal from 'decimal.js'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
 import { KycCheckService } from '../../../kyc/application/use-cases/kyc-check.service'
@@ -15,14 +16,14 @@ export class CreateFiatDepositUseCase {
     private config: ConfigService,
   ) {}
   async execute(userId: string, amount: string, method = 'card') {
-    const amt = parseFloat(amount)
-    if (amt < 100) throw new AmountTooSmallError('100')
-    if (amt > 500000) throw new AmountTooLargeError('500000')
-    await this.kycCheck.assertCanDeposit(userId, amt)
+    const amt = new Decimal(amount)
+    if (amt.lt(100)) throw new AmountTooSmallError('100')
+    if (amt.gt(500000)) throw new AmountTooLargeError('500000')
+    await this.kycCheck.assertCanDeposit(userId, amount)
     const idempotencyKey = `dep_${randomUUID()}`
     const pr = await this.repo.create({
       userId, type: 'deposit', status: 'pending', provider: 'rukassa',
-      method, currency: 'RUB', amount, amountRub: amt,
+      method, currency: 'RUB', amount, amountRub: amount,
       idempotencyKey,
       expiresAt: new Date(Date.now() + 2*3600*1000),
     })
