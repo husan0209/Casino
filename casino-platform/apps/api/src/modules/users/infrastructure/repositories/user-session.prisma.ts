@@ -8,7 +8,7 @@ export class PrismaUserSessionRepository implements IUserSessionRepository {
       where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' }
     })
-    return rows.map(r => ({ id: r.id, ipAddress: r.ipAddress, userAgent: r.userAgent, createdAt: r.createdAt }))
+    return rows.map((r: any) => ({ id: r.id, ipAddress: r.ipAddress, userAgent: r.userAgent, createdAt: r.createdAt }))
   }
   async revoke(sessionId: string, userId: string) {
     const res = await prisma.session.updateMany({

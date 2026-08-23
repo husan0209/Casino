@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
-import { AuthModule } from '../../auth/auth.module'
-import { WalletModule } from '../../wallet/wallet.module'
-import { KycModule } from '../../kyc/kyc.module'
+
+import { AuthModule } from '../auth/auth.module'
+import { WalletModule } from '../wallet/wallet.module'
+import { KycModule } from '../kyc/kyc.module'
 import { PaymentsController } from './presentation/controllers/payments.controller'
 import { PaymentsWebhookController } from './presentation/controllers/payments-webhook.controller'
 import { PaymentRequestRepository } from './infrastructure/repositories/payment-request.repository'

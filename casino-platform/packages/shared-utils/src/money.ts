@@ -8,5 +8,6 @@ export const money = {
   isPositive(a: MoneyAmount): boolean { return new Decimal(a).gt(0) },
   equals(a: MoneyAmount, b: MoneyAmount): boolean { return new Decimal(a).eq(b) },
   isGreaterOrEqual(a: MoneyAmount, b: MoneyAmount): boolean { return new Decimal(a).gte(b) },
+  isGreaterThan(a: MoneyAmount, b: MoneyAmount): boolean { return new Decimal(a).gt(b) },
   toDisplay(a: MoneyAmount, currency: Currency): string { const d = new Decimal(a); return currency==='RUB' ? d.toFixed(2) : d.toFixed(8) },
 }

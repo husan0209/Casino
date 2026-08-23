@@ -32,7 +32,7 @@ export class ReferralsController {
       prisma.user.findMany({ where:{ referredBy: u.id }, skip:(page-1)*perPage, take:perPage, select:{ id:true, createdAt:true }}),
       prisma.user.count({ where:{ referredBy: u.id }})
     ])
-    return { data: items.map((x,i)=>({ id: x.id.slice(0,8), registered_at: x.createdAt, is_active:true, total_earned:'0', currency:'RUB'})), meta:{ page, perPage, total }}
+    return { data: items.map((x: { id: string; createdAt: Date },_i: number)=>({ id: x.id.slice(0,8), registered_at: x.createdAt, is_active:true, total_earned:'0', currency:'RUB'})), meta:{ page, perPage, total }}
   }
   @Get('rewards')
   async rewards(@CurrentUser() u:any, @Query() q:any){

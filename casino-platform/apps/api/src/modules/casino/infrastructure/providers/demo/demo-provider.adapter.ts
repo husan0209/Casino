@@ -16,7 +16,13 @@ export class DemoProviderAdapter implements GameProviderAdapter {
       { externalGameId: 'demo-book-of-demo', name: 'Book of Demo', type: 'slot', category: 'slots', hasDemo: true, rtp: 96.21 },
     ]
   }
-  verifyCallback() { return true }
+  verifyCallback() {
+    const env = this.config.get('NODE_ENV')
+    if (env === 'production') {
+      throw new Error('DEMO_PROVIDER_DISABLED. Demo provider cannot be used in production.')
+    }
+    return true
+  }
   parseCallback(_h: any, body: any): ParsedProviderCallback {
     return {
       action: body.action,

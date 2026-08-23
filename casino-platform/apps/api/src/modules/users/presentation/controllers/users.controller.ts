@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
@@ -7,6 +7,7 @@ import { UpdateProfileUseCase } from '../../application/use-cases/update-profile
 import { UpdateSettingsUseCase } from '../../application/use-cases/update-settings.use-case'
 import { ListSessionsUseCase } from '../../application/use-cases/list-sessions.use-case'
 import { RevokeSessionUseCase } from '../../application/use-cases/revoke-session.use-case'
+import { SelfExclusionUseCase } from '../../application/use-cases/self-exclusion.use-case'
 import { diskStorage } from 'multer'
 import { extname } from 'path'
 import { randomUUID } from 'crypto'
@@ -20,6 +21,7 @@ export class UsersController {
     private updateSettings: UpdateSettingsUseCase,
     private listSessions: ListSessionsUseCase,
     private revokeSession: RevokeSessionUseCase,
+    private selfExclusion: SelfExclusionUseCase,
   ) {}
 
   @Get('me')
@@ -51,6 +53,24 @@ export class UsersController {
     const url = `/uploads/avatars/${file.filename}`
     await repo.setAvatar(user.id, url)
     return { avatar_url: url }
+  }
+
+  /**
+   * UC-RG-01 — Activate self-exclusion.
+   * Body: { period_hours: number } — 0 = permanent, min 24
+   */
+  @Post('me/self-exclude')
+  selfExclude(@CurrentUser() user: any, @Body() body: { period_hours: number }) {
+    const hours = typeof body.period_hours === 'number' ? body.period_hours : 24
+    return this.selfExclusion.exclude(user.id, hours)
+  }
+
+  /**
+   * UC-RG-02 — Lift self-exclusion (subject to 72h cooloff from when exclusion was set).
+   */
+  @Delete('me/self-exclude')
+  liftExclusion(@CurrentUser() user: any) {
+    return this.selfExclusion.lift(user.id)
   }
 
   @Get('me/sessions')

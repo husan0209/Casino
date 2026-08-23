@@ -48,13 +48,13 @@ last_updated: 2026-06-19
 
 | # | Часть | Документ | Описание |
 |---|-------|----------|----------|
-| 1 | Foundation | [tz-part-1-foundation.md](../tz-part-1-foundation.md) | Monorepo, стек, architecture, conventions |
-| 2 | Backend Core | [tz-part-2-auth-users-kyc-rbac.md](../tz-part-2-auth-users-kyc-rbac.md) | Auth, Users, KYC, RBAC |
-| 3 | Wallet & Payments | [tz-part-3-payments-wallet.md](../tz-part-3-payments-wallet.md) | Wallet ledger, Rukassa, NOWPayments |
-| 4 | Casino Providers | [tz-part-4-casino-providers.md](../tz-part-4-casino-providers.md) | Seamless Wallet, providers, Demo |
-| 5 | Frontend Web | [tz-part-5-frontend-web.md](../tz-part-5-frontend-web.md) | Next.js frontend |
-| 6 | Admin & Support | [tz-part-6-admin-support-referrals.md](../tz-part-6-admin-support-referrals.md) | Admin panel, support, referrals |
-| 7 | DevOps | [tz-part-7-devops-security-qa.md](../tz-part-7-devops-security-qa.md) | VPS, Docker, CI/CD, security, QA |
+| 1 | Foundation | [tz-part-1-foundation.md](./tz-part-1-foundation.md) | Monorepo, стек, architecture, conventions |
+| 2 | Backend Core | [tz-part-2-auth-users-kyc-rbac.md](./tz-part-2-auth-users-kyc-rbac.md) | Auth, Users, KYC, RBAC |
+| 3 | Wallet & Payments | [tz-part-3-payments-wallet.md](./tz-part-3-payments-wallet.md) | Wallet ledger, Rukassa, NOWPayments |
+| 4 | Casino Providers | [tz-part-4-casino-providers.md](./tz-part-4-casino-providers.md) | Seamless Wallet, providers, Demo |
+| 5 | Frontend Web | [tz-part-5-frontend-web.md](./tz-part-5-frontend-web.md) | Next.js frontend |
+| 6 | Admin & Support | [tz-part-6-admin-support-referrals.md](./tz-part-6-admin-support-referrals.md) | Admin panel, support, referrals |
+| 7 | DevOps | [tz-part-7-devops-security-qa.md](./tz-part-7-devops-security-qa.md) | VPS, Docker, CI/CD, security, QA |
 
 ---
 

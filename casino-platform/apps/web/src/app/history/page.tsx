@@ -1,8 +1,9 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
 import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
-import Link from 'next/link'
+import { money } from '@casino/shared-utils'
 export default function HistoryPage(){
   const { user } = useAuth()
   const { data } = useQuery({ queryKey:['casino-history'], queryFn:()=>apiGet<any>('/casino/history?per_page=50'), enabled:!!user })
@@ -21,7 +22,7 @@ export default function HistoryPage(){
                 <td><Link href={`/casino/${r.game.slug}`} className="hover:text-brand">{r.game.name}</Link></td>
                 <td>{r.total_bet}</td>
                 <td className="text-emerald-400">{r.total_win}</td>
-                <td className={parseFloat(r.profit) >= 0 ? 'text-emerald-400' : 'text-red-400'}>{r.profit}</td>
+                <td className={money.isGreaterOrEqual(r.profit, '0') ? 'text-emerald-400' : 'text-red-400'}>{r.profit}</td>
                 <td><span className="badge">{r.status}</span></td>
               </tr>
             ))}

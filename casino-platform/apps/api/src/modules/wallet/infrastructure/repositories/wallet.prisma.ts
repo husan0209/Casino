@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { prisma } from '@casino/database'
-import type { MoneyAmount, Currency } from '@casino/shared-types'
+import { ZERO, type Currency, type MoneyAmount } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 import { IWalletRepository, IWalletLedger, CreditInput, CreditResult, WalletAccount } from '../../domain/repositories/wallet.repository'
 import { InsufficientFundsError, OptimisticLockError } from '../../domain/errors'
@@ -16,7 +16,7 @@ export class PrismaWalletRepository implements IWalletRepository {
   }
   async listBalances(userId: string): Promise<WalletAccount[]> {
     const rows = await prisma.walletAccount.findMany({ where: { userId }})
-    return rows.map(w => ({ userId: w.userId, currency: w.currency as Currency, balance: toMoney(w.balance), locked: toMoney(w.locked), version: w.version }))
+    return rows.map((w: { userId: string; currency: string; balance: any; locked: any; version: bigint }) => ({ userId: w.userId, currency: w.currency as Currency, balance: toMoney(w.balance), locked: toMoney(w.locked), version: w.version }))
   }
 }
 
@@ -30,10 +30,10 @@ export class PrismaWalletLedger implements IWalletLedger {
     }
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        return await prisma.$transaction(async (tx) => {
+        return await prisma.$transaction(async (tx: { [k: string]: any }) => {
           let wallet = await tx.walletAccount.findUnique({ where: { userId_currency: { userId: input.userId, currency: input.currency }}})
           if (!wallet) {
-            wallet = await tx.walletAccount.create({ data: { userId: input.userId, currency: input.currency, balance: 0, locked: 0, version: 0n }})
+            wallet = await tx.walletAccount.create({ data: { userId: input.userId, currency: input.currency, balance: ZERO[input.currency], locked: ZERO[input.currency], version: 0n }})
           }
           const balanceBefore = toMoney(wallet.balance)
           const available = money.subtract(balanceBefore, toMoney(wallet.locked))
@@ -79,7 +79,7 @@ export class PrismaWalletLedger implements IWalletLedger {
   async lock(userId: string, currency: Currency, amount: MoneyAmount, idempotencyKey: string): Promise<CreditResult> {
     const existing = await prisma.ledgerEntry.findUnique({ where: { idempotencyKey }})
     if (existing) return { balanceBefore: toMoney(existing.balanceBefore), balanceAfter: toMoney(existing.balanceAfter), ledgerEntryId: existing.id, duplicate: true }
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: { [k: string]: any }) => {
       const wallet = await tx.walletAccount.findUnique({ where: { userId_currency: { userId, currency }}})
       if (!wallet) throw new Error('WALLET_NOT_FOUND')
       const available = money.subtract(toMoney(wallet.balance), toMoney(wallet.locked))
@@ -101,7 +101,7 @@ export class PrismaWalletLedger implements IWalletLedger {
   async unlock(userId: string, currency: Currency, amount: MoneyAmount, idempotencyKey: string): Promise<CreditResult> {
     const existing = await prisma.ledgerEntry.findUnique({ where: { idempotencyKey }})
     if (existing) return { balanceBefore: toMoney(existing.balanceBefore), balanceAfter: toMoney(existing.balanceAfter), ledgerEntryId: existing.id, duplicate: true }
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: { [k: string]: any }) => {
       const wallet = await tx.walletAccount.findUnique({ where: { userId_currency: { userId, currency }}})
       if (!wallet) throw new Error('WALLET_NOT_FOUND')
       const newLocked = money.subtract(toMoney(wallet.locked), amount)
@@ -122,7 +122,7 @@ export class PrismaWalletLedger implements IWalletLedger {
     if (existing) return { balanceBefore: toMoney(existing.balanceBefore), balanceAfter: toMoney(existing.balanceAfter), ledgerEntryId: existing.id, duplicate: true }
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        return await prisma.$transaction(async (tx) => {
+        return await prisma.$transaction(async (tx: { [k: string]: any }) => {
           const wallet = await tx.walletAccount.findUnique({ where: { userId_currency: { userId, currency }}})
           if (!wallet) throw new Error('WALLET_NOT_FOUND')
           const balanceBefore = toMoney(wallet.balance)

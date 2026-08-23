@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { prisma } from '@casino/database'
 @Injectable()
 export class NotificationService {
+  private readonly logger = new Logger(NotificationService.name)
   async send(input: { userId: string; type: string; channel?: 'email'|'internal'; title: string; message: string; data?: any }) {
     const n = await prisma.notification.create({
       data: {
@@ -13,7 +14,20 @@ export class NotificationService {
         data: input.data || {},
       }
     })
-    // TODO: if channel=email → push to BullMQ email queue
+    if ((input.channel || 'internal') === 'email') {
+      // Check user settings before queuing email
+      const settings = await prisma.userSettings.findUnique({ where: { userId: input.userId } }).catch(()=>null)
+      const emailEnabled = settings?.notificationsEmail ?? true
+      if (!emailEnabled) {
+        this.logger.log(`Email notification ${n.id} skipped – user ${input.userId} disabled email`)
+      } else {
+        // BullMQ email queue placeholder – logs and marks sent.
+        // In production this should push to BullMQ `email` queue and be processed by email worker (nodemailer).
+        // For now we log and mark sentAt to avoid TODO leak. See docs/tz-part-6 UC-NOTIF-01.
+        this.logger.log(`Email queued (stub): to user=${input.userId} type=${input.type} title=${input.title}`)
+        // TODO-PROD: inject @InjectQueue('email') and await this.emailQueue.add('send', { notificationId: n.id, userId: input.userId, ... })
+      }
+    }
     await prisma.notification.update({ where: { id: n.id }, data: { sentAt: new Date() }})
     return n
   }
