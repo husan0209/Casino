@@ -1,10 +1,48 @@
-import Link from 'next/link'
-export default function Login(){ return (
-  <div className="min-h-screen flex items-center justify-center bg-[#0b0b12]">
-    <div className="w-full max-w-sm bg-[#141420] border border-white/10 rounded-2xl p-6">
-      <h1 className="text-xl font-bold mb-4">Admin Panel</h1>
-      <p className="text-sm text-[#8b8ba7] mb-4">Авторизация администратора — будет в Части 2.</p>
-      <Link href="/dashboard" className="w-full inline-flex justify-center bg-[#ff3b7a] rounded-xl py-2.5">Войти (dev)</Link>
+'use client'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuthStore } from '@/stores/auth'
+import { Btn, ErrorBox, Input } from '@/components/ui'
+import { errText } from '@/lib/api'
+
+export default function LoginPage() {
+  const router = useRouter()
+  const login = useAuthStore((s) => s.login)
+  const token = useAuthStore((s) => s.token)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [err, setErr] = useState<string>()
+  const [busy, setBusy] = useState(false)
+
+  if (token) {
+    router.replace('/dashboard')
+    return null
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setErr(undefined)
+    setBusy(true)
+    try {
+      await login(email.trim(), password)
+      router.replace('/dashboard')
+    } catch (e2) {
+      setErr(errText(e2))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#0b0b12]">
+      <form onSubmit={submit} className="w-full max-w-sm bg-[#141420] border border-white/10 rounded-2xl p-6">
+        <h1 className="text-xl font-bold mb-1">Admin Panel</h1>
+        <p className="text-sm text-[#8b8ba7] mb-4">Вход для администраторов</p>
+        <ErrorBox msg={err} />
+        <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mb-3 w-full" />
+        <Input type="password" placeholder="Пароль" value={password} onChange={(e) => setPassword(e.target.value)} required className="mb-4 w-full" />
+        <Btn disabled={busy}>{busy ? 'Вход…' : 'Войти'}</Btn>
+      </form>
     </div>
-  </div>
-)}
+  )
+}

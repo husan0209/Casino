@@ -1,42 +1,40 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { AppError } from '@casino/shared-utils'
-
-export class EmailNotConfiguredError extends AppError {
-  readonly code = 'EMAIL_NOT_CONFIGURED'
-  readonly httpStatus = 500
-  constructor() { super('SMTP не настроен: письма не могут быть отправлены') }
-}
+import { EMAIL_QUEUE_PORT, EmailQueuePort } from '../../../../queues/queue.types'
 
 /**
- * Постановка писем в очередь.
- *
- * MVP-статус (см. docs/IMPLEMENTATION_GAPS.md GAP-02/GAP-05):
- * - development: письмо пишется в лог со ссылкой — флоу проверяемы без Redis/SMTP.
- * - production: без SMTP_HOST — fail-closed (EmailNotConfiguredError), как и платёжные клиенты.
- * - BullMQ-воркер `email` добавляется отдельной задачей (queues.module), продюсер ниже оставлен за интерфейсом.
+ * Продюсер писей аутентификации (verify-email / reset-password).
+ * Постановка в очередь `email` через QueuesModule (GAP-02);
+ * фактическая отправка — EmailWorker → MailerPort (SMTP в prod, лог в dev).
  */
 @Injectable()
 export class EmailQueueService {
-  private readonly logger = new Logger(EmailQueueService.name)
+  constructor(
+    private config: ConfigService,
+    @Inject(EMAIL_QUEUE_PORT) private readonly emailQueue: EmailQueuePort,
+  ) {}
 
-  constructor(private config: ConfigService) {}
-
-  private async enqueue(to: string, subject: string, text: string): Promise<void> {
-    const env = this.config.get<string>('NODE_ENV')
-    const smtpHost = this.config.get<string>('SMTP_HOST')
-    if (env === 'production' && !smtpHost) throw new EmailNotConfiguredError()
-    // TODO(GAP-02): await this.emailQueue.add('send', { to, subject, html }) через BullMQ
-    this.logger.log(`EMAIL[dev] to=${to} subject="${subject}" ${text}`)
+  private base(): string {
+    return this.config.get<string>('APP_URL') || 'http://localhost:3000'
   }
 
   sendVerificationEmail(to: string, token: string) {
-    const base = this.config.get<string>('APP_URL') || 'http://localhost:3000'
-    return this.enqueue(to, 'Подтвердите ваш email', `${base}/verify-email?token=${token}`)
+    const link = `${this.base()}/verify-email?token=${token}`
+    return this.emailQueue.enqueue({
+      to,
+      subject: 'Подтвердите ваш email',
+      text: `Здравствуйте!\n\nПодтвердите ваш email по ссылке:\n${link}\n\nСсылка действительна 24 часа.`,
+      html: `<p>Здравствуйте!</p><p>Подтвердите ваш email: <a href="${link}">${link}</a></p>`,
+    })
   }
 
   sendPasswordReset(to: string, token: string) {
-    const base = this.config.get<string>('APP_URL') || 'http://localhost:3000'
-    return this.enqueue(to, 'Сброс пароля', `${base}/reset-password?token=${token}`)
+    const link = `${this.base()}/reset-password?token=${token}`
+    return this.emailQueue.enqueue({
+      to,
+      subject: 'Сброс пароля',
+      text: `Вы запросили сброс пароля.\nСсылка для сброса:\n${link}\n\nЕсли это не вы — проигнорируйте письмо.`,
+      html: `<p>Вы запросили сброс пароля.</p><p><a href="${link}">Сбросить пароль</a></p><p>Если это не вы — проигнорируйте письмо.</p>`,
+    })
   }
 }

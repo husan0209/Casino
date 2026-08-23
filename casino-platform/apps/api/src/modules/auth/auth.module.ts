@@ -22,8 +22,10 @@ import { ForgotPasswordUseCase } from './application/use-cases/forgot-password.u
 import { ResetPasswordUseCase } from './application/use-cases/reset-password.use-case'
 import { GoogleOAuthUseCase } from './application/use-cases/oauth/google-oauth.use-case'
 import { TelegramLoginUseCase } from './application/use-cases/oauth/telegram-login.use-case'
+import { QueuesModule } from '../../queues/queues.module'
 
 @Module({
+  imports: [QueuesModule],
   controllers: [AuthController],
   providers: [
     PasswordHasher, JwtTokenService, EmailQueueService, AuthGuard, RolesGuard,

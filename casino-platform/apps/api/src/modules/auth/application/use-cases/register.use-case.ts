@@ -1,21 +1,25 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { randomBytes } from 'crypto'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
 import { IEmailVerificationRepository, EMAIL_VERIFICATION_REPOSITORY } from '../../domain/repositories/verification-token.repository'
 import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
 import { EmailQueueService } from '../../infrastructure/services/email-queue.service'
+import { JwtTokenService } from '../../infrastructure/services/jwt.service'
 import { EmailAlreadyExistsError, WeakPasswordError } from '../../domain/errors'
 
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // без 0/O/1/I — меньше ошибок при вводе
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const CODE_LENGTH = 8
 
 @Injectable()
 export class RegisterUseCase {
   constructor(
     @Inject(USER_REPOSITORY) private users: IUserRepository,
+    @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,
     @Inject(EMAIL_VERIFICATION_REPOSITORY) private verif: IEmailVerificationRepository,
     private hasher: PasswordHasher,
     private email: EmailQueueService,
+    private jwt: JwtTokenService,
   ) {}
 
   private async generateReferralCode(): Promise<string> {
@@ -28,14 +32,16 @@ export class RegisterUseCase {
     throw new Error('REFERRAL_CODE_GENERATION_FAILED')
   }
 
-  async execute(input: { email: string; password: string; referralCode?: string }) {
+  async execute(
+    input: { email: string; password: string; referralCode?: string },
+    meta?: { ip?: string; userAgent?: string },
+  ) {
     if (input.password.length < 8) throw new WeakPasswordError()
     const emailNormalized = input.email.toLowerCase().trim()
 
     const existing = await this.users.findByEmail(emailNormalized)
     if (existing) throw new EmailAlreadyExistsError()
 
-    // UC-REF-02: если код не найден — игнорируем, регистрацию не блокируем
     let referredBy: string | null = null
     if (input.referralCode) {
       const referrer = await this.users.findByReferralCode(input.referralCode.toUpperCase().trim())
@@ -51,6 +57,24 @@ export class RegisterUseCase {
     await this.verif.create(user.id, token, expiresAt)
     await this.email.sendVerificationEmail(emailNormalized, token)
 
-    return { userId: user.id, referralCode, message: 'Регистрация успешна. Подтвердите email по ссылке из письма.' }
+    const { token: refreshToken, hash } = this.jwt.generateRefreshToken()
+    const sessionExpires = new Date(Date.now() + 30 * 24 * 3600 * 1000)
+    const session = await this.sessions.create({
+      userId: user.id,
+      refreshTokenHash: hash,
+      ipAddress: meta?.ip || null,
+      userAgent: meta?.userAgent || null,
+      expiresAt: sessionExpires,
+      revokedAt: null,
+    })
+    const accessToken = this.jwt.signAccess(user.id, user.role, session.id)
+
+    return {
+      accessToken,
+      refreshToken,
+      user: { id: user.id, email: user.email, role: user.role },
+      referralCode,
+      message: 'Регистрация успешна',
+    }
   }
 }
