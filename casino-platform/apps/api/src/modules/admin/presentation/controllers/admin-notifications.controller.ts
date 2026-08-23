@@ -15,7 +15,7 @@ export class AdminNotificationsController {
     let targets = body.userIds
     if (!targets || targets.length === 0) {
       const allUsers = await prisma.user.findMany({ select: { id: true } })
-      targets = allUsers.map(u => u.id)
+      targets = allUsers.map((u: { id: string }) => u.id)
     }
 
     const notifications = targets.map(userId => ({

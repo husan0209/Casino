@@ -28,10 +28,10 @@ export class ReferralCalcService {
         where: { userId: ru.id, type: 'win', createdAt: { gte: dayStart, lte: dayEnd }},
         _sum: { amount: true }
       })
-      const currencies = new Set([...bets.map(b=>b.currency), ...wins.map(w=>w.currency)])
+      const currencies = new Set<string>([...bets.map((b: { currency: string })=>b.currency), ...wins.map((w: { currency: string })=>w.currency)])
       for (const cur of currencies) {
-        const betSum = bets.find(b=>b.currency===cur)?._sum.amount ?? '0'
-        const winSum = wins.find(w=>w.currency===cur)?._sum.amount ?? '0'
+        const betSum = bets.find((b: { currency: string })=>b.currency===cur)?._sum.amount ?? '0'
+        const winSum = wins.find((w: { currency: string })=>w.currency===cur)?._sum.amount ?? '0'
         const ggr = new Decimal(betSum).minus(winSum)
         const isPositiveGgr = ggr.gt(0)
         const status = isPositiveGgr ? 'pending' : 'zero'

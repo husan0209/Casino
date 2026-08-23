@@ -28,7 +28,7 @@ export class FavoritesUseCase {
       }),
       prisma.gameFavorite.count({ where: { userId }})
     ])
-    return { items: rows.map(r=>r.game), total }
+    return { items: rows.map((r: { game: any })=>r.game), total }
   }
   async recent(userId: string) {
     const sessions = await prisma.gameSession.findMany({
@@ -38,7 +38,7 @@ export class FavoritesUseCase {
       take: 20,
       include: { game: { include: { provider: true }}}
     })
-    return sessions.map(s => s.game)
+    return sessions.map((s: { game: any }) => s.game)
   }
   async history(userId: string, page=1, perPage=20, gameId?: string) {
     const where:any = { userId }
@@ -50,7 +50,7 @@ export class FavoritesUseCase {
       }),
       prisma.gameRound.count({ where })
     ])
-    const data = rounds.map(r => ({
+    const data = rounds.map((r: any) => ({
       round_id: r.id,
       game: { slug: r.game.slug, name: r.game.name, provider: r.game.provider.name },
       currency: r.currency,

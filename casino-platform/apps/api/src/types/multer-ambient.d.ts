@@ -1,0 +1,13 @@
+/**
+ * Script-style ambient declaration для 'multer'.
+ * Отдельный файл без import/export — иначе ambient-модуль не подхватывается.
+ * Временная мера до `pnpm add -D @types/multer` (см. IMPLEMENTATION_GAPS → Environment).
+ */
+declare module 'multer' {
+  type MulterCallback<T> = (error: Error | null, value?: T) => void
+  interface StorageEngineOptions {
+    destination?: string | ((req: any, file: any, cb: MulterCallback<string>) => void)
+    filename?: (req: any, file: any, cb: MulterCallback<string>) => void
+  }
+  function diskStorage(options: StorageEngineOptions): unknown
+}

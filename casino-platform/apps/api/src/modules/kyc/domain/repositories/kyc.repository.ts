@@ -4,6 +4,7 @@ export interface KycSubmitInput {
 }
 export interface IKycRepository {
   getByUserId(userId: string): Promise<any | null>
+  getById(id: string): Promise<any | null>
   submit(input: KycSubmitInput): Promise<any>
   addDocument(kycProfileId: string, doc: { documentType: string; fileUrl: string; fileName?: string; fileSize?: number; mimeType?: string }): Promise<any>
   getStatus(userId: string): Promise<{status:string; submittedAt: Date | null; rejectionReason: string | null; documents: string[] } | null>

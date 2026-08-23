@@ -7,7 +7,7 @@ export class PrismaSupportRepository implements ISupportRepository {
     return prisma.supportTicket.count({ where: { userId, status: { in: ['open','in_progress','waiting_user'] }}})
   }
   async createTicket(userId: string, subject: string, category: TicketCategory, message: string) {
-    const ticket = await prisma.$transaction(async tx => {
+    const ticket = await prisma.$transaction(async (tx: { [k: string]: any }) => {
       const t = await tx.supportTicket.create({ data: { userId, subject, category: category as any, status: 'open', priority: 'normal' }})
       await tx.supportMessage.create({ data: { ticketId: t.id, senderType: 'user', senderId: userId, message, attachments: [], isInternal: false }})
       return t

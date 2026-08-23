@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, Query, Req, Res, UsePipes } from '@nestjs/common'
-import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe'
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { RegisterSchema } from '../dto/register.dto'
 import { LoginSchema } from '../dto/login.dto'
 import { RegisterUseCase } from '../../application/use-cases/register.use-case'

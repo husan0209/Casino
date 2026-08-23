@@ -16,7 +16,6 @@ export class RukassaClient {
       throw new Error('RUKASSA_CREATE_PAYMENT_NOT_IMPLEMENTED. Rukassa integration is not yet implemented for real payments.')
     }
 
-    const shopId = this.config.get('RUKASSA_SHOP_ID') || 'dev_shop'
     this.logger.log(`Rukassa create ${params.amount} RUB order=${params.orderId}`)
     const paymentId = `rk_${params.orderId}`
     const paymentUrl = `${params.successUrl}&stub=rukassa&order=${params.orderId}`

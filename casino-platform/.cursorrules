@@ -1,0 +1,159 @@
+# casino-platform — Cursor Agent Rules
+
+# ── Project context ────────────────────────────────────────
+You are working on casino-platform — an online casino for the CIS market (Russian language only on MVP).
+Stack: TypeScript + NestJS 11 (modular monolith) + Prisma + PostgreSQL + Redis + BullMQ + Next.js 14.
+Architecture: Monorepo (pnpm workspaces), 4-layer modules (domain / application / infrastructure / presentation).
+
+# ── Project structure ──────────────────────────────────────
+-   Monorepo root: package.json, pnpm-workspace.yaml
+-   Backend:        apps/api/ (NestJS)
+-   Frontend:       apps/web/ (Next.js public), apps/admin/ (Next.js admin)
+-   Shared:         packages/shared-types, packages/shared-utils, packages/shared-config, packages/database
+-   Infra:          infra/docker/, infra/scripts/
+-   Docs:           docs/ (this folder)
+
+# ── Module structure (CRITICAL) ────────────────────────────
+EVERY backend module under apps/api/src/modules/<name>/ has this EXACT 4-layer layout:
+
+    module-name/
+    ├── domain/                ← pure business (NO Prisma, NO Express/Nest)
+    │   ├── entities/
+    │   ├── value-objects/
+    │   ├── enums/
+    │   ├── errors/            ← custom error classes extending AppError
+    │   └── repositories/      ← interface only
+    ├── application/           ← use cases (NO HTTP, NO Prisma direct)
+    │   ├── use-cases/
+    │   ├── dto/
+    │   ├── events/
+    │   └── validators/        ← Zod schemas
+    ├── infrastructure/        ← external world
+    │   ├── repositories/      ← Prisma implementations
+    │   ├── adapters/          ← External providers
+    │   ├── clients/
+    │   ├── mappers/
+    │   └── queue/
+    ├── presentation/          ← HTTP boundary
+    │   ├── controllers/
+    │   ├── dtos/              ← class-validator DTOs
+    │   ├── guards/
+    │   └── interceptors/
+    └── module-name.module.ts  ← NestJS module wiring
+
+Rules of dependency (NEVER VIOLATE):
+    presentation → application (DTOs only)
+    application  → domain
+    application  → infrastructure (THROUGH interfaces only)
+    infrastructure → domain (for mappers)
+    domain       → NOTHING
+
+# ── Cross-module communication ─────────────────────────────
+Modules NEVER access each other directly. Always through a Facade:
+
+    // ❌ WRONG
+    await prisma.walletAccount.update(...)
+
+    // ✅ RIGHT
+    await walletFacade.credit({ userId, currency, amount, idempotencyKey })
+
+Each module exposes ONE Facade class (XxxFacade) registered in NestJS providers.
+Other modules inject this facade via DI.
+
+# ── Money — ABSOLUTE RULE #1 ──────────────────────────────
+NEVER use number/float for money.
+ALWAYS use:
+    -   Database: DECIMAL(20, 8)
+    -   Code:     string + decimal.js (or big.js)
+    -   API:      string in request and response (e.g., "1500.00")
+    -   Type:     MoneyAmount from @casino/shared-types
+
+Helpers:  money.add / money.subtract / money.multiply / money.divide from @casino/shared-utils
+DO NOT write custom decimal math — use existing helpers.
+
+# ── Idempotency — ABSOLUTE RULE #2 ─────────────────────────
+EVERY financial operation MUST have an idempotencyKey and check duplicates BEFORE execution:
+    -   credit, debit, lock, unlock of wallet
+    -   confirmation of payment
+    -   processing of bet/win/rollback from game provider
+    -   referral reward calculation
+    -   admin manual credit/debit
+
+Format: see AI_DEVELOPMENT_RULES.md §2.3.
+Use UNIQUE constraint on ledger_entries.idempotency_key.
+
+# ── API responses — ALWAYS wrapper ─────────────────────────
+Return ONLY through helpers from @casino/shared-types:
+    successResponse(data)
+    successResponse(data, paginationMeta)
+    errorResponse(code, message, details?)
+
+NEVER return raw objects from controllers.
+NEVER do res.json({error: "..."}) — let GlobalExceptionFilter handle it.
+
+# ── Errors — ALWAYS custom classes ─────────────────────────
+Every error extends AppError (abstract, has .code and .httpStatus).
+Examples: InsufficientFundsError, WalletNotFoundError, DuplicateRequestError, KycRequiredError.
+NEVER throw raw new Error("...").
+NEVER throw NestJS HttpException manually.
+
+# ── Before creating new module ─────────────────────────────
+MUST read in order:
+    1.  docs/AI_DEVELOPMENT_RULES.md
+    2.  docs/MODULE_BOUNDARIES.md
+    3.  docs/MODULE_TEMPLATE.md (step-by-step)
+    4.  Relevant docs/CONVENTIONS.md sections
+    5.  Relevant TZ part (tz-part-*.md)
+    6.  packages/shared-types/ for existing types/enums
+    7.  packages/database/prisma/schema.prisma for current DB structure
+
+# ── Before modifying existing code ─────────────────────────
+Check:
+    -   This module's README.md (if exists)
+    -   Other modules' Facades that may consume what you're changing
+    -   Whether shared-types/ has a type you should reuse
+    -   Whether events.ts has an event you should emit
+
+# ── Database ───────────────────────────────────────────────
+-   Schema: packages/database/prisma/schema.prisma
+    Migrations: packages/database/prisma/migrations/
+-   ALWAYS use $transaction for multi-table financial ops
+-   Use optimistic locking via version field on wallet_accounts
+-   On OptimisticLockError → retry 3 times with exponential backoff
+-   NEVER do prisma.walletAccount.update() directly — use WalletFacade
+
+# ── Stack specifics ────────────────────────────────────────
+Backend:    NestJS 11 (NOT Express standalone)
+ORM:        Prisma 5.x
+Validation: Zod (own) + class-validator (NestJS DTOs)
+Logging:    Pino with structured JSON + redact for secrets
+Queue:      BullMQ (NOT Kafka, NOT raw queues)
+Cache:      Redis 7 via ioredis
+Realtime:   NOT used on MVP (polling only)
+Frontend:   Next.js 14 App Router + Tailwind + TanStack Query + Zustand + React Hook Form + Zod
+
+# ── Don't do ───────────────────────────────────────────────
+-   ❌ Use number type for money anywhere
+-   ❌ Hardcode secrets, URLs, API keys
+-   ❌ Log passwords, tokens, full card numbers, KYC documents
+-   ❌ Import one module's repository into another module
+-   ❌ Mix HTTP layer and business logic in same method
+-   ❌ Update wallet_accounts without going through WalletFacade
+-   ❌ Process webhook without saving raw body first
+-   ❌ Duplicate-check financial op without idempotency_key
+-   ❌ Return res.json() from controller — use helpers
+-   ❌ Throw Error("...") — use domain error classes
+-   ❌ Make module depend on another module's domain/
+
+# ── Commands quick reference ───────────────────────────────
+-   pnpm install         install deps
+-   pnpm dev             run api + web + admin in parallel
+-   pnpm build           build all
+-   pnpm typecheck       tsc --noEmit across workspace
+-   pnpm lint            eslint .
+-   pnpm test            vitest (unit tests)
+-   pnpm db:generate     prisma generate
+-   pnpm db:migrate      prisma migrate dev
+-   pnpm db:deploy       prisma migrate deploy (prod)
+-   pnpm db:studio       prisma studio (GUI)
+-   pnpm --filter @casino/api <cmd>  run inside one package

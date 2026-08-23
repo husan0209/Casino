@@ -37,7 +37,7 @@ export class AdminSettingsController {
   async updateEmailTemplate(@Body() body: { name: string; subject: string; htmlBody: string }, @CurrentUser() admin: any, @Req() req: any) {
     const templateKey = `email_template_${body.name}`
     const templateValue = JSON.stringify({ subject: body.subject, htmlBody: body.htmlBody })
-    const template = await prisma.systemSetting.upsert({
+    await prisma.systemSetting.upsert({
       where: { key: templateKey },
       update: { value: templateValue, updatedBy: admin.id },
       create: { key: templateKey, value: templateValue, type: 'json' as any, updatedBy: admin.id }

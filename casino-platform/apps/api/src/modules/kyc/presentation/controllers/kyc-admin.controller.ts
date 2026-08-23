@@ -13,7 +13,13 @@ export class KycAdminController {
   @Get() list(@Query('status') status?: string, @Query('page') page = '1', @Query('per_page') per_page = '20') {
     return this.repo.listAdmin(status, parseInt(page), parseInt(per_page))
   }
-  @Get(':id') get(@Param('id') id: string) { return { todo: true } }
+  @Get(':id') async get(@Param('id') id: string) {
+    const rec = await this.repo.getById(id)
+    if (!rec) return { success:false, error:{code:'NOT_FOUND', message:'KYC profile not found'}}
+    // enrich with total deposited for admin view
+    const totalDeposited = await this.repo.getTotalDepositedRub(rec.userId).catch(()=> '0')
+    return { ...rec, totalDepositedRub: totalDeposited }
+  }
   @Post(':id/approve')
   async approve(@Param('id') id: string, @CurrentUser() u: any) {
     await this.repo.setStatus(id, 'approved', undefined, u.id); return { ok: true }

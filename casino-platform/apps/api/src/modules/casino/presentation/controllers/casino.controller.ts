@@ -19,7 +19,7 @@ export class CasinoController {
   @Get('providers')
   async providers() {
     const rows = await prisma.gameProvider.findMany({ where: { isEnabled: true }, orderBy: { sortOrder: 'asc' }})
-    return rows.map(p => ({ slug: p.slug, name: p.name, logo_url: p.logoUrl, game_count: p.gameCount, type: p.type }))
+    return rows.map((p: { slug: string; name: string; logoUrl: any; gameCount: number; type: any }) => ({ slug: p.slug, name: p.name, logo_url: p.logoUrl, game_count: p.gameCount, type: p.type }))
   }
   @Get('categories')
   async categories() {

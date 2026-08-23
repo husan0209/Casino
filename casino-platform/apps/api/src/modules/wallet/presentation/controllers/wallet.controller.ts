@@ -28,7 +28,7 @@ export class WalletController {
       prisma.ledgerEntry.findMany({ where, skip:(page-1)*perPage, take:perPage, orderBy:{ createdAt:'desc' }, include:{ walletAccount:{ select:{ currency:true }}} }),
       prisma.ledgerEntry.count({ where })
     ])
-    const data = items.map(e => ({
+    const data = items.map((e: { [k: string]: any }) => ({
       id: e.id, transaction_id: e.transactionId, type: e.type,
       amount: e.amount.toString(), currency: e.walletAccount.currency,
       balance_before: e.balanceBefore.toString(), balance_after: e.balanceAfter.toString(),

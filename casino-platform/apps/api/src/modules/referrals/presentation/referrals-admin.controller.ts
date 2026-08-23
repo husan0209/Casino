@@ -19,7 +19,7 @@ export class ReferralsAdminController {
       take: 10,
       where: { status: 'credited' }
     })
-    const topWithEmail = await Promise.all(top.map(async t => {
+    const topWithEmail = await Promise.all(top.map(async (t: { referrerId: string; _count: { referredId: number }; _sum: { rewardAmount: any } }) => {
       const u = await prisma.user.findUnique({ where:{ id: t.referrerId }, select:{ email:true }})
       return { user_id: t.referrerId, email: u?.email, referral_count: t._count.referredId, total_earned: t._sum.rewardAmount?.toString() || '0' }
     }))

@@ -4,6 +4,7 @@ import { IKycRepository, KycSubmitInput } from '../../domain/repositories/kyc.re
 @Injectable()
 export class PrismaKycRepository implements IKycRepository {
   async getByUserId(userId: string) { return prisma.kycProfile.findUnique({ where: { userId }, include: { documents: true }}) }
+  async getById(id: string) { return prisma.kycProfile.findUnique({ where: { id }, include: { documents: true, user: { select: { id:true, email:true, createdAt:true, status:true } } }}) }
   async submit(input: KycSubmitInput) {
     return prisma.kycProfile.upsert({
       where: { userId: input.userId },
@@ -27,7 +28,7 @@ export class PrismaKycRepository implements IKycRepository {
   async getStatus(userId: string) {
     const p = await prisma.kycProfile.findUnique({ where: { userId }, include: { documents: true }})
     if (!p) return { status: 'not_started', submittedAt: null, rejectionReason: null, documents: [] }
-    return { status: p.status, submittedAt: p.submittedAt, rejectionReason: p.rejectionReason, documents: p.documents.map(d => d.documentType) }
+    return { status: p.status, submittedAt: p.submittedAt, rejectionReason: p.rejectionReason, documents: p.documents.map((d: { documentType: string }) => d.documentType) }
   }
   async listAdmin(status?: string, page = 1, perPage = 20) {
     const where = status ? { status: status as any } : {}

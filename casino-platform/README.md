@@ -23,14 +23,16 @@ Admin http://localhost:3002
 
 Seed admin: superadmin@casino.example.com / dev_superadmin_password_123
 
-## TZ Progress
-- [x] Часть 1 Foundation – monorepo, Prisma schema (19 таблиц), shared packages, Docker, Nginx
-- [x] Часть 2 Auth/Users/KYC/RBAC – email/Google/Telegram OAuth, JWT 15m/30d refresh rotation, UserProfile, Sessions, KYC 5000₽ limit, Admin + AuditLog
-- [x] Часть 3 Wallet & Payments – ledger optimistic locking, Rukassa fiat, NOWPayments crypto, withdrawals lock/unlock/confirm, exchange_rates
-- [x] Часть 4 Casino Providers – Seamless Wallet API (authenticate/balance/bet/win/rollback), ProviderAdapter, DemoProvider, catalog, favorites
-- [x] Часть 5 Frontend Web – Premium Dark UI, каталог с фильтрами, ЛК, кошелёк, KYC upload, история ставок, deposit/withdraw UI
-- [x] Часть 6 Admin/Support/Referrals – Admin panel layout, Support tickets (with internal notes), Referral GGR-share daily cron, Notifications
-- [x] Часть 7 DevOps – docker-compose.prod, Nginx SSL + rate limits + security headers, GitHub Actions CI/CD, VPS init (UFW/fail2ban), backup script, QA checklist
+## TZ Progress (честный статус на 2026-08-22)
+- [x] Часть 1 Foundation – ~85% – monorepo, Prisma schema (19 таблиц), shared packages, Docker, Nginx — готово
+- [~] Часть 2 Auth/Users/KYC/RBAC – ~85% – регистрация/логин/JWT-сессии/refresh-rotation/KYC 5000₽ реализованы, `tsc` чистый. Google/Telegram – заглушки, email – лог-stub в dev (см. docs/IMPLEMENTATION_GAPS.md GAP-03..05)
+- [~] Часть 3 Wallet & Payments – ~75-80% – ledger/optimistic locking, Rukassa/NOWPayments verify есть, но `createPayment` в production кидает `NOT_IMPLEMENTED` (только stub в dev)
+- [~] Часть 4 Casino Providers – ~40% – Seamless Wallet API + DemoProvider только. Реальных провайдеров нет (`apps/api/src/modules/casino/infrastructure/providers/provider-adapter.factory.ts:32`)
+- [~] Часть 5 Frontend Web – ~65-70% – страницы/фильтры/ЛК/кошелёк есть, Premium Dark UI – базовый
+- [~] Часть 6 Admin/Support/Referrals – ~30-35% – Backend API есть (users/finance/support/referrals), но: `GET admin/kyc/:id = {todo:true}`, нет `admin/dashboard/*`, нет `batch approve/reject`, нет email-очереди (`notifications.service.ts:16 TODO`), Admin frontend – почти все страницы-заглушки `Раздел админки — Часть 6` (см. `apps/admin/src/app/dashboard/*/page.tsx`), дашборд – хардкод, логин `Войти (dev)` без auth
+- [~] Часть 7 DevOps – ~60% – docker-compose.prod, nginx, GitHub Actions CI – скелет есть, VPS init/backup – скрипты есть
+
+> Подробнее см. `docs/IMPLEMENTATION_GAPS.md` и раздел Money safety ниже.
 
 ## Money safety
 - DB: `DECIMAL(20,8)`
