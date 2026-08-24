@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { createHmac } from 'crypto'
+import { createHmac, timingSafeEqual } from 'crypto'
+import { PaymentProviderNotConfiguredError } from './rukassa.client'
 
-const MAP: Record<string,string> = {
+const MAP: Record<string, string> = {
   USDT_TRC20: 'usdttrc20',
   BTC: 'btc',
   TON: 'ton',
@@ -11,52 +12,132 @@ const MAP: Record<string,string> = {
   RUB: 'rub',
 }
 
+const TIMEOUT_MS = 30_000
+
+/**
+ * NOWPayments HTTP client — TZ part 3 §6 (UC-PAY-03/04).
+ *
+ * Публичный API: {NOWPAYMENTS_API_BASE|https://api.nowpayments.io/v1}
+ *   POST /payment   {price_amount, price_currency, pay_currency, order_id, ipn_callback_url}
+ *   GET  /payment/{id}
+ *   GET  /estimate?amount&currency_from&currency_to
+ * Auth: заголовок x-api-key = NOWPAYMENTS_API_KEY (обязателен в production).
+ *
+ * IPN подпись: HMAC-SHA512(NOWPAYMENTS_IPN_SECRET, JSON отсортированных по ключу полей),
+ * заголовок x-nowpayments-sig.
+ */
 @Injectable()
 export class NOWPaymentsClient {
   private readonly logger = new Logger(NOWPaymentsClient.name)
   constructor(private config: ConfigService) {}
+
+  private isProd(): boolean { return this.config.get<string>('NODE_ENV') === 'production' }
+
+  private assertApiKey(): string {
+    const key = this.config.get<string>('NOWPAYMENTS_API_KEY')
+    if (!key) throw new PaymentProviderNotConfiguredError('NOWPayments', 'NOWPAYMENTS_API_KEY')
+    return key
+  }
+
+  private base(): string {
+    return this.config.get<string>('NOWPAYMENTS_API_BASE') || 'https://api.nowpayments.io/v1'
+  }
+
   mapCurrency(ours: string) { return MAP[ours] || ours.toLowerCase() }
 
   async createPayment(params: { priceAmount: string; priceCurrency: string; payCurrency: string; orderId: string; ipnCallbackUrl: string }) {
-    const env = this.config.get('NODE_ENV')
-    if (env === 'production') {
-      throw new Error('NOWPAYMENTS_CREATE_PAYMENT_NOT_IMPLEMENTED. NOWPayments integration is not yet implemented for real payments.')
+    if (!this.isProd() && !this.config.get<string>('NOWPAYMENTS_API_KEY')) {
+      this.logger.log(`NOWPayments DEV-STUB create ${params.priceAmount} ${params.priceCurrency}->${params.payCurrency} order=${params.orderId}`)
+      const payAmount = params.priceAmount
+      return {
+        paymentId: `np_${params.orderId}`,
+        payAddress: 'TX' + params.orderId.replace(/-/g, '').slice(0, 30),
+        payAmount,
+        payCurrency: this.mapCurrency(params.payCurrency),
+        expirationEstimateDate: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      }
     }
+    const apiKey = this.assertApiKey()
+    try {
+      const res = await fetch(`${this.base()}/payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+        body: JSON.stringify({
+          price_amount: Number(params.priceAmount),
+          price_currency: params.priceCurrency.toLowerCase(),
+          pay_currency: this.mapCurrency(params.payCurrency),
+          order_id: params.orderId,
+          ipn_callback_url: params.ipnCallbackUrl,
+        }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
+      const d = (await res.json()) as Record<string, any>
+      const paymentId = String(d.payment_id ?? '')
+      const payAddress = String(d.pay_address ?? '')
+      if (!paymentId || !payAddress) throw new Error(`unexpected shape: ${JSON.stringify(d).slice(0, 200)}`)
+      this.logger.log(`NOWPayments payment created: ${paymentId}`)
+      return {
+        paymentId,
+        payAddress,
+        payAmount: String(d.pay_amount ?? ''),
+        payCurrency: String(d.pay_currency ?? this.mapCurrency(params.payCurrency)),
+        expirationEstimateDate: String(d.expiration_estimate_date ?? new Date(Date.now() + 3600_000).toISOString()),
+      }
+    } catch (e: any) {
+      this.logger.error(`NOWPayments createPayment failed: ${e?.message}`)
+      throw e
+    }
+  }
 
-    this.logger.log(`NOWPayments create ${params.priceAmount} ${params.priceCurrency} -> ${params.payCurrency}`)
-    const payAmount = params.priceAmount
+  async getPaymentStatus(paymentId: string): Promise<{ paymentStatus: string; actuallyPaid: string; outcomeAmount: string }> {
+    const apiKey = this.assertApiKey()
+    const res = await fetch(`${this.base()}/payment/${encodeURIComponent(paymentId)}`, {
+      headers: { 'x-api-key': apiKey },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const d = (await res.json()) as Record<string, any>
     return {
-      paymentId: `np_${params.orderId}`,
-      payAddress: 'TX' + params.orderId.replace(/-/g,'').slice(0,30),
-      payAmount,
-      payCurrency: this.mapCurrency(params.payCurrency),
-      expirationEstimateDate: new Date(Date.now() + 60*60*1000).toISOString(),
+      paymentStatus: String(d.payment_status ?? 'unknown'),
+      actuallyPaid: String(d.actually_paid ?? '0'),
+      outcomeAmount: String(d.outcome_amount ?? '0'),
     }
   }
-  async getEstimatePrice(params: { amount: string; currencyFrom: string; currencyTo: string }) {
-    // stub rates
-    const rates: Record<string, number> = { USDT_TRC20: 92.5, BTC: 8500000, TON: 450, TRX: 11.3, LTC: 7800 }
-    const from = params.currencyFrom
-    const to = params.currencyTo
-    if (from === 'RUB' && rates[to]) return { estimatedAmount: (parseFloat(params.amount) / rates[to]).toFixed(8) }
-    if (to === 'RUB' && rates[from]) return { estimatedAmount: (parseFloat(params.amount) * rates[from]).toFixed(2) }
-    return { estimatedAmount: params.amount }
+
+  async getEstimatePrice(params: { amount: string; currencyFrom: string; currencyTo: string }): Promise<{ estimatedAmount: string }> {
+    // Dev без ключа: прежние захардкоженные курсы, чтобы флоу был проходим
+    if (!this.isProd() && !this.config.get<string>('NOWPAYMENTS_API_KEY')) {
+      const rates: Record<string, number> = { USDT_TRC20: 92.5, BTC: 8500000, TON: 450, TRX: 11.3, LTC: 7800 }
+      const from = params.currencyFrom; const to = params.currencyTo
+      if (from === 'RUB' && rates[to]) return { estimatedAmount: (parseFloat(params.amount) / rates[to]).toFixed(8) }
+      if (to === 'RUB' && rates[from]) return { estimatedAmount: (parseFloat(params.amount) * rates[from]).toFixed(2) }
+      return { estimatedAmount: params.amount }
+    }
+    const apiKey = this.assertApiKey()
+    const q = new URLSearchParams({
+      amount: params.amount,
+      currency_from: this.mapCurrency(params.currencyFrom),
+      currency_to: this.mapCurrency(params.currencyTo),
+    })
+    const res = await fetch(`${this.base()}/estimate?${q.toString()}`, {
+      headers: { 'x-api-key': apiKey },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    })
+    if (!res.ok) throw new Error(`estimate HTTP ${res.status}`)
+    const d = (await res.json()) as { estimated_amount?: number | string }
+    return { estimatedAmount: String(d.estimated_amount ?? params.amount) }
   }
+
   /**
-   * Verify NOWPayments IPN signature.
-   * NOWPayments signs: HMAC-SHA512(ipn_secret, sorted_payload_string)
-   * Header: x-nowpayments-sig
-   * Fail-closed: throws in production without implementation.
+   * IPN подпись: HMAC-SHA512(secret, JSON полей, отсортированных по ключу), hex-строка в нижнем регистре.
+   * Fail-closed: production без NOWPAYMENTS_IPN_SECRET — исключение.
    */
   verifyIPN(body: any, signature: string): boolean {
-    const env = this.config.get('NODE_ENV')
-    if (env === 'production') {
-      throw new Error('NOWPAYMENTS_SIGNATURE_VERIFIER_NOT_IMPLEMENTED. Cannot verify NOWPayments IPN in production without complete integration.')
-    }
-
     const secret = this.config.get<string>('NOWPAYMENTS_IPN_SECRET')
     if (!secret) {
-      this.logger.error('NOWPAYMENTS_IPN_SECRET not set — rejecting IPN (fail-closed)')
+      if (this.isProd()) throw new PaymentProviderNotConfiguredError('NOWPayments', 'NOWPAYMENTS_IPN_SECRET')
+      this.logger.error('NOWPAYMENTS_IPN_SECRET not set — rejecting IPN (fail-closed dev)')
       return false
     }
     if (!signature) return false
@@ -68,8 +149,9 @@ export class NOWPaymentsClient {
     const expected = createHmac('sha512', secret).update(payload).digest('hex')
 
     try {
-      const { timingSafeEqual } = require('crypto')
-      return timingSafeEqual(Buffer.from(signature.toLowerCase()), Buffer.from(expected.toLowerCase()))
+      const a = Buffer.from(signature.toLowerCase())
+      const b = Buffer.from(expected)
+      return a.length === b.length && timingSafeEqual(a, b)
     } catch {
       return false
     }

@@ -40,10 +40,12 @@ export const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
+  RUKASSA_API_BASE: z.string().url().optional(),
   RUKASSA_SHOP_ID: z.string().optional(),
   RUKASSA_API_KEY: z.string().optional(),
   RUKASSA_SECRET_KEY: z.string().optional(),
   NOWPAYMENTS_API_KEY: z.string().optional(),
+  NOWPAYMENTS_API_BASE: z.string().url().optional(),
   NOWPAYMENTS_IPN_SECRET: z.string().optional(),
   DEMO_PROVIDER_ENABLED: z
     .enum(['true', 'false'])
