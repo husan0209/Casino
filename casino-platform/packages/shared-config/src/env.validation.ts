@@ -46,6 +46,10 @@ export const envSchema = z.object({
   RUKASSA_SECRET_KEY: z.string().optional(),
   NOWPAYMENTS_API_KEY: z.string().optional(),
   NOWPAYMENTS_API_BASE: z.string().url().optional(),
+  GITSLOTPARK_AGENT_ID: z.string().optional(),
+  GITSLOTPARK_API_TOKEN: z.string().optional(),
+  GITSLOTPARK_SECRET_KEY: z.string().optional(),
+  GITSLOTPARK_API_BASE: z.string().url().optional(),
   NOWPAYMENTS_IPN_SECRET: z.string().optional(),
   DEMO_PROVIDER_ENABLED: z
     .enum(['true', 'false'])
