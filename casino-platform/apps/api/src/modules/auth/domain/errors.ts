@@ -54,6 +54,24 @@ export class SessionInvalidError extends AppError {
   constructor() { super('Сессия недействительна') }
 }
 
+export class OAuthNotConfiguredError extends AppError {
+  readonly code = 'OAUTH_NOT_CONFIGURED'
+  readonly httpStatus = 503
+  constructor(provider: string) { super(`${provider} OAuth не настроен: отсутствуют ключи в окружении`) }
+}
+
+export class OAuthStateError extends AppError {
+  readonly code = 'OAUTH_STATE_INVALID'
+  readonly httpStatus = 400
+  constructor() { super('Некорректный или просроченный state') }
+}
+
+export class OAuthExchangeError extends AppError {
+  readonly code = 'OAUTH_EXCHANGE_FAILED'
+  readonly httpStatus = 401
+  constructor(detail?: string) { super(`Обмен кода у провайдера не удался${detail ? ': ' + detail : ''}`) }
+}
+
 export class SessionExpiredError extends AppError {
   readonly code = 'SESSION_EXPIRED'
   readonly httpStatus = 401

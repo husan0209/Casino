@@ -34,6 +34,7 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async create(input: CreateUserInput) {
+    if (input.email === null && input.passwordHash !== null) throw new Error('OAUTH_USER_REQUIRES_NULL_PASSWORD')
     const row = await prisma.user.create({
       data: {
         email: input.email,
