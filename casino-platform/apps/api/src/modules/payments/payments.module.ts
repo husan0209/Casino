@@ -4,6 +4,8 @@ import { ConfigModule } from '@nestjs/config'
 import { AuthModule } from '../auth/auth.module'
 import { WalletModule } from '../wallet/wallet.module'
 import { KycModule } from '../kyc/kyc.module'
+import { GeoModule } from '../geo/geo.module'
+import { UsersModule } from '../users/users.module'
 import { PaymentsController } from './presentation/controllers/payments.controller'
 import { PaymentsWebhookController } from './presentation/controllers/payments-webhook.controller'
 import { PaymentRequestRepository } from './infrastructure/repositories/payment-request.repository'
@@ -17,7 +19,7 @@ import { CreateWithdrawalUseCase } from './application/use-cases/create-withdraw
 import { CancelWithdrawalUseCase } from './application/use-cases/cancel-withdrawal.use-case'
 
 @Module({
-  imports: [ConfigModule, AuthModule, WalletModule, KycModule],
+  imports: [ConfigModule, AuthModule, WalletModule, KycModule, GeoModule, UsersModule],
   controllers: [PaymentsController, PaymentsWebhookController],
   providers: [
     PaymentRequestRepository, RukassaClient, NOWPaymentsClient,

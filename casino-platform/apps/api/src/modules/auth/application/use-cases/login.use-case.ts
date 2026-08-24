@@ -4,7 +4,7 @@ import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user
 import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
 import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
 import { JwtTokenService } from '../../infrastructure/services/jwt.service'
-import { InvalidCredentialsError, EmailNotVerifiedError, AccountBlockedError } from '../../domain/errors'
+import { InvalidCredentialsError, AccountBlockedError } from '../../domain/errors'
 
 export class SelfExcludedError extends Error {
   constructor(public readonly excludedUntil: Date) {
@@ -26,7 +26,7 @@ export class LoginUseCase {
     if (!user || !user.passwordHash) throw new InvalidCredentialsError()
     const ok = await this.hasher.verify(user.passwordHash, input.password)
     if (!ok) throw new InvalidCredentialsError()
-    if (!user.emailVerified) throw new EmailNotVerifiedError()
+    // Email verification не блокирует вход — требуется позже для вывода (tz-part-5 §5.1)
     if (user.status !== 'active') throw new AccountBlockedError()
 
     // Self-exclusion gate — check AFTER password validation to avoid leaking user existence

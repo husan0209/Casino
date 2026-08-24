@@ -599,7 +599,29 @@ POST /api/v1/provider-callback/:providerSlug/rollback
 
 ## 6. Запуск игр
 
-### 6.1. Launch Flow
+### 6.1. Launch Flow (контракт с фронтом)
+
+Контракт UI описан в [tz-part-5](tz-part-5-frontend-web.md) §8.2 и [USER_FLOW_FIRST_90_SECONDS.md](USER_FLOW_FIRST_90_SECONDS.md). Бэкенд обязан поддерживать те же правила.
+
+**Ключевые правила:**
+
+1. **Кросс-валютная игра запрещена** — сессия создаётся только в валюте переданного кошелька; тихой конвертации нет.
+2. **`currency` в launch request** — валюта активного или явно выбранного кошелька (после sheet «Играть в ₸»).
+3. **`lastPlayedCurrency`** — фронт хранит локально; бэкенд сохраняет валюту в `game_sessions.currency` для UC-GAME-15.
+4. Если валюта не в `game.supported_currencies` → `CURRENCY_NOT_SUPPORTED` (не запускать молча).
+5. Если `available < min_bet` → `INSUFFICIENT_FUNDS`.
+6. Demo — без авторизации, без привязки к кошельку.
+
+**Коды ошибок launch (стабильные):**
+
+| Код | Когда |
+|---|---|
+| `CURRENCY_NOT_SUPPORTED` | Игра/провайдер не принимает валюту |
+| `INSUFFICIENT_FUNDS` | Недостаточно на кошельке |
+| `KYC_REQUIRED` | Блокировка по лимиту (редко на launch, чаще на deposit) |
+| `GAME_UNAVAILABLE` | Игра выключена / регион |
+| `PROVIDER_TIMEOUT` | Провайдер не ответил |
+| `SESSION_ALREADY_ACTIVE` | Уже открыта сессия у провайдера |
 
 #### UC-GAME-06: Запустить игру на реальные деньги
 
@@ -622,8 +644,8 @@ Authorization: Bearer <token>
 2. Проверить что game.is_enabled = true
 3. Проверить что provider.is_enabled = true
 4. Проверить что user.status = active
-5. Проверить что у пользователя есть кошелёк в указанной валюте
-6. Проверить что валюта поддерживается провайдером
+5. Проверить что у пользователя есть кошелёк в указанной валюте с `available > 0` (или фронт уже показал sheet выбора другого кошелька)
+6. Проверить что валюта в `game.supported_currencies` и `provider.config.supported_currencies`
 7. Закрыть предыдущую активную сессию этого пользователя у этого провайдера (если есть)
 8. Создать game_session:
    - session_token = crypto.randomBytes(32).toString('hex')

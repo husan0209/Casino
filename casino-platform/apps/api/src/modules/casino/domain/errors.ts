@@ -4,3 +4,8 @@ export class GameDisabledError extends AppError { readonly code='GAME_DISABLED';
 export class ProviderDisabledError extends AppError { readonly code='PROVIDER_MAINTENANCE'; readonly httpStatus=422; constructor(){ super('Provider is offline') } }
 export class GameSessionInvalidError extends AppError { readonly code='GAME_SESSION_INVALID'; readonly httpStatus=422; constructor(){ super('Invalid or expired game session') } }
 export class ProviderNotSupportedError extends AppError { readonly code='PROVIDER_NOT_SUPPORTED'; readonly httpStatus=501; constructor(slug:string){ super(`Provider ${slug} not supported`) } }
+export class CurrencyNotSupportedError extends AppError {
+  readonly code = 'CURRENCY_NOT_SUPPORTED'
+  readonly httpStatus = 422
+  constructor(currency: string) { super(`Currency ${currency} is not supported for this game`, { currency }) }
+}
