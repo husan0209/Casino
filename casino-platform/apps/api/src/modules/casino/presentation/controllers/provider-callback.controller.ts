@@ -8,6 +8,13 @@ import { prisma } from '@casino/database'
 export class ProviderCallbackController {
   constructor(private adapters: ProviderAdapterFactory, private cb: GameCallbackService) {}
 
+  @Post(':providerSlug/:op')
+  @HttpCode(200)
+  async handleOp(@Param('providerSlug') slug: string, @Param('op') op: string, @Headers() headers: any, @Body() body: any, @Res() res: Response) {
+    headers['x-gsp-op'] = op
+    return this.handle(slug, headers, body, res)
+  }
+
   @Post(':providerSlug')
   @HttpCode(200)
   async handle(@Param('providerSlug') slug: string, @Headers() headers: any, @Body() body: any, @Res() res: Response) {
