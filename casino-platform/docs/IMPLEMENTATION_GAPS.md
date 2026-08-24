@@ -31,8 +31,8 @@
 
 | # | Gap | Где | TZ |
 |---|-----|-----|----|
-| GAP-03 | Google OAuth — `throw new Error('not configured')`; контроллер отдаёт `{error:'GOOGLE_OAUTH_NOT_CONFIGURED'}` | `auth/application/use-cases/oauth/google-oauth.use-case.ts`, `auth.controller.ts` | tz-2 |
-| GAP-04 | Telegram Login — аналогичная заглушка | `oauth/telegram-login.use-case.ts` | tz-2 |
+| GAP-03 | ~~Google OAuth — заглушка~~ | ✅ Реализовано 2026-08-24: authorization-code flow (`GET /auth/google/url` со state=HMAC 10 мин; `POST /auth/google` — обмен кода, userinfo, провижининг через `OAuthUserProvisioningService`, сессия+refresh-cookie). Требует `GOOGLE_CLIENT_ID/SECRET`. Runtime не проверялся (нет сети/ключей в среде) |
+| GAP-04 | ~~Telegram Login — заглушка~~ | ✅ Реализовано 2026-08-24: `POST /auth/telegram` — верификация виджета (secret=SHA256(bot_token), HMAC data-check-string, timingSafeEqual, auth_date ≤24ч), пользователь без email (schema nullable), сессия. Требует `TELEGRAM_BOT_TOKEN` |
 | GAP-05 | ~~Email-отправка отсутствует~~ | ✅ Закрыт вместе с GAP-02: очередь+воркер+SmtpMailer; в prod без SMTP_HOST — старт невозможен (fail-closed) |
 | GAP-06 | Rukassa `createPayment`: в production `throw NOT_IMPLEMENTED`, в dev — фейковый URL-stub | `payments/infrastructure/clients/rukassa.client.ts:13-24` | tz-3 |
 | GAP-07 | NOWPayments `createPayment`: то же; адреса/курсы — фейковые стабы | `nowpayments.client.ts:20-44` | tz-3 |

@@ -10,6 +10,8 @@ import { LogoutUseCase } from '../../application/use-cases/logout.use-case'
 import { ForgotPasswordUseCase } from '../../application/use-cases/forgot-password.use-case'
 import { ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case'
 import type { Request, Response } from 'express'
+import { GoogleOAuthUseCase } from '../../application/use-cases/oauth/google-oauth.use-case'
+import { TelegramLoginUseCase } from '../../application/use-cases/oauth/telegram-login.use-case'
 
 @Controller('auth')
 export class AuthController {
@@ -21,6 +23,8 @@ export class AuthController {
     private readonly logoutUc: LogoutUseCase,
     private readonly forgotUc: ForgotPasswordUseCase,
     private readonly resetUc: ResetPasswordUseCase,
+    private readonly googleUc: GoogleOAuthUseCase,
+    private readonly telegramUc: TelegramLoginUseCase,
   ) {}
 
   @Post('register')
@@ -76,9 +80,31 @@ export class AuthController {
     return this.resetUc.execute(body.token, body.new_password)
   }
 
+  // ===== OAuth (TZ part 2) =====
+
+  @Get('google/url')
+  googleUrl(@Query('redirect_uri') redirectUri?: string) {
+    return this.googleUc.buildAuthUrl(redirectUri)
+  }
+
   @Post('google')
-  async google() { return { error: 'GOOGLE_OAUTH_NOT_CONFIGURED' } }
+  async google(
+    @Body() body: { code: string; redirect_uri?: string; state?: string; referral_code?: string },
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.googleUc.execute({
+      code: body.code, redirectUri: body.redirect_uri, state: body.state,
+      referralCode: body.referral_code, ip: req.ip, userAgent: req.headers['user-agent'],
+    })
+    res.cookie('refresh_token', result.refreshToken, { httpOnly: true, secure: false, sameSite: 'strict', maxAge: 30*24*3600*1000 })
+    return { accessToken: result.accessToken, user: result.user }
+  }
 
   @Post('telegram')
-  async telegram() { return { error: 'TELEGRAM_LOGIN_NOT_CONFIGURED' } }
+  async telegram(@Body() payload: any, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const result = await this.telegramUc.execute(payload, { ip: req.ip, userAgent: req.headers['user-agent'] })
+    res.cookie('refresh_token', result.refreshToken, { httpOnly: true, secure: false, sameSite: 'strict', maxAge: 30*24*3600*1000 })
+    return { accessToken: result.accessToken, user: result.user }
+  }
 }

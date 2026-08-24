@@ -1,8 +1,9 @@
 import { User } from '../entities/user.entity'
 
 export interface CreateUserInput {
-  email: string
-  passwordHash: string
+  /** null для OAuth-пользователей (вход через провайдера, пароля нет) */
+  passwordHash: string | null
+  email: string | null
   referralCode: string
   referredBy?: string | null
 }
