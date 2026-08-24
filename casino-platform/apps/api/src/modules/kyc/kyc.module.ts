@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common'
+import { ConfigModule } from '@nestjs/config'
 import { AuthModule } from '../auth/auth.module'
+import { GeoModule } from '../geo/geo.module'
 import { KycController } from './presentation/controllers/kyc.controller'
 import { KycAdminController } from './presentation/controllers/kyc-admin.controller'
 import { PrismaKycRepository } from './infrastructure/repositories/kyc.prisma'
@@ -8,7 +10,7 @@ import { SubmitKycUseCase } from './application/use-cases/submit-kyc.use-case'
 import { GetKycStatusUseCase } from './application/use-cases/get-kyc-status.use-case'
 import { KycCheckService } from './application/use-cases/kyc-check.service'
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, ConfigModule, GeoModule],
   controllers: [KycController, KycAdminController],
   providers: [
     { provide: KYC_REPOSITORY, useClass: PrismaKycRepository },

@@ -1,11 +1,24 @@
 import { Injectable } from '@nestjs/common'
 import { randomUUID } from 'crypto'
-import Decimal from 'decimal.js'
+import { money } from '@casino/shared-utils'
+import type { DisplayCurrency } from '@casino/shared-config'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
 import { KycCheckService } from '../../../kyc/application/use-cases/kyc-check.service'
-import { AmountTooSmallError, AmountTooLargeError, PaymentProviderError } from '../../domain/errors'
+import {
+  AmountTooLargeError,
+  AmountTooSmallError,
+  PaymentProviderError,
+} from '../../domain/errors'
 import { ConfigService } from '@nestjs/config'
+import { GeoFacade } from '../../../geo/facade/geo.facade'
+import { UsersFacade } from '../../../users/facade/users.facade'
+
+export interface CreateFiatDepositInput {
+  amount: string
+  currency: string
+  method: string
+}
 
 @Injectable()
 export class CreateFiatDepositUseCase {
@@ -14,29 +27,58 @@ export class CreateFiatDepositUseCase {
     private rukassa: RukassaClient,
     private kycCheck: KycCheckService,
     private config: ConfigService,
+    private geo: GeoFacade,
+    private users: UsersFacade,
   ) {}
-  async execute(userId: string, amount: string, method = 'card') {
-    const amt = new Decimal(amount)
-    if (amt.lt(100)) throw new AmountTooSmallError('100')
-    if (amt.gt(500000)) throw new AmountTooLargeError('500000')
-    await this.kycCheck.assertCanDeposit(userId, amount)
+
+  async execute(userId: string, input: CreateFiatDepositInput) {
+    const { amount, currency, method } = input
+
+    const userContext = await this.users.getGeoContext(userId)
+    const legalCountry = this.geo.resolveLegalCountry(userContext?.country)
+    this.geo.validateFiatDepositMethod(legalCountry, currency, method)
+
+    const limits = this.geo.getLimits(currency as DisplayCurrency)
+    if (!money.isGreaterOrEqual(amount, limits.depositMin)) {
+      throw new AmountTooSmallError(limits.depositMin)
+    }
+    if (money.isGreaterThan(amount, limits.depositMax)) {
+      throw new AmountTooLargeError(limits.depositMax)
+    }
+
+    const amountRub = this.geo.toRubEquivalent(amount, currency as DisplayCurrency)
+    await this.kycCheck.assertCanDeposit(userId, amountRub)
+
     const idempotencyKey = `dep_${randomUUID()}`
     const pr = await this.repo.create({
-      userId, type: 'deposit', status: 'pending', provider: 'rukassa',
-      method, currency: 'RUB', amount, amountRub: amount,
+      userId,
+      type: 'deposit',
+      status: 'pending',
+      provider: 'rukassa',
+      method,
+      currency,
+      amount,
+      amountRub,
       idempotencyKey,
-      expiresAt: new Date(Date.now() + 2*3600*1000),
+      expiresAt: new Date(Date.now() + 2 * 3600 * 1000),
     })
+
     const webhookUrl = this.config.get('RUKASSA_WEBHOOK_URL') || 'http://localhost:3001/api/v1/payments/webhooks/rukassa'
-    const successUrl = this.config.get('RUKASSA_SUCCESS_URL') || 'http://localhost:3000/wallet?deposit=success'
-    const failUrl = this.config.get('RUKASSA_FAIL_URL') || 'http://localhost:3000/wallet?deposit=failed'
+    const successUrl = this.config.get('RUKASSA_SUCCESS_URL') || 'http://localhost:3000/?deposit=success'
+    const failUrl = this.config.get('RUKASSA_FAIL_URL') || 'http://localhost:3000/?deposit=failed'
+
     try {
       const res = await this.rukassa.createPayment({
-        amount, orderId: pr.id, method, webhookUrl, successUrl, failUrl
+        amount,
+        orderId: pr.id,
+        method,
+        webhookUrl,
+        successUrl,
+        failUrl,
       })
       await this.repo.updateStatus(pr.id, 'pending', { externalId: res.paymentId, paymentUrl: res.paymentUrl })
-      return { payment_request_id: pr.id, payment_url: res.paymentUrl }
-    } catch (e:any) {
+      return { payment_request_id: pr.id, payment_url: res.paymentUrl, currency, method }
+    } catch (e: any) {
       await this.repo.updateStatus(pr.id, 'failed', { errorMessage: e.message })
       throw new PaymentProviderError('Rukassa error', { cause: e.message })
     }

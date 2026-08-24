@@ -103,6 +103,7 @@ model UserProfile {
   city               String?   @db.VarChar(128)
   avatarUrl          String?   @map("avatar_url") @db.Text
   currencyPreference String    @default("RUB") @map("currency_preference") @db.VarChar(10)
+  lastPaymentMethod  String?   @map("last_payment_method") @db.VarChar(64)
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

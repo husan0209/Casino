@@ -423,7 +423,8 @@ phone_verified      BOOLEAN, default false
 country             VARCHAR(2), nullable (ISO Alpha-2)
 city                VARCHAR(128), nullable
 avatar_url          TEXT, nullable
-currency_preference VARCHAR(10), default 'RUB'
+currency_preference VARCHAR(10), default 'RUB'   — активный кошелёк UI; синхронизируется с фронтом
+last_payment_method VARCHAR(64), nullable      — последний успешный метод депозита (для сортировки в кассе)
 created_at          TIMESTAMPTZ
 updated_at          TIMESTAMPTZ
 ```
@@ -560,12 +561,16 @@ DELETE /api/v1/users/me/sessions/:session_id
 
 KYC в этом проекте срабатывает **по лимитам**, а не обязательно при регистрации.
 
-Лимит: **5000 рублей** суммарных пополнений.
+Лимит: **`KYC_DEPOSIT_LIMIT_RUB` (default 5000 ₽)** суммарных пополнений в **RUB-эквиваленте** (внутренний расчёт).
 
 Когда пользователь превышает этот порог — он должен пройти верификацию, иначе не может:
 
 - делать дальнейшие пополнения;
 - выводить средства.
+
+**Отображение для игрока ([tz-part-5](tz-part-5-frontend-web.md) §13):** API отдаёт остаток лимита в **активной валюте** кошелька (`?currency=KZT` → «осталось X ₸»). Внутренний порог остаётся в RUB-эквиваленте; конвертация только для display/compliance, не для списаний.
+
+Вывод **всегда** требует `kyc_status = approved`, независимо от суммы.
 
 ### 4.2. Сущности базы данных
 
@@ -677,8 +682,10 @@ Content-Type: multipart/form-data
 #### UC-KYC-04: Получить статус KYC
 
 ```
-GET /api/v1/kyc/status
+GET /api/v1/kyc/status?currency=RUB
 ```
+
+**Query:** `currency` — optional, для расчёта `limit_remaining` в валюте активного кошелька.
 
 **Возвращает:**
 
@@ -687,9 +694,15 @@ GET /api/v1/kyc/status
   "status": "pending",
   "submitted_at": "2024-01-01T00:00:00Z",
   "rejection_reason": null,
-  "documents": ["front", "selfie"]
+  "documents": ["front", "selfie"],
+  "deposit_limit_rub": "5000.00",
+  "total_deposited_rub": "3200.00",
+  "limit_remaining": "1800.00",
+  "limit_currency": "RUB"
 }
 ```
+
+`limit_remaining` — display-only конвертация из RUB-остатка; не означает автоконвертацию кошельков.
 
 ---
 

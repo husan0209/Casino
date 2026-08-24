@@ -17,8 +17,8 @@ last_updated: 2026-06-19
 ┌──────────────────────────────────────────────────────────────┐
 │                        Backend                                │
 │                                                               │
-│   ┌─────┐  ┌──────┐  ┌─────┐  ┌─────────┐  ┌──────────┐     │
-│   │auth │  │users │  │ kyc │  │  wallet │  │ payments │     │
+│   ┌─────┐  ┌──────┐  ┌─────┐  ┌─────────┐  ┌──────────┐  ┌─────┐ │
+│   │auth │  │users │  │ kyc │  │  wallet │  │ payments │  │ geo │ │
 │   └──┬──┘  └──┬───┘  └──┬──┘  └────┬────┘  └─────┬────┘     │
 │      │        │        │          │             │            │
 │      ▼        ▼        ▼          ▼             ▼            │
@@ -110,8 +110,39 @@ sessions             (refresh tokens hashed)
 
 ### 3.5. Экспортирует
 
-- `UserFacade` (findById, findByEmail)
+- `UsersFacade` (getGeoContext, updateCurrencyPreference, onDepositCompleted)
 - `UserEntity` (read-only DTO для других модулей)
+
+---
+
+## 3a. Geo Module
+
+### 3a.1. Ответственность
+
+- Geo-конфиг для кассы: legal country, активная валюта, методы оплаты
+- Пресеты и лимиты депозита по валюте
+- Display-конвертация RUB → активная валюта (KYC UI, без конвертации в player wallet UI)
+
+### 3a.2. Ключевые Use Cases
+
+| UC | Описание |
+|----|----------|
+| UC-GEO-01 | GET /geo/config — конфиг для гостя / авторизованного |
+| UC-GEO-02 | Валидация фиатного метода депозита |
+| UC-GEO-03 | RUB → display currency (KYC limit_remaining) |
+
+### 3a.3. Использует
+
+- `users` (UsersFacade — currency_preference, last_payment_method, country)
+
+### 3a.4. Используется в
+
+- `payments` (GeoFacade)
+- `kyc` (GeoFacade)
+
+### 3a.5. Экспортирует
+
+- `GeoFacade`
 
 ---
 
@@ -485,8 +516,12 @@ auth          → users (create user)
               → referrals (generate code, link referrer)
 
 users         → (standalone, базовые операции)
+              exports UsersFacade
+
+geo           → users               (UsersFacade.getGeoContext)
 
 kyc           → users
+              → geo                 (GeoFacade — limit display)
               → notifications
               → audit
 
@@ -495,7 +530,8 @@ wallet        → users               (UserFacade.findById)
 
 payments      → wallet              (WalletFacade)
               → kyc                 (KycFacade.checkLimit / isVerified)
-              → users               (UserFacade)
+              → users               (UsersFacade)
+              → geo                 (GeoFacade)
               → audit
               → notifications
 

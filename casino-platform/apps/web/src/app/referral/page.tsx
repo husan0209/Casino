@@ -7,6 +7,7 @@ export default function ReferralPage(){
   const { user } = useAuth()
   const { data: info } = useQuery({ queryKey:['ref-info'], queryFn:()=>apiGet<any>('/referrals/info'), enabled:!!user })
   const { data: list } = useQuery({ queryKey:['ref-list'], queryFn:()=>apiGet<any>('/referrals/list'), enabled:!!user })
+void list
   const { data: rewards } = useQuery({ queryKey:['ref-rewards'], queryFn:()=>apiGet<any>('/referrals/rewards'), enabled:!!user })
   if (!user) return <div className="container-1 py-8">Войдите, чтобы получить реферальную ссылку</div>
   return (

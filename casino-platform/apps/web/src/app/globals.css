@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0f0f1a;
+  --surface: #1a1a2e;
+  --surface2: #16213e;
+  --border: #2a2a4a;
+  --brand: #6c63ff;
+  --money: #00c853;
+  --muted: #8888aa;
+}
+
+body {
+  @apply bg-[#0F0F1A] text-white antialiased min-h-screen;
+}
+
+.container-1 {
+  @apply max-w-6xl mx-auto px-4;
+}
+
+.card {
+  @apply rounded-2xl border border-[#2A2A4A] bg-[#16213E] p-4;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-xl bg-[#6C63FF] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50;
+}
+
+.btn-money {
+  @apply inline-flex items-center justify-center rounded-xl bg-[#00C853] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50;
+}
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center rounded-xl border border-[#2A2A4A] bg-transparent px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/5;
+}
+
+.input {
+  @apply w-full rounded-xl border border-[#2A2A4A] bg-[#1A1A2E] px-3 py-2.5 text-sm outline-none focus:border-[#6C63FF];
+}
+
+.text-muted {
+  color: var(--muted);
+}
+
+.sheet-backdrop {
+  @apply fixed inset-0 z-40 bg-black/60;
+}
+
+.sheet-panel {
+  @apply fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-2xl border border-[#2A2A4A] bg-[#1A1A2E] p-4 pb-8;
+}

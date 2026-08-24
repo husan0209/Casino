@@ -11,16 +11,28 @@ import { PrismaUserSessionRepository } from './infrastructure/repositories/user-
 import { USER_PROFILE_REPOSITORY } from './domain/repositories/user-profile.repository'
 import { USER_SESSION_REPOSITORY } from './domain/repositories/user-session.repository'
 import { SelfExclusionUseCase } from './application/use-cases/self-exclusion.use-case'
+import { UpdateCurrencyPreferenceUseCase } from './application/use-cases/update-currency-preference.use-case'
+import { GetGeoContextUseCase } from './application/use-cases/get-geo-context.use-case'
+import { UpdateAfterDepositUseCase } from './application/use-cases/update-after-deposit.use-case'
+import { UsersFacade } from './facade/users.facade'
 
 @Module({
   imports: [AuthModule],
   controllers: [UsersController],
   providers: [
-    GetMeUseCase, UpdateProfileUseCase, UpdateSettingsUseCase, ListSessionsUseCase, RevokeSessionUseCase,
+    GetMeUseCase,
+    UpdateProfileUseCase,
+    UpdateSettingsUseCase,
+    ListSessionsUseCase,
+    RevokeSessionUseCase,
     SelfExclusionUseCase,
+    UpdateCurrencyPreferenceUseCase,
+    GetGeoContextUseCase,
+    UpdateAfterDepositUseCase,
+    UsersFacade,
     { provide: USER_PROFILE_REPOSITORY, useClass: PrismaUserProfileRepository },
     { provide: USER_SESSION_REPOSITORY, useClass: PrismaUserSessionRepository },
   ],
-  exports: [SelfExclusionUseCase]
+  exports: [UsersFacade, SelfExclusionUseCase],
 })
 export class UsersModule {}

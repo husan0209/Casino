@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { Body, Controller, Get, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { diskStorage } from 'multer'
 import { extname } from 'path'
@@ -19,7 +19,9 @@ export class KycController {
     @Inject(KYC_REPOSITORY) private repo: IKycRepository,
   ) {}
   @Get('status')
-  status(@CurrentUser() u: any) { return this.statusUc.execute(u.id) }
+  status(@CurrentUser() u: any, @Query('currency') currency?: string) {
+    return this.statusUc.execute(u.id, currency || 'RUB')
+  }
   @Post('submit')
   submit(@CurrentUser() u: any, @Body() body: any) { return this.submitUc.execute({ userId: u.id, ...body }) }
   @Post('documents')

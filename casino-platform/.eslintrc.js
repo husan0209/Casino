@@ -87,4 +87,15 @@ module.exports = {
       },
     ],
   },
+  overrides: [
+    {
+      // Relaxed rules for tests (docs/CONVENTIONS.md: tests assert behavior, not size)
+      files: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e-spec.ts'],
+      rules: {
+        'max-lines-per-function': 'off',
+        'max-params': 'off',
+        '@typescript-eslint/no-explicit-any': 'off',
+      },
+    },
+  ],
 }

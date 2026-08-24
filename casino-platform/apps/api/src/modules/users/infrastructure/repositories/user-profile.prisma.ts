@@ -16,6 +16,35 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
       kycStatus: user.kycProfile?.status ?? 'not_started',
     }
   }
+
+  async getGeoContext(userId: string) {
+    const profile = await prisma.userProfile.findUnique({
+      where: { userId },
+      select: { currencyPreference: true, lastPaymentMethod: true, country: true },
+    })
+    if (!profile) return null
+    return {
+      currencyPreference: profile.currencyPreference,
+      lastPaymentMethod: profile.lastPaymentMethod,
+      country: profile.country,
+    }
+  }
+
+  async updateCurrencyPreference(userId: string, currency: string) {
+    await prisma.userProfile.upsert({
+      where: { userId },
+      update: { currencyPreference: currency },
+      create: { userId, currencyPreference: currency },
+    })
+  }
+
+  async updateAfterDeposit(userId: string, currency: string, method: string) {
+    await prisma.userProfile.upsert({
+      where: { userId },
+      update: { lastPaymentMethod: method, currencyPreference: currency },
+      create: { userId, lastPaymentMethod: method, currencyPreference: currency },
+    })
+  }
   async updateProfile(userId: string, data: any) {
     await prisma.userProfile.upsert({
       where: { userId },

@@ -1,13 +1,16 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseGuards, UseInterceptors, UsePipes } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { GetMeUseCase } from '../../application/use-cases/get-me.use-case'
 import { UpdateProfileUseCase } from '../../application/use-cases/update-profile.use-case'
 import { UpdateSettingsUseCase } from '../../application/use-cases/update-settings.use-case'
 import { ListSessionsUseCase } from '../../application/use-cases/list-sessions.use-case'
 import { RevokeSessionUseCase } from '../../application/use-cases/revoke-session.use-case'
 import { SelfExclusionUseCase } from '../../application/use-cases/self-exclusion.use-case'
+import { UpdateCurrencyPreferenceUseCase } from '../../application/use-cases/update-currency-preference.use-case'
+import { UpdateCurrencySchema } from '../dto/update-currency.dto'
 import { diskStorage } from 'multer'
 import { extname } from 'path'
 import { randomUUID } from 'crypto'
@@ -22,6 +25,7 @@ export class UsersController {
     private listSessions: ListSessionsUseCase,
     private revokeSession: RevokeSessionUseCase,
     private selfExclusion: SelfExclusionUseCase,
+    private updateCurrency: UpdateCurrencyPreferenceUseCase,
   ) {}
 
   @Get('me')
@@ -35,6 +39,12 @@ export class UsersController {
   @Patch('me/settings')
   updateSettingsCtl(@CurrentUser() user: any, @Body() body: any) {
     return this.updateSettings.execute(user.id, body)
+  }
+
+  @Patch('me/currency')
+  @UsePipes(new ZodValidationPipe(UpdateCurrencySchema))
+  setCurrency(@CurrentUser() user: any, @Body() body: { currency: string }) {
+    return this.updateCurrency.execute(user.id, body.currency)
   }
 
   @Post('me/avatar')

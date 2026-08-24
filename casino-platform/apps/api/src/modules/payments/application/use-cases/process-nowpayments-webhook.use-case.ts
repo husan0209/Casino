@@ -2,10 +2,17 @@ import { Injectable, Logger } from '@nestjs/common'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 import { NOWPaymentsClient } from '../../infrastructure/clients/nowpayments.client'
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
+import { UsersFacade } from '../../../users/facade/users.facade'
+
 @Injectable()
 export class ProcessNOWPaymentsWebhookUseCase {
   private logger = new Logger(ProcessNOWPaymentsWebhookUseCase.name)
-  constructor(private repo: PaymentRequestRepository, private np: NOWPaymentsClient, private wallet: WalletFacade) {}
+  constructor(
+    private repo: PaymentRequestRepository,
+    private np: NOWPaymentsClient,
+    private wallet: WalletFacade,
+    private users: UsersFacade,
+  ) {}
   async execute(rawHeaders: any, rawBody: any, ip: string) {
     const signature = rawHeaders['x-nowpayments-sig'] || ''
     const cb = await this.repo.saveCallback({
@@ -34,6 +41,8 @@ export class ProcessNOWPaymentsWebhookUseCase {
           description: 'Крипто-пополнение через NOWPayments',
           metadata: { provider: 'nowpayments', external_id: paymentId, actually_paid: actuallyPaid }
         })
+        const cryptoMethod = pr.currency === 'BTC' ? 'btc' : 'usdt_trc20'
+        await this.users.onDepositCompleted(pr.userId, pr.currency, cryptoMethod)
         await this.repo.updateStatus(pr.id, 'completed', { completedAt: new Date(), externalStatus: paymentStatus })
       } else if (['failed','expired','refunded'].includes(paymentStatus)) {
         await this.repo.updateStatus(pr.id, paymentStatus === 'expired' ? 'expired' : 'failed', { externalStatus: paymentStatus })

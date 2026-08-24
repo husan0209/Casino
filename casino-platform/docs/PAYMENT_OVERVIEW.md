@@ -2,7 +2,7 @@
 title: Payment Overview
 description: Обзор payment-провайдеров, идемпотентности и webhook обработки
 status: living document
-last_updated: 2026-06-19
+last_updated: 2026-08-23
 ---
 
 # Payment Overview
@@ -15,12 +15,22 @@ last_updated: 2026-06-19
 
 ### 1.1. Обзор
 
-| Provider | Тип | Валюты | Markets | Регион |
+| Provider | Тип | Валюты MVP | Markets | Регион |
 |----------|-----|--------|---------|--------|
-| **Rukassa** | Фиат | RUB | CIS | Russia |
-| **NOWPayments** | Крипто | USDT/BTC/TON/TRX/LTC | Global | Worldwide |
+| **Rukassa** | Фиат | RUB (Phase 2: UAH, BYN, KZT, UZS) | CIS | Russia + Phase 2 geo |
+| **NOWPayments** | Крипто | USDT_TRC20, BTC | Global | Worldwide |
 
-### 1.2. Архитектура интеграции
+### 1.2. Продуктовые правила (синхронизация с tz-part-5)
+
+- **Игроку:** отдельные кошельки, без общего баланса в ₽, без автоконвертации при депозите/игре/выводе.
+- **MVP платежи:** RUB + USDT_TRC20 + BTC. UAH/BYN/KZT/UZS — Phase 2 (типы и GeoConfig готовы).
+- **Geo:** `GET /api/v1/geo/config` — методы по стране + активной валюте; RU и UA методы не смешивать.
+- **KYC лимит:** внутренний расчёт в RUB-эквиваленте; UI показывает `limit_remaining` в запрошенной валюте.
+- **Крипто-депозит:** зачислять факт входящей суммы; BTC без пресетов суммы.
+- **Admin reporting:** RUB-эквивалент для списков/дашборда — допустим (tz-part-3 §8, tz-part-6 §5.1).
+- **User-flow 90 сек:** продуктовый контракт — [USER_FLOW_FIRST_90_SECONDS.md](./USER_FLOW_FIRST_90_SECONDS.md); backend checklist — tz-part-3 §15.
+
+### 1.3. Архитектура интеграции
 
 ```
 Payments Module
@@ -521,6 +531,10 @@ async createWithdrawal(input: CreateWithdrawalInput) {
   // ... создание withdrawal
 }
 ```
+
+### 8.3. Display для фронта
+
+`GET /api/v1/kyc/status?currency=KZT` возвращает `limit_remaining` в запрошенной валюте. Это **только отображение**; enforcement остаётся на RUB-эквиваленте.
 
 ---
 

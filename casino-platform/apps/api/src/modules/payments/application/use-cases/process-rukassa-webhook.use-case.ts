@@ -2,10 +2,17 @@ import { Injectable, Logger } from '@nestjs/common'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
+import { UsersFacade } from '../../../users/facade/users.facade'
+
 @Injectable()
 export class ProcessRukassaWebhookUseCase {
   private logger = new Logger(ProcessRukassaWebhookUseCase.name)
-  constructor(private repo: PaymentRequestRepository, private rukassa: RukassaClient, private wallet: WalletFacade) {}
+  constructor(
+    private repo: PaymentRequestRepository,
+    private rukassa: RukassaClient,
+    private wallet: WalletFacade,
+    private users: UsersFacade,
+  ) {}
   async execute(rawHeaders: any, rawBody: any, ip: string) {
     const cb = await this.repo.saveCallback({
       provider: 'rukassa',
@@ -28,15 +35,17 @@ export class ProcessRukassaWebhookUseCase {
       const status = (rawBody.status || rawBody.state || '').toLowerCase()
       const success = ['paid','success','completed','confirm'].some(s => status.includes(s))
       if (success) {
+        const currency = pr.currency || 'RUB'
         await this.wallet.credit({
           userId: pr.userId,
-          currency: 'RUB' as any,
+          currency: currency as any,
           amount: pr.amount.toString(),
           type: 'DEPOSIT',
           idempotencyKey: 'deposit_' + pr.id,
           description: 'Пополнение через Rukassa',
           metadata: { provider: 'rukassa', external_id: externalId }
         })
+        await this.users.onDepositCompleted(pr.userId, currency, pr.method || 'card')
         await this.repo.updateStatus(pr.id, 'completed', { completedAt: new Date(), externalStatus: status })
       } else if (status.includes('fail') || status.includes('cancel')) {
         await this.repo.updateStatus(pr.id, 'failed', { externalStatus: status })

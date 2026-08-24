@@ -499,25 +499,28 @@ module-name/
 
 ### 9.2. Валюты MVP
 
-**Fiat:**
+**Fiat (MVP):**
 
 - RUB
 
-**Crypto:**
+**Fiat (Phase 2 — типы готовы):**
+
+- UAH, BYN, KZT, UZS
+
+**Crypto (MVP):**
 
 - USDT_TRC20
 - BTC
-- TON
-- TRX
-- LTC
 
-Архитектура должна позволять позже добавить:
+Архитектура должна позволять позже добавить Phase 2 фиат и:
 
 - ETH
 - USDT_ERC20
 - USDT_BEP20
 - USDC
 - EUR/USD fiat
+
+**Не в релизе:** TON, TRX, LTC (не показывать игроку; см. [tz-part-3](tz-part-3-payments-wallet.md) §3.2).
 
 ---
 

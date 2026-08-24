@@ -1,6 +1,8 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query, UseGuards, BadRequestException, UsePipes } from '@nestjs/common'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
+import { CreateFiatDepositSchema } from '../dto/create-fiat-deposit.dto'
 import { CreateFiatDepositUseCase } from '../../application/use-cases/create-fiat-deposit.use-case'
 import { CreateCryptoDepositUseCase } from '../../application/use-cases/create-crypto-deposit.use-case'
 import { CreateWithdrawalUseCase } from '../../application/use-cases/create-withdrawal.use-case'
@@ -18,8 +20,9 @@ export class PaymentsController {
     private repo: PaymentRequestRepository,
   ) {}
   @Post('deposit/fiat')
-  depositFiat(@CurrentUser() u: any, @Body() b: { amount: string; method?: string }) {
-    return this.fiatDep.execute(u.id, b.amount, b.method)
+  @UsePipes(new ZodValidationPipe(CreateFiatDepositSchema))
+  depositFiat(@CurrentUser() u: any, @Body() b: { amount: string; currency: string; method: string }) {
+    return this.fiatDep.execute(u.id, { amount: b.amount, currency: b.currency, method: b.method })
   }
   @Post('deposit/crypto')
   depositCrypto(@CurrentUser() u: any, @Body() b: { amount: string; currency: string }) {
@@ -28,8 +31,15 @@ export class PaymentsController {
   @Get('deposit/:id/status')
   async depositStatus(@CurrentUser() u: any, @Param('id') id: string) {
     const pr = await this.repo.findById(id)
-    if (!pr || pr.userId !== u.id) throw new Error('NOT_FOUND')
-    return pr
+    if (!pr || pr.userId !== u.id) throw new BadRequestException('NOT_FOUND')
+    return {
+      id: pr.id,
+      status: pr.status,
+      currency: pr.currency,
+      amount: pr.amount?.toString?.() ?? pr.amount,
+      payment_url: pr.paymentUrl,
+      completed_at: pr.completedAt,
+    }
   }
   @Post('withdrawal/fiat')
   wdFiat(@CurrentUser() u: any, @Body() b: any) {
@@ -48,15 +58,5 @@ export class PaymentsController {
   @Post('withdrawal/:id/cancel')
   cancel(@CurrentUser() u: any, @Param('id') id: string) {
     return this.cancelWd.execute(u.id, id)
-  }
-  @Get('exchange-rates')
-  async rates() {
-    return {
-      BTC_RUB: '8500000.00',
-      USDT_TRC20_RUB: '92.50',
-      TON_RUB: '450.00',
-      TRX_RUB: '11.30',
-      LTC_RUB: '7800.00',
-    }
   }
 }
