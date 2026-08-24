@@ -34,8 +34,8 @@
 | GAP-03 | ~~Google OAuth — заглушка~~ | ✅ Реализовано 2026-08-24: authorization-code flow (`GET /auth/google/url` со state=HMAC 10 мин; `POST /auth/google` — обмен кода, userinfo, провижининг через `OAuthUserProvisioningService`, сессия+refresh-cookie). Требует `GOOGLE_CLIENT_ID/SECRET`. Runtime не проверялся (нет сети/ключей в среде) |
 | GAP-04 | ~~Telegram Login — заглушка~~ | ✅ Реализовано 2026-08-24: `POST /auth/telegram` — верификация виджета (secret=SHA256(bot_token), HMAC data-check-string, timingSafeEqual, auth_date ≤24ч), пользователь без email (schema nullable), сессия. Требует `TELEGRAM_BOT_TOKEN` |
 | GAP-05 | ~~Email-отправка отсутствует~~ | ✅ Закрыт вместе с GAP-02: очередь+воркер+SmtpMailer; в prod без SMTP_HOST — старт невозможен (fail-closed) |
-| GAP-06 | Rukassa `createPayment`: в production `throw NOT_IMPLEMENTED`, в dev — фейковый URL-stub | `payments/infrastructure/clients/rukassa.client.ts:13-24` | tz-3 |
-| GAP-07 | NOWPayments `createPayment`: то же; адреса/курсы — фейковые стабы | `nowpayments.client.ts:20-44` | tz-3 |
+| GAP-06 | ~~Rukassa createPayment — заглушка~~ | ✅ Реализовано 2026-08-24: реальный HTTP (`POST {RUKASSA_API_BASE|pay.rukassa.is}/api/v1/order/create`, заголовки shop_id/api_key, timeout 30с), getPaymentStatus; dev без ключей — лог-стаб. Верификация вебхука HMAC-SHA256 активна в prod (раньше кидала NOT_IMPLEMENTED). Runtime — нужны боевые ключи |
+| GAP-07 | ~~NOWPayments — стабы~~ | ✅ Реализовано 2026-08-24: `POST /v1/payment` (x-api-key), `/estimate`, `/payment/{id}`; курсы больше не хардкод при наличии ключа; IPN HMAC-SHA512 активен в prod. Env: `NOWPAYMENTS_API_BASE`. Runtime — нужен NOWPAYMENTS_API_KEY |
 | GAP-08 | Единственный провайдер игр — DemoProvider; фабрика бросает `ProviderNotSupportedError` на всё остальное | `casino/infrastructure/providers/provider-adapter.factory.ts` | tz-4 |
 | GAP-09 | Admin sync-games возвращает `{added:0, note:'see UC-GAME-19'}` — синхронизации нет | `casino-admin.controller.ts:25-32` | tz-4 |
 | GAP-10 | ~~Frontend админки — заглушки~~ | ✅ Исправлено 2026-08-23: реальный UI на 13 страницах (`apps/admin/src`): логин c JWT (zustand persist), guard-layout, дашборд на живых metrics/charts/events + Recharts, users (block/unblock), transactions, payments, withdrawals (single+batch approve/reject), KYC (approve/reject/resubmit), games/providers (toggle/sync), support (диалог+внутр.заметки+приоритет+close), referrals (stats), audit, admins (superadmin CRUD), settings. `tsc -p apps/admin` = 0 |
@@ -92,9 +92,8 @@
 
 ## Остаток работ (актуально на 2026-08-24)
 
-1. **GAP-06/07** — реальные интеграции Rukassa/NOWPayments (создание платежа; верификация подписей уже написана). Блокирует реальные депозиты.
-2. **GAP-08/09** — хотя бы один реальный game-provider через ProviderAdapter + настоящая синхронизация каталога.
-3. **GAP-03/04** — Google/Telegram OAuth (ключи уже в env.validation).
-4. **Runtime-приёмка** на Linux-FS: `pnpm install && pnpm db:generate && pnpm db:migrate && pnpm dev`; прогон register→login→deposit→launch→admin.
+1. **GAP-08/09** — хотя бы один реальный game-provider через ProviderAdapter + настоящая синхронизация каталога.
+2. **GAP-03/04** — Google/Telegram OAuth: код готов, нужны ключи + runtime-проверка.
+3. **Runtime-приёмка** на Linux-FS: `pnpm install && pnpm db:generate && pnpm db:migrate && pnpm dev`; прогон register→login→deposit→launch→admin.
 5. Решение по email-верификации (см. заметку о TZ-10 выше).
 6. После MVP: email-воркер отдельным процессом, rich HTML-шаблоны, exchange-rates очередь.
