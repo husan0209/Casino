@@ -1,11 +1,18 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
 import { prisma } from '@casino/database'
+import { AppError } from '@casino/shared-utils'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
 import { PaymentRequestRepository } from '../../../payments/infrastructure/repositories/payment-request.repository'
 import { AuditLogService } from '../../application/audit-log.service'
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
 import { randomUUID } from 'crypto'
+
+export class WithdrawalInvalidStatusError extends AppError {
+  readonly code = 'WITHDRAWAL_INVALID_STATUS'
+  readonly httpStatus = 409
+  constructor() { super('Заявка не найдена или уже обработана') }
+}
 
 @UseGuards(AdminAuthGuard)
 @Controller('admin')
@@ -70,26 +77,62 @@ export class AdminFinanceController {
     return { items, meta:{ page, perPage, total }}
   }
 
-  // UC-PAY-11 approve
-  @Post('withdrawals/:id/approve')
-  async approve(@Param('id') id: string, @CurrentUser() admin: any, @Req() req:any) {
-    const pr = await this.payments.findById(id)
-    if (!pr || pr.type !== 'withdrawal' || pr.status !== 'pending') throw new Error('INVALID_STATUS')
-    await this.wallet.confirmWithdrawal(pr.userId, pr.currency as any, pr.amount.toString(), `wd_confirm_${pr.id}`)
+  /** Общая логика одобрения одной заявки (single + batch). */
+  private async approveOne(id: string, admin: any, req: any) {
+    const wd = await this.payments.findById(id)
+    if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') throw new WithdrawalInvalidStatusError()
+    await this.wallet.confirmWithdrawal(wd.userId, wd.currency as any, wd.amount.toString(), `wd_confirm_${wd.id}`)
     await this.payments.updateStatus(id, 'completed', { completedAt: new Date() })
     await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.withdrawal.approved', targetType:'payment_request', targetId: id, ipAddress: req.ip, userAgent: req.headers['user-agent'] })
+  }
+
+  /** Общая логика отклонения одной заявки (single + batch). */
+  private async rejectOne(id: string, reason: string | undefined, admin: any, req: any) {
+    const wd = await this.payments.findById(id)
+    if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') throw new WithdrawalInvalidStatusError()
+    await this.wallet.unlock(wd.userId, wd.currency as any, wd.amount.toString(), `wd_unlock_${wd.id}_${randomUUID()}`)
+    await this.payments.updateStatus(id, 'cancelled', { errorMessage: reason })
+    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.withdrawal.rejected', targetType:'payment_request', targetId: id, payload:{ reason }, ipAddress: req.ip })
+  }
+
+  // UC-PAY-11 approve
+  @Post('withdrawals/:id/approve')
+  async approve(@Param('id') id: string, @CurrentUser() admin: any, @Req() req: any) {
+    await this.approveOne(id, admin, req)
     return { ok: true }
   }
 
   // UC-PAY-12 reject
   @Post('withdrawals/:id/reject')
-  async reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() admin: any, @Req() req:any) {
-    const pr = await this.payments.findById(id)
-    if (!pr || pr.type !== 'withdrawal' || pr.status !== 'pending') throw new Error('INVALID_STATUS')
-    await this.wallet.unlock(pr.userId, pr.currency as any, pr.amount.toString(), `wd_unlock_${pr.id}_${randomUUID()}`)
-    await this.payments.updateStatus(id, 'cancelled', { errorMessage: body.reason })
-    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.withdrawal.rejected', targetType:'payment_request', targetId: id, payload:{ reason: body.reason }, ipAddress: req.ip })
+  async reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() admin: any, @Req() req: any) {
+    await this.rejectOne(id, body?.reason, admin, req)
     return { ok: true }
+  }
+
+  // UC-ADMIN-FIN-05 batch approve – каждая заявка обрабатывается независимо (TZ part 6 §6.3)
+  @Post('withdrawals/batch-approve')
+  async batchApprove(@Body() body: { ids: string[] }, @CurrentUser() admin: any, @Req() req: any) {
+    const failed: Array<{ id: string; error: string }> = []
+    let approved = 0
+    for (const id of body.ids ?? []) {
+      try { await this.approveOne(id, admin, req); approved++ }
+      catch (e: any) { failed.push({ id, error: e.code ?? e.message }) }
+    }
+    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.withdrawal.batch_approved', targetType:'payment_request', payload:{ requested: body.ids?.length ?? 0, approved, failed: failed.length }, ipAddress: req.ip })
+    return { ok: true, approved, failed }
+  }
+
+  // UC-ADMIN-FIN-05 batch reject – общая причина, независимая обработка
+  @Post('withdrawals/batch-reject')
+  async batchReject(@Body() body: { ids: string[]; reason: string }, @CurrentUser() admin: any, @Req() req: any) {
+    const failed: Array<{ id: string; error: string }> = []
+    let rejected = 0
+    for (const id of body.ids ?? []) {
+      try { await this.rejectOne(id, body.reason, admin, req); rejected++ }
+      catch (e: any) { failed.push({ id, error: e.code ?? e.message }) }
+    }
+    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.withdrawal.batch_rejected', targetType:'payment_request', payload:{ requested: body.ids?.length ?? 0, rejected, failed: failed.length, reason: body.reason }, ipAddress: req.ip })
+    return { ok: true, rejected, failed }
   }
 
   // UC-PAY-14 credit

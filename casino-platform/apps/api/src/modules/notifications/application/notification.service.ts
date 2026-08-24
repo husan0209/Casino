@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { prisma } from '@casino/database'
+import { EMAIL_QUEUE_PORT, EmailQueuePort } from '../../../queues/queue.types'
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name)
+  constructor(@Inject(EMAIL_QUEUE_PORT) private readonly emailQueue: EmailQueuePort) {}
   async send(input: { userId: string; type: string; channel?: 'email'|'internal'; title: string; message: string; data?: any }) {
     const n = await prisma.notification.create({
       data: {
@@ -21,14 +23,17 @@ export class NotificationService {
       if (!emailEnabled) {
         this.logger.log(`Email notification ${n.id} skipped – user ${input.userId} disabled email`)
       } else {
-        // BullMQ email queue placeholder – logs and marks sent.
-        // In production this should push to BullMQ `email` queue and be processed by email worker (nodemailer).
-        // For now we log and mark sentAt to avoid TODO leak. See docs/tz-part-6 UC-NOTIF-01.
-        this.logger.log(`Email queued (stub): to user=${input.userId} type=${input.type} title=${input.title}`)
-        // TODO-PROD: inject @InjectQueue('email') and await this.emailQueue.add('send', { notificationId: n.id, userId: input.userId, ... })
+        const user = await prisma.user.findUnique({ where: { id: input.userId }, select: { email: true } })
+        if (!user?.email) {
+          this.logger.warn(`Email notification ${n.id}: у пользователя ${input.userId} нет email – пропущено`)
+        } else {
+          // UC-NOTIF-01: постановка в очередь; sentAt проставит EmailWorker после фактической отправки
+          await this.emailQueue.enqueue({ to: user.email, subject: input.title, text: input.message, html: input.message, notificationId: n.id })
+        }
       }
+    } else {
+      await prisma.notification.update({ where: { id: n.id }, data: { sentAt: new Date() }})
     }
-    await prisma.notification.update({ where: { id: n.id }, data: { sentAt: new Date() }})
     return n
   }
   async list(userId: string, page=1, perPage=20, isRead?: boolean) {

@@ -2,7 +2,7 @@
 title: Documentation Index
 description: Навигация по всей документации casino-platform
 status: living document
-last_updated: 2026-06-19
+last_updated: 2026-08-23
 ---
 
 # Documentation Index
@@ -37,9 +37,10 @@ last_updated: 2026-06-19
 |--------------------|------------------------|
 | **Новый модуль** | [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md) + [MODULE_TEMPLATE.md](./MODULE_TEMPLATE.md) |
 | **Настройкой AI IDE** | [AGENT_INSTRUCTIONS.md](./AGENT_INSTRUCTIONS.md) |
-| **Payments / wallet** | [PAYMENT_OVERVIEW.md](./PAYMENT_OVERVIEW.md) |
+| **Payments / wallet** | [PAYMENT_OVERVIEW.md](./PAYMENT_OVERVIEW.md) + [USER_FLOW_FIRST_90_SECONDS.md](./USER_FLOW_FIRST_90_SECONDS.md) §Backend |
 | **Security / auth** | [SECURITY_BASELINE.md](./SECURITY_BASELINE.md) |
 | **Casino providers** | [PROVIDER_INTEGRATION_STRATEGY.md](./PROVIDER_INTEGRATION_STRATEGY.md) |
+| **Frontend web / витрина** | [tz-part-5-frontend-web.md](./tz-part-5-frontend-web.md) + [USER_FLOW_FIRST_90_SECONDS.md](./USER_FLOW_FIRST_90_SECONDS.md) |
 | **Env-переменные** | [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md) |
 
 ---
@@ -52,9 +53,15 @@ last_updated: 2026-06-19
 | 2 | Backend Core | [tz-part-2-auth-users-kyc-rbac.md](./tz-part-2-auth-users-kyc-rbac.md) | Auth, Users, KYC, RBAC |
 | 3 | Wallet & Payments | [tz-part-3-payments-wallet.md](./tz-part-3-payments-wallet.md) | Wallet ledger, Rukassa, NOWPayments |
 | 4 | Casino Providers | [tz-part-4-casino-providers.md](./tz-part-4-casino-providers.md) | Seamless Wallet, providers, Demo |
-| 5 | Frontend Web | [tz-part-5-frontend-web.md](./tz-part-5-frontend-web.md) | Next.js frontend |
+| 5 | Frontend Web | [tz-part-5-frontend-web.md](./tz-part-5-frontend-web.md) | Next.js: mobile-first витрина, касса, geo, мультивалютный UI |
 | 6 | Admin & Support | [tz-part-6-admin-support-referrals.md](./tz-part-6-admin-support-referrals.md) | Admin panel, support, referrals |
 | 7 | DevOps | [tz-part-7-devops-security-qa.md](./tz-part-7-devops-security-qa.md) | VPS, Docker, CI/CD, security, QA |
+
+### Продуктовый user-flow (не часть ТЗ, но контракт приёмки)
+
+| Документ | Зачем |
+|----------|-------|
+| [USER_FLOW_FIRST_90_SECONDS.md](./USER_FLOW_FIRST_90_SECONDS.md) | Путь игрока 0–90 сек: слот → вход → касса. Связан с Part 3 §15 и Part 5 |
 
 ---
 
@@ -164,6 +171,6 @@ last_updated: 2026-06-19
 
 ---
 
-> **Последнее обновление:** 2026-06-19
+> **Последнее обновление:** 2026-08-23 (синхронизация tz-part-5 ↔ parts 1–4, 6–7, PAYMENT_OVERVIEW)
 > **Версия ТЗ:** v1.0 (7 частей + README)
 > **Документов создано:** 13 (этот INDEX + 11 тематических: ARCHITECTURE, STACK, CONVENTIONS, API_CONVENTIONS, MODULE_BOUNDARIES, MODULE_TEMPLATE, SECURITY_BASELINE, PAYMENT_OVERVIEW, PROVIDER_INTEGRATION_STRATEGY, ENVIRONMENT_VARIABLES, AGENT_INSTRUCTIONS + AI_DEVELOPMENT_RULES)

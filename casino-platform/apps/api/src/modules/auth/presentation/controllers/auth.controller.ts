@@ -25,8 +25,13 @@ export class AuthController {
 
   @Post('register')
   @UsePipes(new ZodValidationPipe(RegisterSchema))
-  async register(@Body() body: any) {
-    return this.registerUc.execute({ email: body.email, password: body.password, referralCode: body.referral_code })
+  async register(@Body() body: any, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const result = await this.registerUc.execute(
+      { email: body.email, password: body.password, referralCode: body.referral_code },
+      { ip: req.ip, userAgent: req.headers['user-agent'] },
+    )
+    res.cookie('refresh_token', result.refreshToken, { httpOnly: true, secure: false, sameSite: 'strict', maxAge: 30 * 24 * 3600 * 1000 })
+    return { accessToken: result.accessToken, user: result.user, referralCode: result.referralCode }
   }
 
   @Get('verify-email')

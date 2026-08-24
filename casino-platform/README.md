@@ -25,11 +25,11 @@ Seed admin: superadmin@casino.example.com / dev_superadmin_password_123
 
 ## TZ Progress (честный статус на 2026-08-22)
 - [x] Часть 1 Foundation – ~85% – monorepo, Prisma schema (19 таблиц), shared packages, Docker, Nginx — готово
-- [~] Часть 2 Auth/Users/KYC/RBAC – ~85% – регистрация/логин/JWT-сессии/refresh-rotation/KYC 5000₽ реализованы, `tsc` чистый. Google/Telegram – заглушки, email – лог-stub в dev (см. docs/IMPLEMENTATION_GAPS.md GAP-03..05)
+- [~] Часть 2 Auth/Users/KYC/RBAC – ~85% – регистрация/логин/JWT-сессии/refresh-rotation/KYC 5000₽ + BullMQ email queue (verify/reset). Google/Telegram – заглушки (GAP-03/04)
 - [~] Часть 3 Wallet & Payments – ~75-80% – ledger/optimistic locking, Rukassa/NOWPayments verify есть, но `createPayment` в production кидает `NOT_IMPLEMENTED` (только stub в dev)
 - [~] Часть 4 Casino Providers – ~40% – Seamless Wallet API + DemoProvider только. Реальных провайдеров нет (`apps/api/src/modules/casino/infrastructure/providers/provider-adapter.factory.ts:32`)
 - [~] Часть 5 Frontend Web – ~65-70% – страницы/фильтры/ЛК/кошелёк есть, Premium Dark UI – базовый
-- [~] Часть 6 Admin/Support/Referrals – ~30-35% – Backend API есть (users/finance/support/referrals), но: `GET admin/kyc/:id = {todo:true}`, нет `admin/dashboard/*`, нет `batch approve/reject`, нет email-очереди (`notifications.service.ts:16 TODO`), Admin frontend – почти все страницы-заглушки `Раздел админки — Часть 6` (см. `apps/admin/src/app/dashboard/*/page.tsx`), дашборд – хардкод, логин `Войти (dev)` без auth
+- [~] Часть 6 Admin/Support/Referrals – ~50% – Backend API полный (users/finance/support/referrals/notifications+queue/dashboard metrics·charts·events/batch withdrawals). Admin frontend реализован (13 страниц: JWT-логин, живой дашборд с графиками, withdrawals batch, KYC/support/games/audit/admins/settings). Осталось: реальные провайдеры игр, OAuth, runtime-проверка на Linux-FS
 - [~] Часть 7 DevOps – ~60% – docker-compose.prod, nginx, GitHub Actions CI – скелет есть, VPS init/backup – скрипты есть
 
 > Подробнее см. `docs/IMPLEMENTATION_GAPS.md` и раздел Money safety ниже.

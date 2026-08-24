@@ -50,6 +50,9 @@ export const envSchema = z.object({
     .default('false')
     .transform(value => value === 'true'),
   SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
   SMTP_FROM_EMAIL: z.string().optional(),
 })
   .superRefine((env, ctx) => {

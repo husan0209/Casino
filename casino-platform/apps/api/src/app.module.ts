@@ -5,6 +5,7 @@ import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core'
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { ResponseFormatInterceptor } from './common/interceptors/response-format.interceptor'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
+import { GeoModule } from './modules/geo/geo.module'
 import { HealthModule } from './modules/health/health.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { UsersModule } from './modules/users/users.module'
@@ -16,12 +17,13 @@ import { CasinoModule } from './modules/casino/casino.module'
 import { SupportModule } from './modules/support/support.module'
 import { ReferralsModule } from './modules/referrals/referrals.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
+import { QueuesModule } from './queues/queues.module'
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
-    HealthModule, AuthModule, UsersModule, KycModule, AdminModule,
-    WalletModule, PaymentsModule, CasinoModule, SupportModule, ReferralsModule, NotificationsModule,
+    HealthModule, AuthModule, UsersModule, KycModule, AdminModule, GeoModule,
+    WalletModule, PaymentsModule, CasinoModule, SupportModule, ReferralsModule, NotificationsModule, QueuesModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
