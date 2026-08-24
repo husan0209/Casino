@@ -2,11 +2,15 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@ne
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { RolesGuard, Roles } from '../../../auth/presentation/guards/roles.guard'
 import { prisma } from '@casino/database'
+import { createHash } from 'crypto'
+import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin','superadmin')
 @Controller('admin')
 export class CasinoAdminController {
+  constructor(private adapters: ProviderAdapterFactory) {}
+
   // providers
   @Get('providers')
   async providersList() {
@@ -22,13 +26,46 @@ export class CasinoAdminController {
     await prisma.gameProvider.update({ where: { id }, data: { isEnabled: false }})
     return { ok: true }
   }
+  // UC-GAME-19: синхронизация каталога через ProviderAdapter
   @Post('providers/:id/sync-games')
   async syncGames(@Param('id') id: string) {
     const provider = await prisma.gameProvider.findUnique({ where: { id }})
     if (!provider) throw new Error('NOT_FOUND')
-    // DemoProvider sync – in real: call ProviderAdapterFactory.fetchGameList()
-    const existingCount = await prisma.game.count({ where: { providerId: id }})
-    return { added: 0, updated: existingCount, total: existingCount, note: 'Sync via ProviderAdapter – see tz-part-4 UC-GAME-19' }
+    const adapter = this.adapters.getAdapter(provider.slug)
+    const list = await adapter.fetchGameList()
+
+    let added = 0
+    let updated = 0
+    for (const g of list) {
+      const slugBase = String(g.name || g.externalGameId).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'game'
+      const slug = `${slugBase}-${createHash('md5').update(`${provider.slug}:${g.externalGameId}`).digest('hex').slice(0, 6)}`
+      const data: any = {
+        name: g.name || g.externalGameId,
+        type: (g.type as any) ?? 'slot',
+        category: (g.category as any) ?? 'slots',
+        thumbnailUrl: g.thumbnailUrl ?? null,
+        hasDemo: g.hasDemo ?? false,
+        rtp: g.rtp != null ? String(g.rtp) : null,
+        metadata: (g.metadata ?? {}) as any,
+      }
+      const existing = await prisma.game.findUnique({
+        where: { providerId_externalGameId: { providerId: id, externalGameId: g.externalGameId } },
+      })
+      if (existing) {
+        await prisma.game.update({ where: { id: existing.id }, data })
+        updated++
+      } else {
+        // UC-GAME-19 правило: новые игры добавляются ВЫКЛЮЧЕННЫМИ
+        await prisma.game.create({
+          data: { ...data, providerId: id, externalGameId: g.externalGameId, slug, isEnabled: false },
+        })
+        added++
+      }
+    }
+
+    const total = await prisma.game.count({ where: { providerId: id } })
+    await prisma.gameProvider.update({ where: { id }, data: { gameCount: total } })
+    return { added, updated, total, note: 'Новые игры добавлены выключенными — включите нужные в разделе «Игры»' }
   }
 
   // games
