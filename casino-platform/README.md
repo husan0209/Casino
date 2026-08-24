@@ -25,10 +25,10 @@ Seed admin: superadmin@casino.example.com / dev_superadmin_password_123
 
 ## TZ Progress (честный статус на 2026-08-22)
 - [x] Часть 1 Foundation – ~85% – monorepo, Prisma schema (19 таблиц), shared packages, Docker, Nginx — готово
-- [~] Часть 2 Auth/Users/KYC/RBAC – ~85% – регистрация/логин/JWT-сессии/refresh-rotation/KYC 5000₽ + BullMQ email queue (verify/reset). Google/Telegram – заглушки (GAP-03/04)
+- [~] Часть 2 Auth/Users/KYC/RBAC – ~85% – регистрация (сразу сессия, TZ-10)/логин/JWT refresh-rotation/KYC 5000₽ + limit_remaining; BullMQ email queue. Google/Telegram – заглушки (GAP-03/04)
 - [~] Часть 3 Wallet & Payments – ~75-80% – ledger/optimistic locking, Rukassa/NOWPayments verify есть, но `createPayment` в production кидает `NOT_IMPLEMENTED` (только stub в dev)
 - [~] Часть 4 Casino Providers – ~40% – Seamless Wallet API + DemoProvider только. Реальных провайдеров нет (`apps/api/src/modules/casino/infrastructure/providers/provider-adapter.factory.ts:32`)
-- [~] Часть 5 Frontend Web – ~65-70% – страницы/фильтры/ЛК/кошелёк есть, Premium Dark UI – базовый
+- [~] Часть 5 Frontend Web – ~75% – витрина/ЛК/кошелёк/KYC/история + geo/wallet stores, DepositSheet/LaunchCurrencySheet, play-страница; полный 90-сек флоу частично (TZ-07/09)
 - [~] Часть 6 Admin/Support/Referrals – ~50% – Backend API полный (users/finance/support/referrals/notifications+queue/dashboard metrics·charts·events/batch withdrawals). Admin frontend реализован (13 страниц: JWT-логин, живой дашборд с графиками, withdrawals batch, KYC/support/games/audit/admins/settings). Осталось: реальные провайдеры игр, OAuth, runtime-проверка на Linux-FS
 - [~] Часть 7 DevOps – ~60% – docker-compose.prod, nginx, GitHub Actions CI – скелет есть, VPS init/backup – скрипты есть
 

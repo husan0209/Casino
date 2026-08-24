@@ -1,6 +1,6 @@
 # Implementation Gaps — честный аудит ТЗ vs код
 
-> Дата аудита: 2026-08-23. Цель: зафиксировать расхождения между ТЗ (`docs/tz-part-*.md`) и фактическим кодом.
+> Дата аудита: 2026-08-23, ревизия 2026-08-24. Цель: зафиксировать расхождения между ТЗ (`docs/tz-part-*.md`) и фактическим кодом.
 > Этот файл — точка правды по статусу. Не отмечать пункт «готов», пока не работает end-to-end.
 
 ## 🔴 CRITICAL — блокеры (API не собирается)
@@ -48,7 +48,7 @@
 | # | Что | Статус |
 |---|-----|--------|
 | GAP-14 | `GET /admin/kyc/:id` возвращал `{todo:true}` | ✅ Исправлено 2026-08-22: возвращает профиль+документы+`totalDepositedRub` (`kyc-admin.controller.ts`) |
-| GAP-15 | NotificationService игнорировал настройки и канал email | ⚠️ Частично: проверка `user_settings.notificationsEmail` добавлена; реальная отправка ждёт GAP-02/05 |
+| GAP-15 | ~~NotificationService игнорировал настройки и канал email~~ | ✅ Закрыто в рамках GAP-02: enqueue в очередь `email` с проверкой `user_settings.notificationsEmail`; sentAt проставляет воркер |
 | GAP-16 | README врал про `[x]` во всех частях | ✅ Исправлено: честные проценты + ссылка сюда |
 | GAP-17 | KYC upload UI есть, но лимит 5000₽ проверяется только на бэке при депозите — сверить с kyc-check.service | ⚠️ Нужен `limit_remaining` в активной валюте для UI (tz-part-2 §4, tz-part-5 §13) |
 
@@ -69,8 +69,10 @@
 | TZ-09 | Приёмка 90 сек: geo presets, deposit `currency`+`method` | ⚠️ Backend готов; web flow частично (register→launch→deposit) |
 | TZ-10 | Register → сразу сессия без email-тупика | ✅ RegisterUseCase + auth store |
 
-## ⚠️ Параллельная разработка
-2026-08-23: во время работ обнаружены чужие коммиты в рабочем дереве (модуль `geo`, `deposit-profile.service`, правки kyc/payments/users) с импортами ещё не существующих экспортов `@casino/shared-config` (CURRENCY_LIMITS, GEO_PROFILES, resolveLegalCountry…). На момент фиксации API-tsc из-за них ≠ 0; это не регрессия задач выше. Координировать: добавить экспорты в shared-config или дождаться завершения параллельной задачи.
+## Параллельная разработка — РАЗРЕШЕНО 2026-08-24
+Работа второго агента (Copilot) слита: geo-модуль, deposit-profile, web-компоненты (`d7a923d`). Экспорты `shared-config/geo.config.ts` добавлены, два битых относительных пути починены, полный monorepo tsc = 0, всё в main (`8473f59a`).
+
+Продуктовое решение агента (TZ-10): регистрация выдаёт сессию сразу, gate `emailVerified` в LoginUseCase снят, RegisterUseCase переписан (сессия + access-token немедленно); письмо-верификация идёт по очереди как информационное. Если для рынка СНГ верификация обязательна ДО игры — вернуть gate и выдавать сессию после verify-email.
 
 ## Environment — особенности этой машины (Android SD-card)
 
@@ -88,12 +90,11 @@
 | `.env` лежит на диске, но не закоммичен (в git только `.env.example`) | ✅ ок |
 | Доки описывают схему Prisma как `prisma/schema/<area>.prisma` и `turbo.json` — в реальности один `schema.prisma` и turbo нет | ⚠️ расхождение доков учтено в новых AGENTS.md/.cursorrules; поправить доки |
 
-## Порядок восстановления (рекомендация)
+## Остаток работ (актуально на 2026-08-24)
 
-1. GAP-01: восстановить infra/domain слой auth (hasher argon2, JWT access/refresh rotation, prisma-репозитории под существующий `schema.prisma`, register use-case) — иначе ничего не проверить.
-2. GAP-02+05: BullMQ email queue + nodemailer-воркер + шаблоны из tz-6 §15.
-3. GAP-11/12: dashboard metrics/charts/events + batch endpoints — они разблокируют реальный UI админки.
-4. GAP-10: реализовать страницы админки на уже готовом backend API (users/finance/support/referrals работают).
-5. GAP-03/04: OAuth по ключам из env (уже есть в schema env.validation).
-6. GAP-06/07: реальные интеграции Rukassa/NOWPayments по их API-докам (верификация подписей уже написана).
-7. GAP-08: минимум один реальный провайдер через ProviderAdapter (см. PROVIDER_INTEGRATION_STRATEGY.md).
+1. **GAP-06/07** — реальные интеграции Rukassa/NOWPayments (создание платежа; верификация подписей уже написана). Блокирует реальные депозиты.
+2. **GAP-08/09** — хотя бы один реальный game-provider через ProviderAdapter + настоящая синхронизация каталога.
+3. **GAP-03/04** — Google/Telegram OAuth (ключи уже в env.validation).
+4. **Runtime-приёмка** на Linux-FS: `pnpm install && pnpm db:generate && pnpm db:migrate && pnpm dev`; прогон register→login→deposit→launch→admin.
+5. Решение по email-верификации (см. заметку о TZ-10 выше).
+6. После MVP: email-воркер отдельным процессом, rich HTML-шаблоны, exchange-rates очередь.
