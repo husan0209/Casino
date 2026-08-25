@@ -89,6 +89,8 @@ last_updated: 2026-08-23
 ### Процессы
 
 - [AI_DEVELOPMENT_RULES.md](./AI_DEVELOPMENT_RULES.md) — правила для AI-агента
+- [AUDIT_REPORT.md](./AUDIT_REPORT.md) — технический аудит: баги, уязвимости, нарушения (2026-08-25)
+- [IMPLEMENTATION_GAPS.md](./IMPLEMENTATION_GAPS.md) — расхождения ТЗ ↔ код (честный статус)
 - tz-part-7 — деплой, CI/CD, testing
 
 ---
@@ -146,7 +148,9 @@ last_updated: 2026-08-23
 │   ├── PROVIDER_INTEGRATION_STRATEGY.md
 │   ├── ENVIRONMENT_VARIABLES.md
 │   ├── AGENT_INSTRUCTIONS.md     ← .cursorrules / CLAUDE.md шаблоны
-│   └── AI_DEVELOPMENT_RULES.md
+│   ├── AI_DEVELOPMENT_RULES.md
+│   ├── IMPLEMENTATION_GAPS.md    ← ТЗ ↔ код
+│   └── AUDIT_REPORT.md           ← тех. аудит 2026-08-25
 ├── apps/                         ← npm workspace apps
 │   ├── api/
 │   ├── web/
@@ -171,6 +175,6 @@ last_updated: 2026-08-23
 
 ---
 
-> **Последнее обновление:** 2026-08-23 (синхронизация tz-part-5 ↔ parts 1–4, 6–7, PAYMENT_OVERVIEW)
+> **Последнее обновление:** 2026-08-25 (добавлен AUDIT_REPORT.md)
 > **Версия ТЗ:** v1.0 (7 частей + README)
-> **Документов создано:** 13 (этот INDEX + 11 тематических: ARCHITECTURE, STACK, CONVENTIONS, API_CONVENTIONS, MODULE_BOUNDARIES, MODULE_TEMPLATE, SECURITY_BASELINE, PAYMENT_OVERVIEW, PROVIDER_INTEGRATION_STRATEGY, ENVIRONMENT_VARIABLES, AGENT_INSTRUCTIONS + AI_DEVELOPMENT_RULES)
+> **Документов создано:** 14 (этот INDEX + 12 тематических: ARCHITECTURE, STACK, CONVENTIONS, API_CONVENTIONS, MODULE_BOUNDARIES, MODULE_TEMPLATE, SECURITY_BASELINE, PAYMENT_OVERVIEW, PROVIDER_INTEGRATION_STRATEGY, ENVIRONMENT_VARIABLES, AGENT_INSTRUCTIONS, AI_DEVELOPMENT_RULES, AUDIT_REPORT + IMPLEMENTATION_GAPS)
