@@ -1,6 +1,12 @@
 // casino-platform — Prisma Schema
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
 model User {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -37,9 +43,16 @@ model User {
   referralRewardsAsReferred ReferralReward[] @relation("Referred")
   @@map("users")
 }
-enum UserStatus { active blocked suspended }
-enum UserRole { user admin superadmin }
-
+enum UserStatus {
+  active
+  blocked
+  suspended
+}
+enum UserRole {
+  user
+  admin
+  superadmin
+}
 model AuthProvider {
   id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId           String       @map("user_id") @db.Uuid
@@ -52,8 +65,11 @@ model AuthProvider {
   @@unique([provider, providerUserId])
   @@map("auth_providers")
 }
-enum AuthProviderType { email google telegram }
-
+enum AuthProviderType {
+  email
+  google
+  telegram
+}
 model Session {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId           String    @map("user_id") @db.Uuid
@@ -111,16 +127,17 @@ model UserProfile {
 }
 
 model UserSettings {
-  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId             String   @unique @map("user_id") @db.Uuid
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String    @unique @map("user_id") @db.Uuid
   notificationsEmail Boolean  @default(true) @map("notifications_email")
-  notificationsPush  Boolean  @default(true) @map("notifications_push")
-  twoFaEnabled       Boolean  @default(false) @map("two_fa_enabled")
-  twoFaSecret        String?  @map("two_fa_secret") @db.Text
-  language           String   @default("ru") @db.VarChar(8)
-  timezone           String   @default("Europe/Moscow") @db.VarChar(64)
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  notificationsPush Boolean   @default(true) @map("notifications_push")
+  twoFaEnabled      Boolean   @default(false) @map("two_fa_enabled")
+  twoFaSecret       String?   @map("two_fa_secret") @db.Text
+  language          String    @default("ru") @db.VarChar(8)
+  timezone          String    @default("Europe/Moscow") @db.VarChar(64)
+  selfExcludedUntil DateTime? @map("self_excluded_until") @db.Timestamptz
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@map("user_settings")
 }
@@ -148,9 +165,18 @@ model KycProfile {
   documents KycDocument[]
   @@map("kyc_profiles")
 }
-enum KycStatus { not_started pending approved rejected requires_resubmission }
-enum KycDocumentType { passport id_card drivers_license }
-
+enum KycStatus {
+  not_started
+  pending
+  approved
+  rejected
+  requires_resubmission
+}
+enum KycDocumentType {
+  passport
+  id_card
+  drivers_license
+}
 model KycDocument {
   id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   kycProfileId   String          @map("kyc_profile_id") @db.Uuid
@@ -163,8 +189,12 @@ model KycDocument {
   kycProfile KycProfile @relation(fields: [kycProfileId], references: [id], onDelete: Cascade)
   @@map("kyc_documents")
 }
-enum KycFileType { front back selfie proof_of_address }
-
+enum KycFileType {
+  front
+  back
+  selfie
+  proof_of_address
+}
 model AdminUser {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email       String    @unique @db.VarChar(255)
@@ -183,8 +213,10 @@ model AdminUser {
   assignedTickets SupportTicket[] @relation("TicketAssignee")
   @@map("admin_users")
 }
-enum AdminRole { admin superadmin }
-
+enum AdminRole {
+  admin
+  superadmin
+}
 model AuditLog {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   actorType  ActorType @map("actor_type")
@@ -201,8 +233,11 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
-enum ActorType { user admin system }
-
+enum ActorType {
+  user
+  admin
+  system
+}
 model WalletAccount {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
@@ -240,8 +275,22 @@ model LedgerEntry {
   @@index([type])
   @@map("ledger_entries")
 }
-enum LedgerEntryType { DEPOSIT WITHDRAWAL WITHDRAWAL_LOCK WITHDRAWAL_UNLOCK WITHDRAWAL_CONFIRM BET WIN ROLLBACK BONUS ADMIN_CREDIT ADMIN_DEBIT REFERRAL_REWARD CONVERSION_DEBIT CONVERSION_CREDIT }
-
+enum LedgerEntryType {
+  DEPOSIT
+  WITHDRAWAL
+  WITHDRAWAL_LOCK
+  WITHDRAWAL_UNLOCK
+  WITHDRAWAL_CONFIRM
+  BET
+  WIN
+  ROLLBACK
+  BONUS
+  ADMIN_CREDIT
+  ADMIN_DEBIT
+  REFERRAL_REWARD
+  CONVERSION_DEBIT
+  CONVERSION_CREDIT
+}
 model PaymentRequest {
   id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId          String            @map("user_id") @db.Uuid
@@ -270,10 +319,23 @@ model PaymentRequest {
   @@index([status])
   @@map("payment_requests")
 }
-enum PaymentType { deposit withdrawal }
-enum PaymentStatus { pending processing completed failed cancelled expired }
-enum PaymentProvider { rukassa nowpayments manual }
-
+enum PaymentType {
+  deposit
+  withdrawal
+}
+enum PaymentStatus {
+  pending
+  processing
+  completed
+  failed
+  cancelled
+  expired
+}
+enum PaymentProvider {
+  rukassa
+  nowpayments
+  manual
+}
 model PaymentCallback {
   id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   provider          String          @db.VarChar(32)
@@ -321,8 +383,12 @@ model GameProvider {
   gameTransactions GameTransaction[]
   @@map("game_providers")
 }
-enum GameProviderType { slots live_casino table_games other }
-
+enum GameProviderType {
+  slots
+  live_casino
+  table_games
+  other
+}
 model Game {
   id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   providerId        String          @map("provider_id") @db.Uuid
@@ -361,10 +427,31 @@ model Game {
   @@index([category])
   @@map("games")
 }
-enum GameType { slot live_roulette live_blackjack live_baccarat live_poker live_game_show table_game crash dice other }
-enum GameCategory { slots live_casino table_games instant_games other }
-enum GameVolatility { low medium high very_high }
-
+enum GameType {
+  slot
+  live_roulette
+  live_blackjack
+  live_baccarat
+  live_poker
+  live_game_show
+  table_game
+  crash
+  dice
+  other
+}
+enum GameCategory {
+  slots
+  live_casino
+  table_games
+  instant_games
+  other
+}
+enum GameVolatility {
+  low
+  medium
+  high
+  very_high
+}
 model GameSession {
   id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId         String            @map("user_id") @db.Uuid
@@ -390,8 +477,11 @@ model GameSession {
   gameTransactions GameTransaction[]
   @@map("game_sessions")
 }
-enum GameSessionStatus { active closed expired }
-
+enum GameSessionStatus {
+  active
+  closed
+  expired
+}
 model GameRound {
   id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   sessionId        String          @map("session_id") @db.Uuid
@@ -413,8 +503,11 @@ model GameRound {
   @@unique([providerId, externalRoundId])
   @@map("game_rounds")
 }
-enum GameRoundStatus { open closed rolled_back }
-
+enum GameRoundStatus {
+  open
+  closed
+  rolled_back
+}
 model GameTransaction {
   id                     String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   roundId                String              @map("round_id") @db.Uuid
@@ -438,8 +531,11 @@ model GameTransaction {
   @@unique([providerId, externalTransactionId])
   @@map("game_transactions")
 }
-enum GameTransactionType { bet win rollback }
-
+enum GameTransactionType {
+  bet
+  win
+  rollback
+}
 model GameFavorite {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
@@ -468,11 +564,29 @@ model SupportTicket {
   messages SupportMessage[]
   @@map("support_tickets")
 }
-enum SupportTicketCategory { payments games technical account other }
-enum SupportTicketStatus { open in_progress waiting_user closed }
-enum SupportTicketPriority { low normal high urgent }
-enum SupportClosedBy { user admin }
-
+enum SupportTicketCategory {
+  payments
+  games
+  technical
+  account
+  other
+}
+enum SupportTicketStatus {
+  open
+  in_progress
+  waiting_user
+  closed
+}
+enum SupportTicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+enum SupportClosedBy {
+  user
+  admin
+}
 model SupportMessage {
   id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ticketId    String            @map("ticket_id") @db.Uuid
@@ -485,8 +599,10 @@ model SupportMessage {
   ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   @@map("support_messages")
 }
-enum SupportSenderType { user admin }
-
+enum SupportSenderType {
+  user
+  admin
+}
 model ReferralReward {
   id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   referrerId     String               @map("referrer_id") @db.Uuid
@@ -506,9 +622,15 @@ model ReferralReward {
   referred User @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
   @@map("referral_rewards")
 }
-enum ReferralRewardType { ggr_share first_deposit_bonus }
-enum ReferralRewardStatus { pending credited zero }
-
+enum ReferralRewardType {
+  ggr_share
+  first_deposit_bonus
+}
+enum ReferralRewardStatus {
+  pending
+  credited
+  zero
+}
 model Notification {
   id        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String              @map("user_id") @db.Uuid
@@ -524,8 +646,10 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@map("notifications")
 }
-enum NotificationChannel { email internal }
-
+enum NotificationChannel {
+  email
+  internal
+}
 model SystemSetting {
   id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   key         String              @unique @db.VarChar(128)
@@ -537,4 +661,9 @@ model SystemSetting {
   updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz
   @@map("system_settings")
 }
-enum SystemSettingType { string number boolean json }
+enum SystemSettingType {
+  string
+  number
+  boolean
+  json
+}
