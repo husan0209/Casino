@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post, Query, Req, Res, UsePipes } from '@nestjs/common'
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
+import { setRefreshTokenCookie, clearRefreshTokenCookie } from '../../../../common/cookies/refresh-token-cookie'
 import { RegisterSchema } from '../dto/register.dto'
 import { LoginSchema } from '../dto/login.dto'
 import { RegisterUseCase } from '../../application/use-cases/register.use-case'
@@ -34,7 +35,7 @@ export class AuthController {
       { email: body.email, password: body.password, referralCode: body.referral_code },
       { ip: req.ip, userAgent: req.headers['user-agent'] },
     )
-    res.cookie('refresh_token', result.refreshToken, { httpOnly: true, secure: false, sameSite: 'strict', maxAge: 30 * 24 * 3600 * 1000 })
+    setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user, referralCode: result.referralCode }
   }
 
@@ -51,7 +52,7 @@ export class AuthController {
       email: body.email, password: body.password,
       ip: req.ip, userAgent: req.headers['user-agent']
     })
-    res.cookie('refresh_token', result.refreshToken, { httpOnly: true, secure: false, sameSite: 'strict', maxAge: 30*24*3600*1000 })
+    setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user }
   }
 
@@ -59,14 +60,14 @@ export class AuthController {
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = (req.cookies?.refresh_token) || req.body?.refreshToken
     const result = await this.refreshUc.execute(token)
-    res.cookie('refresh_token', result.refreshToken, { httpOnly: true, secure: false, sameSite: 'strict', maxAge: 30*24*3600*1000 })
+    setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken }
   }
 
   @Post('logout')
   async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
     if (req.user?.sessionId) await this.logoutUc.execute(req.user.sessionId)
-    res.clearCookie('refresh_token')
+    clearRefreshTokenCookie(res)
     return { ok: true }
   }
 
@@ -97,14 +98,14 @@ export class AuthController {
       code: body.code, redirectUri: body.redirect_uri, state: body.state,
       referralCode: body.referral_code, ip: req.ip, userAgent: req.headers['user-agent'],
     })
-    res.cookie('refresh_token', result.refreshToken, { httpOnly: true, secure: false, sameSite: 'strict', maxAge: 30*24*3600*1000 })
+    setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user }
   }
 
   @Post('telegram')
   async telegram(@Body() payload: any, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.telegramUc.execute(payload, { ip: req.ip, userAgent: req.headers['user-agent'] })
-    res.cookie('refresh_token', result.refreshToken, { httpOnly: true, secure: false, sameSite: 'strict', maxAge: 30*24*3600*1000 })
+    setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user }
   }
 }
