@@ -77,3 +77,11 @@ export class SessionExpiredError extends AppError {
   readonly httpStatus = 401
   constructor() { super('Сессия истекла') }
 }
+
+export class SelfExcludedError extends AppError {
+  readonly code = 'SELF_EXCLUDED'
+  readonly httpStatus = 403
+  constructor(public readonly excludedUntil: Date) {
+    super(`Аккаунт временно заблокирован по запросу пользователя до ${excludedUntil.toISOString()}`, { excludedUntil })
+  }
+}

@@ -8,10 +8,12 @@ import { EmailQueueService } from './infrastructure/services/email-queue.service
 import { PrismaUserRepository } from './infrastructure/repositories/user.repository.prisma'
 import { PrismaAuthProviderRepository } from './infrastructure/repositories/auth-provider.repository.prisma'
 import { PrismaSessionRepository } from './infrastructure/repositories/session.repository.prisma'
+import { PrismaUserSettingsRepository } from './infrastructure/repositories/user-settings.repository.prisma'
 import { PrismaEmailVerificationRepository, PrismaPasswordResetRepository } from './infrastructure/repositories/verification.repository.prisma'
 import { USER_REPOSITORY } from './domain/repositories/user.repository'
 import { AUTH_PROVIDER_REPOSITORY } from './domain/repositories/auth-provider.repository'
 import { SESSION_REPOSITORY } from './domain/repositories/session.repository'
+import { USER_SETTINGS_REPOSITORY } from './domain/repositories/user-settings.repository'
 import { EMAIL_VERIFICATION_REPOSITORY, PASSWORD_RESET_REPOSITORY } from './domain/repositories/verification-token.repository'
 import { RegisterUseCase } from './application/use-cases/register.use-case'
 import { VerifyEmailUseCase } from './application/use-cases/verify-email.use-case'
@@ -32,6 +34,7 @@ import { QueuesModule } from '../../queues/queues.module'
     { provide: USER_REPOSITORY, useClass: PrismaUserRepository },
     { provide: AUTH_PROVIDER_REPOSITORY, useClass: PrismaAuthProviderRepository },
     { provide: SESSION_REPOSITORY, useClass: PrismaSessionRepository },
+    { provide: USER_SETTINGS_REPOSITORY, useClass: PrismaUserSettingsRepository },
     { provide: EMAIL_VERIFICATION_REPOSITORY, useClass: PrismaEmailVerificationRepository },
     { provide: PASSWORD_RESET_REPOSITORY, useClass: PrismaPasswordResetRepository },
     RegisterUseCase, VerifyEmailUseCase, LoginUseCase, RefreshUseCase, LogoutUseCase,
