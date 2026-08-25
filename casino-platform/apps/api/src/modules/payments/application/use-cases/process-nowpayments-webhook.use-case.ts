@@ -13,25 +13,27 @@ export class ProcessNOWPaymentsWebhookUseCase {
     private wallet: WalletFacade,
     private users: UsersFacade,
   ) {}
-  async execute(rawHeaders: any, rawBody: any, ip: string) {
+  async execute(rawHeaders: Record<string, string>, body: any, rawBody: string, ip: string) {
     const signature = rawHeaders['x-nowpayments-sig'] || ''
+    // Store the exact raw body bytes for forensics and re-verification.
     const cb = await this.repo.saveCallback({
       provider: 'nowpayments',
-      externalId: String(rawBody.payment_id || rawBody.order_id || ''),
-      rawHeaders, rawBody: JSON.stringify(rawBody), ipAddress: ip
+      externalId: String(body.payment_id || body.order_id || ''),
+      rawHeaders, rawBody, ipAddress: ip
     })
     try {
+      // HMAC must be verified against the raw body bytes, not the re-serialised JSON.
       if (!this.np.verifyIPN(rawBody, signature)) {
         await this.repo.markCallbackProcessed(cb.id, 'invalid_signature')
         return { ok: true }
       }
-      const paymentId = String(rawBody.payment_id)
-      const paymentStatus = String(rawBody.payment_status || '').toLowerCase()
+      const paymentId = String(body.payment_id)
+      const paymentStatus = String(body.payment_status || '').toLowerCase()
       const pr = await this.repo.findByExternalId(paymentId, 'nowpayments')
       if (!pr) { await this.repo.markCallbackProcessed(cb.id, 'not_found'); return { ok: true } }
       if (pr.status === 'completed') { await this.repo.markCallbackProcessed(cb.id, 'duplicate'); return { ok: true } }
       if (['finished','confirmed'].includes(paymentStatus)) {
-        const actuallyPaid = rawBody.actually_paid || rawBody.pay_amount || pr.amount.toString()
+        const actuallyPaid = body.actually_paid || body.pay_amount || pr.amount.toString()
         await this.wallet.credit({
           userId: pr.userId,
           currency: pr.currency as any,

@@ -100,7 +100,10 @@ export class RukassaClient {
       this.logger.error('RUKASSA_SECRET_KEY not set — rejecting callback (fail-closed dev)')
       return false
     }
-    const receivedSig: string = headers['x-signature'] || body?.sign || ''
+    // Signature MUST come from the header only. Reading `body.sign` would
+    // let an attacker bypass the signature check by simply including a
+    // pre-computed `sign` field in the payload.
+    const receivedSig: string = headers['x-signature'] || ''
     if (!receivedSig) return false
 
     const shopId = this.config.get('RUKASSA_SHOP_ID') || ''

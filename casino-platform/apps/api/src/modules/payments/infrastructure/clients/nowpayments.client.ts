@@ -130,10 +130,20 @@ export class NOWPaymentsClient {
   }
 
   /**
-   * IPN подпись: HMAC-SHA512(secret, JSON полей, отсортированных по ключу), hex-строка в нижнем регистре.
-   * Fail-closed: production без NOWPAYMENTS_IPN_SECRET — исключение.
+   * IPN signature verification.
+   *
+   * IMPORTANT: HMAC must be computed against the RAW request body bytes
+   * (captured by express.json({ verify }) in main.ts), NOT against a
+   * re-serialised JSON object. Re-serialised JSON differs from the
+   * original in key order, whitespace, and number formatting, which
+   * would reject legitimate webhooks.
+   *
+   * The `body` argument is kept for logging/fallback only — never use it
+   * for the HMAC computation.
+   *
+   * Fail-closed: production without NOWPAYMENTS_IPN_SECRET — exception.
    */
-  verifyIPN(body: any, signature: string): boolean {
+  verifyIPN(rawBody: string, signature: string): boolean {
     const secret = this.config.get<string>('NOWPAYMENTS_IPN_SECRET')
     if (!secret) {
       if (this.isProd()) throw new PaymentProviderNotConfiguredError('NOWPayments', 'NOWPAYMENTS_IPN_SECRET')
@@ -141,12 +151,9 @@ export class NOWPaymentsClient {
       return false
     }
     if (!signature) return false
+    if (!rawBody) return false
 
-    const sortedBody = Object.keys(body)
-      .sort()
-      .reduce((acc: Record<string, unknown>, key) => { acc[key] = body[key]; return acc }, {})
-    const payload = JSON.stringify(sortedBody)
-    const expected = createHmac('sha512', secret).update(payload).digest('hex')
+    const expected = createHmac('sha512', secret).update(rawBody, 'utf8').digest('hex')
 
     try {
       const a = Buffer.from(signature.toLowerCase())
