@@ -1,0 +1,300 @@
+name: Architecture & Codebase Guards
+
+# Tier 2 of AUDIT_REPORT.md remediation plan.
+# Runs grep-based architecture guards that ESLint cannot express.
+# These are *separate* from the `ci.yml` lint job — they enforce
+# project-specific invariants from docs/AI_DEVELOPMENT_RULES.md,
+# docs/SECURITY_BASELINE.md, and .cursorrules.
+#
+# Each guard maps to a row in docs/AUDIT_REPORT.md (ID column).
+# If a guard fails, the message names the audit ID so the author
+# can find the context.
+#
+# To skip a guard locally (e.g. for a false positive), use the
+# `// arch-guard: disable-next-line` comment on the offending line
+# AND link the ticket/issue that justifies it.
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guards:
+    name: Architecture guards
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: casino-platform
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ──────────────────────────────────────────────────────────────
+      # A. No direct prisma.* in domain/application layers
+      # Catches: AUDIT_REPORT §A3, A4, H5
+      # Rule: docs/AI_DEVELOPMENT_RULES.md §3.2, .cursorrules §"Cross-module"
+      # ──────────────────────────────────────────────────────────────
+      - name: G1 — no direct prisma in domain/application
+        id: g1
+        run: |
+          if grep -rnE "from ['\"]@casino/database['\"]" \
+              apps/api/src/modules/*/domain apps/api/src/modules/*/application 2>/dev/null; then
+            echo "❌ G1 FAIL: prisma imported directly in domain/application."
+            echo "   See AUDIT_REPORT.md §A3, A4, H5."
+            echo "   Use a Repository interface (IXxxRepository) or a Facade."
+            exit 1
+          fi
+          echo "✅ G1 OK"
+
+      # ──────────────────────────────────────────────────────────────
+      # B. No @ts-ignore / @ts-nocheck in production code
+      # Catches: AUDIT_REPORT §C1, GENERAL best practice
+      # Rule: docs/CONVENTIONS.md §1.3 (forbidden)
+      # ──────────────────────────────────────────────────────────────
+      - name: G2 — no @ts-ignore / @ts-nocheck
+        id: g2
+        run: |
+          HITS=$(grep -rnE "@ts-(ignore|nocheck|expect-error)" \
+            apps/web/src apps/admin/src apps/api/src packages 2>/dev/null \
+            | grep -v "\.spec\.ts" | grep -v "\.test\.ts" || true)
+          if [ -n "$HITS" ]; then
+            echo "❌ G2 FAIL: @ts-ignore/@ts-nocheck found:"
+            echo "$HITS"
+            echo "   See AUDIT_REPORT.md §C1 and docs/CONVENTIONS.md §1.3."
+            exit 1
+          fi
+          echo "✅ G2 OK"
+
+      # ──────────────────────────────────────────────────────────────
+      # C. No console.log in api code (only console.warn/error allowed)
+      # Catches: AUDIT_REPORT §C2
+      # Rule: .eslintrc.js (no-console), docs/CONVENTIONS.md §7
+      # ──────────────────────────────────────────────────────────────
+      - name: G3 — no console.log in api
+        id: g3
+        run: |
+          HITS=$(grep -rnE "console\.log\(" apps/api/src 2>/dev/null || true)
+          if [ -n "$HITS" ]; then
+            echo "❌ G3 FAIL: console.log in api:"
+            echo "$HITS"
+            echo "   See AUDIT_REPORT.md §C2. Use Pino logger."
+            exit 1
+          fi
+          echo "✅ G3 OK"
+
+      # ──────────────────────────────────────────────────────────────
+      # D. No @Body() any / @Body() { ... } without Zod
+      # Catches: AUDIT_REPORT §C3, N8, N9 (forgot-password, withdrawals)
+      # Rule: docs/SECURITY_BASELINE.md §9.1, docs/API_CONVENTIONS.md §2
+      # ──────────────────────────────────────────────────────────────
+      - name: G4 — controllers must validate input
+        id: g4
+        run: |
+          # Heuristic: look for @Body() typed as any, or @Body() followed by
+          # body.* usage in the same line (i.e. no DTO extraction).
+          HITS=$(grep -rnE "@Body\(\)\s+[a-zA-Z_]+:\s*any" \
+            apps/api/src/modules/*/presentation/controllers 2>/dev/null || true)
+          if [ -n "$HITS" ]; then
+            echo "❌ G4 FAIL: @Body() any in controller (no Zod validation):"
+            echo "$HITS"
+            echo "   See AUDIT_REPORT.md §C3, N8, N9."
+            echo "   Use @UsePipes(new ZodValidationPipe(SomeSchema))."
+            exit 1
+          fi
+          echo "✅ G4 OK"
+
+      # ──────────────────────────────────────────────────────────────
+      # E. Webhook controllers must save raw body
+      # Catches: AUDIT_REPORT §N5
+      # Rule: docs/AI_DEVELOPMENT_RULES.md §8
+      # ──────────────────────────────────────────────────────────────
+      - name: G5 — webhook controllers persist raw body
+        id: g5
+        run: |
+          # Look for @Post('webhooks') in controllers. For each, check that
+          # there is a bodyParser with verify callback in main.ts.
+          WEBHOOK_CTRLS=$(grep -rln "@Post('.*webhook" apps/api/src 2>/dev/null || true)
+          if [ -n "$WEBHOOK_CTRLS" ]; then
+            if ! grep -q "rawBody" apps/api/src/main.ts 2>/dev/null; then
+              echo "❌ G5 FAIL: webhook controllers exist but main.ts has no rawBody setup."
+              echo "   Files with webhooks: $WEBHOOK_CTRLS"
+              echo "   See AUDIT_REPORT.md §N5."
+              echo "   Configure bodyParser({ verify: (req, _, buf) => { req.rawBody = buf } })."
+              exit 1
+            fi
+          fi
+          echo "✅ G5 OK"
+
+      # ──────────────────────────────────────────────────────────────
+      # F. No status.includes(...) on payment provider responses
+      # Catches: AUDIT_REPORT §H3 (Rukassa webhook: 'paid' matches 'unpaid')
+      # Rule: docs/AI_DEVELOPMENT_RULES.md §8.2
+      # ──────────────────────────────────────────────────────────────
+      - name: G6 — no string-includes on payment status
+        id: g6
+        run: |
+          HITS=$(grep -rnE "status\.(includes|startsWith|endsWith)" \
+            apps/api/src/modules/payments 2>/dev/null || true)
+          if [ -n "$HITS" ]; then
+            echo "❌ G6 FAIL: string-match on payment status is unsafe:"
+            echo "$HITS"
+            echo "   See AUDIT_REPORT.md §H3."
+            echo "   'status.includes(\"paid\")' matches 'unpaid', 'prepaid', etc."
+            echo "   Use explicit whitelist comparison: status === 'paid'."
+            exit 1
+          fi
+          echo "✅ G6 OK"
+
+      # ──────────────────────────────────────────────────────────────
+      # G. Wallet ledger methods must use Serializable isolation
+      # Catches: AUDIT_REPORT §H1 (lock/unlock without Serializable)
+      # Rule: docs/AI_DEVELOPMENT_RULES.md §7.2
+      # ──────────────────────────────────────────────────────────────
+      - name: G7 — wallet ops use Serializable + retry
+        id: g7
+        run: |
+          FILE="apps/api/src/modules/wallet/infrastructure/repositories/wallet.prisma.ts"
+          if [ -f "$FILE" ]; then
+            # Count $transaction( occurrences and Serializable occurrences in same file
+            TXNS=$(grep -c "prisma.\$transaction" "$FILE" 2>/dev/null || echo 0)
+            SERIALS=$(grep -c "isolationLevel.*Serializable" "$FILE" 2>/dev/null || echo 0)
+            if [ "$TXNS" -gt "$SERIALS" ]; then
+              echo "❌ G7 FAIL: $FILE has $TXNS \$transaction calls but only $SERIALS use Serializable."
+              echo "   See AUDIT_REPORT.md §H1."
+              echo "   Every financial \$transaction must use { isolationLevel: 'Serializable' }"
+              echo "   and retry OptimisticLockError up to 3 times."
+              exit 1
+            fi
+          fi
+          echo "✅ G7 OK"
+
+      # ──────────────────────────────────────────────────────────────
+      # H. KYC upload must have fileFilter (MIME whitelist)
+      # Catches: AUDIT_REPORT §N6
+      # Rule: docs/SECURITY_BASELINE.md §7.1
+      # ──────────────────────────────────────────────────────────────
+      - name: G8 — KYC upload has fileFilter
+        id: g8
+        run: |
+          KYC_FILES=$(grep -rln "FileInterceptor.*file" apps/api/src/modules/kyc 2>/dev/null || true)
+          if [ -n "$KYC_FILES" ]; then
+            for f in $KYC_FILES; do
+              if ! grep -q "fileFilter" "$f"; then
+                echo "❌ G8 FAIL: $f uses FileInterceptor but has no fileFilter."
+                echo "   See AUDIT_REPORT.md §N6."
+                echo "   Add: fileFilter: (req, file, cb) => { /* MIME whitelist */ }"
+                exit 1
+              fi
+            done
+          fi
+          echo "✅ G8 OK"
+
+      # ──────────────────────────────────────────────────────────────
+      # I. Refresh-token cookie must use secure: NODE_ENV === 'production'
+      # Catches: AUDIT_REPORT §N7
+      # Rule: docs/SECURITY_BASELINE.md §5.1
+      # ──────────────────────────────────────────────────────────────
+      - name: G9 — refresh cookie secure is conditional
+        id: g9
+        run: |
+          # Look for hardcoded secure: false in auth controller
+          HITS=$(grep -rnE "secure:\s*false" \
+            apps/api/src/modules/auth/presentation 2>/dev/null || true)
+          if [ -n "$HITS" ]; then
+            echo "❌ G9 FAIL: hardcoded secure: false in auth:"
+            echo "$HITS"
+            echo "   See AUDIT_REPORT.md §N7."
+            echo "   Use secure: process.env['NODE_ENV'] === 'production'."
+            exit 1
+          fi
+          echo "✅ G9 OK"
+
+      # ──────────────────────────────────────────────────────────────
+      # J. Dockerfile must set USER (non-root)
+      # Catches: AUDIT_REPORT §N11
+      # Rule: docs/SECURITY_CHECKLIST.md §Infra, OWASP
+      # ──────────────────────────────────────────────────────────────
+      - name: G10 — Dockerfiles use non-root USER
+        id: g10
+        run: |
+          DOCKERFILES=$(find infra/docker -name "*.Dockerfile" 2>/dev/null || true)
+          FAILED=0
+          for f in $DOCKERFILES; do
+            if ! grep -qE "^USER\s+\w" "$f"; then
+              echo "❌ G10 FAIL: $f has no USER directive (running as root)."
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" = "1" ]; then
+            echo "   See AUDIT_REPORT.md §N11."
+            echo "   Add 'USER node' (or other non-root) before CMD."
+            exit 1
+          fi
+          echo "✅ G10 OK"
+
+      # ──────────────────────────────────────────────────────────────
+      # K. No secrets in env.example placeholders that look production-ready
+      # Catches: regressions in docs/SECURITY_BASELINE.md §10
+      # ──────────────────────────────────────────────────────────────
+      - name: G11 — env.example uses obvious placeholders
+        id: g11
+        run: |
+          if [ -f .env.example ]; then
+            # 'change_me' / 'replace_me' is fine. 'dev_xxx' with 64+ chars that
+            # could pass min(64) in zod is dangerous.
+            BAD=$(grep -E "dev_[a-z_]+_REPLACE_WITH" .env.example 2>/dev/null \
+              | awk 'length($0) > 80' || true)
+            if [ -n "$BAD" ]; then
+              echo "❌ G11 FAIL: long dev placeholders in .env.example (could pass min-64 zod check):"
+              echo "$BAD" | head -5
+              echo "   See AUDIT_REPORT.md §N10 and docs/SECURITY_BASELINE.md §10.3."
+              echo "   Use shorter placeholders like 'REPLACE_ME' so production deploys fail fast."
+              exit 1
+            fi
+          fi
+          echo "✅ G11 OK"
+
+      # ──────────────────────────────────────────────────────────────
+      # L. Branch name follows convention
+      # Catches: docs/CONVENTIONS.md §10.1
+      # ──────────────────────────────────────────────────────────────
+      - name: G12 — branch name follows convention
+        id: g12
+        if: github.event_name == 'pull_request'
+        run: |
+          BR="${{ github.head_ref }}"
+          if [ -z "$BR" ]; then
+            BR="${{ github.ref_name }}"
+          fi
+          if ! echo "$BR" | grep -qE "^(feat|fix|chore|docs|refactor|test|perf|style|security|wip)/"; then
+            echo "❌ G12 FAIL: branch '$BR' does not follow type/name convention."
+            echo "   Use one of: feat/, fix/, chore/, docs/, refactor/, test/, perf/, style/, security/, wip/"
+            echo "   See docs/CONVENTIONS.md §10.1."
+            exit 1
+          fi
+          echo "✅ G12 OK (branch: $BR)"
+
+      # ── Final summary ─────────────────────────────────────────────
+      - name: Summary
+        if: always()
+        run: |
+          echo "Architecture guard summary:"
+          echo "- G1  prisma layer:        ${{ steps.g1.outcome }}"
+          echo "- G2  no @ts-ignore:       ${{ steps.g2.outcome }}"
+          echo "- G3  no console.log:      ${{ steps.g3.outcome }}"
+          echo "- G4  Zod on controllers:  ${{ steps.g4.outcome }}"
+          echo "- G5  webhook raw body:    ${{ steps.g5.outcome }}"
+          echo "- G6  status match safe:   ${{ steps.g6.outcome }}"
+          echo "- G7  wallet Serializable: ${{ steps.g7.outcome }}"
+          echo "- G8  KYC fileFilter:      ${{ steps.g8.outcome }}"
+          echo "- G9  cookie secure:       ${{ steps.g9.outcome }}"
+          echo "- G10 docker non-root:     ${{ steps.g10.outcome }}"
+          echo "- G11 env placeholders:    ${{ steps.g11.outcome }}"
+          echo "- G12 branch name:         ${{ steps.g12.outcome }}"

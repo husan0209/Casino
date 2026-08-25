@@ -16,7 +16,7 @@ module.exports = {
   ignorePatterns: ['dist', 'build', '.next', 'node_modules', 'prisma/generated', 'coverage'],
   rules: {
     // ─── General quality ──────────────────────────────────────────
-    'no-console': ['warn', { allow: ['warn', 'error'] }],
+    'no-console': ['error', { allow: ['warn', 'error'] }],
     'no-debugger': 'error',
     'no-alert': 'error',
     'no-var': 'error',
@@ -28,7 +28,8 @@ module.exports = {
     'no-duplicate-imports': 'off',
 
     // ─── TypeScript ───────────────────────────────────────────────
-    '@typescript-eslint/no-explicit-any': 'warn',
+    // CRITICAL: was 'warn'. Money-related code MUST NOT use any.
+    '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/no-unused-vars': [
       'error',
       { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
@@ -37,7 +38,8 @@ module.exports = {
     // ─── Imports ──────────────────────────────────────────────────
     'import/no-duplicates': 'error',
     'import/newline-after-import': 'error',
-    'import/no-cycle': 'warn',
+    // CRITICAL: was 'warn'. Cycles in modules hide dependency problems.
+    'import/no-cycle': 'error',
     'import/order': [
       'error',
       {
@@ -54,15 +56,17 @@ module.exports = {
 
     // ─── React ────────────────────────────────────────────────────
     'react-hooks/rules-of-hooks': 'error',
-    'react-hooks/exhaustive-deps': 'warn',
+    // CRITICAL: was 'warn'. Stale closures cause subtle money bugs (balance, etc).
+    'react-hooks/exhaustive-deps': 'error',
 
     // ─── Function discipline ──────────────────────────────────────
-    'max-params': ['warn', 3],
-    'max-depth': ['warn', 3],
-    'complexity': ['warn', 10],
-    'max-lines-per-function': ['warn', { max: 60, skipBlankLines: true, skipComments: true }],
+    // CRITICAL: was 'warn'. Long/complex methods hide business logic.
+    'max-params': ['error', 3],
+    'max-depth': ['error', 3],
+    'complexity': ['error', 10],
+    'max-lines-per-function': ['error', { max: 60, skipBlankLines: true, skipComments: true }],
 
-    // ─── Money (docs/CONVENTIONS.md 5.3) ──────────────────────────
+    // ─── Money (docs/CONVENTIONS.md §5, AI_DEVELOPMENT_RULES §1) ─
     // Money is MoneyAmount (string) + decimal.js. Never number/float.
     'no-restricted-globals': [
       'error',
@@ -89,13 +93,44 @@ module.exports = {
   },
   overrides: [
     {
-      // Relaxed rules for tests (docs/CONVENTIONS.md: tests assert behavior, not size)
+      // Relaxed rules for tests (docs/CONVENTIONS.md §11: tests assert behavior, not size)
       files: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e-spec.ts'],
       rules: {
         'max-lines-per-function': 'off',
         'max-params': 'off',
+        'complexity': 'off',
+        'max-depth': 'off',
         '@typescript-eslint/no-explicit-any': 'off',
       },
+    },
+    {
+      // ── Module layering: domain/application must NOT import prisma directly ──
+      // Catches AUDIT_REPORT §A3, A4, H5: use cases reaching into prisma.* without
+      // going through a Repository interface or a Facade. Violates
+      // .cursorrules §"Cross-module communication" and AI_DEVELOPMENT_RULES §3.2.
+      files: [
+        'apps/api/src/modules/**/domain/**/*.ts',
+        'apps/api/src/modules/**/application/**/*.ts',
+      ],
+      rules: {
+        'no-restricted-imports': [
+          'error',
+          {
+            patterns: [
+              {
+                group: ['@casino/database', '**/node_modules/.prisma/**', '**/.prisma/client/**'],
+                message:
+                  'Direct prisma import in domain/application is FORBIDDEN. Use a repository interface (IXxxRepository) or another module\'s Facade. See docs/AI_DEVELOPMENT_RULES.md §3.2 and .cursorrules §"Cross-module communication".',
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // ── Web/Admin (Next.js) — disable Node-only rules ──
+      files: ['apps/web/**/*.{ts,tsx}', 'apps/admin/**/*.{ts,tsx}'],
+      env: { browser: true, node: true, es2022: true },
     },
   ],
 }
