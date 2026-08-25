@@ -31,7 +31,7 @@ export class PrismaSupportRepository implements ISupportRepository {
   }
   async addMessage(ticketId: string, senderType: 'user'|'admin', senderId: string, message: string, isInternal = false, attachments: any[] = []) {
     const m = await prisma.supportMessage.create({ data: { ticketId, senderType, senderId, message, attachments, isInternal }})
-    await prisma.supportTicket.update({ where: { id: ticketId }, data: { updatedAt: new Date(), status: senderType==='admin' && !isInternal ? 'waiting_user' : undefined }})
+    await prisma.supportTicket.update({ where: { id: ticketId }, data: { updatedAt: new Date(), ...(senderType==='admin' && !isInternal && { status: 'waiting_user' as const }) }})
     return m
   }
   async listMessages(ticketId: string, includeInternal: boolean) {

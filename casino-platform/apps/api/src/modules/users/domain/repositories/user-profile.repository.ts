@@ -14,7 +14,7 @@ export interface UserGeoContext {
 export interface IUserProfileRepository {
   getMe(userId: string): Promise<UserProfileFull | null>
   getGeoContext(userId: string): Promise<UserGeoContext | null>
-  updateProfile(userId: string, data: { firstName?: string; lastName?: string; dateOfBirth?: Date | null; country?: string; city?: string }): Promise<void>
+  updateProfile(userId: string, data: { firstName?: string | undefined; lastName?: string | undefined; dateOfBirth?: Date | null | undefined; country?: string | undefined; city?: string | undefined }): Promise<void>
   updateSettings(userId: string, data: { notificationsEmail?: boolean; notificationsPush?: boolean; language?: string; timezone?: string }): Promise<void>
   updateCurrencyPreference(userId: string, currency: string): Promise<void>
   updateAfterDeposit(userId: string, currency: string, method: string): Promise<void>

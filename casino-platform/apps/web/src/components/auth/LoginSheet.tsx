@@ -1,6 +1,5 @@
 'use client'
 import { useState } from 'react'
-import Link from 'next/link'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { errText } from '@/lib/api'

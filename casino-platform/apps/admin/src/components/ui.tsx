@@ -62,7 +62,7 @@ export function Pager({ page, perPage, total, onPage }: { page: number; perPage:
   )
 }
 
-export function ErrorBox({ msg }: { msg?: string }) {
+export function ErrorBox({ msg }: { msg?: string | undefined }) {
   if (!msg) return null
   return <div className="mb-3 rounded-lg bg-red-950/70 border border-red-800 px-3 py-2 text-sm text-red-300">{msg}</div>
 }

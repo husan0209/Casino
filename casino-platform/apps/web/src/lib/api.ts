@@ -2,7 +2,7 @@
 import axios, { AxiosError } from 'axios'
 import { useAuthStore } from '@/stores/auth'
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'
+export const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001/api/v1'
 
 export const api = axios.create({ baseURL: API_URL })
 
@@ -39,7 +39,8 @@ export async function apiPatch<T = any>(url: string, body?: unknown): Promise<T>
 }
 
 export function setAccessToken(token: string) {
-  api.defaults.headers.common.Authorization = token ? `Bearer ${token}` : undefined
+  if (token) api.defaults.headers.common.Authorization = `Bearer ${token}`
+  else delete api.defaults.headers.common.Authorization
 }
 
 export function errText(e: unknown): string {

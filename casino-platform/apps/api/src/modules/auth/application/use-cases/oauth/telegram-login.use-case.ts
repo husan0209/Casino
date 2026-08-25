@@ -52,7 +52,7 @@ export class TelegramLoginUseCase {
     }
   }
 
-  async execute(input: TelegramWidgetPayload & { referralCode?: string }, meta?: { ip?: string; userAgent?: string }) {
+  async execute(input: TelegramWidgetPayload & { referralCode?: string | undefined }, meta?: { ip?: string | undefined; userAgent?: string | undefined }) {
     this.verify(input)
     const displayName = [input.first_name, input.last_name].filter(Boolean).join(' ') || input.username
     return this.provisioning.signIn({

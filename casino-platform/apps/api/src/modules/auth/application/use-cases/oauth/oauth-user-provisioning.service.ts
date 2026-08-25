@@ -9,10 +9,10 @@ export interface ProviderSignInInput {
   providerUserId: string
   /** email от провайдера (у Telegram его нет) */
   email?: string | null
-  displayName?: string
-  referralCode?: string
-  ip?: string
-  userAgent?: string
+  displayName?: string | undefined
+  referralCode?: string | undefined
+  ip?: string | undefined
+  userAgent?: string | undefined
 }
 
 /**

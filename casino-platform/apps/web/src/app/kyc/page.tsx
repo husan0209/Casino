@@ -24,7 +24,7 @@ export default function KycPage(){
     const file = files[type]; if (!file) return
     const fd = new FormData(); fd.append('file', file); fd.append('document_type', type)
     try {
-      await fetch((process.env.NEXT_PUBLIC_API_URL||'http://localhost:3001/api/v1') + '/kyc/documents', {
+      await fetch((process.env['NEXT_PUBLIC_API_URL']||'http://localhost:3001/api/v1') + '/kyc/documents', {
         method: 'POST', body: fd, credentials: 'include'
       })
       toast.success('Документ загружен'); refetch()

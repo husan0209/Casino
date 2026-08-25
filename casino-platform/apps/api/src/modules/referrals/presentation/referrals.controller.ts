@@ -14,7 +14,7 @@ export class ReferralsController {
       where:{ referrerId: u.id, status:'credited' },
       _sum:{ rewardAmount:true }
     })
-    const refLink = (process.env.APP_URL || 'http://localhost:3000') + '?ref=' + user?.referralCode
+    const refLink = (process.env['APP_URL'] || 'http://localhost:3000') + '?ref=' + user?.referralCode
     return {
       referral_code: user?.referralCode,
       referral_link: refLink,

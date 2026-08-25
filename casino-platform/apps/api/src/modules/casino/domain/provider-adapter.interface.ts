@@ -5,22 +5,22 @@ export interface LaunchParams {
 }
 export interface ParsedProviderCallback {
   action: 'authenticate' | 'balance' | 'bet' | 'win' | 'rollback'
-  playerToken?: string
-  playerId?: string
-  betAmount?: string
-  winAmount?: string
-  roundId?: string
-  transactionId?: string
-  rollbackTransactionId?: string
-  gameId?: string
+  playerToken?: string | undefined
+  playerId?: string | undefined
+  betAmount?: string | undefined
+  winAmount?: string | undefined
+  roundId?: string | undefined
+  transactionId?: string | undefined
+  rollbackTransactionId?: string | undefined
+  gameId?: string | undefined
   rawRequest: any
-  currency?: string
+  currency?: string | undefined
 }
 export interface GameProviderAdapter {
   getLaunchUrl(params: LaunchParams): Promise<{ url: string }>
   fetchGameList(): Promise<Array<{
-    externalGameId: string; name: string; type?: string; category?: string;
-    thumbnailUrl?: string; hasDemo: boolean; rtp?: number; metadata?: any
+    externalGameId: string; name: string; type?: string | undefined; category?: string | undefined;
+    thumbnailUrl?: string | undefined; hasDemo: boolean; rtp?: number | undefined; metadata?: any
   }>>
   verifyCallback(headers: any, body: any): boolean
   parseCallback(headers: any, body: any): ParsedProviderCallback

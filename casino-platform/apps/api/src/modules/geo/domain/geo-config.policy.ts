@@ -36,9 +36,9 @@ export interface GeoConfigResult {
 }
 
 export function resolveGeoConfig(input: {
-  hostname?: string
-  countryCode?: string | null
-  userContext?: UserGeoContext | null
+  hostname?: string | undefined
+  countryCode?: string | null | undefined
+  userContext?: UserGeoContext | null | undefined
 }): GeoConfigResult {
   const legalCountry = resolveLegalCountry(input.userContext?.country || input.countryCode)
   const profile = GEO_PROFILES[legalCountry]

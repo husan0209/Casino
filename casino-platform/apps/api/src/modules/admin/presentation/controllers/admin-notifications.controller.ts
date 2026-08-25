@@ -23,6 +23,7 @@ export class AdminNotificationsController {
       title: body.title,
       message: body.message,
       type: body.type as any || 'system',
+      channel: 'internal' as const,
       isRead: false
     }))
 

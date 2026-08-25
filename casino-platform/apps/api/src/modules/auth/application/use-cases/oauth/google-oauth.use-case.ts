@@ -60,7 +60,7 @@ export class GoogleOAuthUseCase {
     return { url: `${AUTH_URL}?${q.toString()}`, state }
   }
 
-  async execute(input: { code: string; redirectUri?: string; state?: string; referralCode?: string; ip?: string; userAgent?: string }) {
+  async execute(input: { code: string; redirectUri?: string | undefined; state?: string | undefined; referralCode?: string | undefined; ip?: string | undefined; userAgent?: string | undefined }) {
     const { clientId, clientSecret } = this.credentials()
     this.verifyState(input.state)
     const redirect = input.redirectUri || `${this.config.get<string>('APP_URL')}/auth/google/callback`

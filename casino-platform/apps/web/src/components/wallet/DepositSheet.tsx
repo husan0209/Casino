@@ -37,7 +37,6 @@ export function DepositSheet() {
   const presets = config?.depositPresets ?? ['1000', '2000', '5000', '10000']
   const fiatMethods = config?.paymentMethods ?? []
   const cryptoMethods = config?.cryptoMethods ?? []
-  const methods = mode === 'crypto' ? cryptoMethods : fiatMethods
   const payCurrency = mode === 'crypto' && cryptoMethods[0] ? cryptoMethods.find((m) => m.id === method)?.currency ?? 'USDT_TRC20' : currency
 
   const currencyLabel = formatAmount(0, payCurrency).replace(/^0\s?/, '').trim() || payCurrency

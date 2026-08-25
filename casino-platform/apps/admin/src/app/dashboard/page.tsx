@@ -27,9 +27,9 @@ export default function DashboardPage() {
 
   const cards: Array<[string, string, string]> = metrics.data ? [
     ['Пользователи', fmt(metrics.data!.users.total), `+${metrics.data.users.new_in_period} за период · активных сегодня ${metrics.data.users.active_today}`],
-    ['Депозиты', fmt(metrics.data!.finance.deposits), `всего ${fmt(metrics.data!.finance.deposits_total)}`],
-    ['Выводы', fmt(metrics.data!.finance.withdrawals), `всего ${fmt(metrics.data!.finance.withdrawals_total)}`],
-    ['GGR', fmt(metrics.data!.finance.ggr), `за период (${period})`],
+    ['Депозиты', fmt(metrics.data!.finance['deposits']), `всего ${fmt(metrics.data!.finance['deposits_total'])}`],
+    ['Выводы', fmt(metrics.data!.finance['withdrawals']), `всего ${fmt(metrics.data!.finance['withdrawals_total'])}`],
+    ['GGR', fmt(metrics.data!.finance['ggr']), `за период (${period})`],
   ] : []
 
   const rd = revenue.data

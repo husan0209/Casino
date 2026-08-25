@@ -16,7 +16,7 @@ export default function GamePage() {
   const shouldLaunch = search.get('launch') === '1'
   const { user } = useAuth()
   const { openLogin, openDeposit } = useUIStore()
-  const { activeCurrency, fetchWallets, setLastPlayedCurrency } = useWalletStore()
+  const { activeCurrency, fetchWallets, setLastPlayed } = useWalletStore()
   const { config, load } = useGeoStore()
 
   const currency = config?.activeCurrency || activeCurrency
@@ -33,7 +33,7 @@ export default function GamePage() {
         return_url: window.location.href,
       }),
     onSuccess: (res) => {
-      setLastPlayedCurrency(currency)
+      setLastPlayed(slug, currency)
       window.location.href = `/casino/${slug}/play?url=${encodeURIComponent(res.launch_url)}`
     },
     onError: (e: any) => {

@@ -14,7 +14,7 @@ function VerifyInner(){
   const [status, setStatus] = useState('Проверка…')
   useEffect(() => {
     if (!token) { setStatus('Нет токена'); return }
-    axios.get((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1') + '/auth/verify-email?token=' + token)
+    axios.get((process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001/api/v1') + '/auth/verify-email?token=' + token)
       .then(r => {
         const d = r.data?.data || r.data
         if (d.accessToken) { setAuth(d.user, d.accessToken); setAccessToken(d.accessToken) }

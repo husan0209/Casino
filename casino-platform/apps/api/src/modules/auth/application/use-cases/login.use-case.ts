@@ -21,7 +21,7 @@ export class LoginUseCase {
     private hasher: PasswordHasher,
     private jwt: JwtTokenService,
   ) {}
-  async execute(input: { email: string; password: string; ip?: string; userAgent?: string }) {
+  async execute(input: { email: string; password: string; ip?: string | undefined; userAgent?: string | undefined }) {
     const user = await this.users.findByEmail(input.email.toLowerCase().trim())
     if (!user || !user.passwordHash) throw new InvalidCredentialsError()
     const ok = await this.hasher.verify(user.passwordHash, input.password)

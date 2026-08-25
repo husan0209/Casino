@@ -4,7 +4,7 @@ export interface EmailJobData {
   to: string
   subject: string
   text: string
-  html?: string
+  html?: string | undefined
   /** id записи в notifications – воркер проставит sentAt после успешной отправки */
   notificationId?: string
 }

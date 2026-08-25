@@ -2,7 +2,7 @@ export interface MailMessage {
   to: string
   subject: string
   text: string
-  html?: string
+  html?: string | undefined
 }
 
 /** Порт отправки письма. Реализации: SmtpMailer (prod), DevLogMailer (dev). */

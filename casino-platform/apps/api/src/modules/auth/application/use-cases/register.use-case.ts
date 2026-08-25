@@ -34,7 +34,7 @@ export class RegisterUseCase {
 
   async execute(
     input: { email: string; password: string; referralCode?: string },
-    meta?: { ip?: string; userAgent?: string },
+    meta?: { ip?: string | undefined; userAgent?: string | undefined },
   ) {
     if (input.password.length < 8) throw new WeakPasswordError()
     const emailNormalized = input.email.toLowerCase().trim()

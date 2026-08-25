@@ -11,7 +11,7 @@ export class ReferralCalcService {
     const date = dateStr ? new Date(dateStr) : new Date(Date.now() - 86400000)
     const dayStart = new Date(date); dayStart.setUTCHours(0,0,0,0)
     const dayEnd = new Date(dayStart); dayEnd.setUTCHours(23,59,59,999)
-    const rewardRate = new Decimal(process.env.REFERRAL_REWARD_RATE || '0.05')
+    const rewardRate = new Decimal(process.env['REFERRAL_REWARD_RATE'] || '0.05')
     // get all users with referrer
     const referredUsers = await prisma.user.findMany({ where: { referredBy: { not: null }}, select: { id: true, referredBy: true }})
     let processed = 0, credited = 0
