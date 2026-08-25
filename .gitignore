@@ -1,0 +1,28 @@
+# ── Non-project directories (local artifacts, not part of repo) ──
+/home/
+/uploads/
+/apps/
+
+# ── Dependencies & builds ────────────────────────────────────────
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+.turbo/
+
+# ── Environment & secrets ───────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── OS / editor ─────────────────────────────────────────────────
+*.log
+logs/
+.DS_Store
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea
