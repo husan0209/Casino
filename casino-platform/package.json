@@ -13,7 +13,7 @@
     "dev:api": "pnpm --filter @casino/api dev",
     "dev:web": "pnpm --filter @casino/web dev",
     "dev:admin": "pnpm --filter @casino/admin dev",
-    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "lint": "pnpm -r lint",
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.jsx --fix",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
