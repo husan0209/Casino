@@ -1,12 +1,25 @@
 #!/bin/sh
+ROOT="$(git rev-parse --show-toplevel)"
+PLAT="$ROOT/casino-platform"
 
-# Проверка на утечку секретов (если gitleaks установлен)
+# ── Secrets scan ─────────────────────────────────────────────────
 if command -v gitleaks >/dev/null 2>&1; then
-  gitleaks detect --source . --verbose
-  if [ $? -ne 0 ]; then
+  gitleaks detect --source "$ROOT" --verbose || {
     echo "SECRETS_FOUND: potential secrets detected, aborting commit"
+    exit 1
+  }
+else
+  echo "WARN: gitleaks not installed — running simplified secret scan"
+  SECRETS_FOUND=0
+  PATTERNS='AKIA[0-9A-Z]{16}|-----BEGIN (RSA |EC |OPENSSH |PGP )?PRIVATE KEY|sk_live_[0-9a-zA-Z]{10,}|ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|xox[baprs]-[0-9A-Za-z-]{10,}|AIza[0-9A-Za-z_-]{35}'
+  if git diff --cached --diff-filter=ACM --unified=0 | grep -IEn "$PATTERNS"; then
+    echo ""
+    echo "SECRETS_FOUND: potential secret in staged changes — commit aborted"
+    echo "If this is a false positive, use: git commit --no-verify"
     exit 1
   fi
 fi
 
-pnpm exec lint-staged
+# ── Lint staged files (use sh to invoke on FAT fs without exec bit) ──
+cd "$PLAT" || exit 1
+exec sh "$PLAT/scripts/bin/lint-staged"
