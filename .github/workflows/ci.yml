@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'casino-platform/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: casino-platform
+
+env:
+  # На CI symlinks доступны: включаем bin-links, чтобы работали все package.json-скрипты.
+  # Локально на FAT/sdcard действует .npmrc (bin-links=false), там используются scripts/bin/*.
+  npm_config_bin_links: 'true'
+
+jobs:
+  secrets-scan:
+    name: Secrets scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  commitlint:
+    name: Commit messages (commitlint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install toolchain
+        run: pnpm install --frozen-lockfile
+      - name: Lint commits
+        run: |
+          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+            FROM="${{ github.event.pull_request.base.sha }}"
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            FROM="${{ github.event.before }}"
+          else
+            FROM="HEAD~${{ github.event.commits[0].id && '1' || '1' }}"
+          fi
+          echo "Committing range: ${FROM}..HEAD"
+          pnpm exec commitlint --from "${FROM}" --to HEAD
+
+  quality:
+    name: Lint + Typecheck + Test + Build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: casino
+          POSTGRES_PASSWORD: casino_test
+          POSTGRES_DB: casino_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://casino:casino_test@localhost:5432/casino_test
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: casino-platform/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prisma generate
+        run: pnpm db:generate
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test
+      - name: Build
+        run: pnpm build
+
+  deploy:
+    name: Deploy to VPS (only after green CI)
+    needs: [secrets-scan, commitlint, quality]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/casino-platform
+            git pull origin main
+            docker compose -f docker-compose.prod.yml pull || true
+            docker compose -f docker-compose.prod.yml build --pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml exec -T api npx prisma migrate deploy
+            docker compose -f docker-compose.prod.yml ps
+            echo "Deploy OK $(date)"
