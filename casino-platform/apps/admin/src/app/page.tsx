@@ -1,9 +1,10 @@
 'use client'
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/stores/auth'
+import { useState } from 'react'
+
 import { Btn, ErrorBox, Input } from '@/components/ui'
 import { errText } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
 
 export default function LoginPage() {
   const router = useRouter()

@@ -2,6 +2,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
+
 import { useAuthStore } from '@/stores/auth'
 
 const nav: Array<[string, string]> = [

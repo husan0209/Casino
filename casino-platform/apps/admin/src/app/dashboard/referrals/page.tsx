@@ -1,8 +1,9 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
-import { apiGet, apiGetFull } from '@/lib/api'
-import { Badge, Card, Loading, PageTitle, Pager, Td, Th } from '@/components/ui'
 import { useState } from 'react'
+
+import { Badge, Card, Loading, PageTitle, Pager, Td, Th } from '@/components/ui'
+import { apiGet, apiGetFull } from '@/lib/api'
 
 interface Stats { total_referrals: number; total_rewards_paid: string; top_referrers: Array<{ user_id: string; email: string | null; referral_count: number; total_earned: string }> }
 

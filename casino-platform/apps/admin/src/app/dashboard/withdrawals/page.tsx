@@ -1,8 +1,9 @@
 'use client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { apiGetFull, apiPost, errText } from '@/lib/api'
+
 import { Badge, Btn, ErrorBox, Input, Loading, PageTitle, Pager, Select, Td, Th } from '@/components/ui'
+import { apiGetFull, apiPost, errText } from '@/lib/api'
 
 interface WdRow { id: string; createdAt: string; status: string; amount: string; currency: string; method: string | null; destination: any; user?: { email: string | null } }
 
@@ -39,7 +40,7 @@ export default function WithdrawalsPage() {
     onSuccess: (res) => {
       setErr(undefined); invalidate()
       const done = res.approved ?? res.rejected ?? 0
-      if (res.failed?.length) setErr(`Обработано: ${done}, ошибок: ${res.failed.length} (${res.failed.map(f => f.id.slice(0, 8)).join(', ')})`)
+      if (res.failed.length) setErr(`Обработано: ${done}, ошибок: ${res.failed.length} (${res.failed.map(f => f.id.slice(0, 8)).join(', ')})`)
       else setErr(undefined)
       setBatchReason('')
     },

@@ -1,8 +1,9 @@
 'use client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { apiGet, apiPost, errText } from '@/lib/api'
+
 import { Badge, Btn, ErrorBox, Loading, PageTitle, Td, Th } from '@/components/ui'
+import { apiGet, apiPost, errText } from '@/lib/api'
 
 interface ProviderRow { id: string; slug: string; name: string; type: string; isEnabled: boolean; gameCount: number }
 interface SyncResult { added: number; updated?: number; total?: number; note?: string }
@@ -18,7 +19,7 @@ export default function ProvidersPage() {
     mutationFn: ({ id, action }: { id: string; action: string }) => apiPost<SyncResult>(`/admin/providers/${id}/${action}`),
     onSuccess: (res, vars) => {
       setErr(undefined); qc.invalidateQueries({ queryKey: ['providers'] })
-      if (vars.action === 'sync-games') setNote(res?.note ?? `Добавлено ${res?.added ?? 0}, всего ${res?.total ?? '—'}`)
+      if (vars.action === 'sync-games') setNote(res.note ?? `Добавлено ${res.added ?? 0}, всего ${res.total ?? '—'}`)
     },
     onError: (e) => setErr(errText(e)),
   })

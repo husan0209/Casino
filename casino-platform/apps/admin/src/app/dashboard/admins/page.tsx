@@ -1,9 +1,10 @@
 'use client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { useAuthStore } from '@/stores/auth'
-import { apiGet, apiPost, errText } from '@/lib/api'
+
 import { Badge, Btn, ErrorBox, Input, Loading, PageTitle, Select, Td, Th } from '@/components/ui'
+import { apiGet, apiPost, errText } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
 
 interface AdminRow { id: string; email: string; firstName: string | null; lastName: string | null; role: 'admin' | 'superadmin'; isActive: boolean; lastLoginAt: string | null }
 
@@ -58,7 +59,7 @@ export default function AdminsPage() {
                 <Td><span className="text-xs bg-white/10 rounded px-2 py-0.5">{a.role}</span></Td>
                 <Td><Badge value={a.isActive ? 'active' : 'blocked'} /></Td>
                 <Td className="text-[#8b8ba7]">{a.lastLoginAt ? new Date(a.lastLoginAt).toLocaleString('ru-RU') : '—'}</Td>
-                <Td>{a.isActive && a.email !== me?.email && <Btn small variant="danger" onClick={() => deactivate.mutate(a.id)}>Деактивировать</Btn>}</Td>
+                <Td>{a.isActive && a.email !== me.email && <Btn small variant="danger" onClick={() => deactivate.mutate(a.id)}>Деактивировать</Btn>}</Td>
               </tr>
             ))}
           </tbody>

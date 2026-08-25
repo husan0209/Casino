@@ -1,5 +1,5 @@
 'use client'
-import { ReactNode } from 'react'
+import { type ReactNode } from 'react'
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <div className={`bg-[#141420] rounded-2xl border border-white/5 p-4 ${className}`}>{children}</div>

@@ -3,8 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useState } from 'react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { apiGet } from '@/lib/api'
+
 import { Card, Loading, PageTitle } from '@/components/ui'
+import { apiGet } from '@/lib/api'
 
 interface Metrics {
   period: string
@@ -42,7 +43,7 @@ export default function DashboardPage() {
       }))
     : []
   const rg = regs.data
-  const regData = rg ? rg.labels.map((l, i) => ({ day: l.slice(5), count: rg.datasets.registrations?.[i] ?? 0 })) : []
+  const regData = rg ? rg.labels.map((l, i) => ({ day: l.slice(5), count: rg.datasets.registrations[i] ?? 0 })) : []
 
   return (
     <div>

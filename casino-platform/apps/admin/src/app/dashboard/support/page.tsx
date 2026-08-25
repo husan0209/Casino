@@ -1,8 +1,9 @@
 'use client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { apiGetFull, apiPost, errText } from '@/lib/api'
+
 import { Badge, Btn, ErrorBox, Loading, PageTitle, Pager, Select, Td, Th } from '@/components/ui'
+import { apiGetFull, apiPost, errText } from '@/lib/api'
 
 interface TicketRow { id: string; subject: string; category: string; status: string; priority: string; createdAt: string; user?: { email: string | null } }
 
@@ -23,7 +24,7 @@ export default function SupportPage() {
   const messages = useQuery({
     queryKey: ['ticket', openId],
     queryFn: () => apiGetFull<any>(`/admin/support/tickets/${openId}`),
-    enabled: !!openId,
+    enabled: Boolean(openId),
   })
 
   const act = useMutation({
