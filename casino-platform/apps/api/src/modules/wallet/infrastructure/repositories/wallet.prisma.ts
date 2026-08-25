@@ -79,41 +79,83 @@ export class PrismaWalletLedger implements IWalletLedger {
   async lock(userId: string, currency: Currency, amount: MoneyAmount, idempotencyKey: string): Promise<CreditResult> {
     const existing = await prisma.ledgerEntry.findUnique({ where: { idempotencyKey }})
     if (existing) return { balanceBefore: toMoney(existing.balanceBefore), balanceAfter: toMoney(existing.balanceAfter), ledgerEntryId: existing.id, duplicate: true }
-    return prisma.$transaction(async (tx: { [k: string]: any }) => {
-      const wallet = await tx.walletAccount.findUnique({ where: { userId_currency: { userId, currency }}})
-      if (!wallet) throw new Error('WALLET_NOT_FOUND')
-      const available = money.subtract(toMoney(wallet.balance), toMoney(wallet.locked))
-      if (!money.isGreaterOrEqual(available, amount)) throw new InsufficientFundsError(amount, available)
-      const newLocked = money.add(toMoney(wallet.locked), amount)
-      await tx.walletAccount.update({ where: { id: wallet.id }, data: { locked: newLocked, version: { increment: 1 }}})
-      const ledger = await tx.ledgerEntry.create({
-        data: {
-          transactionId: randomUUID(), walletAccountId: wallet.id, userId,
-          type: 'WITHDRAWAL_LOCK', amount: '0',
-          balanceBefore: toMoney(wallet.balance), balanceAfter: toMoney(wallet.balance),
-          idempotencyKey, description: 'Withdrawal lock', metadata: { locked_amount: amount }
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await prisma.$transaction(async (tx: { [k: string]: any }) => {
+          const wallet = await tx.walletAccount.findUnique({ where: { userId_currency: { userId, currency }}})
+          if (!wallet) throw new Error('WALLET_NOT_FOUND')
+          const balance = toMoney(wallet.balance)
+          const currentLocked = toMoney(wallet.locked)
+          const available = money.subtract(balance, currentLocked)
+          if (!money.isGreaterOrEqual(available, amount)) throw new InsufficientFundsError(amount, available)
+          const newLocked = money.add(currentLocked, amount)
+          const updated = await tx.walletAccount.updateMany({
+            where: { id: wallet.id, version: wallet.version },
+            data: { locked: newLocked, version: { increment: 1 } },
+          })
+          if (updated.count === 0) throw new OptimisticLockError()
+          const ledger = await tx.ledgerEntry.create({
+            data: {
+              transactionId: randomUUID(), walletAccountId: wallet.id, userId,
+              type: 'WITHDRAWAL_LOCK', amount: '0',
+              balanceBefore: balance, balanceAfter: balance,
+              idempotencyKey, description: 'Withdrawal lock', metadata: { locked_amount: amount }
+            }
+          })
+          return { balanceBefore: balance, balanceAfter: balance, ledgerEntryId: ledger.id, duplicate: false }
+        }, { isolationLevel: 'Serializable' })
+      } catch (e) {
+        // Don't retry on business errors (InsufficientFundsError) — they won't get better.
+        if (e instanceof InsufficientFundsError) throw e
+        if (e instanceof OptimisticLockError && attempt < 3) {
+          await new Promise(r => setTimeout(r, 50 * attempt * attempt))
+          continue
         }
-      })
-      return { balanceBefore: toMoney(wallet.balance), balanceAfter: toMoney(wallet.balance), ledgerEntryId: ledger.id, duplicate: false }
-    })
+        throw e
+      }
+    }
+    throw new OptimisticLockError()
   }
 
   async unlock(userId: string, currency: Currency, amount: MoneyAmount, idempotencyKey: string): Promise<CreditResult> {
     const existing = await prisma.ledgerEntry.findUnique({ where: { idempotencyKey }})
     if (existing) return { balanceBefore: toMoney(existing.balanceBefore), balanceAfter: toMoney(existing.balanceAfter), ledgerEntryId: existing.id, duplicate: true }
-    return prisma.$transaction(async (tx: { [k: string]: any }) => {
-      const wallet = await tx.walletAccount.findUnique({ where: { userId_currency: { userId, currency }}})
-      if (!wallet) throw new Error('WALLET_NOT_FOUND')
-      const newLocked = money.subtract(toMoney(wallet.locked), amount)
-      await tx.walletAccount.update({ where: { id: wallet.id }, data: { locked: newLocked, version: { increment: 1 }}})
-      const ledger = await tx.ledgerEntry.create({
-        data: { transactionId: randomUUID(), walletAccountId: wallet.id, userId,
-          type: 'WITHDRAWAL_UNLOCK', amount: '0',
-          balanceBefore: toMoney(wallet.balance), balanceAfter: toMoney(wallet.balance),
-          idempotencyKey, description: 'Withdrawal unlock', metadata: { unlocked_amount: amount }}
-      })
-      return { balanceBefore: toMoney(wallet.balance), balanceAfter: toMoney(wallet.balance), ledgerEntryId: ledger.id, duplicate: false }
-    })
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await prisma.$transaction(async (tx: { [k: string]: any }) => {
+          const wallet = await tx.walletAccount.findUnique({ where: { userId_currency: { userId, currency }}})
+          if (!wallet) throw new Error('WALLET_NOT_FOUND')
+          const currentLocked = toMoney(wallet.locked)
+          const newLocked = money.subtract(currentLocked, amount)
+          // Prevent negative locked balance. If unlock amount > currently locked,
+          // this is either a logic bug or an attack — abort the transaction.
+          if (!money.isGreaterOrEqual(currentLocked, amount)) {
+            throw new Error('UNLOCK_EXCEEDS_LOCKED')
+          }
+          const updated = await tx.walletAccount.updateMany({
+            where: { id: wallet.id, version: wallet.version },
+            data: { locked: newLocked, version: { increment: 1 } },
+          })
+          if (updated.count === 0) throw new OptimisticLockError()
+          const ledger = await tx.ledgerEntry.create({
+            data: { transactionId: randomUUID(), walletAccountId: wallet.id, userId,
+              type: 'WITHDRAWAL_UNLOCK', amount: '0',
+              balanceBefore: toMoney(wallet.balance), balanceAfter: toMoney(wallet.balance),
+              idempotencyKey, description: 'Withdrawal unlock', metadata: { unlocked_amount: amount }}
+          })
+          return { balanceBefore: toMoney(wallet.balance), balanceAfter: toMoney(wallet.balance), ledgerEntryId: ledger.id, duplicate: false }
+        }, { isolationLevel: 'Serializable' })
+      } catch (e) {
+        // Don't retry on business errors (UNLOCK_EXCEEDS_LOCKED) — they won't get better.
+        if (e instanceof Error && e.message === 'UNLOCK_EXCEEDS_LOCKED') throw e
+        if (e instanceof OptimisticLockError && attempt < 3) {
+          await new Promise(r => setTimeout(r, 50 * attempt * attempt))
+          continue
+        }
+        throw e
+      }
+    }
+    throw new OptimisticLockError()
   }
 
   async confirmWithdrawal(userId: string, currency: Currency, amount: MoneyAmount, idempotencyKey: string): Promise<CreditResult> {
