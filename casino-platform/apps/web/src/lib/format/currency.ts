@@ -1,4 +1,5 @@
 import Decimal from 'decimal.js'
+
 import type { FiatCurrency } from '@/types/wallet'
 
 function decimalsFor(currency: string, compact: boolean): number {

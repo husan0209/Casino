@@ -1,8 +1,10 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
-import { apiGet } from '@/lib/api'
 import Link from 'next/link'
 import { useState } from 'react'
+
+import { apiGet } from '@/lib/api'
+
 export default function CasinoPage(){
   const [category, setCategory] = useState('')
   const [provider, setProvider] = useState('')

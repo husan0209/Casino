@@ -1,8 +1,8 @@
 import { Worker } from 'bullmq'
-import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
+import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { prisma } from '@casino/database'
-import { EmailJobData, QUEUES } from '../queue.types'
+import { type EmailJobData, QUEUES } from '../queue.types'
 import { queueConnection } from '../infrastructure/email.queue'
 import { MAILER_PORT, MailerPort } from '../infrastructure/mailer.port'
 

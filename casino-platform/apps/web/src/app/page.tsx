@@ -1,9 +1,10 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
+
+import { GameCard } from '@/components/casino/GameCard'
 import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
-import { GameCard } from '@/components/casino/GameCard'
 
 export default function Home() {
   const { user } = useAuth()

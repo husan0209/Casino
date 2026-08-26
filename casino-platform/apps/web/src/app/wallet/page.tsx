@@ -1,8 +1,10 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
+
 import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
+
 import { money } from '@casino/shared-utils'
 
 export default function WalletPage(){
@@ -10,12 +12,12 @@ export default function WalletPage(){
   const { data: balances } = useQuery({
     queryKey: ['wallet','balances'],
     queryFn: () => apiGet<any[]>('/wallet/balances'),
-    enabled: !!user, refetchInterval: 10000,
+    enabled: Boolean(user), refetchInterval: 10000,
   })
   const { data: tx } = useQuery({
     queryKey: ['wallet','tx'],
     queryFn: () => apiGet<any>('/wallet/transactions?per_page=20'),
-    enabled: !!user,
+    enabled: Boolean(user),
   })
   if (!user) return <div className="container-1 py-8">Войдите в аккаунт</div>
   return (

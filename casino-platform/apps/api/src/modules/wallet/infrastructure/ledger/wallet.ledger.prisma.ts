@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { prisma } from '@casino/database'
 import { ZERO, type Currency, type MoneyAmount } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
-import { IWalletRepository, IWalletLedger, CreditInput, CreditResult, WalletAccount } from '../../domain/repositories/wallet.repository'
+import { IWalletRepository, IWalletLedger, type CreditInput, type CreditResult, type WalletAccount } from '../../domain/repositories/wallet.repository'
 import { InsufficientFundsError, OptimisticLockError } from '../../domain/errors'
 
 /**
@@ -202,4 +202,8 @@ export class PrismaWalletLedger implements IWalletLedger {
   }
 }
 
-function randomUUID() { return globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : require('crypto').randomUUID() }
+function randomUUID(): string {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID()
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require('crypto').randomUUID() as string
+}

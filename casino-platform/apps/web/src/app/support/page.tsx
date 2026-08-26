@@ -1,10 +1,11 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiGet, apiPost } from '@/lib/api'
-import { useAuth } from '@/stores/auth'
 import Link from 'next/link'
 import { useState } from 'react'
+
 import { toast } from '@/components/ui/toaster'
+import { apiGet, apiPost } from '@/lib/api'
+import { useAuth } from '@/stores/auth'
 
 export default function SupportPage(){
   const { user } = useAuth()
@@ -15,11 +16,11 @@ export default function SupportPage(){
   const { data } = useQuery({
     queryKey:['support-tickets'],
     queryFn:()=> apiGet<any>('/support/tickets'),
-    enabled: !!user,
+    enabled: Boolean(user),
   })
   const createMut = useMutation({
     mutationFn: () => apiPost('/support/tickets', { subject, category, message }),
-    onSuccess: () => { toast.success('Тикет создан'); setSubject(''); setMessage(''); qc.invalidateQueries({ queryKey:['support-tickets'] })},
+    onSuccess: () => { toast.success('Тикет создан'); setSubject(''); setMessage(''); void qc.invalidateQueries({ queryKey:['support-tickets'] })},
     onError: (e:any)=> toast.error(e?.response?.data?.error?.message || 'Ошибка')
   })
   if (!user) return <div className="container-1 py-8">Войдите, чтобы создать обращение</div>

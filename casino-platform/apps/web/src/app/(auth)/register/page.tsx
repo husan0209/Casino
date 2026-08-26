@@ -1,8 +1,9 @@
 'use client'
-import { useState } from 'react'
-import { useAuth } from '@/stores/auth'
-import { toast } from '@/components/ui/toaster'
 import Link from 'next/link'
+import { useState } from 'react'
+
+import { toast } from '@/components/ui/toaster'
+import { useAuth } from '@/stores/auth'
 
 export default function RegisterPage(){
   const [email, setEmail] = useState('')

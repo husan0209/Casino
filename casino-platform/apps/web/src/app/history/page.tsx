@@ -1,12 +1,15 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
+
 import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
+
 import { money } from '@casino/shared-utils'
+
 export default function HistoryPage(){
   const { user } = useAuth()
-  const { data } = useQuery({ queryKey:['casino-history'], queryFn:()=>apiGet<any>('/casino/history?per_page=50'), enabled:!!user })
+  const { data } = useQuery({ queryKey:['casino-history'], queryFn:()=>apiGet<any>('/casino/history?per_page=50'), enabled:Boolean(user) })
   if (!user) return <div className="container-1 py-8">Войдите в аккаунт</div>
   const rows = data?.data || []
   return (

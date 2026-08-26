@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { prisma } from '@casino/database'
-import { IUserSessionRepository } from '../../domain/repositories/user-session.repository'
+import { type IUserSessionRepository } from '../../domain/repositories/user-session.repository'
 @Injectable()
 export class PrismaUserSessionRepository implements IUserSessionRepository {
   async list(userId: string) {

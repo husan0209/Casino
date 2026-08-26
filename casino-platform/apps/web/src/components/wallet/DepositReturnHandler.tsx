@@ -1,10 +1,11 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
+
 import { pollDepositStatus } from '@/lib/api/wallet.api'
-import { useWalletStore } from '@/stores/wallet'
-import { useUIStore } from '@/stores/ui'
 import { formatAmount } from '@/lib/format/currency'
+import { useUIStore } from '@/stores/ui'
+import { useWalletStore } from '@/stores/wallet'
 
 const PAYMENT_KEY = 'casino_pending_payment_id'
 const GAME_KEY = 'casino_pending_game_slug'
@@ -68,7 +69,7 @@ export function DepositReturnHandler() {
       if (attempts < maxAttempts) setTimeout(tick, 2000)
     }
 
-    tick()
+    void tick()
   }, [fetchWallets, pendingGameSlug])
 
   if (!success) return null

@@ -1,23 +1,24 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+
+import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
-import { useState } from 'react'
-import { toast } from '@/components/ui/toaster'
 
 export default function KycPage(){
   const { user } = useAuth()
   const { data, refetch } = useQuery({
     queryKey: ['kyc-status'],
     queryFn: () => apiGet<any>('/kyc/status'),
-    enabled: !!user,
+    enabled: Boolean(user),
   })
   const [form, setForm] = useState<any>({ first_name:'', last_name:'', date_of_birth:'', country:'RU', document_type:'passport', document_number:'', document_expiry:'' })
   const [files, setFiles] = useState<Record<string, File|null>>({ front:null, back:null, selfie:null })
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    try { await apiPost('/kyc/submit', form); toast.success('KYC заявка подана'); refetch() }
+    try { await apiPost('/kyc/submit', form); toast.success('KYC заявка подана'); void refetch() }
     catch(err:any){ toast.error(err?.response?.data?.error?.message || 'Ошибка') }
   }
   const uploadDoc = async (type: string) => {
@@ -27,7 +28,7 @@ export default function KycPage(){
       await fetch((process.env['NEXT_PUBLIC_API_URL']||'http://localhost:3001/api/v1') + '/kyc/documents', {
         method: 'POST', body: fd, credentials: 'include'
       })
-      toast.success('Документ загружен'); refetch()
+      toast.success('Документ загружен'); void refetch()
     } catch { toast.error('Ошибка загрузки') }
   }
 

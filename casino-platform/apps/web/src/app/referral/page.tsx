@@ -1,14 +1,16 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
+
+import { toast } from '@/components/ui/toaster'
 import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 
 export default function ReferralPage(){
   const { user } = useAuth()
-  const { data: info } = useQuery({ queryKey:['ref-info'], queryFn:()=>apiGet<any>('/referrals/info'), enabled:!!user })
-  const { data: list } = useQuery({ queryKey:['ref-list'], queryFn:()=>apiGet<any>('/referrals/list'), enabled:!!user })
+  const { data: info } = useQuery({ queryKey:['ref-info'], queryFn:()=>apiGet<any>('/referrals/info'), enabled:Boolean(user) })
+  const { data: list } = useQuery({ queryKey:['ref-list'], queryFn:()=>apiGet<any>('/referrals/list'), enabled:Boolean(user) })
 void list
-  const { data: rewards } = useQuery({ queryKey:['ref-rewards'], queryFn:()=>apiGet<any>('/referrals/rewards'), enabled:!!user })
+  const { data: rewards } = useQuery({ queryKey:['ref-rewards'], queryFn:()=>apiGet<any>('/referrals/rewards'), enabled:Boolean(user) })
   if (!user) return <div className="container-1 py-8">Войдите, чтобы получить реферальную ссылку</div>
   return (
     <div className="container-1 py-8 max-w-3xl">
@@ -22,7 +24,7 @@ void list
         <div className="text-sm text-muted">Ваша ссылка</div>
         <div className="flex gap-2 mt-1">
           <input readOnly value={info?.referral_link || ''} className="input" />
-          <button onClick={()=>{navigator.clipboard.writeText(info?.referral_link || ''); alert('Скопировано')}} className="btn-ghost text-sm">Копировать</button>
+          <button onClick={()=>{void navigator.clipboard.writeText(info?.referral_link || ''); toast.success('Скопировано')}} className="btn-ghost text-sm">Копировать</button>
         </div>
         <div className="text-xs text-muted mt-2">Код: <b>{info?.referral_code}</b> • 5% от GGR рефералов ежедневно</div>
       </div>

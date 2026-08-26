@@ -1,5 +1,6 @@
 'use client'
 import { create } from 'zustand'
+
 import { fetchGeoConfig } from '@/lib/api/geo.api'
 import type { GeoConfig } from '@/types/wallet'
 

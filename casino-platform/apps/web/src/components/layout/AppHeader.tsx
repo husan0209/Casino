@@ -1,11 +1,12 @@
 'use client'
 import Link from 'next/link'
 import { useEffect } from 'react'
+
+import { formatBalance } from '@/lib/format/currency'
 import { useAuth } from '@/stores/auth'
-import { useWalletStore } from '@/stores/wallet'
 import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
-import { formatBalance } from '@/lib/format/currency'
+import { useWalletStore } from '@/stores/wallet'
 
 export function AppHeader() {
   const { user } = useAuth()
@@ -14,8 +15,8 @@ export function AppHeader() {
   const { openDeposit, openLogin, openWalletSwitcher } = useUIStore()
 
   useEffect(() => {
-    load()
-    if (user) fetchWallets()
+    void load()
+    if (user) void fetchWallets()
   }, [user, load, fetchWallets])
 
   const wallet = getActiveWallet()

@@ -1,5 +1,6 @@
-import { money } from '@casino/shared-utils'
 import type { WalletBalance } from '@/types/wallet'
+
+import { money } from '@casino/shared-utils'
 
 export function sortWallets(wallets: WalletBalance[], activeCurrency: string): WalletBalance[] {
   return [...wallets].sort((a, b) => {

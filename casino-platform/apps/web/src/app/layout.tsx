@@ -1,8 +1,11 @@
 import './globals.css'
-import type { Metadata } from 'next'
-import { Toaster } from '@/components/ui/toaster'
-import { Providers } from './providers'
 import { MainShell } from '@/components/layout/MainShell'
+import { Toaster } from '@/components/ui/toaster'
+
+import { Providers } from './providers'
+
+import type { Metadata } from 'next'
+
 
 export const metadata: Metadata = {
   title: 'Casino',

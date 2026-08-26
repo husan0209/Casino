@@ -1,14 +1,16 @@
 'use client'
-import { useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { apiGet, apiPost, errText } from '@/lib/api'
-import { useAuth } from '@/stores/auth'
-import { useUIStore } from '@/stores/ui'
-import { useWalletStore } from '@/stores/wallet'
-import { useGeoStore } from '@/stores/geo'
 import Link from 'next/link'
 import { useParams, useSearchParams } from 'next/navigation'
+import { useEffect } from 'react'
+
 import { toast } from '@/components/ui/toaster'
+import { apiGet, apiPost, errText } from '@/lib/api'
+import { useAuth } from '@/stores/auth'
+import { useGeoStore } from '@/stores/geo'
+import { useUIStore } from '@/stores/ui'
+import { useWalletStore } from '@/stores/wallet'
+
 
 export default function GamePage() {
   const { slug } = useParams() as { slug: string }
@@ -51,8 +53,8 @@ export default function GamePage() {
   })
 
   useEffect(() => {
-    load()
-    if (user) fetchWallets()
+    void load()
+    if (user) void fetchWallets()
   }, [user, load, fetchWallets])
 
   useEffect(() => {
@@ -63,7 +65,8 @@ export default function GamePage() {
     if (shouldLaunch && game && !launch.isPending && !launch.isSuccess) {
       launch.mutate()
     }
-  }, [user, shouldLaunch, game])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `launch` исключён намеренно: его изменение вызывало бы повторные mutate после ошибки
+  }, [user, shouldLaunch, game, slug, openLogin])
 
   if (!game) return <div className="container-1 py-8 text-muted">Загрузка…</div>
 

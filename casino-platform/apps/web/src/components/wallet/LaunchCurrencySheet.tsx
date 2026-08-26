@@ -1,7 +1,7 @@
 'use client'
+import { formatBalance, formatAmount } from '@/lib/format/currency'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
-import { formatBalance, formatAmount } from '@/lib/format/currency'
 
 export function LaunchCurrencySheet() {
   const { launchCurrencySheet, launchCurrencyOptions, closeLaunchCurrency, openDeposit } = useUIStore()

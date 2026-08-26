@@ -1,6 +1,7 @@
 'use client'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+
 import { fetchBalances, setActiveCurrency } from '@/lib/api/wallet.api'
 import type { WalletBalance } from '@/types/wallet'
 

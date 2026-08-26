@@ -1,12 +1,14 @@
 'use client'
 import { useEffect } from 'react'
+
+import { formatBalance } from '@/lib/format/currency'
+import { sortWallets } from '@/lib/wallet/helpers'
 import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
-import { formatBalance } from '@/lib/format/currency'
-import { sortWallets } from '@/lib/wallet/helpers'
-import { money } from '@casino/shared-utils'
 import type { WalletBalance } from '@/types/wallet'
+
+import { money } from '@casino/shared-utils'
 
 const CRYPTO_LABELS: Record<string, string> = {
   USDT_TRC20: 'USDT',
@@ -31,8 +33,8 @@ export function WalletSwitcher() {
 
   useEffect(() => {
     if (walletSwitcher) {
-      load()
-      fetchWallets()
+      void load()
+      void fetchWallets()
     }
   }, [walletSwitcher, load, fetchWallets])
 

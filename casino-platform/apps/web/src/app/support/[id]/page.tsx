@@ -1,9 +1,10 @@
 'use client'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiGet, apiPost } from '@/lib/api'
 import { useParams } from 'next/navigation'
 import { useState } from 'react'
+
 import { toast } from '@/components/ui/toaster'
+import { apiGet, apiPost } from '@/lib/api'
 
 export default function TicketPage(){
   const { id } = useParams() as { id: string }
@@ -15,11 +16,11 @@ export default function TicketPage(){
   })
   const sendMut = useMutation({
     mutationFn: () => apiPost(`/support/tickets/${id}/messages`, { message: msg }),
-    onSuccess: () => { setMsg(''); qc.invalidateQueries({ queryKey:['ticket', id]}); toast.success('Отправлено') }
+    onSuccess: () => { setMsg(''); void qc.invalidateQueries({ queryKey:['ticket', id]}); toast.success('Отправлено') }
   })
   const closeMut = useMutation({
     mutationFn: () => apiPost(`/support/tickets/${id}/close`, {}),
-    onSuccess: () => { toast.success('Тикет закрыт'); qc.invalidateQueries({ queryKey:['ticket', id]}) }
+    onSuccess: () => { toast.success('Тикет закрыт'); void qc.invalidateQueries({ queryKey:['ticket', id]}) }
   })
   if (!data) return <div className="container-1 py-8">Загрузка…</div>
   const messages = data.messages || []

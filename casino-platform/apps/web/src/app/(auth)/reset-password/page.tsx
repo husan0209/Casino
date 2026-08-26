@@ -1,9 +1,10 @@
 'use client'
-import { useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { apiPost } from '@/lib/api'
+import { useState , Suspense } from 'react'
+
 import { toast } from '@/components/ui/toaster'
-import { Suspense } from 'react'
+import { apiPost } from '@/lib/api'
+
 
 function ResetInner(){
   const sp = useSearchParams()

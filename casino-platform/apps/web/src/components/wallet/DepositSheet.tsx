@@ -1,13 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
+
+import { toast } from '@/components/ui/toaster'
+import { saveDepositContext } from '@/components/wallet/DepositReturnHandler'
+import { errText } from '@/lib/api'
+import { createFiatDeposit } from '@/lib/api/wallet.api'
+import { formatAmount } from '@/lib/format/currency'
 import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
-import { createFiatDeposit } from '@/lib/api/wallet.api'
-import { formatAmount } from '@/lib/format/currency'
-import { errText } from '@/lib/api'
-import { toast } from '@/components/ui/toaster'
-import { saveDepositContext } from '@/components/wallet/DepositReturnHandler'
 
 export function DepositSheet() {
   const { depositSheet, closeDeposit, depositCurrency, pendingGameSlug } = useUIStore()
@@ -22,14 +23,14 @@ export function DepositSheet() {
   const currency = depositCurrency || config?.activeCurrency || activeCurrency
 
   useEffect(() => {
-    if (depositSheet) load()
+    if (depositSheet) void load()
   }, [depositSheet, load])
 
   useEffect(() => {
     if (!depositSheet) return
     setMode('fiat')
     setShowCrypto(false)
-    if (config?.paymentMethods?.[0]) setMethod(config.paymentMethods[0].id)
+    if (config?.paymentMethods[0]) setMethod(config.paymentMethods[0].id)
   }, [config, depositSheet])
 
   if (!depositSheet) return null

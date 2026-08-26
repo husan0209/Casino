@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { prisma } from '@casino/database'
-import { IUserProfileRepository } from '../../domain/repositories/user-profile.repository'
+import { type IUserProfileRepository } from '../../domain/repositories/user-profile.repository'
 @Injectable()
 export class PrismaUserProfileRepository implements IUserProfileRepository {
   async getMe(userId: string) {

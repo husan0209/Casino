@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { AppError } from '@casino/shared-utils'
-import { MailMessage, MailerPort } from './mailer.port'
+import { type MailMessage, MailerPort } from './mailer.port'
 
 export class EmailNotConfiguredError extends AppError {
   readonly code = 'EMAIL_NOT_CONFIGURED'

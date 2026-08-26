@@ -1,5 +1,6 @@
 'use client'
-import axios, { AxiosError } from 'axios'
+import axios, { type AxiosError } from 'axios'
+
 import { useAuthStore } from '@/stores/auth'
 
 export const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001/api/v1'
@@ -45,5 +46,5 @@ export function setAccessToken(token: string) {
 
 export function errText(e: unknown): string {
   const ax = e as AxiosError<any>
-  return ax?.response?.data?.error?.message ?? ax?.response?.data?.message ?? (e as Error)?.message ?? 'Ошибка'
+  return ax.response?.data?.error?.message ?? ax.response?.data?.message ?? (e as Error).message ?? 'Ошибка'
 }

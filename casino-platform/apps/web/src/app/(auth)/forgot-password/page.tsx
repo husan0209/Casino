@@ -1,7 +1,9 @@
 'use client'
 import { useState } from 'react'
-import { apiPost } from '@/lib/api'
+
 import { toast } from '@/components/ui/toaster'
+import { apiPost } from '@/lib/api'
+
 export default function ForgotPage(){
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)

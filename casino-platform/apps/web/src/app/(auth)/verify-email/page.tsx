@@ -1,10 +1,10 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
 import axios from 'axios'
-import { useAuth } from '@/stores/auth'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { useEffect, useState , Suspense } from 'react'
+
 import { setAccessToken } from '@/lib/api'
-import { Suspense } from 'react'
+import { useAuth } from '@/stores/auth'
 
 function VerifyInner(){
   const sp = useSearchParams()
@@ -22,7 +22,7 @@ function VerifyInner(){
         setTimeout(()=>router.push('/profile'), 1200)
       })
       .catch(e => setStatus('Ошибка: ' + (e?.response?.data?.error?.message || 'неверный токен')))
-  }, [token])
+  }, [token, router, setAuth])
   return (
     <div className="container-1 py-12 max-w-sm mx-auto">
       <div className="card text-center">{status}</div>

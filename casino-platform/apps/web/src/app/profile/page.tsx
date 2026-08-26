@@ -1,22 +1,23 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+
+import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
-import { useState } from 'react'
-import { toast } from '@/components/ui/toaster'
 
 export default function ProfilePage(){
   const { user } = useAuth()
   const { data, refetch, isLoading } = useQuery({
     queryKey: ['me'],
     queryFn: () => apiGet<any>('/users/me'),
-    enabled: !!user,
+    enabled: Boolean(user),
   })
   const [form, setForm] = useState<any>({})
   if (!user) return <div className="container-1 py-8">Войдите в аккаунт</div>
   const p = data?.profile || {}
   const save = async () => {
-    try { await apiPost('/users/me/profile', form); toast.success('Сохранено'); refetch() }
+    try { await apiPost('/users/me/profile', form); toast.success('Сохранено'); void refetch() }
     catch(e:any){ toast.error(e?.response?.data?.error?.message || 'Ошибка') }
   }
   return (

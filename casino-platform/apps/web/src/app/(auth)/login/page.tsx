@@ -1,9 +1,10 @@
 'use client'
-import { useState } from 'react'
-import { useAuth } from '@/stores/auth'
-import { toast } from '@/components/ui/toaster'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+
+import { toast } from '@/components/ui/toaster'
+import { useAuth } from '@/stores/auth'
 
 export default function LoginPage(){
   const [email, setEmail] = useState('')
