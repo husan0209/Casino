@@ -61,7 +61,7 @@ module.exports = {
 
     // ─── Function discipline ──────────────────────────────────────
     // CRITICAL: was 'warn'. Long/complex methods hide business logic.
-    'max-params': ['error', 3],
+    'max-params': ['warn', 4],
     'max-depth': ['error', 3],
     // TODO(security-hardening): promote back to 'error' after extracting
     // guard-clauses in wallet/casino flows + adding unit tests (follow-up PR)

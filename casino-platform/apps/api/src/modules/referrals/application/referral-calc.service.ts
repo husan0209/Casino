@@ -2,11 +2,17 @@ import { Injectable, Logger } from '@nestjs/common'
 import Decimal from 'decimal.js'
 
 import { prisma } from '@casino/database'
+import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
+
+import { WalletFacade } from '../../wallet/application/wallet.facade'
 
 @Injectable()
 export class ReferralCalcService {
   private logger = new Logger(ReferralCalcService.name)
+
+  constructor(private readonly walletFacade: WalletFacade) {}
+
   async runDaily(dateStr?: string) {
     const date = dateStr ? new Date(dateStr) : new Date(Date.now() - 86400000)
     const dayStart = new Date(date); dayStart.setUTCHours(0,0,0,0)
@@ -54,9 +60,24 @@ export class ReferralCalcService {
         })
         processed++
         if (isPositiveGgr && money.isPositive(rewardAmount)) {
-          // credit marked directly – real payout wiring pending DI in referrals.module
-          await prisma.referralReward.update({ where: { id: rr.id }, data: { status: 'credited', creditedAt: new Date() }})
-          credited++
+          try {
+            await this.walletFacade.credit({
+              userId: ru.referredBy,
+              currency: cur as Currency,
+              amount: rewardAmount,
+              type: 'referral_reward',
+              idempotencyKey: `ref_reward_${rr.id}`,
+              description: `Referral reward for ${ru.id} (${dayStart.toISOString().slice(0, 10)})`,
+              metadata: { referralRewardId: rr.id, referredId: ru.id },
+            })
+            await prisma.referralReward.update({
+              where: { id: rr.id },
+              data: { status: 'credited', creditedAt: new Date() },
+            })
+            credited++
+          } catch (err: any) {
+            this.logger.error(`Failed to credit referral reward ${rr.id} for user ${ru.referredBy}: ${err?.message || err}`)
+          }
         }
       }
     }

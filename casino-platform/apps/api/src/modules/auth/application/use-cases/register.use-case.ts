@@ -35,7 +35,7 @@ export class RegisterUseCase {
   }
 
   async execute(
-    input: { email: string; password: string; referralCode?: string },
+    input: { email: string; password: string; referralCode?: string | undefined },
     meta?: { ip?: string | undefined; userAgent?: string | undefined },
   ) {
     if (input.password.length < 8) throw new WeakPasswordError()

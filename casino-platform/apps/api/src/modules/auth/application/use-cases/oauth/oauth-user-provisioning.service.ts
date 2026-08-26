@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+
 import { Inject, Injectable } from '@nestjs/common'
 
 import { IAuthProviderRepository, AUTH_PROVIDER_REPOSITORY, type AuthProviderKind } from '../../../domain/repositories/auth-provider.repository'

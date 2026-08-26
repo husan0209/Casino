@@ -35,12 +35,12 @@ export class UsersController {
   me(@CurrentUser() user: any) { return this.getMe.execute(user.id) }
 
   @Patch('me/profile')
-  updateProfileCtl(@CurrentUser() user: any, @Body() body: any) {
+  updateProfileCtl(@CurrentUser() user: any, @Body() body: { first_name?: string; last_name?: string; date_of_birth?: string; country?: string; city?: string }) {
     return this.updateProfile.execute(user.id, body)
   }
 
   @Patch('me/settings')
-  updateSettingsCtl(@CurrentUser() user: any, @Body() body: any) {
+  updateSettingsCtl(@CurrentUser() user: any, @Body() body: { language?: string; notifications_email?: boolean; notifications_sms?: boolean; notifications_push?: boolean; two_factor_enabled?: boolean }) {
     return this.updateSettings.execute(user.id, body)
   }
 

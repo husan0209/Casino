@@ -12,9 +12,10 @@ import { RefreshUseCase } from '../../application/use-cases/refresh.use-case'
 import { RegisterUseCase } from '../../application/use-cases/register.use-case'
 import { ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case'
 import { VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case'
-import { LoginSchema } from '../dto/login.dto'
-import { ForgotPasswordSchema, ResetPasswordSchema } from '../dto/password-reset.dto'
-import { RegisterSchema } from '../dto/register.dto'
+import { RegisterSchema, type RegisterDto } from '../dto/register.dto'
+import { ForgotPasswordSchema } from '../dto/password-reset.dto'
+import { ResetPasswordSchema } from '../dto/password-reset.dto'
+import { LoginSchema, type LoginDto } from '../dto/login.dto'
 
 
 @Controller('auth')
@@ -33,7 +34,7 @@ export class AuthController {
 
   @Post('register')
   @UsePipes(new ZodValidationPipe(RegisterSchema))
-  async register(@Body() body: any, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async register(@Body() body: RegisterDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.registerUc.execute(
       { email: body.email, password: body.password, referralCode: body.referral_code },
       { ip: req.ip, userAgent: req.headers['user-agent'] },
@@ -50,7 +51,7 @@ export class AuthController {
 
   @Post('login')
   @UsePipes(new ZodValidationPipe(LoginSchema))
-  async login(@Body() body: any, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async login(@Body() body: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.loginUc.execute({
       email: body.email, password: body.password,
       ip: req.ip, userAgent: req.headers['user-agent']
@@ -101,15 +102,15 @@ export class AuthController {
   ) {
     const result = await this.googleUc.execute({
       code: body.code, redirectUri: body.redirect_uri, state: body.state,
-      referralCode: body.referral_code, ip: req.ip, userAgent: req.headers['user-agent'],
+      referralCode: body.referral_code as string | undefined, ip: req.ip, userAgent: req.headers['user-agent'],
     })
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user }
   }
 
   @Post('telegram')
-  async telegram(@Body() payload: any, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const result = await this.telegramUc.execute(payload, { ip: req.ip, userAgent: req.headers['user-agent'] })
+  async telegram(@Body() payload: Record<string, unknown>, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const result = await this.telegramUc.execute(payload as unknown as Parameters<typeof this.telegramUc.execute>[0], { ip: req.ip, userAgent: req.headers['user-agent'] })
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user }
   }

@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
-import { Decimal } from 'decimal.js'
 
 import { Injectable } from '@nestjs/common'
+import { Decimal } from 'decimal.js'
 
 import { KycCheckService } from '../../../kyc/application/use-cases/kyc-check.service'
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
