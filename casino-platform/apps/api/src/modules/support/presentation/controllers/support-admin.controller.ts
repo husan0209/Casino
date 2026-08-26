@@ -6,7 +6,7 @@ import { RolesGuard, Roles } from '../../../auth/presentation/guards/roles.guard
 import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
 import { GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
 import { SendMessageUseCase } from '../../application/use-cases/send-message.use-case'
-import { ISupportRepository, SUPPORT_REPOSITORY } from '../../domain/repositories/support.repository'
+import { ISupportRepository, SUPPORT_REPOSITORY, type TicketPriority } from '../../domain/repositories/support.repository'
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin','superadmin')
@@ -30,16 +30,16 @@ export class SupportAdminController {
   @Get('tickets/:id')
   get(@CurrentUser() _u:any, @Param('id') id:string){ return this.getUc.execute('', id, true) }
   @Post('tickets/:id/messages')
-  send(@CurrentUser() u:any, @Param('id') id:string, @Body() b:any){
+  send(@CurrentUser() u: any, @Param('id') id: string, @Body() b: { message: string; is_internal?: boolean }) {
     return this.sendUc.execute({ ticketId: id, senderType: 'admin', senderId: u.id, message: b.message, isInternal: Boolean(b.is_internal) })
   }
   @Post('tickets/:id/assign')
-  async assign(@Param('id') id:string, @Body() b:any){
+  async assign(@Param('id') id: string, @Body() b: { admin_id?: string }) {
     await this.repo.assign(id, b.admin_id || null); return { ok: true }
   }
   @Patch('tickets/:id/priority')
-  async priority(@Param('id') id:string, @Body() b:any){
-    await this.repo.setPriority(id, b.priority); return { ok: true }
+  async priority(@Param('id') id: string, @Body() b: { priority: string }) {
+    await this.repo.setPriority(id, b.priority as TicketPriority); return { ok: true }
   }
   @Post('tickets/:id/close')
   close(@Param('id') id:string){ return this.closeUc.execute(id, 'admin') }

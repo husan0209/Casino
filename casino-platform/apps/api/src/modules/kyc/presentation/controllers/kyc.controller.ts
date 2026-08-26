@@ -47,7 +47,12 @@ export class KycController {
     return this.statusUc.execute(u.id, currency || 'RUB')
   }
   @Post('submit')
-  submit(@CurrentUser() u: any, @Body() body: any) { return this.submitUc.execute({ userId: u.id, ...body }) }
+  submit(
+    @CurrentUser() u: any,
+    @Body() body: { first_name: string; last_name: string; date_of_birth: string; country: string; document_type: string; document_number: string; document_expiry?: string },
+  ) {
+    return this.submitUc.execute({ userId: u.id, ...body })
+  }
   @Post('documents')
   @UseInterceptors(FileInterceptor('file', {
     storage: diskStorage({

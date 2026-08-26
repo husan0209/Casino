@@ -37,7 +37,7 @@ export class CasinoController {
   }
   @Post('games/:slug/launch')
   @UseGuards(AuthGuard)
-  async launch(@Param('slug') slug: string, @Body() body: any, @Req() req: any) {
+  async launch(@Param('slug') slug: string, @Body() body: { currency?: string; return_url?: string }, @Req() req: any) {
     const isMobile = /mobile/i.test(req.headers['user-agent'] || '')
     return this.launchGame.execute({
       userId: req.user.id, gameSlug: slug,
@@ -47,7 +47,7 @@ export class CasinoController {
     })
   }
   @Post('games/:slug/demo')
-  async demo(@Param('slug') slug: string, @Body() body: any, @Req() req: any) {
+  async demo(@Param('slug') slug: string, @Body() body: { currency?: string; return_url?: string }, @Req() req: any) {
     const isMobile = /mobile/i.test(req.headers['user-agent'] || '')
     return this.launchGame.execute({
       userId: null, gameSlug: slug,
