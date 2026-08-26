@@ -3,6 +3,8 @@ import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { CreateFiatDepositSchema } from '../dto/create-fiat-deposit.dto'
+import { CreateCryptoDepositSchema } from '../dto/create-crypto-deposit.dto'
+import { CreateFiatWithdrawalSchema, CreateCryptoWithdrawalSchema } from '../dto/create-withdrawal.dto'
 import { CreateFiatDepositUseCase } from '../../application/use-cases/create-fiat-deposit.use-case'
 import { CreateCryptoDepositUseCase } from '../../application/use-cases/create-crypto-deposit.use-case'
 import { CreateWithdrawalUseCase } from '../../application/use-cases/create-withdrawal.use-case'
@@ -25,6 +27,7 @@ export class PaymentsController {
     return this.fiatDep.execute(u.id, { amount: b.amount, currency: b.currency, method: b.method })
   }
   @Post('deposit/crypto')
+  @UsePipes(new ZodValidationPipe(CreateCryptoDepositSchema))
   depositCrypto(@CurrentUser() u: any, @Body() b: { amount: string; currency: string }) {
     return this.cryptoDep.execute(u.id, b.amount, b.currency)
   }
@@ -42,11 +45,13 @@ export class PaymentsController {
     }
   }
   @Post('withdrawal/fiat')
-  wdFiat(@CurrentUser() u: any, @Body() b: any) {
+  @UsePipes(new ZodValidationPipe(CreateFiatWithdrawalSchema))
+  wdFiat(@CurrentUser() u: any, @Body() b: { amount: string; method: string; destination: string }) {
     return this.createWd.execute(u.id, { amount: b.amount, currency: 'RUB', method: b.method, destination: b.destination })
   }
   @Post('withdrawal/crypto')
-  wdCrypto(@CurrentUser() u: any, @Body() b: any) {
+  @UsePipes(new ZodValidationPipe(CreateCryptoWithdrawalSchema))
+  wdCrypto(@CurrentUser() u: any, @Body() b: { amount: string; currency: string; destination: string }) {
     return this.createWd.execute(u.id, { amount: b.amount, currency: b.currency, destination: b.destination })
   }
   @Get('withdrawals')

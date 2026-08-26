@@ -90,6 +90,22 @@ export const envSchema = z.object({
       }
 
       // Check for unsafe placeholder secrets
+      if (env.JWT_ACCESS_SECRET && isUnsafeSecret(env.JWT_ACCESS_SECRET)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['JWT_ACCESS_SECRET'],
+          message: 'JWT_ACCESS_SECRET appears to be a placeholder. Use only real production secrets (openssl rand -hex 64).',
+        })
+      }
+
+      if (env.JWT_REFRESH_SECRET && isUnsafeSecret(env.JWT_REFRESH_SECRET)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['JWT_REFRESH_SECRET'],
+          message: 'JWT_REFRESH_SECRET appears to be a placeholder. Use only real production secrets (openssl rand -hex 64).',
+        })
+      }
+
       if (env.RUKASSA_SECRET_KEY && isUnsafeSecret(env.RUKASSA_SECRET_KEY)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

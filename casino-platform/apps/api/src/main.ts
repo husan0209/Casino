@@ -35,7 +35,10 @@ async function bootstrap() {
   app.useLogger(new Logger())
   app.setGlobalPrefix('api/v1')
   app.enableCors({
-    origin: (process.env['CORS_ORIGINS'] || 'http://localhost:3000,http://localhost:3002').split(','),
+    origin: (process.env['CORS_ORIGINS'] || 'http://localhost:3000,http://localhost:3002')
+      .split(',')
+      .map(o => o.trim())
+      .filter(Boolean),
     credentials: true,
   })
   app.use(cookieParser())

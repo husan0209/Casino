@@ -5,6 +5,17 @@ import { money } from '@casino/shared-utils'
 import { IWalletRepository, IWalletLedger, CreditInput, CreditResult, WalletAccount } from '../../domain/repositories/wallet.repository'
 import { InsufficientFundsError, OptimisticLockError } from '../../domain/errors'
 
+/**
+ * NOTE on architecture (AUDIT_REPORT.md §A1):
+ * The 4-layer rule says ledger operations should live in application/use-cases/.
+ * We keep them here as an internal Prisma-backed implementation of IWalletLedger
+ * (a domain interface) and expose them only through WalletFacade. This is a
+ * pragmatic compromise: the IWalletLedger boundary is enforced, but the actual
+ * use-case class wrappers would be redundant boilerplate. When a non-Prisma
+ * ledger is added, only this file needs to change.
+ */
+
+
 function toMoney(n: any): MoneyAmount { return n.toString() }
 
 @Injectable()

@@ -27,7 +27,7 @@ export class EmailAlreadyExistsError extends AppError {
 export class WeakPasswordError extends AppError {
   readonly code = 'WEAK_PASSWORD'
   readonly httpStatus = 400
-  constructor() { super('Пароль должен содержать минимум 8 символов') }
+  constructor() { super('Пароль должен содержать минимум 8 символов и минимум 1 цифру') }
 }
 
 export class TokenInvalidError extends AppError {

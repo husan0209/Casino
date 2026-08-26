@@ -3,6 +3,7 @@ import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { setRefreshTokenCookie, clearRefreshTokenCookie } from '../../../../common/cookies/refresh-token-cookie'
 import { RegisterSchema } from '../dto/register.dto'
 import { LoginSchema } from '../dto/login.dto'
+import { ForgotPasswordSchema, ResetPasswordSchema } from '../dto/password-reset.dto'
 import { RegisterUseCase } from '../../application/use-cases/register.use-case'
 import { VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case'
 import { LoginUseCase } from '../../application/use-cases/login.use-case'
@@ -72,11 +73,13 @@ export class AuthController {
   }
 
   @Post('forgot-password')
+  @UsePipes(new ZodValidationPipe(ForgotPasswordSchema))
   async forgot(@Body() body: { email: string }) {
     return this.forgotUc.execute(body.email)
   }
 
   @Post('reset-password')
+  @UsePipes(new ZodValidationPipe(ResetPasswordSchema))
   async reset(@Body() body: { token: string; new_password: string }) {
     return this.resetUc.execute(body.token, body.new_password)
   }
