@@ -32,7 +32,7 @@ export default function SupportPage() {
       action === 'messages' ? apiPost(`/admin/support/tickets/${id}/messages`, body) : apiPost(`/admin/support/tickets/${id}/${action}`, body),
     onSuccess: () => {
       setErr(undefined); setReply('')
-      qc.invalidateQueries({ queryKey: ['tickets'] }); qc.invalidateQueries({ queryKey: ['ticket'] })
+      void qc.invalidateQueries({ queryKey: ['tickets'] }); void qc.invalidateQueries({ queryKey: ['ticket'] })
     },
     onError: (e) => setErr(errText(e)),
   })

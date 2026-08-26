@@ -21,7 +21,7 @@ export default function GamesPage() {
 
   const act = useMutation({
     mutationFn: ({ id, action }: { id: string; action: string }) => apiPost(`/admin/games/${id}/${action}`),
-    onSuccess: () => { setErr(undefined); qc.invalidateQueries({ queryKey: ['games'] }) },
+    onSuccess: () => { setErr(undefined); void qc.invalidateQueries({ queryKey: ['games'] }) },
     onError: (e) => setErr(errText(e)),
   })
 

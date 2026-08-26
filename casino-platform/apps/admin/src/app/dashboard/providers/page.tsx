@@ -18,7 +18,7 @@ export default function ProvidersPage() {
   const act = useMutation({
     mutationFn: ({ id, action }: { id: string; action: string }) => apiPost<SyncResult>(`/admin/providers/${id}/${action}`),
     onSuccess: (res, vars) => {
-      setErr(undefined); qc.invalidateQueries({ queryKey: ['providers'] })
+      setErr(undefined); void qc.invalidateQueries({ queryKey: ['providers'] })
       if (vars.action === 'sync-games') setNote(res.note ?? `Добавлено ${res.added ?? 0}, всего ${res.total ?? '—'}`)
     },
     onError: (e) => setErr(errText(e)),

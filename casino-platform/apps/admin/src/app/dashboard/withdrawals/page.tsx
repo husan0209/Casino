@@ -25,7 +25,7 @@ export default function WithdrawalsPage() {
     refetchInterval: 15000,
   })
 
-  function invalidate() { qc.invalidateQueries({ queryKey: ['withdrawals'] }); setSelected(new Set()) }
+  function invalidate() { void qc.invalidateQueries({ queryKey: ['withdrawals'] }); setSelected(new Set()) }
 
   const single = useMutation({
     mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' }) => apiPost(`/admin/withdrawals/${id}/${action}`, action === 'reject' ? { reason } : {}),

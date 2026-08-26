@@ -30,7 +30,11 @@ module.exports = {
         'deps',
         'ci',
         'docs',
+        'security',
+        'rg',
       ],
     ],
+    // AI-agent driven repo: subjects like "P1 audit fixes" are legitimate
+    'subject-case': [0],
   },
 }

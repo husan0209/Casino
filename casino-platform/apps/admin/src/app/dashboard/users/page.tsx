@@ -22,7 +22,7 @@ export default function UsersPage() {
 
   const act = useMutation({
     mutationFn: ({ id, action }: { id: string; action: 'block' | 'unblock' }) => apiPost(`/admin/users/${id}/${action}`, { reason: 'admin panel' }),
-    onSuccess: () => { setErr(undefined); qc.invalidateQueries({ queryKey: ['users'] }) },
+    onSuccess: () => { setErr(undefined); void qc.invalidateQueries({ queryKey: ['users'] }) },
     onError: (e) => setErr(errText(e)),
   })
 

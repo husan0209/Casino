@@ -25,7 +25,7 @@ export default function KycPage() {
   const act = useMutation({
     mutationFn: ({ id, action }: { id: string; action: 'approve' | 'reject' | 'request-resubmission' }) =>
       apiPost(`/admin/kyc/${id}/${action}`, action === 'approve' ? {} : { reason }),
-    onSuccess: () => { setErr(undefined); setRejectId(null); setReason(''); qc.invalidateQueries({ queryKey: ['kyc'] }) },
+    onSuccess: () => { setErr(undefined); setRejectId(null); setReason(''); void qc.invalidateQueries({ queryKey: ['kyc'] }) },
     onError: (e) => setErr(errText(e)),
   })
 

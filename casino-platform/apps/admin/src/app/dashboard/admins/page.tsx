@@ -20,13 +20,13 @@ export default function AdminsPage() {
 
   const create = useMutation({
     mutationFn: () => apiPost('/admin/admins', form),
-    onSuccess: () => { setErr(undefined); setOk(`Администратор ${form.email} создан`); setForm({ email: '', password: '', first_name: '', last_name: '', role: 'admin' }); qc.invalidateQueries({ queryKey: ['admins'] }) },
+    onSuccess: () => { setErr(undefined); setOk(`Администратор ${form.email} создан`); setForm({ email: '', password: '', first_name: '', last_name: '', role: 'admin' }); void qc.invalidateQueries({ queryKey: ['admins'] }) },
     onError: (e) => { setOk(undefined); setErr(errText(e)) },
   })
 
   const deactivate = useMutation({
     mutationFn: (id: string) => apiPost(`/admin/admins/${id}/deactivate`),
-    onSuccess: () => { setErr(undefined); qc.invalidateQueries({ queryKey: ['admins'] }) },
+    onSuccess: () => { setErr(undefined); void qc.invalidateQueries({ queryKey: ['admins'] }) },
     onError: (e) => setErr(errText(e)),
   })
 

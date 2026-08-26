@@ -20,7 +20,7 @@ export default function SettingsPage() {
 
   const save = useMutation({
     mutationFn: (row: SettingRow) => apiPost('/admin/settings', { key: row.key, value: drafts[row.key] ?? row.value, type: row.type }),
-    onSuccess: () => { setErr(undefined); setOkMsg('Сохранено'); qc.invalidateQueries({ queryKey: ['settings'] }) },
+    onSuccess: () => { setErr(undefined); setOkMsg('Сохранено'); void qc.invalidateQueries({ queryKey: ['settings'] }) },
     onError: (e) => { setOkMsg(undefined); setErr(errText(e)) },
   })
 
