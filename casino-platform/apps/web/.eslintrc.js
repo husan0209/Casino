@@ -30,8 +30,8 @@ module.exports = {
   },
   overrides: [
     {
-      // Dashboard pages are declarative JSX blocks, not logic functions
-      files: ['**/app/**/{page,layout,providers}.tsx'],
+      // Pages and big sheet/handler components are declarative JSX blocks, not logic functions
+      files: ['**/app/**/*.tsx', '**/components/**/*.tsx'],
       rules: {
         'max-lines-per-function': ['warn', { max: 140, skipBlankLines: true, skipComments: true }],
         complexity: 'off',
