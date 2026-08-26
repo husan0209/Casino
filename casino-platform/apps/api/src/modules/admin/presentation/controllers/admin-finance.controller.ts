@@ -1,12 +1,15 @@
+import { randomUUID } from 'crypto'
+
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
 import { AppError } from '@casino/shared-utils'
-import { AdminAuthGuard } from '../admin-auth.guard'
-import { WalletFacade } from '../../../wallet/application/wallet.facade'
-import { PaymentRequestRepository } from '../../../payments/infrastructure/repositories/payment-request.repository'
-import { AuditLogService } from '../../application/audit-log.service'
+
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { randomUUID } from 'crypto'
+import { PaymentRequestRepository } from '../../../payments/infrastructure/repositories/payment-request.repository'
+import { WalletFacade } from '../../../wallet/application/wallet.facade'
+import { AuditLogService } from '../../application/audit-log.service'
+import { AdminAuthGuard } from '../admin-auth.guard'
 
 export class WithdrawalInvalidStatusError extends AppError {
   readonly code = 'WITHDRAWAL_INVALID_STATUS'
@@ -105,7 +108,7 @@ export class AdminFinanceController {
   // UC-PAY-12 reject
   @Post('withdrawals/:id/reject')
   async reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() admin: any, @Req() req: any) {
-    await this.rejectOne(id, body?.reason, admin, req)
+    await this.rejectOne(id, body.reason, admin, req)
     return { ok: true }
   }
 
@@ -118,7 +121,7 @@ export class AdminFinanceController {
       try { await this.approveOne(id, admin, req); approved++ }
       catch (e: any) { failed.push({ id, error: e.code ?? e.message }) }
     }
-    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.withdrawal.batch_approved', targetType:'payment_request', payload:{ requested: body.ids?.length ?? 0, approved, failed: failed.length }, ipAddress: req.ip })
+    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.withdrawal.batch_approved', targetType:'payment_request', payload:{ requested: body.ids.length ?? 0, approved, failed: failed.length }, ipAddress: req.ip })
     return { ok: true, approved, failed }
   }
 
@@ -131,7 +134,7 @@ export class AdminFinanceController {
       try { await this.rejectOne(id, body.reason, admin, req); rejected++ }
       catch (e: any) { failed.push({ id, error: e.code ?? e.message }) }
     }
-    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.withdrawal.batch_rejected', targetType:'payment_request', payload:{ requested: body.ids?.length ?? 0, rejected, failed: failed.length, reason: body.reason }, ipAddress: req.ip })
+    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.withdrawal.batch_rejected', targetType:'payment_request', payload:{ requested: body.ids.length ?? 0, rejected, failed: failed.length, reason: body.reason }, ipAddress: req.ip })
     return { ok: true, rejected, failed }
   }
 

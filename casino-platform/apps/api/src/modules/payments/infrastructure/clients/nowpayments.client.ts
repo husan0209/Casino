@@ -1,6 +1,8 @@
+import { createHmac, timingSafeEqual } from 'crypto'
+
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { createHmac, timingSafeEqual } from 'crypto'
+
 import { PaymentProviderNotConfiguredError } from './rukassa.client'
 
 const MAP: Record<string, string> = {
@@ -110,8 +112,8 @@ export class NOWPaymentsClient {
     if (!this.isProd() && !this.config.get<string>('NOWPAYMENTS_API_KEY')) {
       const rates: Record<string, number> = { USDT_TRC20: 92.5, BTC: 8500000, TON: 450, TRX: 11.3, LTC: 7800 }
       const from = params.currencyFrom; const to = params.currencyTo
-      if (from === 'RUB' && rates[to]) return { estimatedAmount: (parseFloat(params.amount) / rates[to]).toFixed(8) }
-      if (to === 'RUB' && rates[from]) return { estimatedAmount: (parseFloat(params.amount) * rates[from]).toFixed(2) }
+      if (from === 'RUB' && rates[to]) return { estimatedAmount: (Number(params.amount) / rates[to]).toFixed(8) }
+      if (to === 'RUB' && rates[from]) return { estimatedAmount: (Number(params.amount) * rates[from]).toFixed(2) }
       return { estimatedAmount: params.amount }
     }
     const apiKey = this.assertApiKey()

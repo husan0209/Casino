@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
 
 // Minimum cooloff before self-exclusion can be lifted (72 hours)

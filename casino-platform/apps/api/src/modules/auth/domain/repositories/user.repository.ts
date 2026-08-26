@@ -1,4 +1,4 @@
-import { User } from '../entities/user.entity'
+import { type User } from '../entities/user.entity'
 
 export interface CreateUserInput {
   /** null для OAuth-пользователей (вход через провайдера, пароля нет) */

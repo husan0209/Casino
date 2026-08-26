@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
-import { NOWPaymentsClient } from '../../infrastructure/clients/nowpayments.client'
-import { WalletFacade } from '../../../wallet/application/wallet.facade'
+
 import { UsersFacade } from '../../../users/facade/users.facade'
+import { WalletFacade } from '../../../wallet/application/wallet.facade'
+import { NOWPaymentsClient } from '../../infrastructure/clients/nowpayments.client'
+import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 
 @Injectable()
 export class ProcessNOWPaymentsWebhookUseCase {

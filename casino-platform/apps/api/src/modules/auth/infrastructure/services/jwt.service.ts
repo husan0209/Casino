@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto'
+
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
@@ -7,7 +8,7 @@ const b64url = (buf: Buffer) => buf.toString('base64url')
 function expiresToSeconds(v: string | undefined, fallback: number): number {
   if (!v) return fallback
   const m = /^(\d+)([smhd])$/.exec(v.trim())
-  if (!m || !m[1] || !m[2]) return fallback
+  if (!m?.[1] || !m[2]) return fallback
   const mult = { s: 1, m: 60, h: 3600, d: 86400 }[m[2] as 's' | 'm' | 'h' | 'd']!
   return parseInt(m[1], 10) * mult
 }

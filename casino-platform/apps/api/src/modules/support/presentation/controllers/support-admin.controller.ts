@@ -1,12 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards , Inject } from '@nestjs/common'
+
+import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { RolesGuard, Roles } from '../../../auth/presentation/guards/roles.guard'
-import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { ISupportRepository, SUPPORT_REPOSITORY } from '../../domain/repositories/support.repository'
-import { Inject } from '@nestjs/common'
+import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
 import { GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
 import { SendMessageUseCase } from '../../application/use-cases/send-message.use-case'
-import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
+import { ISupportRepository, SUPPORT_REPOSITORY } from '../../domain/repositories/support.repository'
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin','superadmin')
@@ -31,7 +31,7 @@ export class SupportAdminController {
   get(@CurrentUser() _u:any, @Param('id') id:string){ return this.getUc.execute('', id, true) }
   @Post('tickets/:id/messages')
   send(@CurrentUser() u:any, @Param('id') id:string, @Body() b:any){
-    return this.sendUc.execute({ ticketId: id, senderType: 'admin', senderId: u.id, message: b.message, isInternal: !!b.is_internal })
+    return this.sendUc.execute({ ticketId: id, senderType: 'admin', senderId: u.id, message: b.message, isInternal: Boolean(b.is_internal) })
   }
   @Post('tickets/:id/assign')
   async assign(@Param('id') id:string, @Body() b:any){

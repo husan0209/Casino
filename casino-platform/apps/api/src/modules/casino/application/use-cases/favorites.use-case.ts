@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common'
 import Decimal from 'decimal.js'
+
 import { prisma } from '@casino/database'
+
 @Injectable()
 export class FavoritesUseCase {
   async add(userId: string, slug: string) {

@@ -1,5 +1,6 @@
-import Decimal from 'decimal.js'
 import { Injectable } from '@nestjs/common'
+import Decimal from 'decimal.js'
+
 import { prisma } from '@casino/database'
 
 export type DashPeriod = 'today' | '7d' | '30d' | '90d'

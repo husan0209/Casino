@@ -1,12 +1,14 @@
-import { Inject, Injectable } from '@nestjs/common'
 import { randomBytes } from 'crypto'
-import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+
+import { Inject, Injectable } from '@nestjs/common'
+
+import { EmailAlreadyExistsError, WeakPasswordError } from '../../domain/errors'
 import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
+import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 import { IEmailVerificationRepository, EMAIL_VERIFICATION_REPOSITORY } from '../../domain/repositories/verification-token.repository'
-import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
 import { EmailQueueService } from '../../infrastructure/services/email-queue.service'
 import { JwtTokenService } from '../../infrastructure/services/jwt.service'
-import { EmailAlreadyExistsError, WeakPasswordError } from '../../domain/errors'
+import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const CODE_LENGTH = 8

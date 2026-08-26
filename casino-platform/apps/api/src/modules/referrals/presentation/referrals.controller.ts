@@ -1,7 +1,9 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common'
-import { AuthGuard } from '../../auth/presentation/guards/auth.guard'
-import { CurrentUser } from '../../../common/decorators/current-user.decorator'
+
 import { prisma } from '@casino/database'
+
+import { CurrentUser } from '../../../common/decorators/current-user.decorator'
+import { AuthGuard } from '../../auth/presentation/guards/auth.guard'
 
 @UseGuards(AuthGuard)
 @Controller('referrals')

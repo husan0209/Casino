@@ -1,16 +1,19 @@
-import { Injectable } from '@nestjs/common'
 import { randomBytes } from 'crypto'
+
+import { Injectable } from '@nestjs/common'
 import Decimal from 'decimal.js'
+
 import { prisma } from '@casino/database'
-import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
+
+import { WalletFacade } from '../../../wallet/application/wallet.facade'
+import { InsufficientFundsError } from '../../../wallet/domain/errors'
 import {
   CurrencyNotSupportedError,
   GameDisabledError,
   GameNotFoundError,
   ProviderDisabledError,
 } from '../../domain/errors'
-import { WalletFacade } from '../../../wallet/application/wallet.facade'
-import { InsufficientFundsError } from '../../../wallet/domain/errors'
+import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 
 @Injectable()
 export class LaunchGameUseCase {

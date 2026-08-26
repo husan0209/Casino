@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
-import { IUserSettingsRepository, SelfExclusionStatus } from '../../domain/repositories/user-settings.repository'
+
+import { type IUserSettingsRepository, type SelfExclusionStatus } from '../../domain/repositories/user-settings.repository'
 
 @Injectable()
 export class PrismaUserSettingsRepository implements IUserSettingsRepository {

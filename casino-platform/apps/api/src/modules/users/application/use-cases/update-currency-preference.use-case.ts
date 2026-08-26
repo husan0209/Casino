@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
+
 import { IUserProfileRepository, USER_PROFILE_REPOSITORY } from '../../domain/repositories/user-profile.repository'
 
 @Injectable()

@@ -1,10 +1,10 @@
 import {
   DISPLAY_RUB_RATES,
   GEO_PROFILES,
-  GeoProfileDef,
-  FiatCurrency,
-  LegalCountry,
-  PaymentMethodDef,
+  type GeoProfileDef,
+  type FiatCurrency,
+  type LegalCountry,
+  type PaymentMethodDef,
   cryptoMethods,
   liveFiatCurrencies,
   resolveLegalCountry,
@@ -12,6 +12,7 @@ import {
   CURRENCY_LIMITS,
 } from '@casino/shared-config'
 import { money } from '@casino/shared-utils'
+
 import { FiatCurrencyNotLiveError, PaymentMethodUnavailableError } from './errors'
 
 export interface UserGeoContext {

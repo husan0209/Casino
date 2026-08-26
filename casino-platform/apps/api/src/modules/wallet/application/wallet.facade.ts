@@ -1,7 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { money } from '@casino/shared-utils'
-import { IWalletLedger, IWalletRepository, WALLET_LEDGER, WALLET_REPOSITORY, type CreditInput } from '../domain/repositories/wallet.repository'
+
 import type { Currency, MoneyAmount } from '@casino/shared-types'
+import { money } from '@casino/shared-utils'
+
+import { IWalletLedger, IWalletRepository, WALLET_LEDGER, WALLET_REPOSITORY, type CreditInput } from '../domain/repositories/wallet.repository'
+
 @Injectable()
 export class WalletFacade {
   constructor(

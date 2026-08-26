@@ -1,7 +1,9 @@
+import { createHmac, timingSafeEqual } from 'crypto'
+
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { createHmac, timingSafeEqual } from 'crypto'
 import * as argon2 from 'argon2'
+
 import { prisma } from '@casino/database'
 
 const b64url = (buf: Buffer) => buf.toString('base64url')

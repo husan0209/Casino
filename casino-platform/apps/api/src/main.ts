@@ -1,9 +1,10 @@
 import 'reflect-metadata'
 import { Logger } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
-import { NestExpressApplication } from '@nestjs/platform-express'
-import { json, urlencoded, type Request, type Response } from 'express'
+import { type NestExpressApplication } from '@nestjs/platform-express'
 import cookieParser from 'cookie-parser'
+import { json, urlencoded, type Request, type Response } from 'express'
+
 import { AppModule } from './app.module'
 
 /**
@@ -23,7 +24,7 @@ interface RawBodyRequest extends Request {
 }
 
 function captureRawBody(req: Request, _res: Response, buf: Buffer, _encoding: string): void {
-  ;(req as RawBodyRequest).rawBody = buf.toString('utf8')
+  (req as RawBodyRequest).rawBody = buf.toString('utf8')
 }
 
 async function bootstrap() {
@@ -51,4 +52,4 @@ async function bootstrap() {
   await app.listen(port)
   new Logger('Bootstrap').log(`API listening on http://localhost:${port}/api/v1`)
 }
-bootstrap()
+void bootstrap()

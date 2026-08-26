@@ -1,6 +1,9 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
+
 import { AdminAuthGuard } from '../admin-auth.guard'
+
 @UseGuards(AdminAuthGuard)
 @Controller('admin/audit-logs')
 export class AdminAuditController {

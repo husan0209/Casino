@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
+
 import type { AuthProviderKind, AuthProviderView, IAuthProviderRepository } from '../../domain/repositories/auth-provider.repository'
 
 @Injectable()

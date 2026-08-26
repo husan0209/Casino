@@ -1,6 +1,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common'
-import { AdminAuthGuard } from '../admin-auth.guard'
+
 import { DashboardService, DashPeriod } from '../../application/dashboard.service'
+import { AdminAuthGuard } from '../admin-auth.guard'
 
 @UseGuards(AdminAuthGuard)
 @Controller('admin/dashboard')

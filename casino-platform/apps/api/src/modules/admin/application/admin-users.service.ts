@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common'
-import { prisma } from '@casino/database'
 import * as argon2 from 'argon2'
+
+import { prisma } from '@casino/database'
+
 @Injectable()
 export class AdminUsersService {
   list(page=1, perPage=20) {

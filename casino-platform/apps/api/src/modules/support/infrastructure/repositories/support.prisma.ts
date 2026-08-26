@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
-import { ISupportRepository, TicketStatus, TicketCategory, TicketPriority } from '../../domain/repositories/support.repository'
+
+import { type ISupportRepository, type TicketStatus, type TicketCategory, type TicketPriority } from '../../domain/repositories/support.repository'
+
 @Injectable()
 export class PrismaSupportRepository implements ISupportRepository {
   async countOpenByUser(userId: string) {

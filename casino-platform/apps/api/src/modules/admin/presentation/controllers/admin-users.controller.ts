@@ -1,7 +1,9 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
-import { AdminAuthGuard } from '../admin-auth.guard'
+
 import { AuditLogService } from '../../application/audit-log.service'
+import { AdminAuthGuard } from '../admin-auth.guard'
 
 @UseGuards(AdminAuthGuard)
 @Controller('admin/users')

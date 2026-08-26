@@ -1,8 +1,11 @@
+import { createHash } from 'crypto'
+
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+
+import { prisma } from '@casino/database'
+
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { RolesGuard, Roles } from '../../../auth/presentation/guards/roles.guard'
-import { prisma } from '@casino/database'
-import { createHash } from 'crypto'
 import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 
 @UseGuards(AuthGuard, RolesGuard)
@@ -45,7 +48,7 @@ export class CasinoAdminController {
         category: (g.category as any) ?? 'slots',
         thumbnailUrl: g.thumbnailUrl ?? null,
         hasDemo: g.hasDemo ?? false,
-        rtp: g.rtp != null ? String(g.rtp) : null,
+        rtp: g.rtp != null ? String(g.rtp) : null, // eslint-disable-line eqeqeq -- null|undefined guard on provider payload
         metadata: (g.metadata ?? {}) as any,
       }
       const existing = await prisma.game.findUnique({

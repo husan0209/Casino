@@ -1,6 +1,7 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common'
+import { type ArgumentsHost, Catch, type ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common'
+import { type Request, type Response } from 'express'
+
 import { AppError, errorResponse } from '@casino/shared-utils'
-import { Request, Response } from 'express'
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {

@@ -1,5 +1,7 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
+import { type CanActivate, type ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
+
 import { AdminAuthService } from '../infrastructure/admin-jwt.service'
+
 @Injectable()
 export class AdminAuthGuard implements CanActivate {
   constructor(private auth: AdminAuthService) {}

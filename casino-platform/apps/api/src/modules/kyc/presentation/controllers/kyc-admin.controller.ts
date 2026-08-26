@@ -1,9 +1,9 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query, UseGuards , Inject } from '@nestjs/common'
+
+import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { RolesGuard, Roles } from '../../../auth/presentation/guards/roles.guard'
 import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
-import { Inject } from '@nestjs/common'
-import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin','superadmin')

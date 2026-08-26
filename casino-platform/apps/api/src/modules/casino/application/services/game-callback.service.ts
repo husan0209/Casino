@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
 import { money } from '@casino/shared-utils'
+
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
-import { ParsedProviderCallback } from '../../domain/provider-adapter.interface'
+import { type ParsedProviderCallback } from '../../domain/provider-adapter.interface'
 
 @Injectable()
 export class GameCallbackService {
@@ -17,7 +19,7 @@ export class GameCallbackService {
     if (session.user.status !== 'active') throw new Error('PLAYER_BLOCKED')
     await prisma.gameSession.update({ where: { id: session.id }, data: { lastActivityAt: new Date() }})
     const wallet = await prisma.walletAccount.findUnique({ where: { userId_currency: { userId: session.userId, currency: session.currency }}})
-    const balance = wallet?.balance?.toString() ?? '0'
+    const balance = wallet?.balance.toString() ?? '0'
     return { player_id: session.userId, currency: session.currency, balance, nickname: session.user.email || session.user.id.slice(0,8) }
   }
 
@@ -34,7 +36,7 @@ export class GameCallbackService {
     const dup = await prisma.gameTransaction.findUnique({ where: { providerId_externalTransactionId: { providerId, externalTransactionId: cb.transactionId }}})
     if (dup) {
       const w = await prisma.walletAccount.findUnique({ where: { userId_currency: { userId: session.userId, currency: session.currency }}})
-      return { balance: w?.balance?.toString() ?? '0', duplicate: true }
+      return { balance: w?.balance.toString() ?? '0', duplicate: true }
     }
     // round
     const roundExternalId = cb.roundId || cb.transactionId
@@ -80,7 +82,7 @@ export class GameCallbackService {
     const dup = await prisma.gameTransaction.findUnique({ where: { providerId_externalTransactionId: { providerId, externalTransactionId: cb.transactionId }}})
     if (dup) {
       const w = await prisma.walletAccount.findUnique({ where: { userId_currency: { userId: session.userId, currency: session.currency }}})
-      return { balance: w?.balance?.toString() ?? '0', duplicate: true }
+      return { balance: w?.balance.toString() ?? '0', duplicate: true }
     }
     const winAmount = cb.winAmount || '0'
     const roundExternalId = cb.roundId || cb.transactionId
@@ -105,7 +107,7 @@ export class GameCallbackService {
       ledgerEntryId = res.ledgerEntryId
     } else {
       const w = await prisma.walletAccount.findUnique({ where: { userId_currency: { userId: session.userId, currency: session.currency }}})
-      balanceAfter = w?.balance?.toString() ?? '0'
+      balanceAfter = w?.balance.toString() ?? '0'
     }
     await prisma.gameTransaction.create({
       data: {
@@ -136,7 +138,7 @@ export class GameCallbackService {
     if (!originalTx) {
       // phantom rollback – return current balance
       const w = await prisma.walletAccount.findUnique({ where: { userId_currency: { userId: session.userId, currency: session.currency }}})
-      return { balance: w?.balance?.toString() ?? '0', phantom: true }
+      return { balance: w?.balance.toString() ?? '0', phantom: true }
     }
     // check already rolled back
     const already = await prisma.gameTransaction.findFirst({
@@ -144,7 +146,7 @@ export class GameCallbackService {
     })
     if (already) {
       const w = await prisma.walletAccount.findUnique({ where: { userId_currency: { userId: session.userId, currency: session.currency }}})
-      return { balance: w?.balance?.toString() ?? '0', duplicate: true }
+      return { balance: w?.balance.toString() ?? '0', duplicate: true }
     }
     const rollbackAmount = originalTx.amount.toString()
     const res = await this.wallet.credit({

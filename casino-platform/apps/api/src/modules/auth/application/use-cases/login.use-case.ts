@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+
+import { InvalidCredentialsError, AccountBlockedError, SelfExcludedError } from '../../domain/errors'
 import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
 import { IUserSettingsRepository, USER_SETTINGS_REPOSITORY } from '../../domain/repositories/user-settings.repository'
-import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
+import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 import { JwtTokenService } from '../../infrastructure/services/jwt.service'
-import { InvalidCredentialsError, AccountBlockedError, SelfExcludedError } from '../../domain/errors'
+import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
 
 @Injectable()
 export class LoginUseCase {
@@ -17,7 +18,7 @@ export class LoginUseCase {
   ) {}
   async execute(input: { email: string; password: string; ip?: string | undefined; userAgent?: string | undefined }) {
     const user = await this.users.findByEmail(input.email.toLowerCase().trim())
-    if (!user || !user.passwordHash) throw new InvalidCredentialsError()
+    if (!user?.passwordHash) throw new InvalidCredentialsError()
     const ok = await this.hasher.verify(user.passwordHash, input.password)
     if (!ok) throw new InvalidCredentialsError()
     // Email verification не блокирует вход — требуется позже для вывода (tz-part-5 §5.1)

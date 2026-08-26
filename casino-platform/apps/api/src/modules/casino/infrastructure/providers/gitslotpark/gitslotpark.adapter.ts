@@ -1,8 +1,13 @@
+import { createHmac, timingSafeEqual } from 'crypto'
+
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { createHmac, timingSafeEqual } from 'crypto'
-import { GameProviderAdapter, LaunchParams, ParsedProviderCallback } from '../../../domain/provider-adapter.interface'
+
 import { PaymentProviderNotConfiguredError } from '../../../../payments/infrastructure/clients/rukassa.client'
+import { type GameProviderAdapter, type LaunchParams, type ParsedProviderCallback } from '../../../domain/provider-adapter.interface'
+
+
+const has = (v: unknown): boolean => v !== null && v !== undefined
 
 /**
  * GitSlotPark Seamless Wallet API v2 — агрегатор Pragmatic Play / PG Soft /
@@ -135,14 +140,14 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
     return {
       action: map[op] ?? 'balance',
       // Seamless-модель: игрок идентифицируется по userID, не по session-token
-      playerToken: body.userID != null ? `uid:${body.userID}` : undefined,
-      playerId: body.userID != null ? String(body.userID) : undefined,
-      betAmount: body.amount != null ? String(body.amount) : body.betAmount != null ? String(body.betAmount) : undefined,
-      winAmount: body.winAmount != null ? String(body.winAmount) : body.amount != null ? String(body.amount) : undefined,
-      roundId: body.roundID != null ? String(body.roundID) : undefined,
-      transactionId: body.transactionID != null ? String(body.transactionID) : undefined,
-      rollbackTransactionId: body.refTransactionID != null ? String(body.refTransactionID) : undefined,
-      gameId: body.gameID != null ? String(body.gameID) : undefined,
+      playerToken: has(body.userID) ? `uid:${body.userID}` : undefined,
+      playerId: has(body.userID) ? String(body.userID) : undefined,
+      betAmount: has(body.amount) ? String(body.amount) : has(body.betAmount) ? String(body.betAmount) : undefined,
+      winAmount: has(body.winAmount) ? String(body.winAmount) : has(body.amount) ? String(body.amount) : undefined,
+      roundId: has(body.roundID) ? String(body.roundID) : undefined,
+      transactionId: has(body.transactionID) ? String(body.transactionID) : undefined,
+      rollbackTransactionId: has(body.refTransactionID) ? String(body.refTransactionID) : undefined,
+      gameId: has(body.gameID) ? String(body.gameID) : undefined,
       rawRequest: body,
     }
   }

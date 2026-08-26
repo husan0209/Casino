@@ -1,10 +1,12 @@
-import { Worker } from 'bullmq'
 import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { Worker } from 'bullmq'
+
 import { prisma } from '@casino/database'
-import { type EmailJobData, QUEUES } from '../queue.types'
+
 import { queueConnection } from '../infrastructure/email.queue'
 import { MAILER_PORT, MailerPort } from '../infrastructure/mailer.port'
+import { type EmailJobData, QUEUES } from '../queue.types'
 
 /** Воркер: разбирает очередь `email` и шлёт через MailerPort (SMTP/dev-log). */
 @Injectable()

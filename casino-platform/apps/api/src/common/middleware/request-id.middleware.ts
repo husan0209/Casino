@@ -1,6 +1,7 @@
-import { Injectable, NestMiddleware } from '@nestjs/common'
-import { Request, Response, NextFunction } from 'express'
 import { randomUUID } from 'crypto'
+
+import { Injectable, type NestMiddleware } from '@nestjs/common'
+import { type Request, type Response, type NextFunction } from 'express'
 
 // Whitelist for client-supplied X-Request-Id. Anything outside this pattern
 // is silently replaced with a fresh UUID to prevent:

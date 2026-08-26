@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
+
 @Injectable()
 export class PaymentRequestRepository {
   create(data: any) { return prisma.paymentRequest.create({ data }) }

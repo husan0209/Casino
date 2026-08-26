@@ -1,15 +1,16 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards, BadRequestException, UsePipes } from '@nestjs/common'
-import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
+
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
-import { CreateFiatDepositSchema } from '../dto/create-fiat-deposit.dto'
-import { CreateCryptoDepositSchema } from '../dto/create-crypto-deposit.dto'
-import { CreateFiatWithdrawalSchema, CreateCryptoWithdrawalSchema } from '../dto/create-withdrawal.dto'
-import { CreateFiatDepositUseCase } from '../../application/use-cases/create-fiat-deposit.use-case'
-import { CreateCryptoDepositUseCase } from '../../application/use-cases/create-crypto-deposit.use-case'
-import { CreateWithdrawalUseCase } from '../../application/use-cases/create-withdrawal.use-case'
+import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { CancelWithdrawalUseCase } from '../../application/use-cases/cancel-withdrawal.use-case'
+import { CreateCryptoDepositUseCase } from '../../application/use-cases/create-crypto-deposit.use-case'
+import { CreateFiatDepositUseCase } from '../../application/use-cases/create-fiat-deposit.use-case'
+import { CreateWithdrawalUseCase } from '../../application/use-cases/create-withdrawal.use-case'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
+import { CreateCryptoDepositSchema } from '../dto/create-crypto-deposit.dto'
+import { CreateFiatDepositSchema } from '../dto/create-fiat-deposit.dto'
+import { CreateFiatWithdrawalSchema, CreateCryptoWithdrawalSchema } from '../dto/create-withdrawal.dto'
 
 @UseGuards(AuthGuard)
 @Controller('payments')
@@ -39,7 +40,7 @@ export class PaymentsController {
       id: pr.id,
       status: pr.status,
       currency: pr.currency,
-      amount: pr.amount?.toString?.() ?? pr.amount,
+      amount: pr.amount.toString() ?? pr.amount,
       payment_url: pr.paymentUrl,
       completed_at: pr.completedAt,
     }

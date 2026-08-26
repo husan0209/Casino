@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common'
+
+import { GetGeoContextUseCase } from '../application/use-cases/get-geo-context.use-case'
 import { UpdateAfterDepositUseCase } from '../application/use-cases/update-after-deposit.use-case'
 import { UpdateCurrencyPreferenceUseCase } from '../application/use-cases/update-currency-preference.use-case'
-import { GetGeoContextUseCase } from '../application/use-cases/get-geo-context.use-case'
 
 @Injectable()
 export class UsersFacade {

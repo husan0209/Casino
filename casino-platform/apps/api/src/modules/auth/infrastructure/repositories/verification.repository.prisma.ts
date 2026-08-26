@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
+
 import type { VerificationTokenView, IEmailVerificationRepository, IPasswordResetRepository } from '../../domain/repositories/verification-token.repository'
 
 const toView = (row: { id: string; userId: string; token: string; expiresAt: Date; usedAt: Date | null }): VerificationTokenView => ({ ...row })

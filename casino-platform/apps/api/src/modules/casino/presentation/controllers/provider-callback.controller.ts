@@ -1,8 +1,12 @@
 import { Body, Controller, Headers, Param, Post, Res, HttpCode } from '@nestjs/common'
-import type { Response } from 'express'
-import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
-import { GameCallbackService } from '../../application/services/game-callback.service'
+import { Response } from 'express'
+
 import { prisma } from '@casino/database'
+
+import { GameCallbackService } from '../../application/services/game-callback.service'
+import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
+
+
 
 @Controller('provider-callback')
 export class ProviderCallbackController {

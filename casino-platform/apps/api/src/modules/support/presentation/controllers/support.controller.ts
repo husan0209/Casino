@@ -1,11 +1,12 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
-import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
+
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { CreateTicketUseCase } from '../../application/use-cases/create-ticket.use-case'
-import { ListUserTicketsUseCase } from '../../application/use-cases/list-user-tickets.use-case'
-import { GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
-import { SendMessageUseCase } from '../../application/use-cases/send-message.use-case'
+import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
+import { CreateTicketUseCase } from '../../application/use-cases/create-ticket.use-case'
+import { GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
+import { ListUserTicketsUseCase } from '../../application/use-cases/list-user-tickets.use-case'
+import { SendMessageUseCase } from '../../application/use-cases/send-message.use-case'
 
 @UseGuards(AuthGuard)
 @Controller('support')

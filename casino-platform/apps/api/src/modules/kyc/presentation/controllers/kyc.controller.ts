@@ -1,14 +1,16 @@
-import { BadRequestException, Body, Controller, Get, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common'
+import { randomUUID } from 'crypto'
+import { extname } from 'path'
+
+import { BadRequestException, Body, Controller, Get, Post, Query, UploadedFile, UseGuards, UseInterceptors , Inject } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { diskStorage } from 'multer'
-import { extname } from 'path'
-import { randomUUID } from 'crypto'
-import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
+
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { SubmitKycUseCase } from '../../application/use-cases/submit-kyc.use-case'
+import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { GetKycStatusUseCase } from '../../application/use-cases/get-kyc-status.use-case'
+import { SubmitKycUseCase } from '../../application/use-cases/submit-kyc.use-case'
 import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
-import { Inject } from '@nestjs/common'
+
 
 // SECURITY_BASELINE.md §7.1 — KYC documents whitelist.
 // MIME type and extension MUST both be in the allowed lists.

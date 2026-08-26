@@ -1,6 +1,8 @@
+import { createHmac, timingSafeEqual } from 'crypto'
+
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { createHmac, timingSafeEqual } from 'crypto'
+
 import { OAuthUserProvisioningService } from './oauth-user-provisioning.service'
 import { OAuthNotConfiguredError, OAuthStateError, OAuthExchangeError } from '../../../domain/errors'
 

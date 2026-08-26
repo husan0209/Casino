@@ -1,6 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
+
 import { EMAIL_QUEUE_PORT, EmailQueuePort } from '../../../queues/queue.types'
+
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name)

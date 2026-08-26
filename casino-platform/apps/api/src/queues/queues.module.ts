@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { EMAIL_QUEUE_PORT, MAILER_PORT } from './queue.types'
+
+import { EmailWorker } from './application/email.worker'
 import { BullMqEmailQueue, DevLogEmailQueue } from './infrastructure/email.queue'
 import { mailerFactory } from './infrastructure/smtp.mailer'
-import { EmailWorker } from './application/email.worker'
+import { EMAIL_QUEUE_PORT, MAILER_PORT } from './queue.types'
 
 /**
  * BullMQ-очереди (TZ part 6 §11, IMPLEMENTATION_GAPS GAP-02):

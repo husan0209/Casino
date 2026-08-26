@@ -1,8 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
+
+import { SessionInvalidError, SessionExpiredError, AccountBlockedError } from '../../domain/errors'
 import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 import { JwtTokenService } from '../../infrastructure/services/jwt.service'
-import { SessionInvalidError, SessionExpiredError, AccountBlockedError } from '../../domain/errors'
+
 @Injectable()
 export class RefreshUseCase {
   constructor(

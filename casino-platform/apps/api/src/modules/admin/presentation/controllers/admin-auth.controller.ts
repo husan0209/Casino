@@ -1,7 +1,10 @@
 import { Body, Controller, Post } from '@nestjs/common'
-import { AdminAuthService } from '../../infrastructure/admin-jwt.service'
+
 import { prisma } from '@casino/database'
+
 import { AuditLogService } from '../../application/audit-log.service'
+import { AdminAuthService } from '../../infrastructure/admin-jwt.service'
+
 @Controller('admin/auth')
 export class AdminAuthController {
   constructor(private auth: AdminAuthService, private audit: AuditLogService) {}

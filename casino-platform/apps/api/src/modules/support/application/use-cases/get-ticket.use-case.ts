@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { ISupportRepository, SUPPORT_REPOSITORY } from '../../domain/repositories/support.repository'
+
 import { TicketNotFoundError, ForbiddenTicketError } from '../../domain/errors'
+import { ISupportRepository, SUPPORT_REPOSITORY } from '../../domain/repositories/support.repository'
+
 @Injectable()
 export class GetTicketUseCase {
   constructor(@Inject(SUPPORT_REPOSITORY) private repo: ISupportRepository) {}

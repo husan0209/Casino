@@ -1,7 +1,9 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common'
+
+import { prisma } from '@casino/database'
+
 import { AuthGuard } from '../../auth/presentation/guards/auth.guard'
 import { RolesGuard, Roles } from '../../auth/presentation/guards/roles.guard'
-import { prisma } from '@casino/database'
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin','superadmin')

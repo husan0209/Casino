@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common'
-import { GameProviderAdapter, LaunchParams, ParsedProviderCallback } from '../../../domain/provider-adapter.interface'
 import { ConfigService } from '@nestjs/config'
+
+import { type GameProviderAdapter, type LaunchParams, type ParsedProviderCallback } from '../../../domain/provider-adapter.interface'
+
 @Injectable()
 export class DemoProviderAdapter implements GameProviderAdapter {
   constructor(private config: ConfigService) {}

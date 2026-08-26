@@ -1,8 +1,10 @@
 import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
-import { AdminAuthGuard } from '../admin-auth.guard'
-import { AuditLogService } from '../../application/audit-log.service'
+
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { AuditLogService } from '../../application/audit-log.service'
+import { AdminAuthGuard } from '../admin-auth.guard'
 
 @UseGuards(AdminAuthGuard)
 @Controller('admin/notifications')

@@ -1,8 +1,11 @@
-import { Inject, Injectable } from '@nestjs/common'
 import { randomBytes } from 'crypto'
+
+import { Inject, Injectable } from '@nestjs/common'
+
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 import { IPasswordResetRepository, PASSWORD_RESET_REPOSITORY } from '../../domain/repositories/verification-token.repository'
 import { EmailQueueService } from '../../infrastructure/services/email-queue.service'
+
 @Injectable()
 export class ForgotPasswordUseCase {
   constructor(

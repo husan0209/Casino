@@ -1,19 +1,21 @@
 import { Body, Controller, Get, Post, Query, Req, Res, UsePipes } from '@nestjs/common'
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
+import { Request, Response } from 'express'
+
 import { setRefreshTokenCookie, clearRefreshTokenCookie } from '../../../../common/cookies/refresh-token-cookie'
-import { RegisterSchema } from '../dto/register.dto'
-import { LoginSchema } from '../dto/login.dto'
-import { ForgotPasswordSchema, ResetPasswordSchema } from '../dto/password-reset.dto'
-import { RegisterUseCase } from '../../application/use-cases/register.use-case'
-import { VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case'
-import { LoginUseCase } from '../../application/use-cases/login.use-case'
-import { RefreshUseCase } from '../../application/use-cases/refresh.use-case'
-import { LogoutUseCase } from '../../application/use-cases/logout.use-case'
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { ForgotPasswordUseCase } from '../../application/use-cases/forgot-password.use-case'
-import { ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case'
-import type { Request, Response } from 'express'
+import { LoginUseCase } from '../../application/use-cases/login.use-case'
+import { LogoutUseCase } from '../../application/use-cases/logout.use-case'
 import { GoogleOAuthUseCase } from '../../application/use-cases/oauth/google-oauth.use-case'
 import { TelegramLoginUseCase } from '../../application/use-cases/oauth/telegram-login.use-case'
+import { RefreshUseCase } from '../../application/use-cases/refresh.use-case'
+import { RegisterUseCase } from '../../application/use-cases/register.use-case'
+import { ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case'
+import { VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case'
+import { LoginSchema } from '../dto/login.dto'
+import { ForgotPasswordSchema, ResetPasswordSchema } from '../dto/password-reset.dto'
+import { RegisterSchema } from '../dto/register.dto'
+
 
 @Controller('auth')
 export class AuthController {
@@ -59,7 +61,7 @@ export class AuthController {
 
   @Post('refresh')
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const token = (req.cookies?.refresh_token) || req.body?.refreshToken
+    const token = (req.cookies.refresh_token) || req.body?.refreshToken
     const result = await this.refreshUc.execute(token)
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken }

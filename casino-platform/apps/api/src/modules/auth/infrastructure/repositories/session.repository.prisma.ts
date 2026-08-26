@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
+
 import type { SessionCreateInput, SessionView, ISessionRepository } from '../../domain/repositories/session.repository'
 
 @Injectable()

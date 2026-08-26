@@ -1,8 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
-import { IPasswordResetRepository, PASSWORD_RESET_REPOSITORY, ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories'
-import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
+
 import { TokenInvalidError, TokenExpiredError, TokenAlreadyUsedError, WeakPasswordError } from '../../domain/errors'
+import { IPasswordResetRepository, PASSWORD_RESET_REPOSITORY, ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories'
+import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
+
 @Injectable()
 export class ResetPasswordUseCase {
   constructor(

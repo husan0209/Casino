@@ -1,7 +1,8 @@
-import { Queue } from 'bullmq'
-import Redis from 'ioredis'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { Queue } from 'bullmq'
+import Redis from 'ioredis'
+
 import { type EmailJobData, type EmailQueuePort, type EnqueueResult, QUEUES } from '../queue.types'
 
 export function queueConnection(config: ConfigService): Redis {

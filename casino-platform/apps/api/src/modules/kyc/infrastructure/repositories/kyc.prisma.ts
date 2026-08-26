@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
-import { IKycRepository, KycSubmitInput } from '../../domain/repositories/kyc.repository'
+
+import { type IKycRepository, type KycSubmitInput } from '../../domain/repositories/kyc.repository'
+
 @Injectable()
 export class PrismaKycRepository implements IKycRepository {
   async getByUserId(userId: string) { return prisma.kycProfile.findUnique({ where: { userId }, include: { documents: true }}) }

@@ -1,8 +1,11 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common'
-import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
-import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { WalletFacade } from '../../application/wallet.facade'
+
 import { prisma } from '@casino/database'
+
+import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
+import { WalletFacade } from '../../application/wallet.facade'
+
 
 @UseGuards(AuthGuard)
 @Controller('wallet')

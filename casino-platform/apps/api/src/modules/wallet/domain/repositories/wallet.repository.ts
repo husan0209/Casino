@@ -1,4 +1,5 @@
 import type { MoneyAmount, Currency } from '@casino/shared-types'
+
 export interface WalletAccount { userId: string; currency: Currency; balance: MoneyAmount; locked: MoneyAmount; version: bigint }
 export interface CreditInput {
   userId: string; currency: Currency; amount: MoneyAmount;

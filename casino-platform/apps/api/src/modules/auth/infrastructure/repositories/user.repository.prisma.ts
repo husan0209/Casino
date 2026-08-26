@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
+
 import { User } from '../../domain/entities/user.entity'
-import { CreateUserInput, IUserRepository } from '../../domain/repositories/user.repository'
+import { type CreateUserInput, type IUserRepository } from '../../domain/repositories/user.repository'
 
 @Injectable()
 export class PrismaUserRepository implements IUserRepository {

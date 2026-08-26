@@ -1,7 +1,9 @@
+import { randomBytes } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
-import { IUserRepository, USER_REPOSITORY } from '../../../domain/repositories/user.repository'
-import { IAuthProviderRepository, AUTH_PROVIDER_REPOSITORY, AuthProviderKind } from '../../../domain/repositories/auth-provider.repository'
+
+import { IAuthProviderRepository, AUTH_PROVIDER_REPOSITORY, type AuthProviderKind } from '../../../domain/repositories/auth-provider.repository'
 import { ISessionRepository, SESSION_REPOSITORY } from '../../../domain/repositories/session.repository'
+import { IUserRepository, USER_REPOSITORY } from '../../../domain/repositories/user.repository'
 import { JwtTokenService } from '../../../infrastructure/services/jwt.service'
 
 export interface ProviderSignInInput {
@@ -34,7 +36,7 @@ export class OAuthUserProvisioningService {
   private async generateReferralCode(): Promise<string> {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
     for (let attempt = 0; attempt < 5; attempt++) {
-      const bytes = require('crypto').randomBytes(8) as Buffer
+      const bytes = randomBytes(8)
       let code = ''
       for (let i = 0; i < 8; i++) code += alphabet[bytes[i]! % alphabet.length]
       if (!(await this.users.referralCodeExists(code))) return code

@@ -1,10 +1,13 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
-import { ListGamesUseCase } from '../../application/use-cases/list-games.use-case'
-import { LaunchGameUseCase } from '../../application/use-cases/launch-game.use-case'
-import { FavoritesUseCase } from '../../application/use-cases/favorites.use-case'
-import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
-import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+
 import { prisma } from '@casino/database'
+
+import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
+import { FavoritesUseCase } from '../../application/use-cases/favorites.use-case'
+import { LaunchGameUseCase } from '../../application/use-cases/launch-game.use-case'
+import { ListGamesUseCase } from '../../application/use-cases/list-games.use-case'
+
 
 @Controller('casino')
 export class CasinoController {

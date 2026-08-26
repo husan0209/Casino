@@ -1,18 +1,21 @@
-import { Injectable } from '@nestjs/common'
 import { randomUUID } from 'crypto'
-import { money } from '@casino/shared-utils'
+
+import { Injectable } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
+
 import type { DisplayCurrency } from '@casino/shared-config'
-import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
-import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
+import { money } from '@casino/shared-utils'
+
+import { GeoFacade } from '../../../geo/facade/geo.facade'
 import { KycCheckService } from '../../../kyc/application/use-cases/kyc-check.service'
+import { UsersFacade } from '../../../users/facade/users.facade'
 import {
   AmountTooLargeError,
   AmountTooSmallError,
   PaymentProviderError,
 } from '../../domain/errors'
-import { ConfigService } from '@nestjs/config'
-import { GeoFacade } from '../../../geo/facade/geo.facade'
-import { UsersFacade } from '../../../users/facade/users.facade'
+import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
+import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 
 export interface CreateFiatDepositInput {
   amount: string

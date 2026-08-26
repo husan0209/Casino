@@ -1,5 +1,6 @@
-import { AppError } from '@casino/shared-utils'
 import type { MoneyAmount } from '@casino/shared-types'
+import { AppError } from '@casino/shared-utils'
+
 export class InsufficientFundsError extends AppError {
   readonly code = 'INSUFFICIENT_FUNDS'; readonly httpStatus = 422
   constructor(public readonly required: MoneyAmount, public readonly available: MoneyAmount) {

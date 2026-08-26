@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { ISupportRepository, SUPPORT_REPOSITORY } from '../../domain/repositories/support.repository'
+
 import { TooManyOpenTicketsError } from '../../domain/errors'
+import { ISupportRepository, SUPPORT_REPOSITORY } from '../../domain/repositories/support.repository'
+
 @Injectable()
 export class CreateTicketUseCase {
   constructor(@Inject(SUPPORT_REPOSITORY) private repo: ISupportRepository) {}
