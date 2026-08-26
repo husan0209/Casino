@@ -13,9 +13,8 @@ import { RegisterUseCase } from '../../application/use-cases/register.use-case'
 import { ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case'
 import { VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case'
 import { RegisterSchema, type RegisterDto } from '../dto/register.dto'
-import { ForgotPasswordSchema } from '../dto/password-reset.dto'
-import { ResetPasswordSchema } from '../dto/password-reset.dto'
 import { LoginSchema, type LoginDto } from '../dto/login.dto'
+import { ForgotPasswordSchema, ResetPasswordSchema } from '../dto/password-reset.dto'
 
 
 @Controller('auth')

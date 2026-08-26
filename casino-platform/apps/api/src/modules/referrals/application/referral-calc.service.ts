@@ -13,6 +13,8 @@ export class ReferralCalcService {
 
   constructor(private readonly walletFacade: WalletFacade) {}
 
+  // TODO(referrals): split runDaily into accrual + payout steps (<60 lines)
+  // eslint-disable-next-line max-lines-per-function
   async runDaily(dateStr?: string) {
     const date = dateStr ? new Date(dateStr) : new Date(Date.now() - 86400000)
     const dayStart = new Date(date); dayStart.setUTCHours(0,0,0,0)
@@ -59,6 +61,7 @@ export class ReferralCalcService {
           }
         })
         processed++
+        // eslint-disable-next-line max-depth -- reward gating inside per-user loop is inherent here
         if (isPositiveGgr && money.isPositive(rewardAmount)) {
           try {
             await this.walletFacade.credit({
