@@ -133,6 +133,8 @@ Realtime:   NOT used on MVP (polling only)
 Frontend:   Next.js 14 App Router + Tailwind + TanStack Query + Zustand + React Hook Form + Zod
 
 # ── Don't do ───────────────────────────────────────────────
+-   ❌ Write one-liner methods (expand all controller/service methods into multi-line blocks)
+-   ❌ Use cryptic abbreviations (u, b, q, r, ru, rr, cur) — use currentUser, dto, queryParams, ticketId, currency
 -   ❌ Use number type for money anywhere
 -   ❌ Hardcode secrets, URLs, API keys
 -   ❌ Log passwords, tokens, full card numbers, KYC documents

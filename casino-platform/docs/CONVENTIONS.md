@@ -196,19 +196,26 @@ utils/
 └── pagination.ts
 ```
 
-### 4.3. Максимальная длина method
+### 4.3. Максимальная длина метода
 
-Метод не должен превышать **30 строк**. Если превышает — выделить приватные методы.
+Метод не должен превышать **30 строк логики**. Если метод длинный — выделите приватные методы или отдельные Use Cases.
+
+> ⚠️ **ВАЖНО:** Лимит 30 строк касается **логической сложности**, а не форматирования.
+> **Категорически запрещено сжимать код в одну строку** (писать однострочные методы, убирать переносы или объединять переменные через запятую) ради экономии строк. Каждое выражение и тело метода должны быть развернуты на отдельных строках с правильными отступами.
 
 ```typescript
+// ✅ ПРАВИЛЬНО — читаемый, многострочный метод (8 строк, легко читать):
 async register(input: RegisterInput): Promise<RegisterResult> {
   await this.validateNotExists(input.email)
   const hashedPassword = await this.hashPassword(input.password)
   const user = await this.createUserEntity(input, hashedPassword)
   await this.userRepository.save(user)
   await this.sendVerificationEmail(user)
-  return { user, verificationToken: ... }
+  return { user, verificationToken: user.token }
 }
+
+// ❌ ЗАПРЕЩЕНО — искусственное сжатие в одну строку:
+async register(i:any){ await this.val(i.e); return this.repo.save(await this.create(i)) }
 ```
 
 ### 4.4. Один use case = один файл

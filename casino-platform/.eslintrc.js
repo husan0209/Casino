@@ -26,6 +26,8 @@ module.exports = {
     'no-return-assign': 'error',
     'no-throw-literal': 'error',
     'no-duplicate-imports': 'off',
+    'curly': ['error', 'all'],
+    'brace-style': ['error', '1tbs', { allowSingleLine: false }],
 
     // ─── TypeScript ───────────────────────────────────────────────
     // CRITICAL: was 'warn'. Money-related code MUST NOT use any.

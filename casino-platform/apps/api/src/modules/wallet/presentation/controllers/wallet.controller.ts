@@ -1,42 +1,86 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common'
 
 import { prisma } from '@casino/database'
+import type { Currency } from '@casino/shared-types'
+import { money } from '@casino/shared-utils'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { WalletFacade } from '../../application/wallet.facade'
 
-
 @UseGuards(AuthGuard)
 @Controller('wallet')
 export class WalletController {
-  constructor(private wallet: WalletFacade) {}
+  constructor(private readonly walletFacade: WalletFacade) {}
+
   @Get('balances')
-  async balances(@CurrentUser() u: any) {
-    const rows = await this.wallet.getBalances(u.id)
-    const { money } = await import('@casino/shared-utils')
-    return rows.map(r => ({ currency: r.currency, balance: r.balance, locked: r.locked, available: money.subtract(r.balance, r.locked) }))
-  }
-  @Get('balances/:currency')
-  async balance(@CurrentUser() u: any, @Param('currency') currency: string) {
-    return this.wallet.getBalance(u.id, currency as any)
-  }
-  @Get('transactions')
-  async transactions(@CurrentUser() u: any, @Query() q: any) {
-    const page = parseInt(q.page)||1, perPage = Math.min(parseInt(q.per_page)||20,100)
-    const where:any = { userId: u.id }
-    if (q.currency) where.walletAccount = { currency: q.currency }
-    if (q.type) where.type = q.type
-    const [items,total] = await Promise.all([
-      prisma.ledgerEntry.findMany({ where, skip:(page-1)*perPage, take:perPage, orderBy:{ createdAt:'desc' }, include:{ walletAccount:{ select:{ currency:true }}} }),
-      prisma.ledgerEntry.count({ where })
-    ])
-    const data = items.map((e: { [k: string]: any }) => ({
-      id: e.id, transaction_id: e.transactionId, type: e.type,
-      amount: e.amount.toString(), currency: e.walletAccount.currency,
-      balance_before: e.balanceBefore.toString(), balance_after: e.balanceAfter.toString(),
-      description: e.description, created_at: e.createdAt,
+  async balances(@CurrentUser() currentUser: { id: string }) {
+    const rows = await this.walletFacade.getBalances(currentUser.id)
+    return rows.map((row) => ({
+      currency: row.currency,
+      balance: row.balance,
+      locked: row.locked,
+      available: money.subtract(row.balance, row.locked),
     }))
-    return { data, meta: { page, per_page: perPage, total, total_pages: Math.ceil(total/perPage), hasNext: page*perPage < total, hasPrev: page > 1 }}
+  }
+
+  @Get('balances/:currency')
+  async balance(
+    @CurrentUser() currentUser: { id: string },
+    @Param('currency') currency: string,
+  ) {
+    return this.walletFacade.getBalance(currentUser.id, currency as Currency)
+  }
+
+  @Get('transactions')
+  async transactions(
+    @CurrentUser() currentUser: { id: string },
+    @Query() queryParams: { page?: string; per_page?: string; currency?: string; type?: string },
+  ) {
+    const page = parseInt(queryParams.page || '1', 10) || 1
+    const perPage = Math.min(parseInt(queryParams.per_page || '20', 10) || 20, 100)
+
+    const where: any = { userId: currentUser.id }
+    if (queryParams.currency) {
+      where.walletAccount = { currency: queryParams.currency }
+    }
+    if (queryParams.type) {
+      where.type = queryParams.type
+    }
+
+    const [items, total] = await Promise.all([
+      prisma.ledgerEntry.findMany({
+        where,
+        skip: (page - 1) * perPage,
+        take: perPage,
+        orderBy: { createdAt: 'desc' },
+        include: { walletAccount: { select: { currency: true } } },
+      }),
+      prisma.ledgerEntry.count({ where }),
+    ])
+
+    const data = items.map((entry: { [key: string]: any }) => ({
+      id: entry.id,
+      transaction_id: entry.transactionId,
+      type: entry.type,
+      amount: entry.amount.toString(),
+      currency: entry.walletAccount.currency,
+      balance_before: entry.balanceBefore.toString(),
+      balance_after: entry.balanceAfter.toString(),
+      description: entry.description,
+      created_at: entry.createdAt,
+    }))
+
+    return {
+      data,
+      meta: {
+        page,
+        per_page: perPage,
+        total,
+        total_pages: Math.ceil(total / perPage),
+        hasNext: page * perPage < total,
+        hasPrev: page > 1,
+      },
+    }
   }
 }

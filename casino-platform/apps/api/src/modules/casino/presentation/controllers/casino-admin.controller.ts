@@ -86,7 +86,10 @@ export class CasinoAdminController {
     return { items, meta:{ page, perPage, total }}
   }
   @Patch('games/:id')
-  async updateGame(@Param('id') id: string, @Body() b: any) {
+  async updateGame(
+    @Param('id') id: string,
+    @Body() b: { name_ru?: string; is_new?: boolean; is_popular?: boolean; isPopular?: boolean; sort_order?: number; tags?: string[] },
+  ) {
     const data:any = {}
     if (b.name_ru !== undefined) data.nameRu = b.name_ru
     if (b.is_new !== undefined) data.isNew = b.is_new

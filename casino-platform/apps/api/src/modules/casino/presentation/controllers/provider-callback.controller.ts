@@ -14,14 +14,14 @@ export class ProviderCallbackController {
 
   @Post(':providerSlug/:op')
   @HttpCode(200)
-  async handleOp(@Param('providerSlug') slug: string, @Param('op') op: string, @Headers() headers: any, @Body() body: any, @Res() res: Response) {
+  async handleOp(@Param('providerSlug') slug: string, @Param('op') op: string, @Headers() headers: any, @Body() body: Record<string, unknown>, @Res() res: Response) {
     headers['x-gsp-op'] = op
     return this.handle(slug, headers, body, res)
   }
 
   @Post(':providerSlug')
   @HttpCode(200)
-  async handle(@Param('providerSlug') slug: string, @Headers() headers: any, @Body() body: any, @Res() res: Response) {
+  async handle(@Param('providerSlug') slug: string, @Headers() headers: any, @Body() body: Record<string, unknown>, @Res() res: Response) {
     try {
       const adapter = this.adapters.getAdapter(slug)
       if (!adapter.verifyCallback(headers, body)) {

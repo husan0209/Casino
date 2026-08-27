@@ -94,6 +94,8 @@ Online casino платформа для рынка СНГ. MVP на русско
 ## Что НЕ делать
 
 - Не пиши `number` для денег — пиши `string`
+- Не пиши однострочные методы (запрещены one-liners в контроллерах и сервисах)
+- Не используй сокращения и однобуквенные переменные (`u`, `b`, `q`, `r`, `ru`, `rr`, `cur`) — всегда пиши полные имена: `currentUser`, `dto`, `queryParams`, `ticketId`, `currency`
 - Не делай `prisma.x.update()` напрямую вне `infrastructure/repositories/`
 - Не импортируй Facade одного модуля в Domain слой другого
 - Не возвращай объект напрямую из controller — используй `successResponse()`
