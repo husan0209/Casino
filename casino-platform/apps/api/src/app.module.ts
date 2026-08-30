@@ -2,11 +2,13 @@ import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common
 import { ConfigModule } from '@nestjs/config'
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
+import { LoggerModule } from 'nestjs-pino'
 
 import { validateEnv } from '@casino/shared-config'
 
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { ResponseFormatInterceptor } from './common/interceptors/response-format.interceptor'
+import { buildPinoHttpOptions } from './common/logger/logger.options'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 import { AdminModule } from './modules/admin/admin.module'
 import { AuthModule } from './modules/auth/auth.module'
@@ -24,6 +26,10 @@ import { QueuesModule } from './queues/queues.module'
 
 @Module({
   imports: [
+    // GAP-23: структурные JSON-логи (pino) c redact паролей/токенов/cookie.
+    // Первым в списке — чтобы pino-middleware зарегистрировался раньше RequestIdMiddleware;
+    // корреляция id всё равно двусторонняя (req.id ?? resolveRequestId).
+    LoggerModule.forRoot({ pinoHttp: buildPinoHttpOptions() }),
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     // GAP-19: глобальный rate limit по IP. Дефолт — 120 запросов/минуту;
     // auth-эндпоинты переопределяют лимит строже (@Throttle), webhook'и

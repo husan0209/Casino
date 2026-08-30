@@ -10,13 +10,22 @@ import { type Request, type Response, type NextFunction } from 'express'
 // - stored XSS if the id is ever rendered into HTML
 const REQUEST_ID_PATTERN = /^[a-zA-Z0-9-]{1,128}$/
 
+/**
+ * GAP-23: единая логика резолва request-id для RequestIdMiddleware и pino
+ * (genReqId в logger.options.ts) — чтобы оба всегда сошлись на одном id:
+ * уважает клиентский X-Request-Id из белого списка, иначе генерирует UUID.
+ */
+export function resolveRequestId(candidate: unknown): string {
+  const value = Array.isArray(candidate) ? candidate[0] : candidate
+  return typeof value === 'string' && REQUEST_ID_PATTERN.test(value) ? value : randomUUID()
+}
+
 @Injectable()
 export class RequestIdMiddleware implements NestMiddleware {
   use(req: Request & { id?: string }, res: Response, next: NextFunction) {
-    const raw = req.headers['x-request-id']
-    const candidate = Array.isArray(raw) ? raw[0] : raw
-    const id =
-      typeof candidate === 'string' && REQUEST_ID_PATTERN.test(candidate) ? candidate : randomUUID()
+    // req.id может быть уже установлен pino-логгером (genReqId) — не перезатираем,
+    // иначе id в логах и в ответе разъедутся.
+    const id = req.id ?? resolveRequestId(req.headers['x-request-id'])
     req.id = id
     res.setHeader('X-Request-Id', id)
     next()

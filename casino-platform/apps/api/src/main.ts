@@ -1,10 +1,10 @@
 import 'reflect-metadata'
-import { Logger } from '@nestjs/common'
 import { NestFactory } from '@nestjs/core'
 import { type NestExpressApplication } from '@nestjs/platform-express'
 import cookieParser from 'cookie-parser'
 import { json, urlencoded, type Request, type Response } from 'express'
 import helmet from 'helmet'
+import { Logger } from 'nestjs-pino'
 
 import { AppModule } from './app.module'
 
@@ -42,7 +42,9 @@ async function bootstrap() {
   app.use(json({ limit: '1mb', verify: captureRawBody }))
   app.use(urlencoded({ extended: true, limit: '1mb', verify: captureRawBody }))
 
-  app.useLogger(new Logger())
+  // GAP-23: все Nest-логи (включая Logger из use-cases/services) идут через pino
+  // с redact — пароли/токены/cookie в логи не попадают.
+  app.useLogger(app.get(Logger))
   app.setGlobalPrefix('api/v1')
   app.enableCors({
     origin: (process.env['CORS_ORIGINS'] || 'http://localhost:3000,http://localhost:3002')
@@ -55,6 +57,6 @@ async function bootstrap() {
 
   const port = process.env['APP_PORT'] || 3001
   await app.listen(port)
-  new Logger('Bootstrap').log(`API listening on http://localhost:${port}/api/v1`)
+  app.get(Logger).log(`API listening on http://localhost:${port}/api/v1`)
 }
 void bootstrap()
