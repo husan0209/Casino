@@ -1,12 +1,14 @@
 import { createHash } from 'crypto'
 
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
 
 import { prisma } from '@casino/database'
 
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { RolesGuard, Roles } from '../../../auth/presentation/guards/roles.guard'
 import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
+import { UpdateGameSchema } from '../dto/admin-game.dto'
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
@@ -119,6 +121,7 @@ export class CasinoAdminController {
     return { items, meta: { page, perPage, total } }
   }
   @Patch('games/:id')
+  @UsePipes(new ZodValidationPipe(UpdateGameSchema))
   async updateGame(
     @Param('id') id: string,
     @Body()

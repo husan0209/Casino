@@ -1,9 +1,11 @@
-import { Body, Controller, Post } from '@nestjs/common'
+import { Body, Controller, Post, UsePipes } from '@nestjs/common'
 
 import { prisma } from '@casino/database'
 
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthService } from '../../infrastructure/admin-jwt.service'
+import { AdminLoginSchema } from '../dto/admin-auth.dto'
 
 @Controller('admin/auth')
 export class AdminAuthController {
@@ -12,6 +14,7 @@ export class AdminAuthController {
     private audit: AuditLogService,
   ) {}
   @Post('login')
+  @UsePipes(new ZodValidationPipe(AdminLoginSchema))
   async login(@Body() body: { email: string; password: string }) {
     const admin = await this.auth.validate(body.email, body.password)
     if (!admin) {

@@ -1,12 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
 
 import { prisma } from '@casino/database'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { FavoritesUseCase } from '../../application/use-cases/favorites.use-case'
 import { LaunchGameUseCase } from '../../application/use-cases/launch-game.use-case'
 import { ListGamesUseCase } from '../../application/use-cases/list-games.use-case'
+import { LaunchGameSchema } from '../dto/launch.dto'
 
 @Controller('casino')
 export class CasinoController {
@@ -76,6 +78,7 @@ export class CasinoController {
 
   @Post('games/:slug/launch')
   @UseGuards(AuthGuard)
+  @UsePipes(new ZodValidationPipe(LaunchGameSchema))
   async launch(
     @Param('slug') slug: string,
     @Body() dto: { currency?: string; return_url?: string },
@@ -94,6 +97,7 @@ export class CasinoController {
   }
 
   @Post('games/:slug/demo')
+  @UsePipes(new ZodValidationPipe(LaunchGameSchema))
   async demo(
     @Param('slug') slug: string,
     @Body() dto: { currency?: string; return_url?: string },

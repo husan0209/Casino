@@ -16,6 +16,9 @@ import { ProcessRukassaWebhookUseCase } from '../../application/use-cases/proces
  * The rawBody is captured by express.json({ verify }) in main.ts and exposed
  * as req.rawBody (string). It is the ONLY reliable input for HMAC.
  */
+// GAP-21 exemption: тело — payload платёжного провайдера (NOWPayments/…), формат
+// не контролируется нами и проверяется HMAC-подписью в use-case. Жёсткая Zod-схема
+// отбивала бы валидные вебхуки, поэтому сюда — только подпись, не схема.
 @Controller('payments/webhooks')
 // GAP-19: webhook'и провайдеров идут пачками с их IP — rate-limit их душит;
 // защита — HMAC-подпись по rawBody (см. выше), а не троттлинг.

@@ -1,12 +1,14 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
 import { CreateTicketUseCase } from '../../application/use-cases/create-ticket.use-case'
 import { GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
 import { ListUserTicketsUseCase } from '../../application/use-cases/list-user-tickets.use-case'
 import { SendMessageUseCase } from '../../application/use-cases/send-message.use-case'
+import { AddTicketMessageSchema, CreateTicketSchema } from '../dto/support.dto'
 
 @UseGuards(AuthGuard)
 @Controller('support')
@@ -20,6 +22,7 @@ export class SupportController {
   ) {}
 
   @Post('tickets')
+  @UsePipes(new ZodValidationPipe(CreateTicketSchema))
   create(
     @CurrentUser() currentUser: { id: string },
     @Body() dto: { subject: string; category: string; message: string },
@@ -56,6 +59,7 @@ export class SupportController {
   }
 
   @Post('tickets/:id/messages')
+  @UsePipes(new ZodValidationPipe(AddTicketMessageSchema))
   send(
     @CurrentUser() currentUser: { id: string },
     @Param('id') ticketId: string,

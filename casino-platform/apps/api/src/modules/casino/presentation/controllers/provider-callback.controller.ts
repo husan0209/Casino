@@ -7,6 +7,8 @@ import { prisma } from '@casino/database'
 import { GameCallbackService } from '../../application/services/game-callback.service'
 import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 
+// GAP-21 exemption: тело — callback игрового провайдера (формат провайдера,
+// подписан токеном/HMAC, который сверяется в use-case). Zod-схема здесь неуместна.
 @Controller('provider-callback')
 // GAP-19: частые коллбэки от игровых провайдеров (bet/win на каждый спин)
 // душатся глобальным лимитом; их аутентификация — подпись/HMAC в сервисе.

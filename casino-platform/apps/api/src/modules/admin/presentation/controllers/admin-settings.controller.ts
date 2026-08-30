@@ -1,10 +1,12 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
 
 import { prisma } from '@casino/database'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
+import { EmailTemplateSchema, UpsertSettingSchema } from '../dto/admin-settings.dto'
 
 @UseGuards(AdminAuthGuard)
 @Controller('admin/settings')
@@ -17,6 +19,7 @@ export class AdminSettingsController {
   }
 
   @Post()
+  @UsePipes(new ZodValidationPipe(UpsertSettingSchema))
   async updateSetting(
     @Body() body: { key: string; value: string; type: any },
     @CurrentUser() admin: any,
@@ -53,6 +56,7 @@ export class AdminSettingsController {
   }
 
   @Post('email-templates')
+  @UsePipes(new ZodValidationPipe(EmailTemplateSchema))
   async updateEmailTemplate(
     @Body() body: { name: string; subject: string; htmlBody: string },
     @CurrentUser() admin: any,

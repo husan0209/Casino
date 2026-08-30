@@ -1,10 +1,12 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
 
 import { prisma } from '@casino/database'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
+import { SendNotificationSchema } from '../dto/admin-notifications.dto'
 
 @UseGuards(AdminAuthGuard)
 @Controller('admin/notifications')
@@ -12,6 +14,7 @@ export class AdminNotificationsController {
   constructor(private audit: AuditLogService) {}
 
   @Post('send')
+  @UsePipes(new ZodValidationPipe(SendNotificationSchema))
   async sendNotification(
     @Body() body: { userIds: string[]; title: string; message: string; type: string },
     @CurrentUser() admin: any,

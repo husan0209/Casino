@@ -11,16 +11,22 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
+  UsePipes,
   Inject,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { diskStorage } from 'multer'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { GetKycStatusUseCase } from '../../application/use-cases/get-kyc-status.use-case'
 import { SubmitKycUseCase } from '../../application/use-cases/submit-kyc.use-case'
 import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
+import {
+  KycDocumentTypeSchema,
+  SubmitKycSchema,
+} from '../dto/kyc.dto'
 
 // SECURITY_BASELINE.md §7.1 — KYC documents whitelist.
 // MIME type and extension MUST both be in the allowed lists.
@@ -60,6 +66,7 @@ export class KycController {
     return this.statusUc.execute(u.id, currency || 'RUB')
   }
   @Post('submit')
+  @UsePipes(new ZodValidationPipe(SubmitKycSchema))
   submit(
     @CurrentUser() u: any,
     @Body()
@@ -104,7 +111,7 @@ export class KycController {
   )
   async upload(
     @CurrentUser() u: any,
-    @Body() body: { document_type: string },
+    @Body(new ZodValidationPipe(KycDocumentTypeSchema)) body: { document_type: string },
     @UploadedFile() file: Express.Multer.File,
   ) {
     const profile = await this.repo.getByUserId(u.id)

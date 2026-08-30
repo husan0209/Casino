@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
 
 import { prisma } from '@casino/database'
 
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
+import { BlockUserSchema } from '../dto/admin-users.dto'
 
 @UseGuards(AdminAuthGuard)
 @Controller('admin/users')
@@ -72,6 +74,7 @@ export class AdminUsersController {
   }
 
   @Post(':id/block')
+  @UsePipes(new ZodValidationPipe(BlockUserSchema))
   async block(@Param('id') userId: string, @Body() dto: { reason?: string }, @Req() req: any) {
     await prisma.user.update({
       where: { id: userId },
