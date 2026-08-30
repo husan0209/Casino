@@ -324,8 +324,15 @@ export class PrismaWalletLedger implements IWalletLedger {
               throw new Error('WALLET_NOT_FOUND')
             }
             const balanceBefore = toMoney(wallet.balance)
+            const currentLocked = toMoney(wallet.locked)
+            if (!money.isGreaterOrEqual(balanceBefore, amount)) {
+              throw new InsufficientFundsError(amount, balanceBefore)
+            }
+            if (!money.isGreaterOrEqual(currentLocked, amount)) {
+              throw new Error('UNLOCK_EXCEEDS_LOCKED')
+            }
             const balanceAfter = money.subtract(balanceBefore, amount)
-            const newLocked = money.subtract(toMoney(wallet.locked), amount)
+            const newLocked = money.subtract(currentLocked, amount)
             const updated = await tx.walletAccount.updateMany({
               where: { id: wallet.id, version: wallet.version },
               data: { balance: balanceAfter, locked: newLocked, version: { increment: 1 } },

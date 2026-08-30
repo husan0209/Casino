@@ -151,15 +151,32 @@ export class GameCallbackService {
       return { balance: await this.getWalletBalance(session.userId, session.currency), duplicate: true }
     }
     const rollbackAmount = originalTx.amount.toString()
-    const res = await this.wallet.credit({
-      userId: session.userId,
-      currency: session.currency as any,
-      amount: rollbackAmount,
-      type: 'ROLLBACK',
-      idempotencyKey: `rollback_${providerId}_${cb.transactionId || originalTx.id}`,
-      description: 'Отмена ставки',
-      metadata: { rollback_of: originalTx.id },
-    })
+    if (originalTx.type === 'rollback') {
+      throw new Error('CANNOT_ROLLBACK_A_ROLLBACK')
+    }
+    // Reverse the ORIGINAL effect: a bet (debit) is refunded with a credit;
+    // a win (credit) is taken back with a debit. Without this, rolling back a
+    // win would pay the win amount a second time.
+    const isBet = originalTx.type === 'bet'
+    const res = isBet
+      ? await this.wallet.credit({
+          userId: session.userId,
+          currency: session.currency as any,
+          amount: rollbackAmount,
+          type: 'ROLLBACK',
+          idempotencyKey: `rollback_${providerId}_${cb.transactionId || originalTx.id}`,
+          description: 'Отмена ставки',
+          metadata: { rollback_of: originalTx.id },
+        })
+      : await this.wallet.debit({
+          userId: session.userId,
+          currency: session.currency as any,
+          amount: rollbackAmount,
+          type: 'ROLLBACK',
+          idempotencyKey: `rollback_${providerId}_${cb.transactionId || originalTx.id}`,
+          description: 'Отмена выигрыша',
+          metadata: { rollback_of: originalTx.id },
+        })
     await this.play.createTransaction({
       roundId: originalTx.roundId,
       sessionId: session.id,

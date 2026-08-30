@@ -1,4 +1,5 @@
 import { Body, Controller, Headers, Post, Req, HttpCode } from '@nestjs/common'
+import { SkipThrottle } from '@nestjs/throttler'
 
 import { ProcessNOWPaymentsWebhookUseCase } from '../../application/use-cases/process-nowpayments-webhook.use-case'
 import { ProcessRukassaWebhookUseCase } from '../../application/use-cases/process-rukassa-webhook.use-case'
@@ -16,6 +17,9 @@ import { ProcessRukassaWebhookUseCase } from '../../application/use-cases/proces
  * as req.rawBody (string). It is the ONLY reliable input for HMAC.
  */
 @Controller('payments/webhooks')
+// GAP-19: webhook'и провайдеров идут пачками с их IP — rate-limit их душит;
+// защита — HMAC-подпись по rawBody (см. выше), а не троттлинг.
+@SkipThrottle()
 export class PaymentsWebhookController {
   constructor(
     private rukassa: ProcessRukassaWebhookUseCase,

@@ -75,6 +75,9 @@ export function validateEnv() {
 | `APP_PORT` | int | ❌ | `3001` | Порт API |
 | `APP_URL` | URL | ✅ | — | `https://casino.example.com` |
 | `ADMIN_URL` | URL | ✅ | — | `https://admin.casino.example.com` |
+| `THROTTLE_TTL_MS` | int | ❌ | `60000` | Окно rate-limit в мс (GAP-19) |
+| `THROTTLE_GLOBAL_LIMIT` | int | ❌ | `120` | Запросов/окно на IP (глобально) |
+| `THROTTLE_AUTH_LIMIT` | int | ❌ | `10` | Запросов/окно на IP для `/auth/*` |
 | `DOMAIN` | string | ✅ | — | `casino.example.com` (без доменной зоны) |
 
 ---
@@ -322,6 +325,11 @@ APP_PORT=3001
 APP_URL=http://localhost:3000
 ADMIN_URL=http://localhost:3002
 DOMAIN=localhost
+
+# ── Rate limiting (GAP-19) ─────────────────────────────────
+THROTTLE_TTL_MS=60000
+THROTTLE_GLOBAL_LIMIT=120
+THROTTLE_AUTH_LIMIT=10
 
 # ── Database ───────────────────────────────────────────────
 DATABASE_URL=postgresql://casino:casino_dev_password@localhost:5432/casino_dev

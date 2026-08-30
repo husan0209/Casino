@@ -1,6 +1,7 @@
 import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core'
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core'
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler'
 
 import { validateEnv } from '@casino/shared-config'
 
@@ -24,6 +25,15 @@ import { QueuesModule } from './queues/queues.module'
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    // GAP-19: глобальный rate limit по IP. Дефолт — 120 запросов/минуту;
+    // auth-эндпоинты переопределяют лимит строже (@Throttle), webhook'и
+    // провайдеров исключены (@SkipThrottle — у них HMAC-подпись).
+    ThrottlerModule.forRoot([
+      {
+        ttl: Number(process.env['THROTTLE_TTL_MS'] ?? 60_000),
+        limit: Number(process.env['THROTTLE_GLOBAL_LIMIT'] ?? 120),
+      },
+    ]),
     HealthModule,
     AuthModule,
     UsersModule,
@@ -39,6 +49,7 @@ import { QueuesModule } from './queues/queues.module'
     QueuesModule,
   ],
   providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: ResponseFormatInterceptor },
   ],
