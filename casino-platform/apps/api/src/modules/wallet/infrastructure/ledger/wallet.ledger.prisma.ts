@@ -61,8 +61,10 @@ export class PrismaWalletRepository implements IWalletRepository {
 @Injectable()
 export class PrismaWalletLedger implements IWalletLedger {
   private async runCreditDebit(input: CreditInput, sign: 1 | -1): Promise<CreditResult> {
-    // idempotency check
-    const existing = await prisma.ledgerEntry.findUnique({
+    // idempotency check (читаем на том же клиенте, что и мутация —
+    // внутри внешней транзакции это условие гонки внутри tx и корректно)
+    const client = (input.tx ?? prisma) as { [k: string]: any }
+    const existing = await client.ledgerEntry.findUnique({
       where: { idempotencyKey: input.idempotencyKey },
     })
     if (existing) {
@@ -73,56 +75,16 @@ export class PrismaWalletLedger implements IWalletLedger {
         duplicate: true,
       }
     }
+    // P0 #3: внутри внешней транзакции свой $transaction открыть нельзя
+    // (Prisma запрещает вложенные) — мутация идёт на переданном клиенте;
+    // атомарность и Serializable обеспечивает запустивший транзакцию.
+    if (input.tx) {
+      return this.applyCreditDebit(input.tx as { [k: string]: any }, input, sign)
+    }
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         return await prisma.$transaction(
-          async (tx: { [k: string]: any }) => {
-            let wallet = await tx.walletAccount.findUnique({
-              where: { userId_currency: { userId: input.userId, currency: input.currency } },
-            })
-            if (!wallet) {
-              wallet = await tx.walletAccount.create({
-                data: {
-                  userId: input.userId,
-                  currency: input.currency,
-                  balance: ZERO[input.currency],
-                  locked: ZERO[input.currency],
-                  version: 0n,
-                },
-              })
-            }
-            const balanceBefore = toMoney(wallet.balance)
-            const available = money.subtract(balanceBefore, toMoney(wallet.locked))
-            if (sign === -1 && !money.isGreaterOrEqual(available, input.amount)) {
-              throw new InsufficientFundsError(input.amount, available)
-            }
-            const balanceAfter =
-              sign === 1
-                ? money.add(balanceBefore, input.amount)
-                : money.subtract(balanceBefore, input.amount)
-            const updated = await tx.walletAccount.updateMany({
-              where: { userId: input.userId, currency: input.currency, version: wallet.version },
-              data: { balance: balanceAfter, version: { increment: 1 } },
-            })
-            if (updated.count === 0) {
-              throw new OptimisticLockError()
-            }
-            const ledger = await tx.ledgerEntry.create({
-              data: {
-                transactionId: randomUUID(),
-                walletAccountId: wallet.id,
-                userId: input.userId,
-                type: input.type as any,
-                amount: sign === 1 ? input.amount : '-' + input.amount,
-                balanceBefore,
-                balanceAfter,
-                idempotencyKey: input.idempotencyKey,
-                description: input.description,
-                metadata: input.metadata ?? {},
-              },
-            })
-            return { balanceBefore, balanceAfter, ledgerEntryId: ledger.id, duplicate: false }
-          },
+          async (tx: { [k: string]: any }) => this.applyCreditDebit(tx, input, sign),
           { isolationLevel: 'Serializable' },
         )
       } catch (e) {
@@ -134,6 +96,61 @@ export class PrismaWalletLedger implements IWalletLedger {
       }
     }
     throw new OptimisticLockError()
+  }
+
+  /** Тело мутации без обёртки $transaction — общий для tx-режима и solo-режима. */
+  private async applyCreditDebit(
+    tx: { [k: string]: any },
+    input: CreditInput,
+    sign: 1 | -1,
+  ): Promise<CreditResult> {
+    {
+      let wallet = await tx.walletAccount.findUnique({
+        where: { userId_currency: { userId: input.userId, currency: input.currency } },
+      })
+      if (!wallet) {
+        wallet = await tx.walletAccount.create({
+          data: {
+            userId: input.userId,
+            currency: input.currency,
+            balance: ZERO[input.currency],
+            locked: ZERO[input.currency],
+            version: 0n,
+          },
+        })
+      }
+      const balanceBefore = toMoney(wallet.balance)
+      const available = money.subtract(balanceBefore, toMoney(wallet.locked))
+      if (sign === -1 && !money.isGreaterOrEqual(available, input.amount)) {
+        throw new InsufficientFundsError(input.amount, available)
+      }
+      const balanceAfter =
+        sign === 1
+          ? money.add(balanceBefore, input.amount)
+          : money.subtract(balanceBefore, input.amount)
+      const updated = await tx.walletAccount.updateMany({
+        where: { userId: input.userId, currency: input.currency, version: wallet.version },
+        data: { balance: balanceAfter, version: { increment: 1 } },
+      })
+      if (updated.count === 0) {
+        throw new OptimisticLockError()
+      }
+      const ledger = await tx.ledgerEntry.create({
+        data: {
+          transactionId: randomUUID(),
+          walletAccountId: wallet.id,
+          userId: input.userId,
+          type: input.type as any,
+          amount: sign === 1 ? input.amount : '-' + input.amount,
+          balanceBefore,
+          balanceAfter,
+          idempotencyKey: input.idempotencyKey,
+          description: input.description,
+          metadata: input.metadata ?? {},
+        },
+      })
+      return { balanceBefore, balanceAfter, ledgerEntryId: ledger.id, duplicate: false }
+    }
   }
 
   credit(input: CreditInput): Promise<CreditResult> {

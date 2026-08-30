@@ -1,4 +1,6 @@
-import type { MoneyAmount, Currency } from '@casino/shared-types'
+import type { Currency, MoneyAmount } from '@casino/shared-types'
+
+import type { Prisma } from '@prisma/client'
 
 export interface WalletAccount {
   userId: string
@@ -15,6 +17,12 @@ export interface CreditInput {
   idempotencyKey: string
   description?: string
   metadata?: any
+  /**
+   * P0 #3: внешний Prisma-клиент транзакции. Если задан — ledger НЕ открывает
+   * свой внутренний $transaction (Prisma запрещает вложенные), а проводит
+   * мутацию на переданном клиенте: атомарность обеспечивает вызывающий.
+   */
+  tx?: Prisma.TransactionClient | undefined
 }
 export interface CreditResult {
   balanceBefore: MoneyAmount
@@ -27,6 +35,17 @@ export interface IWalletRepository {
   listBalances(userId: string): Promise<WalletAccount[]>
 }
 export const WALLET_REPOSITORY = Symbol('WALLET_REPOSITORY')
+
+/**
+ * P0 #3: раннер внешних транзакций. Реализация — в infrastructure (единственное
+ * место с правом импорта prisma); application получает tx через колбэк и
+ * передаёт его в ledger (CreditInput.tx) и в репозитории других модулей —
+ * bet/win/rollback проводятся атомарно одной $transaction.
+ */
+export interface IWalletTransactionRunner {
+  runInTransaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T>
+}
+export const WALLET_TRANSACTION_RUNNER = Symbol('WALLET_TRANSACTION_RUNNER')
 export interface IWalletLedger {
   credit(input: CreditInput): Promise<CreditResult>
   debit(input: CreditInput): Promise<CreditResult>
