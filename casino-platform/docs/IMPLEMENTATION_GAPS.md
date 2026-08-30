@@ -50,7 +50,7 @@
 
 | # | Audit ID | Что | Где | Приоритет |
 |---|----------|-----|-----|-----------|
-| GAP-18 | N2 | Account lockout после N неудачных логинов (SECURITY_BASELINE §2.3: 10 за 15 мин → блок 30 мин) | `auth/application/use-cases/login.use-case.ts` | P1 |
+| GAP-18 | N2 | ~~Account lockout после N неудачных логинов (SECURITY_BASELINE §2.3: 10 за 15 мин → блок 30 мин)~~ | `auth/application/use-cases/login.use-case.ts` | ✅ P1 закрыт 2026-08-30: поля `failed_login_attempts/last_failed_at/locked_until` (миграция `20260830_account_lockout.sql` — применить при деплое); 10 неудач/15 мин → блок 30 мин; enumeration-safe (неверный пароль → всегда INVALID_CREDENTIALS, лок виден только при верном); уже заблокированный аккаунт не продлевается (DoS-защита); юнит-тесты `test/account-lockout.spec.ts`. Env: `LOCKOUT_MAX_ATTEMPTS/WINDOW_MS/DURATION_MS` |
 | GAP-19 | N3 | ~~ThrottlerModule (app-level rate limit)~~ | `app.module.ts`, `apps/api/package.json` | ✅ P0 закрыт 2026-08-30: `@nestjs/throttler` v6, глобальный `ThrottlerGuard` (APP_GUARD) 120 req/мин на IP; `/auth/*` строже — `@Throttle` 10/мин; webhook'и провайдеров и game-callback — `@SkipThrottle()` (у них HMAC). Env: `THROTTLE_TTL_MS`, `THROTTLE_GLOBAL_LIMIT`, `THROTTLE_AUTH_LIMIT` |
 | GAP-20 | N4 | ~~helmet() middleware~~ | `main.ts`, `apps/api/package.json` | ✅ P0 закрыт 2026-08-30: `app.use(helmet())` в bootstrap до парсеров; API отдаёт только JSON → дефолтный CSP безопасен, `frame-ancestors 'none'` против clickjacking |
 | GAP-21 | N8, N9, C3 | Zod-валидация на всех `@Body` inputs: forgot-password (`auth.controller.ts:79`), все deposit/withdrawal (`payments.controller.ts`), остальные контроллеры | `apps/api/src/modules/*/presentation/controllers/` | P1 |
@@ -114,7 +114,7 @@
 ## Остаток работ (ревизия 2026-08-28)
 
 1. ~~**GAP-19/20/27** — Throttler + Helmet + argon2-параметры~~ ✅ закрыто 2026-08-30 (`security/gap-19-20-27`).
-2. **GAP-18/21/23** — lockout + Zod на всех inputs + Pino redact (P1 security).
+2. **GAP-18 ✅ / GAP-21 / GAP-23** — lockout закрыт 2026-08-30; далее Zod на всех inputs + Pino redact (P1 security).
 3. **GAP-08/09 runtime** — сверка sign-порядков с менеджером GitSlotPark + runtime-тест с ключами.
 4. **GAP-03/04** — Google/Telegram OAuth: код готов, нужны ключи + runtime-проверка.
 5. **Runtime-приёмка** на Linux-FS: `pnpm install && pnpm db:generate && pnpm db:migrate && pnpm dev`; прогон register→login→deposit→launch→admin.

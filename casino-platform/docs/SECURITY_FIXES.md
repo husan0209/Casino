@@ -30,7 +30,7 @@
 | 7 | refresh-token принимается из `req.body` (ослабление CSRF) | `apps/api/src/modules/auth/presentation/controllers/auth.controller.ts` | ✅ Исправлено: только httpOnly cookie |
 | 8 | Нет app-level rate-limit (`@nestjs/throttler`) | `app.module.ts`, `apps/api/package.json` | ✅ Исправлено 2026-08-30 (GAP-19): глобальный `ThrottlerGuard` 120 req/мин на IP; `/auth/*` — `@Throttle` 10/мин; webhook'и и game-callback — `@SkipThrottle()` (защита — HMAC). Env: `THROTTLE_*` |
 | 9 | Нет `helmet()` (app-level headers) | `main.ts` | ✅ Исправлено 2026-08-30 (GAP-20): `app.use(helmet())` в bootstrap до парсеров; nginx-заголовки дублируются на уровне API |
-| 10 | Нет account lockout после N неудачных логинов | `login.use-case.ts` | ⬜ GAP-18 (10 за 15 мин → блок 30 мин) |
+| 10 | Нет account lockout после N неудачных логинов | `login.use-case.ts` | ✅ Исправлено 2026-08-30 (GAP-18): 10 неудач/15 мин → блок 30 мин; поля `failed_login_attempts/last_failed_at/locked_until` (миграция `20260830_account_lockout.sql`); enumeration-safe; env `LOCKOUT_*` |
 | 11 | Frontend хранит access-token в localStorage + CSP `unsafe-inline/eval` | `apps/web/src/stores/auth.ts`, `infra/nginx/conf.d/casino.conf` | ⬜ Токен — в память (не persist), refresh — httpOnly cookie; ужесточить CSP (убрать eval, инлайн по-минимуму) |
 | 12 | KYC `mimetype` доверяет клиентскому `Content-Type` (нет magic-byte проверки) | `apps/api/src/modules/kyc/presentation/controllers/kyc.controller.ts` | ⬜ Добавить проверку сигнатур JPEG/PNG/WebP/PDF |
 
@@ -55,4 +55,4 @@
    прогон `register → login → deposit → launch → bet/win/rollback → admin`.
 4. **P2** — тесты money-flow/rollback, pino, `any`/импорты, env-parity.
 
-> В эту ветку внесены правки #1, #2, #5, #6, #7, #8, #9. Остальное (#3, #4, #10–#18) — по пунктам выше.
+> В эту ветку внесены правки #1, #2, #5, #6, #7, #8, #9, #10. Остальное (#3, #4, #11–#18) — по пунктам выше.

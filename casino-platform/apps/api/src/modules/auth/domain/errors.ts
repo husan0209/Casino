@@ -24,6 +24,17 @@ export class AccountBlockedError extends AppError {
   }
 }
 
+export class AccountLockedError extends AppError {
+  readonly code = 'ACCOUNT_LOCKED'
+  readonly httpStatus = 423
+  constructor(public readonly lockedUntil: Date) {
+    super(
+      `Слишком много неудачных попыток входа. Повторите после ${lockedUntil.toISOString()}`,
+      { lockedUntil },
+    )
+  }
+}
+
 export class EmailAlreadyExistsError extends AppError {
   readonly code = 'EMAIL_ALREADY_EXISTS'
   readonly httpStatus = 409
