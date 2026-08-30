@@ -23,7 +23,9 @@
      - Search and add: `Architecture guards` (job `guards` в корневом `.github/workflows/architecture-guards.yml`)
      - Search and add: `docs-guard` (job в корневом `.github/workflows/docs-guard.yml`)
 
-   ⚠️ Workflows живут в КОРНЕ репо (`.github/workflows/`), а не в `casino-platform/.github/` — GitHub Actions читает только корневой каталог. Все run-шаги через `defaults.working-directory: casino-platform`. Если добавишь новый job — добавь его сюда, иначе docs-guard D6 уронит CI.
+   ⚠️ Workflows живут в КОРНЕ репо (`.github/workflows/`), а не в `casino-platform/.github/` — GitHub Actions читает только корневой каталог. Все run-шаги через `defaults.working-directory: casino-platform`.
+
+   Правило имён required check: чек-ран = значение `name:` job'а, а если оно не задано — job id. В списке выше 5 job'ов намеренно БЕЗ `name:` (чек = job id) и один с ним (`Architecture guards`). Если добавишь job с `name:` — добавляй в список display-name, иначе ruleset вечно будет ждать «Expected». Нарушение ловит docs-guard D6.
    - [x] **Do not allow bypassing the above settings**
    - [x] **Require linear history** (no merge commits)
 4. Repeat for `dev` branch if used.

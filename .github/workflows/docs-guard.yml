@@ -27,7 +27,6 @@ defaults:
 
 jobs:
   docs-guard:
-    name: Docs guard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -98,14 +97,24 @@ jobs:
           WS="${GITHUB_WORKSPACE:-..}" # в Actions — корень репо; локально — родитель casino-platform
           SEC=$(awk '/Require status checks/{flag=1} /⚠️/{flag=0} flag' "$BP")
           echo "$SEC" | grep -oE '`[^`]+`' | tr -d '`' | grep -vE '\.yml$|^guards$|^step$' | sort -u > "$TMPD/checks.txt"
-          # multi-word display-name job'ов — отдельно (word-split ломает пробелы)
-          if grep -q '^Architecture guards$' "$TMPD/checks.txt"; then
-            grep -q "name: Architecture guards" "$WS"/.github/workflows/*.yml || fail "D6: job 'Architecture guards' не найден в workflows"
-            sed -i '/^Architecture guards$/d' "$TMPD/checks.txt"
-          fi
+          # Правило имён required check: чек-ран = job name (если задан) или job id.
+          # Токен с пробелом → обязан быть display-name; токен без пробелов → job id БЕЗ name:
+          # (иначе чек придёт под display-name и ruleset вечно будет ждать "Expected").
           while IFS= read -r t; do
             [ -n "$t" ] || continue
-            grep -qE "^  ${t}:" "$WS"/.github/workflows/*.yml || fail "D6: job '$t' из BRANCH_PROTECTION.md не существует в workflows"
+            case "$t" in
+              *" "*)
+                grep -q "name: *${t} *\$" "$WS"/.github/workflows/*.yml || fail "D6: '$t' не найден как display-name (name:) ни в одном workflow"
+                ;;
+              *)
+                if grep -qE "^  ${t}:" "$WS"/.github/workflows/*.yml; then
+                  NAMED=$(awk -v j="${t}:" 'index($0,"  "j)==1{f=1;next} f&&/^  [^ ]/{exit} f&&/^[ ]+name:/{print "NAMED";exit}' "$WS"/.github/workflows/*.yml)
+                  [ -n "$NAMED" ] && fail "D6: job '$t' имеет name: — required check должен ссылаться на display-name, а не на job id"
+                else
+                  fail "D6: job '$t' из BRANCH_PROTECTION.md не существует в workflows"
+                fi
+                ;;
+            esac
           done < "$TMPD/checks.txt"
 
           # ── итог ─────────────────────────────────────────────────
