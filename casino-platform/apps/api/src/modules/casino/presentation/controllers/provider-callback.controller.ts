@@ -1,4 +1,5 @@
 import { Body, Controller, Headers, Param, Post, Res, HttpCode } from '@nestjs/common'
+import { SkipThrottle } from '@nestjs/throttler'
 import { Response } from 'express'
 
 import { prisma } from '@casino/database'
@@ -7,6 +8,9 @@ import { GameCallbackService } from '../../application/services/game-callback.se
 import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 
 @Controller('provider-callback')
+// GAP-19: частые коллбэки от игровых провайдеров (bet/win на каждый спин)
+// душатся глобальным лимитом; их аутентификация — подпись/HMAC в сервисе.
+@SkipThrottle()
 export class ProviderCallbackController {
   constructor(
     private adapters: ProviderAdapterFactory,

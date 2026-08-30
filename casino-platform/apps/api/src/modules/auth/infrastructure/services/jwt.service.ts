@@ -64,13 +64,24 @@ export class JwtTokenService {
   }
 
   verifyAccess(token: string): { sub: string; role: string; session_id: string } {
-    const [header, body, sig] = token.split('.') as [string, string, string]
+    const parts = token.split('.')
+    if (parts.length !== 3) {
+      throw new Error('BAD_TOKEN')
+    }
+    const [header, body, sig] = parts as [string, string, string]
+    const headerRaw = JSON.parse(Buffer.from(header, 'base64url').toString()) as { alg?: string }
+    if (headerRaw.alg !== 'HS256') {
+      throw new Error('BAD_ALGORITHM')
+    }
     const expected = createHmac('sha256', this.accessSecret()).update(`${header}.${body}`).digest()
-    const given = Buffer.from(sig!, 'base64url')
+    const given = Buffer.from(sig, 'base64url')
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
       throw new Error('BAD_SIGNATURE')
     }
-    const payload = JSON.parse(Buffer.from(body!, 'base64url').toString()) as AccessPayload
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString()) as AccessPayload
+    if (payload.iss !== 'casino-platform') {
+      throw new Error('BAD_ISSUER')
+    }
     if (payload.aud !== 'user') {
       throw new Error('BAD_AUDIENCE')
     }

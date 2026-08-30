@@ -51,15 +51,15 @@
 | # | Audit ID | Что | Где | Приоритет |
 |---|----------|-----|-----|-----------|
 | GAP-18 | N2 | Account lockout после N неудачных логинов (SECURITY_BASELINE §2.3: 10 за 15 мин → блок 30 мин) | `auth/application/use-cases/login.use-case.ts` | P1 |
-| GAP-19 | N3 | ThrottlerModule (app-level rate limit) — `@nestjs/throttler` не установлен | `app.module.ts`, `apps/api/package.json` | P0 |
-| GAP-20 | N4 | helmet() middleware — не установлен | `main.ts`, `apps/api/package.json` | P0 |
+| GAP-19 | N3 | ~~ThrottlerModule (app-level rate limit)~~ | `app.module.ts`, `apps/api/package.json` | ✅ P0 закрыт 2026-08-30: `@nestjs/throttler` v6, глобальный `ThrottlerGuard` (APP_GUARD) 120 req/мин на IP; `/auth/*` строже — `@Throttle` 10/мин; webhook'и провайдеров и game-callback — `@SkipThrottle()` (у них HMAC). Env: `THROTTLE_TTL_MS`, `THROTTLE_GLOBAL_LIMIT`, `THROTTLE_AUTH_LIMIT` |
+| GAP-20 | N4 | ~~helmet() middleware~~ | `main.ts`, `apps/api/package.json` | ✅ P0 закрыт 2026-08-30: `app.use(helmet())` в bootstrap до парсеров; API отдаёт только JSON → дефолтный CSP безопасен, `frame-ancestors 'none'` против clickjacking |
 | GAP-21 | N8, N9, C3 | Zod-валидация на всех `@Body` inputs: forgot-password (`auth.controller.ts:79`), все deposit/withdrawal (`payments.controller.ts`), остальные контроллеры | `apps/api/src/modules/*/presentation/controllers/` | P1 |
 | GAP-22 | A1, C5, C6 | Wallet-модуль: вынести lock/unlock/confirmWithdrawal в `application/use-cases/` (4-слойка); убрать `toMoney(n: any)` (`wallet.ledger.prisma.ts:21`); разбить `runCreditDebit` (~50 строк > 30). **2026-08-30: G1-часть закрыта** — репозитории извлечены для casino (IGameCatalog/IGameFavorites/IGamePlay), notifications (INotification), referrals (IReferral), users (IUserSettings), admin (IAdminUser/IAuditLog/IDashboard); prisma — только в infrastructure; cross-module чтения помечены TODO(GAP-22) на Facade | `modules/wallet/` | P2 |
 | GAP-23 | H6 | Pino + redact вместо Nest Logger (пароли/токены могут попасть в логи) | все `*.use-case.ts`, `*.service.ts` | P1 |
 | GAP-24 | A5, A6 | Покрытие тестами: сейчас 2 spec-файла на монорепо; минимум — money flow + idempotency (план: ENGINEERING_EXCELLENCE_PLAN.md Этап 1) | `apps/api` | P2 |
 | GAP-25 | A7 | Довести ESLint до обещанного в QUALITY_GATES §2.1: `max-params` warn(4)→error(3), `complexity` warn(10)→error(10) | `.eslintrc.js:66,70` | P2 |
 | GAP-26 | C4 | Относительные импорты `../../../../` → path aliases (18 мест) | `apps/api/src/modules/**` | P3 |
-| GAP-27 | NEW | argon2 без явных параметров: `argon2.hash(plain, {type: argon2id})` — дефолты ~19MiB/2/1 вместо SECURITY_BASELINE §2.1 (memoryCost 65536, timeCost 3, parallelism 4) | `password-hasher.service.ts:7` | P1 |
+| GAP-27 | NEW | ~~argon2 без явных параметров~~ | `password-hasher.service.ts:7` | ✅ P1 закрыт 2026-08-30: `PasswordHasher.hash` → `argon2.hash(plain, {type: argon2id, memoryCost: 65536, timeCost: 3, parallelism: 4})` (совпадает с SECURITY_BASELINE §2.1 и admin-хэшером `admin-users.service.ts:28`) |
 | GAP-28 | H4 | Идемпотентность депозита: `deposit_${pr.id}` — добавить защиту и по `external_id` (defense-in-depth, P3) | `process-rukassa-webhook.use-case.ts:48` | P3 |
 | GAP-29 | NEW (docs-guard D3) | env.validation.ts валидирует не все ключи `.env.example` (конкретный список — в выводе docs-guard D3) — дополнить Zod-схему | `packages/shared-config/src/env.validation.ts` | P3 |
 | GAP-30 | NEW (PR-0) | 14 методов 61–88 строк (prettier-инфляция после `--fix`): `game-callback.service` bet/win/rollback, `dashboard.service` metrics/events, `wallet.ledger.prisma` runCreditDebit/lock/unlock/confirmWithdrawal, `list-games.use-case` execute, webhook execute ×2, `provider-callback.controller` handle — разбить на приватные методы, вернуть лимит 60. Делать вместе с тестами (GAP-21/24) | перечисленные файлы | P3 |
@@ -113,7 +113,7 @@
 
 ## Остаток работ (ревизия 2026-08-28)
 
-1. **GAP-19/20/27** — Throttler + Helmet + argon2-параметры (P0–P1 security, маленькие PR).
+1. ~~**GAP-19/20/27** — Throttler + Helmet + argon2-параметры~~ ✅ закрыто 2026-08-30 (`security/gap-19-20-27`).
 2. **GAP-18/21/23** — lockout + Zod на всех inputs + Pino redact (P1 security).
 3. **GAP-08/09 runtime** — сверка sign-порядков с менеджером GitSlotPark + runtime-тест с ключами.
 4. **GAP-03/04** — Google/Telegram OAuth: код готов, нужны ключи + runtime-проверка.

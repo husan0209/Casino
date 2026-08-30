@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core'
 import { type NestExpressApplication } from '@nestjs/platform-express'
 import cookieParser from 'cookie-parser'
 import { json, urlencoded, type Request, type Response } from 'express'
+import helmet from 'helmet'
 
 import { AppModule } from './app.module'
 
@@ -32,6 +33,10 @@ async function bootstrap() {
     bufferLogs: true,
     bodyParser: false, // we wire our own to attach the verify callback
   })
+
+  // Security headers (GAP-20). API отдаёт только JSON, поэтому дефолтный CSP
+  // безопасен; frame-ancestors 'none' блокирует clickjacking на swagger/админке.
+  app.use(helmet())
 
   // JSON parser with rawBody capture (must be before routes that need rawBody)
   app.use(json({ limit: '1mb', verify: captureRawBody }))

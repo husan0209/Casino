@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query, Req, Res, UsePipes } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import { Request, Response } from 'express'
 
 import {
@@ -20,6 +21,13 @@ import { ForgotPasswordSchema, ResetPasswordSchema } from '../dto/password-reset
 import { RegisterSchema, type RegisterDto } from '../dto/register.dto'
 
 @Controller('auth')
+// GAP-19: брутфорс-защита логина/регистрации — строже глобального лимита.
+@Throttle({
+  default: {
+    limit: Number(process.env['THROTTLE_AUTH_LIMIT'] ?? 10),
+    ttl: Number(process.env['THROTTLE_TTL_MS'] ?? 60_000),
+  },
+})
 export class AuthController {
   constructor(
     private readonly registerUc: RegisterUseCase,
@@ -73,7 +81,10 @@ export class AuthController {
 
   @Post('refresh')
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const token = req.cookies.refresh_token || req.body?.refreshToken
+    // Refresh token lives only in the httpOnly cookie. Accepting it from the
+    // request body weakens CSRF protection and breaks the cookie-based rotation
+    // contract — do not reintroduce the body fallback.
+    const token = req.cookies.refresh_token
     const result = await this.refreshUc.execute(token)
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken }
