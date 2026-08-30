@@ -2,12 +2,14 @@
 title: Documentation Index
 description: Навигация по всей документации casino-platform
 status: living document
-last_updated: 2026-08-23
+last_updated: 2026-08-28
 ---
 
 # Documentation Index
 
 > **Назначение:** Карта всей документации с навигацией. Этот файл — **точка входа** для AI-агента и разработчика.
+>
+> **Порядок чтения при старте сессии — канон в `AGENTS.md` «Обязательный bootstrap»** (таблица ниже — тематическая карта, не порядок чтения). Иерархия и приоритеты документов — §6.
 
 ---
 
@@ -89,7 +91,7 @@ last_updated: 2026-08-23
 ### Процессы
 
 - [AI_DEVELOPMENT_RULES.md](./AI_DEVELOPMENT_RULES.md) — правила для AI-агента
-- [AUDIT_REPORT.md](./AUDIT_REPORT.md) — технический аудит: баги, уязвимости, нарушения (2026-08-25)
+- [archive/audit-2026-08-25.md](./archive/audit-2026-08-25.md) — технический аудит (снапшот 2026-08-25 + ревизия 2026-08-28: 17 исправлено, открытые → GAP-18..28)
 - [IMPLEMENTATION_GAPS.md](./IMPLEMENTATION_GAPS.md) — расхождения ТЗ ↔ код (честный статус)
 - tz-part-7 — деплой, CI/CD, testing
 
@@ -149,8 +151,13 @@ last_updated: 2026-08-23
 │   ├── ENVIRONMENT_VARIABLES.md
 │   ├── AGENT_INSTRUCTIONS.md     ← .cursorrules / CLAUDE.md шаблоны
 │   ├── AI_DEVELOPMENT_RULES.md
-│   ├── IMPLEMENTATION_GAPS.md    ← ТЗ ↔ код
-│   └── AUDIT_REPORT.md           ← тех. аудит 2026-08-25
+│   ├── IMPLEMENTATION_GAPS.md    ← ТЗ ↔ код, GAP-трекер (точка правды по статусу)
+│   ├── SECURITY_CHECKLIST.md     ← честный security-статус с подтверждениями
+│   ├── QA_CHECKLIST.md / DEPLOY.md
+│   ├── QUALITY_GATES.md / BRANCH_PROTECTION.md
+│   ├── ENGINEERING_EXCELLENCE_PLAN.md
+│   └── archive/
+│       └── audit-2026-08-25.md   ← снимок аудита (не редактируется)
 ├── apps/                         ← npm workspace apps
 │   ├── api/
 │   ├── web/
@@ -167,14 +174,45 @@ last_updated: 2026-08-23
 
 ---
 
-## 6. Поддержка актуальности
+## 6. Иерархия документов и приоритеты
 
-Документы обновляются **синхронно с TZ**. Если вы обновляете TZ-часть, проверьте что затронутые docs также обновлены.
+### 6.1. Владельцы тем (правило меняется только у владельца)
 
-При появлении противоречий между TZ и docs — **документация приоритетнее** для AI-агента (TZ может содержать устаревшие примеры кода).
+| Тема | Владелец (полная версия) | Сводки/ссылки в |
+|------|--------------------------|------------------|
+| Статус проекта и задач | **IMPLEMENTATION_GAPS.md** (GAP-трекер) | README, INDEX, SECURITY_CHECKLIST |
+| Деньги: типы и helpers | **CONVENTIONS.md §5** (реализация) | AI_DEVELOPMENT_RULES §1 (правило), AGENTS.md, .cursorrules |
+| Слои модуля и фасады | **ARCHITECTURE.md §4–6** | AI_DEVELOPMENT_RULES §3, MODULE_TEMPLATE, AGENTS.md |
+| Процедура создания модуля | **MODULE_TEMPLATE.md** (10 шагов) | AGENTS.md, MODULE_BOUNDARIES §17 |
+| API-контракты и ошибки | **API_CONVENTIONS.md** | AI_DEVELOPMENT_RULES §4–5, AGENTS.md |
+| Безопасность | **SECURITY_BASELINE.md** | AI_DEVELOPMENT_RULES §6, SECURITY_CHECKLIST (статус), AGENTS.md |
+| Env-переменные | **ENVIRONMENT_VARIABLES.md** ↔ `env.validation.ts` | README, DEPLOY |
+| Карта модулей | **MODULE_BOUNDARIES.md** | ARCHITECTURE §4, AGENTS.md |
+| Порядок bootstrap-чтения | **AGENTS.md «Обязательный bootstrap»** (машинный, самый свежий) | INDEX §1 (тематическая карта), AI_DEVELOPMENT_RULES §0 |
+
+### 6.2. Приоритет при противоречиях (сверху вниз)
+
+```
+1. КОД (фактическая реализация)          → расхождения фиксируются в IMPLEMENTATION_GAPS
+2. IMPLEMENTATION_GAPS.md                → статус работ, не правила
+3. Документы-владельцы (§6.1)            → правила и контракты
+4. AI_DEVELOPMENT_RULES.md               → агрегатор правил поведения агента
+5. AGENTS.md / .cursorrules              → производные машинные (кратко; не редактировать напрямую)
+6. tz-part-1..7                          → замороженная спека v1.0
+```
+
+**Прежнее правило «документация приоритетнее ТЗ» отменено** — TZ заморожена (frozen spec), а живые документы ранжированы выше.
+
+### 6.3. Как вносить изменения
+
+- **Правило** — только у владельца (§6.1); агрегатор/машинные файлы обновить следом.
+- **Машинные файлы** — источник: `docs/AGENT_INSTRUCTIONS.md` (§1 → `.cursorrules`, §2 → `AGENTS.md`); прямые правки запрещены, иначе снова разъедутся.
+- **TZ (tz-part-\*)** — заморожена: изменения через новую версию спеки или GAP-записи, не правками в тексте.
+- **Статус «готово»** — только в IMPLEMENTATION_GAPS.md, только при работающем end-to-end.
+- Снапшоты аудитов (`docs/archive/`) — неизменяемые, история.
 
 ---
 
-> **Последнее обновление:** 2026-08-25 (добавлен AUDIT_REPORT.md)
+> **Последнее обновление:** 2026-08-28 (аудит → archive с ревизией; GAP-18..28; честный SECURITY_CHECKLIST)
 > **Версия ТЗ:** v1.0 (7 частей + README)
-> **Документов создано:** 14 (этот INDEX + 12 тематических: ARCHITECTURE, STACK, CONVENTIONS, API_CONVENTIONS, MODULE_BOUNDARIES, MODULE_TEMPLATE, SECURITY_BASELINE, PAYMENT_OVERVIEW, PROVIDER_INTEGRATION_STRATEGY, ENVIRONMENT_VARIABLES, AGENT_INSTRUCTIONS, AI_DEVELOPMENT_RULES, AUDIT_REPORT + IMPLEMENTATION_GAPS)
+> **Файлов в docs/:** 30 + archive/

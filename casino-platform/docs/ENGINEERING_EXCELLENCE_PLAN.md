@@ -8,25 +8,27 @@
 
 ## 🧭 Навигация по 4 этапам
 
-| Этап | Направление | Целевая метрика | Инструменты |
-|---|---|---|---|
-| **Этап 1** | **Unit & Use-Case Тестирование** | Покрытие логики **> 85%** | Vitest, @nestjs/testing |
-| **Этап 2** | **End-to-End (E2E) Сценарии** | 100% покрытие пути игрока | Supertest, Playwright |
-| **Этап 3** | **Нагрузочное тестирование** | 1 000 RPS без race condition | k6 / Artillery |
-| **Этап 4** | **Observability & Трассировка** | Distributed Tracing & Метрики | OpenTelemetry, Prometheus, Pino |
+| Этап       | Направление                      | Целевая метрика               | Инструменты                     |
+| ---------- | -------------------------------- | ----------------------------- | ------------------------------- |
+| **Этап 1** | **Unit & Use-Case Тестирование** | Покрытие логики **> 85%**     | Vitest, @nestjs/testing         |
+| **Этап 2** | **End-to-End (E2E) Сценарии**    | 100% покрытие пути игрока     | Supertest, Playwright           |
+| **Этап 3** | **Нагрузочное тестирование**     | 1 000 RPS без race condition  | k6 / Artillery                  |
+| **Этап 4** | **Observability & Трассировка**  | Distributed Tracing & Метрики | OpenTelemetry, Prometheus, Pino |
 
 ---
 
 ## 🧪 Этап 1. Поднятие покрытия тестами до 85%+ (Vitest)
 
 ### 1.1. Структура тестов
+
 Тесты располагаются рядом с use-case'ами:
 `apps/api/src/modules/<module-name>/application/use-cases/<action>.use-case.spec.ts`
 
 ### 1.2. Обязательная матрица Use-Cases для покрытия:
 
 #### 1. Модуль `wallet` (Критичность: 🔴 Максимальная)
-- [ ] `wallet.prisma.ts` / `WalletFacade`:
+
+- [ ] `wallet.ledger.prisma.ts` / `WalletFacade`:
   - `credit()`: начисление на нулевой баланс, повторный вызов с тем же `idempotencyKey` возвращает `duplicate: true` без повторного начисления.
   - `debit()`: списание при достаточном балансе, выброс `InsufficientFundsError` при нехватке средств.
   - `lock()`: блокировка средств для ставки/вывода, проверка, что `available = balance - locked`.
@@ -35,6 +37,7 @@
   - **Деньги:** проверка точности `0.00000001` (8 знаков) — никаких `0.30000000000000004`.
 
 #### 2. Модуль `auth` (Критичность: 🔴 Высокая)
+
 - [ ] `register.use-case.spec.ts`:
   - Успешная регистрация: хеширование пароля (Argon2id), создание реферального кода, генерация verification token.
   - Попытка регистрации на существующий email -> `EmailAlreadyExistsError`.
@@ -46,6 +49,7 @@
 - [ ] `refresh.use-case.spec.ts`: ротация refresh токена, отзыв сессии при протухшем токене.
 
 #### 3. Модуль `payments` (Критичность: 🔴 Высокая)
+
 - [ ] `process-rukassa-webhook.use-case.spec.ts`:
   - Валидная подпись HMAC-SHA256 -> смена статуса на `completed` + вызов `walletFacade.credit()` со строгим `idempotencyKey`.
   - Невалидная подпись -> `InvalidSignatureError` (кошелек не трогается).
@@ -54,6 +58,7 @@
   - Зачисление фактической суммы `actually_paid` для крипто-платежей.
 
 #### 4. Модуль `casino` (Критичность: 🟠 Средняя)
+
 - [ ] `game-callback.service.spec.ts`:
   - `bet()`: списание ставки через `walletFacade.debit()`. При нехватке денег возврат `INSUFFICIENT_FUNDS` провайдеру без падения.
   - `win()`: зачисление выигрыша через `walletFacade.credit()`.
@@ -61,6 +66,7 @@
 - [ ] `launch-game.use-case.spec.ts`: генерация бесшовной сессии игрока.
 
 #### 5. Модуль `referrals` (Критичность: 🟡 Средняя)
+
 - [ ] `referral-calc.service.spec.ts`:
   - Расчет GGR-share: `(bets - wins) * rewardRate`.
   - Если GGR отрицательный — выплата 0, статус `zero`.
@@ -100,7 +106,9 @@
 ## ⚡ Этап 3. Нагрузочное тестирование (k6 / Artillery)
 
 ### 3.1. Цель
+
 Доказать, что при **1 000 одновременных ставок в секунду** на один и тот же аккаунт:
+
 1. Баланс сходится до копейки (`DECIMAL(20,8)`).
 2. Нет double-spend (двойного списания).
 3. Optimistic Locking корректно обрабатывает конкурентные транзакции без deadlock'ов.
@@ -108,8 +116,8 @@
 ### 3.2. Скрипт нагрузки k6 (`infra/load-tests/wallet-concurrency.js`):
 
 ```javascript
-import http from 'k6/http';
-import { check, sleep } from 'k6';
+import http from 'k6/http'
+import { check, sleep } from 'k6'
 
 export const options = {
   scenarios: {
@@ -118,16 +126,16 @@ export const options = {
       startVUs: 10,
       stages: [
         { duration: '30s', target: 200 }, // Разгон до 200 VU
-        { duration: '1m', target: 500 },  // 500 параллельных потоков
+        { duration: '1m', target: 500 }, // 500 параллельных потоков
         { duration: '30s', target: 0 },
       ],
     },
   },
   thresholds: {
     http_req_duration: ['p(95)<200'], // 95% запросов быстрее 200мс
-    http_req_failed: ['rate<0.01'],    // Ошибок < 1%
+    http_req_failed: ['rate<0.01'], // Ошибок < 1%
   },
-};
+}
 
 export default function () {
   const payload = JSON.stringify({
@@ -136,15 +144,15 @@ export default function () {
     amount: '10.00',
     type: 'BET',
     idempotencyKey: `bet_${__VU}_${__ITER}_${Date.now()}`,
-  });
+  })
 
   const res = http.post('http://localhost:3001/api/v1/wallet/debit', payload, {
     headers: { 'Content-Type': 'application/json' },
-  });
+  })
 
   check(res, {
     'status is 200 or 400 (insufficient funds)': (r) => r.status === 200 || r.status === 400,
-  });
+  })
 }
 ```
 
@@ -153,6 +161,7 @@ export default function () {
 ## 📊 Этап 4. Observability, Метрики и Трассировка (Google-Level)
 
 ### 4.1. Prometheus Метрики (`@willsoto/nestjs-prometheus`)
+
 Экспортировать на эндпоинт `/metrics`:
 
 1. `casino_http_requests_duration_seconds` (Histogram по routes, status codes).
@@ -162,11 +171,13 @@ export default function () {
 5. `casino_optimistic_lock_retries_total` (Количество ретраев транзакций БД).
 
 ### 4.2. OpenTelemetry Tracing (Jaeger / Grafana Tempo)
+
 - Трассировать каждый входящий HTTP запрос через спаны:
   `HTTP Request` ➔ `Use-Case Execution` ➔ `Prisma Transaction` ➔ `Redis Cache Query`.
 - При возникновении ошибки спан помечается красным с записью `error.code` и стектрейса без утечки PII.
 
 ### 4.3. Структурированный логгинг (Pino)
+
 - Внедрение единого формата JSON-логов с авто-маскированием секретов:
   ```json
   {

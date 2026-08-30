@@ -1,3 +1,9 @@
+# ═══ DERIVED FILE ═══════════════════════════════════════════════
+# Источник: docs/AGENT_INSTRUCTIONS.md §1 (cursorrules-шаблон).
+# Не редактировать напрямую — правки вносятся в источник и копируются сюда.
+# Последняя синхронизация: 2026-08-28.
+# ════════════════════════════════════════════════════════════════
+
 # casino-platform — Cursor Agent Rules
 
 # ── Project context ────────────────────────────────────────
@@ -112,7 +118,7 @@ Check:
     -   This module's README.md (if exists)
     -   Other modules' Facades that may consume what you're changing
     -   Whether shared-types/ has a type you should reuse
-    -   Whether events.ts has an event you should emit
+    -   Whether queues/queue.types.ts has a queue/job type you should reuse
 
 # ── Database ───────────────────────────────────────────────
 -   Schema: packages/database/prisma/schema.prisma

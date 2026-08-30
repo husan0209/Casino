@@ -43,6 +43,27 @@
 | GAP-12 | ~~Нет batch approve/reject~~ | ✅ Исправлено 2026-08-23: `POST /admin/withdrawals/batch-approve\|batch-reject`, независимая обработка каждой заявки + audit-log сводки; single-эндпоинты рефакторнуты на общие helpers + `WithdrawalInvalidStatusError`(AppError) |
 | GAP-13 | Referral rewards помечаются `credited` без реального зачисления через WalletFacade (деньги не движутся) | `referrals/application/referral-calc.service.ts:56-60` | UC-REF-03 шаг 5 |
 
+## 🛡 АУДИТ 2026-08-25 → открытые пункты (ревизия 2026-08-28)
+
+> Полный снимок аудита с ревизией каждого пункта: **`docs/archive/audit-2026-08-25.md`**.
+> Из 30 пунктов аудита **17 исправлены** (список в снимке), открытые — перенесены сюда:
+
+| # | Audit ID | Что | Где | Приоритет |
+|---|----------|-----|-----|-----------|
+| GAP-18 | N2 | Account lockout после N неудачных логинов (SECURITY_BASELINE §2.3: 10 за 15 мин → блок 30 мин) | `auth/application/use-cases/login.use-case.ts` | P1 |
+| GAP-19 | N3 | ThrottlerModule (app-level rate limit) — `@nestjs/throttler` не установлен | `app.module.ts`, `apps/api/package.json` | P0 |
+| GAP-20 | N4 | helmet() middleware — не установлен | `main.ts`, `apps/api/package.json` | P0 |
+| GAP-21 | N8, N9, C3 | Zod-валидация на всех `@Body` inputs: forgot-password (`auth.controller.ts:79`), все deposit/withdrawal (`payments.controller.ts`), остальные контроллеры | `apps/api/src/modules/*/presentation/controllers/` | P1 |
+| GAP-22 | A1, C5, C6 | Wallet-модуль: вынести lock/unlock/confirmWithdrawal в `application/use-cases/` (4-слойка); убрать `toMoney(n: any)` (`wallet.ledger.prisma.ts:21`); разбить `runCreditDebit` (~50 строк > 30) | `modules/wallet/` | P2 |
+| GAP-23 | H6 | Pino + redact вместо Nest Logger (пароли/токены могут попасть в логи) | все `*.use-case.ts`, `*.service.ts` | P1 |
+| GAP-24 | A5, A6 | Покрытие тестами: сейчас 2 spec-файла на монорепо; минимум — money flow + idempotency (план: ENGINEERING_EXCELLENCE_PLAN.md Этап 1) | `apps/api` | P2 |
+| GAP-25 | A7 | Довести ESLint до обещанного в QUALITY_GATES §2.1: `max-params` warn(4)→error(3), `complexity` warn(10)→error(10) | `.eslintrc.js:66,70` | P2 |
+| GAP-26 | C4 | Относительные импорты `../../../../` → path aliases (18 мест) | `apps/api/src/modules/**` | P3 |
+| GAP-27 | NEW | argon2 без явных параметров: `argon2.hash(plain, {type: argon2id})` — дефолты ~19MiB/2/1 вместо SECURITY_BASELINE §2.1 (memoryCost 65536, timeCost 3, parallelism 4) | `password-hasher.service.ts:7` | P1 |
+| GAP-28 | H4 | Идемпотентность депозита: `deposit_${pr.id}` — добавить защиту и по `external_id` (defense-in-depth, P3) | `process-rukassa-webhook.use-case.ts:48` | P3 |
+| GAP-29 | NEW (docs-guard D3) | env.validation.ts валидирует не все ключи `.env.example` (конкретный список — в выводе docs-guard D3) — дополнить Zod-схему | `packages/shared-config/src/env.validation.ts` | P3 |
+| GAP-30 | NEW (PR-0) | 14 методов 61–88 строк (prettier-инфляция после `--fix`): `game-callback.service` bet/win/rollback, `dashboard.service` metrics/events, `wallet.ledger.prisma` runCreditDebit/lock/unlock/confirmWithdrawal, `list-games.use-case` execute, webhook execute ×2, `provider-callback.controller` handle — разбить на приватные методы, вернуть лимит 60. Делать вместе с тестами (GAP-21/24) | перечисленные файлы | P3 |
+
 ## 🟡 MEDIUM — частично сделано
 
 | # | Что | Статус |
@@ -88,12 +109,14 @@
 | В корне отсутствовали машинно-читаемые инструкции агента (`AGENTS.md`, `.cursorrules`), хотя `docs/AGENT_INSTRUCTIONS.md` предписывает их создать | ✅ созданы из §1/§2 того же документа |
 | Мусор вне git-репо: `/mnt/sdcard/Casino/apps` (пустой), `/mnt/sdcard/Casino/home`, `/mnt/sdcard/Casino/uploads` (старые .txt копии доков от 2026-07-17) | ⚠️ не тронуто — решить владельцу |
 | `.env` лежит на диске, но не закоммичен (в git только `.env.example`) | ✅ ок |
-| Доки описывают схему Prisma как `prisma/schema/<area>.prisma` и `turbo.json` — в реальности один `schema.prisma` и turbo нет | ⚠️ расхождение доков учтено в новых AGENTS.md/.cursorrules; поправить доки |
+| Доки описывали схему Prisma как `prisma/schema/<area>.prisma` и `turbo.json` — в реальности один `schema.prisma` и turbo нет | ✅ Исправлено 2026-08-28: AGENT_INSTRUCTIONS/MODULE_TEMPLATE/.cursorrules приведены к единому `schema.prisma`, упоминания turbo убраны, `events.ts` → `apps/api/src/queues/queue.types.ts` |
 
-## Остаток работ (актуально на 2026-08-24)
+## Остаток работ (ревизия 2026-08-28)
 
-1. **GAP-08/09** — хотя бы один реальный game-provider через ProviderAdapter + настоящая синхронизация каталога.
-2. **GAP-03/04** — Google/Telegram OAuth: код готов, нужны ключи + runtime-проверка.
-3. **Runtime-приёмка** на Linux-FS: `pnpm install && pnpm db:generate && pnpm db:migrate && pnpm dev`; прогон register→login→deposit→launch→admin.
-5. Решение по email-верификации (см. заметку о TZ-10 выше).
-6. После MVP: email-воркер отдельным процессом, rich HTML-шаблоны, exchange-rates очередь.
+1. **GAP-19/20/27** — Throttler + Helmet + argon2-параметры (P0–P1 security, маленькие PR).
+2. **GAP-18/21/23** — lockout + Zod на всех inputs + Pino redact (P1 security).
+3. **GAP-08/09 runtime** — сверка sign-порядков с менеджером GitSlotPark + runtime-тест с ключами.
+4. **GAP-03/04** — Google/Telegram OAuth: код готов, нужны ключи + runtime-проверка.
+5. **Runtime-приёмка** на Linux-FS: `pnpm install && pnpm db:generate && pnpm db:migrate && pnpm dev`; прогон register→login→deposit→launch→admin.
+6. Решение по email-верификации (см. заметку о TZ-10 выше).
+7. После MVP: GAP-22/24/25/26 (wallet-рефактор, тесты, ESLint, импорты), GAP-28; email-воркер отдельным процессом, rich HTML-шаблоны.

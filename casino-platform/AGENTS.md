@@ -1,6 +1,7 @@
 # casino-platform — Agent Instructions (opencode / Claude Code / Cline)
 
-> Источник: `docs/AGENT_INSTRUCTIONS.md` §2. Синхронизировано 2026-08-22.
+> Источник: `docs/AGENT_INSTRUCTIONS.md` §2. Синхронизировано 2026-08-28.
+> **Производный файл (derived):** правила менять в источнике (§2) и копировать сюда — прямые правки приведут к расхождению.
 > Для Cursor/Windsurf см. `.cursorrules` в корне.
 
 ## Контекст проекта
@@ -18,7 +19,7 @@ Online casino платформа для рынка СНГ. MVP на русско
 3. `docs/CONVENTIONS.md` — coding conventions
 4. `docs/MODULE_BOUNDARIES.md` — карта модулей и их границ
 5. `docs/MODULE_TEMPLATE.md` — пошаговый шаблон создания модуля
-6. Релевантная TZ-часть (`docs/tz-part-1` … `docs/tz-part-7`)
+6. Релевантная TZ-часть (`docs/tz-part-1-foundation.md` … `docs/tz-part-7-devops-security-qa.md`)
 7. `packages/shared-types/src/` — существующие типы и enum-ы
 8. `packages/database/prisma/schema.prisma` — текущая структура БД
 
@@ -39,51 +40,57 @@ Online casino платформа для рынка СНГ. MVP на русско
 ## Типичные задачи
 
 ### Создать новый модуль
+
 → открой `docs/MODULE_TEMPLATE.md`, следуй 10 шагам.
 → После создания обнови `docs/MODULE_BOUNDARIES.md` (добавь модуль в карту).
 
 ### Добавить новый API endpoint
+
 → Найди существующий controller в `apps/api/src/modules/<name>/presentation/controllers/`
 → Если бизнес-логика > 30 строк → создай/дополни `application/use-cases/<action>.use-case.ts`
 → Никогда не добавляй логику прямо в controller
 → Используй `successResponse()` в controller, exceptions — `throw new XxxError()`
 
 ### Добавить новую таблицу
+
 → Schema: `packages/database/prisma/schema.prisma`
 → Создай миграцию: `pnpm db:migrate --name <name>`
 → Обнови seed если данные фиксированные
 
 ### Добавить нового платёжного провайдера
+
 → Создай адаптер в `modules/payments/infrastructure/adapters/`
 → Реализуй `PaymentProvider` interface из `modules/payments/domain/`
 → Зарегистрируй в `PaymentsModule` через DI
 → Подробнее: `docs/PAYMENT_OVERVIEW.md`
 
 ### Добавить нового game-провайдера
+
 → Создай `ProviderAdapter` в `modules/casino/infrastructure/providers/`
 → Зарегистрируй в `ProviderAdapterFactory`
 → Подробнее: `docs/PROVIDER_INTEGRATION_STRATEGY.md`
 
 ## Команды для разработки
 
-| Команда | Что делает |
-|---------|-----------|
-| `pnpm install` | Установить зависимости |
-| `pnpm dev` | Запустить api + web + admin локально |
-| `pnpm build` | Собрать всё |
-| `pnpm typecheck` | Проверить TypeScript по всему монорепо |
-| `pnpm lint` | ESLint по всему монорепо |
-| `pnpm test` | Vitest (unit тесты) |
-| `pnpm test:e2e` | E2E тесты (требует поднятую БД) |
-| `pnpm db:generate` | Prisma generate |
-| `pnpm db:migrate` | Создать миграцию (dev) |
-| `pnpm db:deploy` | Применить миграции (prod) |
-| `pnpm db:studio` | GUI для БД |
-| `pnpm --filter @casino/api <cmd>` | Запустить команду в одном пакете |
+| Команда                           | Что делает                             |
+| --------------------------------- | -------------------------------------- |
+| `pnpm install`                    | Установить зависимости                 |
+| `pnpm dev`                        | Запустить api + web + admin локально   |
+| `pnpm build`                      | Собрать всё                            |
+| `pnpm typecheck`                  | Проверить TypeScript по всему монорепо |
+| `pnpm lint`                       | ESLint по всему монорепо               |
+| `pnpm test`                       | Vitest (unit тесты)                    |
+| `pnpm test:e2e`                   | E2E тесты (требует поднятую БД)        |
+| `pnpm db:generate`                | Prisma generate                        |
+| `pnpm db:migrate`                 | Создать миграцию (dev)                 |
+| `pnpm db:deploy`                  | Применить миграции (prod)              |
+| `pnpm db:studio`                  | GUI для БД                             |
+| `pnpm --filter @casino/api <cmd>` | Запустить команду в одном пакете       |
 
 ## Когда СПРОСИТЬ пользователя
 
 Прежде чем действовать, если:
+
 - Не описано в TZ архитектурное решение (например, новая подсистема)
 - Выбор между двумя валидными подходами с разными trade-off (например, sync vs async)
 - Изменение схемы БД, не описанное в `tz-part-*.md`

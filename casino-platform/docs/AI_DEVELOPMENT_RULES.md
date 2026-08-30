@@ -3,7 +3,7 @@ title: AI Development Rules
 description: Правила для AI-агента, разрабатывающего casino-platform
 status: living document
 audience: AI agents (Claude, GPT-5, etc.)
-last_updated: 2026-06-19
+last_updated: 2026-08-28
 criticality: MAX
 ---
 
@@ -37,6 +37,8 @@ AI-агент при начале работы **ДОЛЖЕН** прочитат
 ---
 
 ## 1. ДЕНЬГИ — КРИТИЧНОЕ ПРАВИЛО
+
+> Реализация (типы `MoneyAmount`/`Currency`, helpers `money.*`, ZERO-таблица): **CONVENTIONS.md §5** — владелец кода контрактов. Здесь — правило поведения.
 
 ### 1.1. Правило
 
@@ -200,6 +202,8 @@ async execute(input: CreditInput): Promise<CreditResult> {
 ---
 
 ## 3. СТРУКТУРА МОДУЛЯ — обязательная
+
+> Пошаговая процедура создания модуля: **MODULE_TEMPLATE.md**. Обоснование слоёв и зависимостей: **ARCHITECTURE.md §5–6**.
 
 ### 3.1. Правило
 
@@ -707,7 +711,7 @@ await prisma.$transaction(async (tx) => {
 4. [ ] Проверить packages/shared-types/ на существующие типы
 5. [ ] Проверить packages/shared-utils/ на существующие helpers
 6. [ ] Проверить актуальную Prisma schema (packages/database/prisma/schema.prisma)
-7. [ ] Проверить events/events.ts на существующие domain events
+7. [ ] Проверить apps/api/src/queues/queue.types.ts на существующие типы очередей
 8. [ ] Проверить релевантную TZ часть
 9. [ ] Использовать существующие Facades других модулей (НЕ прямые prisma вызовы)
 10. [ ] Создать unit тесты
