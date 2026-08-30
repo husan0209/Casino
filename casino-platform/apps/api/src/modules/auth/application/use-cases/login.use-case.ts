@@ -1,8 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
 
+import { type LockoutConfig } from '../../domain/entities/user.entity'
 import {
   InvalidCredentialsError,
   AccountBlockedError,
+  AccountLockedError,
   SelfExcludedError,
 } from '../../domain/errors'
 import {
@@ -19,6 +21,13 @@ import { PasswordHasher } from '../../infrastructure/services/password-hasher.se
 
 @Injectable()
 export class LoginUseCase {
+  // GAP-18: 10 неудач за 15 минут → блок на 30 минут (SECURITY_BASELINE §2.2).
+  private readonly lockout: LockoutConfig = {
+    maxAttempts: Number(process.env['LOCKOUT_MAX_ATTEMPTS'] ?? 10),
+    windowMs: Number(process.env['LOCKOUT_WINDOW_MS'] ?? 15 * 60_000),
+    lockDurationMs: Number(process.env['LOCKOUT_DURATION_MS'] ?? 30 * 60_000),
+  }
+
   constructor(
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,
@@ -32,14 +41,28 @@ export class LoginUseCase {
     ip?: string | undefined
     userAgent?: string | undefined
   }) {
+    const now = new Date()
     const user = await this.users.findByEmail(input.email.toLowerCase().trim())
     if (!user?.passwordHash) {
       throw new InvalidCredentialsError()
     }
     const ok = await this.hasher.verify(user.passwordHash, input.password)
-    if (!ok) {
+
+    // Проверка блокировки ПОСЛЕ verify, чтобы не раскрывать существование аккаунта:
+    // неверный пароль → всегда INVALID_CREDENTIALS (заблокирован аккаунт или нет).
+    if (user.isLocked(now)) {
+      if (ok) {
+        throw new AccountLockedError(user.props.lockedUntil as Date)
+      }
+      // Уже заблокирован — счётчик не продлеваем (DoS-вектор через чужие лог-ины).
       throw new InvalidCredentialsError()
     }
+    if (!ok) {
+      user.registerFailedAttempt(this.lockout, now)
+      await this.users.update(user)
+      throw new InvalidCredentialsError()
+    }
+
     // Email verification не блокирует вход — требуется позже для вывода (tz-part-5 §5.1)
     if (user.status !== 'active') {
       throw new AccountBlockedError()
@@ -51,6 +74,7 @@ export class LoginUseCase {
       throw new SelfExcludedError(exclusion.excludedUntil)
     }
 
+    user.resetFailedAttempts()
     user.markLogin()
     await this.users.update(user)
     const { token: refreshToken, hash } = this.jwt.generateRefreshToken()

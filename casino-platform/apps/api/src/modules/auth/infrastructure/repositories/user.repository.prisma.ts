@@ -23,6 +23,9 @@ export class PrismaUserRepository implements IUserRepository {
       referredBy: row.referredBy,
       lastLoginAt: row.lastLoginAt,
       createdAt: row.createdAt,
+      failedLoginAttempts: row.failedLoginAttempts,
+      lastFailedAt: row.lastFailedAt,
+      lockedUntil: row.lockedUntil,
     })
   }
 
@@ -69,6 +72,9 @@ export class PrismaUserRepository implements IUserRepository {
         passwordHash: user.passwordHash,
         lastLoginAt: user.props.lastLoginAt,
         status: user.status,
+        failedLoginAttempts: user.props.failedLoginAttempts,
+        lastFailedAt: user.props.lastFailedAt,
+        lockedUntil: user.props.lockedUntil,
       },
     })
   }

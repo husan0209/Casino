@@ -21,6 +21,9 @@ model User {
   createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz
   lastLoginAt    DateTime?  @map("last_login_at") @db.Timestamptz
+  failedLoginAttempts Int      @default(0) @map("failed_login_attempts")
+  lastFailedAt        DateTime? @map("last_failed_at") @db.Timestamptz
+  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz
   referrer       User?  @relation("UserReferrals", fields: [referredBy], references: [id])
   referrals      User[] @relation("UserReferrals")
   authProviders    AuthProvider[]

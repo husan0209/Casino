@@ -78,6 +78,9 @@ export function validateEnv() {
 | `THROTTLE_TTL_MS` | int | ❌ | `60000` | Окно rate-limit в мс (GAP-19) |
 | `THROTTLE_GLOBAL_LIMIT` | int | ❌ | `120` | Запросов/окно на IP (глобально) |
 | `THROTTLE_AUTH_LIMIT` | int | ❌ | `10` | Запросов/окно на IP для `/auth/*` |
+| `LOCKOUT_MAX_ATTEMPTS` | int | ❌ | `10` | Неудачных входов за окно до блокировки аккаунта (GAP-18) |
+| `LOCKOUT_WINDOW_MS` | int | ❌ | `900000` | Скользящее окно подсчёта неудач, мс (15 мин) |
+| `LOCKOUT_DURATION_MS` | int | ❌ | `1800000` | Длительность блокировки аккаунта, мс (30 мин) |
 | `DOMAIN` | string | ✅ | — | `casino.example.com` (без доменной зоны) |
 
 ---
@@ -330,6 +333,11 @@ DOMAIN=localhost
 THROTTLE_TTL_MS=60000
 THROTTLE_GLOBAL_LIMIT=120
 THROTTLE_AUTH_LIMIT=10
+
+# ── Account lockout (GAP-18) ───────────────────────────────
+LOCKOUT_MAX_ATTEMPTS=10
+LOCKOUT_WINDOW_MS=900000
+LOCKOUT_DURATION_MS=1800000
 
 # ── Database ───────────────────────────────────────────────
 DATABASE_URL=postgresql://casino:casino_dev_password@localhost:5432/casino_dev
