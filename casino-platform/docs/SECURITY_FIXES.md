@@ -40,7 +40,7 @@
 |---|----------|------|--------|
 | 13 | `totalBet/totalWin` инкрементируется строкой (`increment: cb.betAmount`) | `game-callback.service.ts` | ⬜ Проверить после `prisma generate` (Prisma `Decimal` increment принимает number/Decimal). Если строка не проходит — перевести через `Decimal` |
 | 14 | Тестов почти нет (2 spec-файла), деньги не покрыты | `apps/api` | ⬜ Минимум: money-flow + идемпотентность + rollback-типы (GAP-24) |
-| 15 | Pino/redact вместо Nest Logger (пароли/токены в логах) | все `*.service.ts`/`*.use-case.ts` | ⬜ GAP-23 |
+| 15 | Pino/redact вместо Nest Logger (пароли/токены в логах) | все `*.service.ts`/`*.use-case.ts` | ✅ Исправлено 2026-08-30 (GAP-23): nestjs-pino + redact (password/token/authorization/cookie на 3 уровнях + req.body.*); фильтр не логирует err целиком; тест logger-redact.spec.ts |
 | 16 | `toMoney(n: any)` + 34 `as any` + глубокие относительные импорты | `wallet.ledger.prisma.ts` и др. | ⬜ GAP-22/26 |
 | 17 | Nginx `api_auth:10r/m` не совпадает с требованием 10/15 мин | `infra/nginx/nginx.conf` | ⬜ Согласовать с GAP-19 и `SECURITY_BASELINE §2.3` |
 | 18 | Drift env-дока: `REDIS_PASSWORD`/`DB_*` не в `env.validation.ts` | `ENVIRONMENT_VARIABLES.md` ↔ `env.validation.ts` | ⬜ GAP-29 |
@@ -55,4 +55,4 @@
    прогон `register → login → deposit → launch → bet/win/rollback → admin`.
 4. **P2** — тесты money-flow/rollback, pino, `any`/импорты, env-parity.
 
-> В эту ветку внесены правки #1, #2, #5, #6, #7, #8, #9, #10. Остальное (#3, #4, #11–#18) — по пунктам выше.
+> В эту ветку внесены правки #1, #2, #5, #6, #7, #8, #9, #10, #15. Остальное (#3, #4, #11–#14, #16–#18) — по пунктам выше.

@@ -55,7 +55,7 @@
 | GAP-20 | N4 | ~~helmet() middleware~~ | `main.ts`, `apps/api/package.json` | ✅ P0 закрыт 2026-08-30: `app.use(helmet())` в bootstrap до парсеров; API отдаёт только JSON → дефолтный CSP безопасен, `frame-ancestors 'none'` против clickjacking |
 | GAP-21 | N8, N9, C3 | ~~Zod-валидация на всех `@Body` inputs~~ | `apps/api/src/modules/*/presentation/controllers/` | ✅ P1 закрыт 2026-08-30: `@UsePipes(new ZodValidationPipe(Schema))` на всех клиентских `@Body` (auth incl. google/telegram, users profile/settings/self-exclude, casino launch/demo, kyc submit/documents, support + support-admin, все admin-контроллеры incl. finance credit/debit/batch). Новые DTO-схемы по модулям; неизвестные ключи вырезаются (anti mass-assignment). **Exempt (задокументировано в коде):** `payments-webhook` и `provider-callback` — payload'ы провайдеров под HMAC, жёсткая схема отбила бы валидные коллбэки |
 | GAP-22 | A1, C5, C6 | Wallet-модуль: вынести lock/unlock/confirmWithdrawal в `application/use-cases/` (4-слойка); убрать `toMoney(n: any)` (`wallet.ledger.prisma.ts:21`); разбить `runCreditDebit` (~50 строк > 30). **2026-08-30: G1-часть закрыта** — репозитории извлечены для casino (IGameCatalog/IGameFavorites/IGamePlay), notifications (INotification), referrals (IReferral), users (IUserSettings), admin (IAdminUser/IAuditLog/IDashboard); prisma — только в infrastructure; cross-module чтения помечены TODO(GAP-22) на Facade | `modules/wallet/` | P2 |
-| GAP-23 | H6 | Pino + redact вместо Nest Logger (пароли/токены могут попасть в логи) | все `*.use-case.ts`, `*.service.ts` | P1 |
+| GAP-23 | H6 | ~~Pino + redact вместо Nest Logger (пароли/токены могут попасть в логи)~~ | `apps/api/src/common/logger/logger.options.ts` | ✅ P1 закрыт 2026-08-30: `nestjs-pino` + pino-http по всему Nest (`useLogger`); redact-пути `password/token/authorization/cookie/set-cookie` на 3 уровнях вложенности + `req.body.*`; кастомный req-сериализатор (body в логах — но с redact); `GlobalExceptionFilter` больше не логирует `err` целиком (только type/message/stack через PinoLogger); корреляция request-id между pino и RequestIdMiddleware через общий `resolveRequestId`; env `LOG_LEVEL`/`LOG_FORMAT` подключены (pretty в dev, json в prod). Тесты `test/logger-redact.spec.ts` — секреты физически отсутствуют в выводе лога |
 | GAP-24 | A5, A6 | Покрытие тестами: сейчас 2 spec-файла на монорепо; минимум — money flow + idempotency (план: ENGINEERING_EXCELLENCE_PLAN.md Этап 1) | `apps/api` | P2 |
 | GAP-25 | A7 | Довести ESLint до обещанного в QUALITY_GATES §2.1: `max-params` warn(4)→error(3), `complexity` warn(10)→error(10) | `.eslintrc.js:66,70` | P2 |
 | GAP-26 | C4 | Относительные импорты `../../../../` → path aliases (18 мест) | `apps/api/src/modules/**` | P3 |
@@ -114,7 +114,7 @@
 ## Остаток работ (ревизия 2026-08-28)
 
 1. ~~**GAP-19/20/27** — Throttler + Helmet + argon2-параметры~~ ✅ закрыто 2026-08-30 (`security/gap-19-20-27`).
-2. **GAP-18 ✅ / GAP-21 ✅ / GAP-23** — lockout и Zod закрыты 2026-08-30; далее Pino redact (P1 security).
+2. **GAP-18 ✅ / GAP-21 ✅ / GAP-23 ✅** — lockout, Zod и Pino redact закрыты 2026-08-30; далее P2: тесты money-flow (GAP-24) + P0 #3/#4 (атомарность, NOWPayments IPN).
 3. **GAP-08/09 runtime** — сверка sign-порядков с менеджером GitSlotPark + runtime-тест с ключами.
 4. **GAP-03/04** — Google/Telegram OAuth: код готов, нужны ключи + runtime-проверка.
 5. **Runtime-приёмка** на Linux-FS: `pnpm install && pnpm db:generate && pnpm db:migrate && pnpm dev`; прогон register→login→deposit→launch→admin.

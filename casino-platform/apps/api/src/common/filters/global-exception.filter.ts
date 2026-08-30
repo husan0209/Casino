@@ -4,15 +4,18 @@ import {
   type ExceptionFilter,
   HttpException,
   HttpStatus,
-  Logger,
 } from '@nestjs/common'
 import { type Request, type Response } from 'express'
+import { PinoLogger } from 'nestjs-pino'
 
 import { AppError, errorResponse } from '@casino/shared-utils'
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(GlobalExceptionFilter.name)
+  // GAP-23: PinoLogger вместо Nest Logger — структурные логи с redact.
+  constructor(private readonly pinoLogger: PinoLogger) {
+    this.pinoLogger.setContext(GlobalExceptionFilter.name)
+  }
 
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp()
@@ -53,8 +56,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         .json(errorResponse(code, exception.message, details, requestId))
     }
 
-    // Unknown — log full error (server side), return generic 500 to client.
-    this.logger.error({ msg: 'Unhandled exception', err: exception, requestId })
+    // Unknown — log server-side only (no full err object: он может нести тела
+    // запросов/токены из upstream-ошибок), return generic 500 to client.
+    const isErr = exception instanceof Error
+    this.pinoLogger.error(
+      {
+        requestId,
+        err: {
+          type: isErr ? exception.name : typeof exception,
+          message: isErr ? exception.message : String(exception),
+          stack: isErr ? exception.stack : undefined,
+        },
+      },
+      'Unhandled exception',
+    )
     return response
       .status(HttpStatus.INTERNAL_SERVER_ERROR)
       .json(errorResponse('INTERNAL_ERROR', 'Something went wrong', undefined, requestId))
