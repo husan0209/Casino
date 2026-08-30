@@ -3,9 +3,15 @@ import { randomBytes } from 'crypto'
 import { Inject, Injectable } from '@nestjs/common'
 
 import { EmailAlreadyExistsError, WeakPasswordError } from '../../domain/errors'
-import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
+import {
+  ISessionRepository,
+  SESSION_REPOSITORY,
+} from '../../domain/repositories/session.repository'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
-import { IEmailVerificationRepository, EMAIL_VERIFICATION_REPOSITORY } from '../../domain/repositories/verification-token.repository'
+import {
+  IEmailVerificationRepository,
+  EMAIL_VERIFICATION_REPOSITORY,
+} from '../../domain/repositories/verification-token.repository'
 import { EmailQueueService } from '../../infrastructure/services/email-queue.service'
 import { JwtTokenService } from '../../infrastructure/services/jwt.service'
 import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
@@ -28,8 +34,12 @@ export class RegisterUseCase {
     for (let attempt = 0; attempt < 5; attempt++) {
       const bytes = randomBytes(CODE_LENGTH)
       let code = ''
-      for (let i = 0; i < CODE_LENGTH; i++) code += CODE_ALPHABET[bytes[i]! % CODE_ALPHABET.length]
-      if (!(await this.users.referralCodeExists(code))) return code
+      for (let i = 0; i < CODE_LENGTH; i++) {
+        code += CODE_ALPHABET[bytes[i]! % CODE_ALPHABET.length]
+      }
+      if (!(await this.users.referralCodeExists(code))) {
+        return code
+      }
     }
     throw new Error('REFERRAL_CODE_GENERATION_FAILED')
   }
@@ -38,21 +48,32 @@ export class RegisterUseCase {
     input: { email: string; password: string; referralCode?: string | undefined },
     meta?: { ip?: string | undefined; userAgent?: string | undefined },
   ) {
-    if (input.password.length < 8) throw new WeakPasswordError()
+    if (input.password.length < 8) {
+      throw new WeakPasswordError()
+    }
     const emailNormalized = input.email.toLowerCase().trim()
 
     const existing = await this.users.findByEmail(emailNormalized)
-    if (existing) throw new EmailAlreadyExistsError()
+    if (existing) {
+      throw new EmailAlreadyExistsError()
+    }
 
     let referredBy: string | null = null
     if (input.referralCode) {
       const referrer = await this.users.findByReferralCode(input.referralCode.toUpperCase().trim())
-      if (referrer) referredBy = referrer.id
+      if (referrer) {
+        referredBy = referrer.id
+      }
     }
 
     const passwordHash = await this.hasher.hash(input.password)
     const referralCode = await this.generateReferralCode()
-    const user = await this.users.create({ email: emailNormalized, passwordHash, referralCode, referredBy })
+    const user = await this.users.create({
+      email: emailNormalized,
+      passwordHash,
+      referralCode,
+      referredBy,
+    })
 
     const token = randomBytes(32).toString('hex')
     const expiresAt = new Date(Date.now() + 24 * 3600 * 1000)

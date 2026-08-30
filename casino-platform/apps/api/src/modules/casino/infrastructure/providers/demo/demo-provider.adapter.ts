@@ -1,21 +1,46 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
-import { type GameProviderAdapter, type LaunchParams, type ParsedProviderCallback } from '../../../domain/provider-adapter.interface'
+import {
+  type GameProviderAdapter,
+  type LaunchParams,
+  type ParsedProviderCallback,
+} from '../../../domain/provider-adapter.interface'
 
 @Injectable()
 export class DemoProviderAdapter implements GameProviderAdapter {
   constructor(private config: ConfigService) {}
   async getLaunchUrl(params: LaunchParams) {
     const webUrl = this.config.get('APP_URL') || 'http://localhost:3000'
-    const url = `${webUrl}/demo-game?token=${encodeURIComponent(params.sessionToken)}&game=${encodeURIComponent(params.gameExternalId)}&currency=${params.currency}&demo=${params.isDemo ? '1':'0'}`
+    const url = `${webUrl}/demo-game?token=${encodeURIComponent(params.sessionToken)}&game=${encodeURIComponent(params.gameExternalId)}&currency=${params.currency}&demo=${params.isDemo ? '1' : '0'}`
     return { url }
   }
   async fetchGameList() {
     return [
-      { externalGameId: 'demo-sweet-fruits', name: 'Sweet Fruits', type: 'slot', category: 'slots', hasDemo: true, rtp: 96.5 },
-      { externalGameId: 'demo-lucky-sevens', name: 'Lucky Sevens', type: 'slot', category: 'slots', hasDemo: true, rtp: 96.0 },
-      { externalGameId: 'demo-book-of-demo', name: 'Book of Demo', type: 'slot', category: 'slots', hasDemo: true, rtp: 96.21 },
+      {
+        externalGameId: 'demo-sweet-fruits',
+        name: 'Sweet Fruits',
+        type: 'slot',
+        category: 'slots',
+        hasDemo: true,
+        rtp: 96.5,
+      },
+      {
+        externalGameId: 'demo-lucky-sevens',
+        name: 'Lucky Sevens',
+        type: 'slot',
+        category: 'slots',
+        hasDemo: true,
+        rtp: 96.0,
+      },
+      {
+        externalGameId: 'demo-book-of-demo',
+        name: 'Book of Demo',
+        type: 'slot',
+        category: 'slots',
+        hasDemo: true,
+        rtp: 96.21,
+      },
     ]
   }
   verifyCallback() {

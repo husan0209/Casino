@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common'
 
 import { prisma } from '@casino/database'
 
-import type { AuthProviderKind, AuthProviderView, IAuthProviderRepository } from '../../domain/repositories/auth-provider.repository'
+import type {
+  AuthProviderKind,
+  AuthProviderView,
+  IAuthProviderRepository,
+} from '../../domain/repositories/auth-provider.repository'
 
 @Injectable()
 export class PrismaAuthProviderRepository implements IAuthProviderRepository {
@@ -10,15 +14,26 @@ export class PrismaAuthProviderRepository implements IAuthProviderRepository {
     const row = await prisma.authProvider.findUnique({
       where: { provider_providerUserId: { provider, providerUserId } },
     })
-    if (!row) return null
+    if (!row) {
+      return null
+    }
     const view: AuthProviderView = {
-      id: row.id, userId: row.userId, provider: row.provider as AuthProviderKind,
-      providerUserId: row.providerUserId, providerEmail: row.providerEmail,
+      id: row.id,
+      userId: row.userId,
+      provider: row.provider as AuthProviderKind,
+      providerUserId: row.providerUserId,
+      providerEmail: row.providerEmail,
     }
     return view
   }
 
-  async create(input: { userId: string; provider: AuthProviderKind; providerUserId?: string; providerEmail?: string; providerData?: unknown }) {
+  async create(input: {
+    userId: string
+    provider: AuthProviderKind
+    providerUserId?: string
+    providerEmail?: string
+    providerData?: unknown
+  }) {
     const row = await prisma.authProvider.create({
       data: {
         userId: input.userId,
@@ -29,8 +44,11 @@ export class PrismaAuthProviderRepository implements IAuthProviderRepository {
       },
     })
     const view: AuthProviderView = {
-      id: row.id, userId: row.userId, provider: row.provider as AuthProviderKind,
-      providerUserId: row.providerUserId, providerEmail: row.providerEmail,
+      id: row.id,
+      userId: row.userId,
+      provider: row.provider as AuthProviderKind,
+      providerUserId: row.providerUserId,
+      providerEmail: row.providerEmail,
     }
     return view
   }

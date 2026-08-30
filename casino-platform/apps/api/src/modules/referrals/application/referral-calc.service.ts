@@ -17,20 +17,29 @@ export class ReferralCalcService {
   // eslint-disable-next-line max-lines-per-function
   async runDaily(dateStr?: string) {
     const date = dateStr ? new Date(dateStr) : new Date(Date.now() - 86400000)
-    const dayStart = new Date(date); dayStart.setUTCHours(0,0,0,0)
-    const dayEnd = new Date(dayStart); dayEnd.setUTCHours(23,59,59,999)
+    const dayStart = new Date(date)
+    dayStart.setUTCHours(0, 0, 0, 0)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setUTCHours(23, 59, 59, 999)
     const rewardRate = new Decimal(process.env['REFERRAL_REWARD_RATE'] || '0.05')
     // get all users with referrer
-    const referredUsers = await prisma.user.findMany({ where: { referredBy: { not: null }}, select: { id: true, referredBy: true }})
+    const referredUsers = await prisma.user.findMany({
+      where: { referredBy: { not: null } },
+      select: { id: true, referredBy: true },
+    })
     let processed = 0
     let credited = 0
     for (const ru of referredUsers) {
-      if (!ru.referredBy) continue
+      if (!ru.referredBy) {
+        continue
+      }
       const res = await this.processUserRewards(ru.id, ru.referredBy!, dayStart, dayEnd, rewardRate)
       processed += res.processed
       credited += res.credited
     }
-    this.logger.log(`Referral daily: processed=${processed} credited=${credited} date=${dayStart.toISOString().slice(0,10)}`)
+    this.logger.log(
+      `Referral daily: processed=${processed} credited=${credited} date=${dayStart.toISOString().slice(0, 10)}`,
+    )
     return { processed, credited, date: dayStart }
   }
 
@@ -45,12 +54,12 @@ export class ReferralCalcService {
   ): Promise<{ processed: number; credited: number }> {
     const bets = await prisma.gameTransaction.groupBy({
       by: ['currency'],
-      where: { userId: referredId, type: 'bet', createdAt: { gte: dayStart, lte: dayEnd }},
+      where: { userId: referredId, type: 'bet', createdAt: { gte: dayStart, lte: dayEnd } },
       _sum: { amount: true },
     })
     const wins = await prisma.gameTransaction.groupBy({
       by: ['currency'],
-      where: { userId: referredId, type: 'win', createdAt: { gte: dayStart, lte: dayEnd }},
+      where: { userId: referredId, type: 'win', createdAt: { gte: dayStart, lte: dayEnd } },
       _sum: { amount: true },
     })
     const currencies = new Set<string>([
@@ -71,7 +80,9 @@ export class ReferralCalcService {
       const exists = await prisma.referralReward.findFirst({
         where: { referrerId, referredId, periodStart: dayStart, currency: cur },
       })
-      if (exists) continue
+      if (exists) {
+        continue
+      }
 
       const rr = await prisma.referralReward.create({
         data: {
@@ -89,7 +100,9 @@ export class ReferralCalcService {
       })
       processed++
 
-      if (!isPositiveGgr || !money.isPositive(rewardAmount)) continue
+      if (!isPositiveGgr || !money.isPositive(rewardAmount)) {
+        continue
+      }
       try {
         await this.walletFacade.credit({
           userId: referrerId,
@@ -106,7 +119,9 @@ export class ReferralCalcService {
         })
         credited++
       } catch (err: any) {
-        this.logger.error(`Failed to credit referral reward ${rr.id} for user ${referrerId}: ${err?.message || err}`)
+        this.logger.error(
+          `Failed to credit referral reward ${rr.id} for user ${referrerId}: ${err?.message || err}`,
+        )
       }
     }
     return { processed, credited }

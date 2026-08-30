@@ -10,15 +10,28 @@ import { PaymentRequestRepository } from '../../infrastructure/repositories/paym
 
 @Injectable()
 export class CreateWithdrawalUseCase {
-  constructor(private repo: PaymentRequestRepository, private wallet: WalletFacade, private kyc: KycCheckService) {}
-  async execute(userId: string, input: { amount: string; currency: string; method?: string; destination: any }) {
+  constructor(
+    private repo: PaymentRequestRepository,
+    private wallet: WalletFacade,
+    private kyc: KycCheckService,
+  ) {}
+  async execute(
+    userId: string,
+    input: { amount: string; currency: string; method?: string; destination: any },
+  ) {
     await this.kyc.assertCanWithdraw(userId)
     const amt = new Decimal(input.amount)
     const min = input.currency === 'RUB' ? '500' : '0.001'
     const max = input.currency === 'RUB' ? '200000' : '999999'
-    if (amt.lessThan(min)) throw new AmountTooSmallError(min)
-    if (amt.greaterThan(max)) throw new AmountTooLargeError(max)
-    if (!amt.isFinite()) throw new AmountTooSmallError('0')
+    if (amt.lessThan(min)) {
+      throw new AmountTooSmallError(min)
+    }
+    if (amt.greaterThan(max)) {
+      throw new AmountTooLargeError(max)
+    }
+    if (!amt.isFinite()) {
+      throw new AmountTooSmallError('0')
+    }
     // lock funds
     await this.wallet.lock(userId, input.currency as any, input.amount, `wd_lock_${randomUUID()}`)
     const pr = await this.repo.create({

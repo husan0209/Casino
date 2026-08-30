@@ -8,7 +8,14 @@ import { EMAIL_QUEUE_PORT, EmailQueuePort } from '../../../queues/queue.types'
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name)
   constructor(@Inject(EMAIL_QUEUE_PORT) private readonly emailQueue: EmailQueuePort) {}
-  async send(input: { userId: string; type: string; channel?: 'email'|'internal'; title: string; message: string; data?: any }) {
+  async send(input: {
+    userId: string
+    type: string
+    channel?: 'email' | 'internal'
+    title: string
+    message: string
+    data?: any
+  }) {
     const n = await prisma.notification.create({
       data: {
         userId: input.userId,
@@ -17,47 +24,74 @@ export class NotificationService {
         title: input.title,
         message: input.message,
         data: input.data || {},
-      }
+      },
     })
     if ((input.channel || 'internal') === 'email') {
       // Check user settings before queuing email
-      const settings = await prisma.userSettings.findUnique({ where: { userId: input.userId } }).catch(()=>null)
+      const settings = await prisma.userSettings
+        .findUnique({ where: { userId: input.userId } })
+        .catch(() => null)
       const emailEnabled = settings?.notificationsEmail ?? true
       if (!emailEnabled) {
         this.logger.log(`Email notification ${n.id} skipped – user ${input.userId} disabled email`)
       } else {
-        const user = await prisma.user.findUnique({ where: { id: input.userId }, select: { email: true } })
+        const user = await prisma.user.findUnique({
+          where: { id: input.userId },
+          select: { email: true },
+        })
         if (!user?.email) {
-          this.logger.warn(`Email notification ${n.id}: у пользователя ${input.userId} нет email – пропущено`)
+          this.logger.warn(
+            `Email notification ${n.id}: у пользователя ${input.userId} нет email – пропущено`,
+          )
         } else {
           // UC-NOTIF-01: постановка в очередь; sentAt проставит EmailWorker после фактической отправки
-          await this.emailQueue.enqueue({ to: user.email, subject: input.title, text: input.message, html: input.message, notificationId: n.id })
+          await this.emailQueue.enqueue({
+            to: user.email,
+            subject: input.title,
+            text: input.message,
+            html: input.message,
+            notificationId: n.id,
+          })
         }
       }
     } else {
-      await prisma.notification.update({ where: { id: n.id }, data: { sentAt: new Date() }})
+      await prisma.notification.update({ where: { id: n.id }, data: { sentAt: new Date() } })
     }
     return n
   }
-  async list(userId: string, page=1, perPage=20, isRead?: boolean) {
-    const where:any = { userId }; if (isRead !== undefined) where.isRead = isRead
-    const [items,total,unreadCount] = await Promise.all([
-      prisma.notification.findMany({ where, skip:(page-1)*perPage, take:perPage, orderBy:{ createdAt:'desc' }}),
+  async list(userId: string, page = 1, perPage = 20, isRead?: boolean) {
+    const where: any = { userId }
+    if (isRead !== undefined) {
+      where.isRead = isRead
+    }
+    const [items, total, unreadCount] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        skip: (page - 1) * perPage,
+        take: perPage,
+        orderBy: { createdAt: 'desc' },
+      }),
       prisma.notification.count({ where }),
-      prisma.notification.count({ where:{ userId, isRead:false }})
+      prisma.notification.count({ where: { userId, isRead: false } }),
     ])
     return { items, total, unreadCount }
   }
   async markRead(userId: string, id: string) {
-    await prisma.notification.updateMany({ where:{ id, userId }, data:{ isRead: true, readAt: new Date() }})
+    await prisma.notification.updateMany({
+      where: { id, userId },
+      data: { isRead: true, readAt: new Date() },
+    })
     return { ok: true }
   }
   async markAllRead(userId: string) {
-    await prisma.notification.updateMany({ where:{ userId, isRead:false }, data:{ isRead: true, readAt: new Date() }})
+    await prisma.notification.updateMany({
+      where: { userId, isRead: false },
+      data: { isRead: true, readAt: new Date() },
+    })
     return { ok: true }
   }
   async unreadCount(userId: string) {
-    const count = await prisma.notification.count({ where:{ userId, isRead:false }})
+    const count = await prisma.notification.count({ where: { userId, isRead: false } })
     return { count }
   }
 }

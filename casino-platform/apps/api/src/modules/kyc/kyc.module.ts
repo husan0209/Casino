@@ -16,7 +16,9 @@ import { KycController } from './presentation/controllers/kyc.controller'
   controllers: [KycController, KycAdminController],
   providers: [
     { provide: KYC_REPOSITORY, useClass: PrismaKycRepository },
-    SubmitKycUseCase, GetKycStatusUseCase, KycCheckService,
+    SubmitKycUseCase,
+    GetKycStatusUseCase,
+    KycCheckService,
   ],
   exports: [KycCheckService],
 })

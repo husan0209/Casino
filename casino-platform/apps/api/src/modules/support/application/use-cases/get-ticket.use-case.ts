@@ -1,7 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
 
 import { TicketNotFoundError, ForbiddenTicketError } from '../../domain/errors'
-import { ISupportRepository, SUPPORT_REPOSITORY } from '../../domain/repositories/support.repository'
+import {
+  ISupportRepository,
+  SUPPORT_REPOSITORY,
+} from '../../domain/repositories/support.repository'
 
 @Injectable()
 export class GetTicketUseCase {
@@ -10,8 +13,12 @@ export class GetTicketUseCase {
     const ticket = isAdmin
       ? await this.repo.getAdmin(ticketId)
       : await this.repo.getTicketForUser(ticketId, userId)
-    if (!ticket) throw new TicketNotFoundError()
-    if (!isAdmin && (ticket as any).userId !== userId) throw new ForbiddenTicketError()
+    if (!ticket) {
+      throw new TicketNotFoundError()
+    }
+    if (!isAdmin && (ticket as any).userId !== userId) {
+      throw new ForbiddenTicketError()
+    }
     const messages = await this.repo.listMessages(ticketId, isAdmin)
     return { ...ticket, messages }
   }

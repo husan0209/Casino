@@ -24,13 +24,21 @@ export class PaymentsWebhookController {
 
   @Post('rukassa')
   @HttpCode(200)
-  async rukassaCb(@Headers() headers: Record<string, string>, @Body() body: unknown, @Req() req: { rawBody?: string; ip?: string }) {
+  async rukassaCb(
+    @Headers() headers: Record<string, string>,
+    @Body() body: unknown,
+    @Req() req: { rawBody?: string; ip?: string },
+  ) {
     return this.rukassa.execute(headers, body, req.rawBody ?? '', req.ip ?? '')
   }
 
   @Post('nowpayments')
   @HttpCode(200)
-  async npCb(@Headers() headers: Record<string, string>, @Body() body: unknown, @Req() req: { rawBody?: string; ip?: string }) {
+  async npCb(
+    @Headers() headers: Record<string, string>,
+    @Body() body: unknown,
+    @Req() req: { rawBody?: string; ip?: string },
+  ) {
     return this.np.execute(headers, body, req.rawBody ?? '', req.ip ?? '')
   }
 }

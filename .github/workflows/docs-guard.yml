@@ -1,0 +1,118 @@
+# Docs Guard — автопроверка документации (Фаза 3)
+# D1 markdown-ссылки · D2 пути в живых доках · D3 env-parity
+# D4 честность SECURITY_CHECKLIST · D5 drift машинных файлов · D6 job-имена branch protection
+#
+# Замороженная спека (docs/tz-part-*) и immutable-снапшоты (docs/archive/)
+# исключены из D2/D3 по design: их пути — историческая фиксация v1.0
+# (приоритет: INDEX.md §6.2 — код > статус > владельцы > … > TZ).
+# Allowlist для D2 — только с обоснованием в комментарии (по аналогии с arch-guard).
+
+name: Docs guard
+on:
+  pull_request:
+    branches: [main]
+    paths: ['casino-platform/**', '.github/workflows/**']
+  push:
+    branches: [main, dev]
+    paths: ['casino-platform/**', '.github/workflows/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Доки живут в casino-platform/docs, воркфлоу — в корневом .github
+defaults:
+  run:
+    working-directory: casino-platform
+
+jobs:
+  docs-guard:
+    name: Docs guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: D1–D6 checks
+        run: |
+          set -uo pipefail
+          ERR="$(mktemp)"
+          TMPD="$(mktemp -d)"
+          trap 'rm -f "$ERR"; rm -rf "$TMPD"' EXIT
+          fail() { echo "❌ $1" | tee -a "$ERR"; }
+
+          # ── D1: все markdown-ссылки разрешаются ──────────────────
+          echo "D1: markdown link check…"
+          while IFS= read -r -d '' f; do
+            dir=$(dirname "$f")
+            while IFS= read -r link; do
+              [ -n "$link" ] || continue
+              [ -e "$dir/$link" ] || fail "D1: битая ссылка $f -> $link"
+            done < <(grep -oE '\]\([^)#]+' "$f" | sed -E 's/\]\((.*)/\1/' | grep -v '^http' || true)
+          done < <(find . -name '*.md' -not -path './node_modules/*' -print0)
+
+          # ── D2: backtick-пути с repo-префиксом существуют ────────
+          echo "D2: backtick path check (living docs)…"
+          ALLOW_RE='^(\.github/|infra/load-tests/|apps/api/src/types/multer)' # .github/* живёт в корне репо (GitHub читает только корневой) # обоснования: CODEOWNERS — рекомендуется к созданию (BRANCH_PROTECTION.md); load-tests — план Этапа 3 (ENGINEERING_EXCELLENCE_PLAN); multer — glob-шим из GAP-01
+          while IFS= read -r -d '' f; do
+            while IFS= read -r tok; do
+              [ -n "$tok" ] || continue
+              echo "$tok" | grep -qE "$ALLOW_RE" && continue
+              [ -e "$tok" ] || fail "D2: путь из $f не существует: $tok"
+            done < <(grep -oE '`[A-Za-z0-9_./-]+`' "$f" | tr -d '`' \
+              | grep -E '^(apps/|packages/|docs/|infra/|\.github/|scripts/|\.husky/|\.eslintrc\.js$|\.cursorrules$|\.env\.example$|docker-compose|pnpm-workspace\.yaml$|AGENTS\.md$|package\.json$)' \
+              | sort -u || true)
+          done < <(find . -name '*.md' -not -path './node_modules/*' -not -path './docs/archive/*' -not -path './docs/tz-part-*' -print0)
+
+          # ── D3: .env.example ↔ ENVIRONMENT_VARIABLES §22 ─────────
+          echo "D3: env parity…"
+          grep -vE '^\s*#|^\s*$' .env.example | cut -d= -f1 | sort -u > "$TMPD/d3_ex.txt"
+          awk '/^## 22\./,0' docs/ENVIRONMENT_VARIABLES.md | grep -E '^[A-Z][A-Z0-9_]+=' | cut -d= -f1 | sort -u > "$TMPD/d3_doc.txt"
+          if ! diff -q "$TMPD/d3_doc.txt" "$TMPD/d3_ex.txt" >/dev/null 2>&1; then
+            fail "D3: ENVIRONMENT_VARIABLES §22 ≠ .env.example:"
+            diff "$TMPD/d3_doc.txt" "$TMPD/d3_ex.txt" | sed 's/^/    /' >> "$ERR"
+          fi
+          grep -oE '^  [A-Z][A-Z0-9_]+:' packages/shared-config/src/env.validation.ts | tr -d ' :' | sort -u > "$TMPD/d3_val.txt"
+          MISSING=$(comm -13 "$TMPD/d3_val.txt" "$TMPD/d3_ex.txt" | paste -sd, -)
+          [ -n "$MISSING" ] && echo "⚠️  D3 (не блокирует): env.validation.ts не валидирует: $MISSING — см. GAP-29"
+
+          # ── D4: честность SECURITY_CHECKLIST ─────────────────────
+          echo "D4: security checklist honesty…"
+          SC=docs/SECURITY_CHECKLIST.md
+          grep -qE '^\s*[-*] \[x\]' "$SC" && fail "D4: SECURITY_CHECKLIST содержит [x] без подтверждения — используй таблицу (статус + подтверждение)"
+          BADROWS=$(grep -E '^\| .*[✅⚠️❌]' "$SC" | grep -vE 'GAP-|`|manual|аудит|ревизия|guard|pipeline|вручную' || true)
+          [ -n "$BADROWS" ] && { fail "D4: строки чеклиста без подтверждения:"; echo "$BADROWS" | sed 's/^/    /' >> "$ERR"; }
+
+          # ── D5: производные машинные файлы не разъехались ────────
+          echo "D5: derived files drift…"
+          grep -qi "turbo" .cursorrules AGENTS.md && fail "D5: turbo вернулся в машинные файлы"
+          grep -q "events/events.ts" .cursorrules AGENTS.md && fail "D5: events.ts вернулся в машинные файлы"
+          grep -q "packages/database/prisma/schema.prisma" .cursorrules || fail "D5: .cursorrules потерял schema.prisma"
+          grep -q "packages/database/prisma/schema.prisma" AGENTS.md || fail "D5: AGENTS.md потерял schema.prisma"
+          grep -q "queue.types.ts" .cursorrules || fail "D5: .cursorrules потерял queue.types.ts"
+          grep -q "DERIVED FILE" .cursorrules || fail "D5: .cursorrules без DERIVED-маркера"
+          grep -q "Производный файл" AGENTS.md || fail "D5: AGENTS.md без derived-маркера"
+
+          # ── D6: job-имена из BRANCH_PROTECTION существуют ────────
+          echo "D6: branch protection job names…"
+          BP=docs/BRANCH_PROTECTION.md
+          WS="${GITHUB_WORKSPACE:-..}" # в Actions — корень репо; локально — родитель casino-platform
+          SEC=$(awk '/Require status checks/{flag=1} /⚠️/{flag=0} flag' "$BP")
+          echo "$SEC" | grep -oE '`[^`]+`' | tr -d '`' | grep -vE '\.yml$|^guards$|^step$' | sort -u > "$TMPD/checks.txt"
+          # multi-word display-name job'ов — отдельно (word-split ломает пробелы)
+          if grep -q '^Architecture guards$' "$TMPD/checks.txt"; then
+            grep -q "name: Architecture guards" "$WS"/.github/workflows/*.yml || fail "D6: job 'Architecture guards' не найден в workflows"
+            sed -i '/^Architecture guards$/d' "$TMPD/checks.txt"
+          fi
+          while IFS= read -r t; do
+            [ -n "$t" ] || continue
+            grep -qE "^  ${t}:" "$WS"/.github/workflows/*.yml || fail "D6: job '$t' из BRANCH_PROTECTION.md не существует в workflows"
+          done < "$TMPD/checks.txt"
+
+          # ── итог ─────────────────────────────────────────────────
+          if [ -s "$ERR" ]; then
+            echo
+            echo "════ Docs guard FAILED ════"
+            cat "$ERR"
+            exit 1
+          fi
+          echo "✅ Docs guard: D1–D6 OK"

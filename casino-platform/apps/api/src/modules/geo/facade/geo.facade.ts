@@ -2,7 +2,10 @@ import { Injectable } from '@nestjs/common'
 
 import type { DisplayCurrency, LegalCountry } from '@casino/shared-config'
 
-import { GetGeoConfigUseCase, type ResolveGeoInput } from '../application/use-cases/get-geo-config.use-case'
+import {
+  GetGeoConfigUseCase,
+  type ResolveGeoInput,
+} from '../application/use-cases/get-geo-config.use-case'
 import {
   assertFiatDepositMethod,
   convertRubToDisplayAmount,

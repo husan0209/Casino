@@ -2,11 +2,23 @@ import { Injectable } from '@nestjs/common'
 
 import { prisma } from '@casino/database'
 
-import type { SessionCreateInput, SessionView, ISessionRepository } from '../../domain/repositories/session.repository'
+import type {
+  SessionCreateInput,
+  SessionView,
+  ISessionRepository,
+} from '../../domain/repositories/session.repository'
 
 @Injectable()
 export class PrismaSessionRepository implements ISessionRepository {
-  private toView(row: { id: string; userId: string; refreshTokenHash: string; ipAddress: string | null; userAgent: string | null; expiresAt: Date; revokedAt: Date | null }): SessionView {
+  private toView(row: {
+    id: string
+    userId: string
+    refreshTokenHash: string
+    ipAddress: string | null
+    userAgent: string | null
+    expiresAt: Date
+    revokedAt: Date | null
+  }): SessionView {
     return { ...row }
   }
 
@@ -24,10 +36,16 @@ export class PrismaSessionRepository implements ISessionRepository {
   }
 
   async revoke(id: string) {
-    await prisma.session.updateMany({ where: { id, revokedAt: null }, data: { revokedAt: new Date() } })
+    await prisma.session.updateMany({
+      where: { id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
   }
 
   async revokeAllUserSessions(userId: string) {
-    await prisma.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } })
+    await prisma.session.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
   }
 }

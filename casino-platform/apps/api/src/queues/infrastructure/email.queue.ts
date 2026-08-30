@@ -6,7 +6,10 @@ import Redis from 'ioredis'
 import { type EmailJobData, type EmailQueuePort, type EnqueueResult, QUEUES } from '../queue.types'
 
 export function queueConnection(config: ConfigService): Redis {
-  return new Redis(config.get<string>('REDIS_URL')!, { maxRetriesPerRequest: null, lazyConnect: true })
+  return new Redis(config.get<string>('REDIS_URL')!, {
+    maxRetriesPerRequest: null,
+    lazyConnect: true,
+  })
 }
 
 /** Продюсер: пишет письма в BullMQ-очередь `email`. Сбой постановки не роняет HTTP-запрос. */

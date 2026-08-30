@@ -22,10 +22,15 @@ import { PaymentsController } from './presentation/controllers/payments.controll
   imports: [ConfigModule, AuthModule, WalletModule, KycModule, GeoModule, UsersModule],
   controllers: [PaymentsController, PaymentsWebhookController],
   providers: [
-    PaymentRequestRepository, RukassaClient, NOWPaymentsClient,
-    CreateFiatDepositUseCase, CreateCryptoDepositUseCase,
-    ProcessRukassaWebhookUseCase, ProcessNOWPaymentsWebhookUseCase,
-    CreateWithdrawalUseCase, CancelWithdrawalUseCase,
+    PaymentRequestRepository,
+    RukassaClient,
+    NOWPaymentsClient,
+    CreateFiatDepositUseCase,
+    CreateCryptoDepositUseCase,
+    ProcessRukassaWebhookUseCase,
+    ProcessNOWPaymentsWebhookUseCase,
+    CreateWithdrawalUseCase,
+    CancelWithdrawalUseCase,
   ],
 })
 export class PaymentsModule {}

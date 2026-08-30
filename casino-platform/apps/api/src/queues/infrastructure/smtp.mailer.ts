@@ -8,7 +8,9 @@ import { type MailMessage, type MailerPort } from './mailer.port'
 export class EmailNotConfiguredError extends AppError {
   readonly code = 'EMAIL_NOT_CONFIGURED'
   readonly httpStatus = 500
-  constructor() { super('SMTP не настроен: письма не могут быть отправлены') }
+  constructor() {
+    super('SMTP не настроен: письма не могут быть отправлены')
+  }
 }
 
 @Injectable()
@@ -20,7 +22,9 @@ export class SmtpMailer implements MailerPort {
 
   /** nodemailer — optional peer: require ленивый, чтобы dev-среда без пакета собиралась. */
   private transporter(): any {
-    if (this.transport) return this.transport
+    if (this.transport) {
+      return this.transport
+    }
     let nodemailer: any
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -40,7 +44,9 @@ export class SmtpMailer implements MailerPort {
   }
 
   async send(msg: MailMessage) {
-    if (!this.config.get<string>('SMTP_HOST')) throw new EmailNotConfiguredError()
+    if (!this.config.get<string>('SMTP_HOST')) {
+      throw new EmailNotConfiguredError()
+    }
     await this.transporter().sendMail({
       from: this.config.get<string>('SMTP_FROM_EMAIL') || 'no-reply@casino.local',
       to: msg.to,
@@ -64,7 +70,11 @@ export class DevLogMailer implements MailerPort {
 }
 
 export function mailerFactory(config: ConfigService): MailerPort {
-  if (config.get<string>('SMTP_HOST')) return new SmtpMailer(config)
-  if (config.get<string>('NODE_ENV') === 'production') throw new Error('SMTP_HOST_REQUIRED_IN_PRODUCTION')
+  if (config.get<string>('SMTP_HOST')) {
+    return new SmtpMailer(config)
+  }
+  if (config.get<string>('NODE_ENV') === 'production') {
+    throw new Error('SMTP_HOST_REQUIRED_IN_PRODUCTION')
+  }
   return new DevLogMailer(config)
 }

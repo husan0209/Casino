@@ -11,7 +11,9 @@ export class AdminUsersController {
   constructor(private readonly auditLogService: AuditLogService) {}
 
   @Get()
-  async list(@Query() queryParams: { page?: string; per_page?: string; status?: string; search?: string }) {
+  async list(
+    @Query() queryParams: { page?: string; per_page?: string; status?: string; search?: string },
+  ) {
     const page = parseInt(queryParams.page || '1', 10) || 1
     const perPage = Math.min(parseInt(queryParams.per_page || '20', 10) || 20, 100)
 
@@ -70,11 +72,7 @@ export class AdminUsersController {
   }
 
   @Post(':id/block')
-  async block(
-    @Param('id') userId: string,
-    @Body() dto: { reason?: string },
-    @Req() req: any,
-  ) {
+  async block(@Param('id') userId: string, @Body() dto: { reason?: string }, @Req() req: any) {
     await prisma.user.update({
       where: { id: userId },
       data: { status: 'blocked' },
@@ -97,10 +95,7 @@ export class AdminUsersController {
   }
 
   @Post(':id/unblock')
-  async unblock(
-    @Param('id') userId: string,
-    @Req() req: any,
-  ) {
+  async unblock(@Param('id') userId: string, @Req() req: any) {
     await prisma.user.update({
       where: { id: userId },
       data: { status: 'active' },

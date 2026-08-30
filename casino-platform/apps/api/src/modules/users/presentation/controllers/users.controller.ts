@@ -1,7 +1,19 @@
 import { randomUUID } from 'crypto'
 import { extname } from 'path'
 
-import { Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseGuards, UseInterceptors, UsePipes } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+  UsePipes,
+} from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { diskStorage } from 'multer'
 
@@ -17,7 +29,6 @@ import { UpdateProfileUseCase } from '../../application/use-cases/update-profile
 import { UpdateSettingsUseCase } from '../../application/use-cases/update-settings.use-case'
 import { UpdateCurrencySchema } from '../dto/update-currency.dto'
 
-
 @UseGuards(AuthGuard)
 @Controller('users')
 export class UsersController {
@@ -32,15 +43,37 @@ export class UsersController {
   ) {}
 
   @Get('me')
-  me(@CurrentUser() user: any) { return this.getMe.execute(user.id) }
+  me(@CurrentUser() user: any) {
+    return this.getMe.execute(user.id)
+  }
 
   @Patch('me/profile')
-  updateProfileCtl(@CurrentUser() user: any, @Body() body: { first_name?: string; last_name?: string; date_of_birth?: string; country?: string; city?: string }) {
+  updateProfileCtl(
+    @CurrentUser() user: any,
+    @Body()
+    body: {
+      first_name?: string
+      last_name?: string
+      date_of_birth?: string
+      country?: string
+      city?: string
+    },
+  ) {
     return this.updateProfile.execute(user.id, body)
   }
 
   @Patch('me/settings')
-  updateSettingsCtl(@CurrentUser() user: any, @Body() body: { language?: string; notifications_email?: boolean; notifications_sms?: boolean; notifications_push?: boolean; two_factor_enabled?: boolean }) {
+  updateSettingsCtl(
+    @CurrentUser() user: any,
+    @Body()
+    body: {
+      language?: string
+      notifications_email?: boolean
+      notifications_sms?: boolean
+      notifications_push?: boolean
+      two_factor_enabled?: boolean
+    },
+  ) {
     return this.updateSettings.execute(user.id, body)
   }
 
@@ -51,17 +84,23 @@ export class UsersController {
   }
 
   @Post('me/avatar')
-  @UseInterceptors(FileInterceptor('file', {
-    storage: diskStorage({
-      destination: './uploads/avatars',
-      filename: (_, file, cb) => cb(null, randomUUID() + extname(file.originalname))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads/avatars',
+        filename: (_, file, cb) => cb(null, randomUUID() + extname(file.originalname)),
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_, file, cb) => {
+        const ok = /jpe?g|png|webp/.test(file.mimetype)
+        cb(null, ok)
+      },
     }),
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (_, file, cb) => { const ok = /jpe?g|png|webp/.test(file.mimetype); cb(null, ok) }
-  }))
+  )
   async avatar(@CurrentUser() user: any, @UploadedFile() file: Express.Multer.File) {
     // avatar url saving – simplified, reuse profile repo directly
-    const { PrismaUserProfileRepository } = await import('../../infrastructure/repositories/user-profile.prisma')
+    const { PrismaUserProfileRepository } =
+      await import('../../infrastructure/repositories/user-profile.prisma')
     const repo = new PrismaUserProfileRepository()
     const url = `/uploads/avatars/${file.filename}`
     await repo.setAvatar(user.id, url)

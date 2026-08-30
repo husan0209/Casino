@@ -25,10 +25,7 @@ export class WalletController {
   }
 
   @Get('balances/:currency')
-  async balance(
-    @CurrentUser() currentUser: { id: string },
-    @Param('currency') currency: string,
-  ) {
+  async balance(@CurrentUser() currentUser: { id: string }, @Param('currency') currency: string) {
     return this.walletFacade.getBalance(currentUser.id, currency as Currency)
   }
 

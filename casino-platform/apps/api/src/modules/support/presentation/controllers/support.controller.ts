@@ -51,10 +51,7 @@ export class SupportController {
   }
 
   @Get('tickets/:id')
-  get(
-    @CurrentUser() currentUser: { id: string },
-    @Param('id') ticketId: string,
-  ) {
+  get(@CurrentUser() currentUser: { id: string }, @Param('id') ticketId: string) {
     return this.getTicketUseCase.execute(currentUser.id, ticketId, false)
   }
 
@@ -74,10 +71,7 @@ export class SupportController {
   }
 
   @Post('tickets/:id/close')
-  close(
-    @CurrentUser() currentUser: { id: string },
-    @Param('id') ticketId: string,
-  ) {
+  close(@CurrentUser() currentUser: { id: string }, @Param('id') ticketId: string) {
     return this.closeTicketUseCase.execute(ticketId, 'user', currentUser.id)
   }
 }

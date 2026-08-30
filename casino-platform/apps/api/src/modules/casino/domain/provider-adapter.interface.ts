@@ -1,7 +1,13 @@
 export interface LaunchParams {
-  gameExternalId: string; sessionToken: string; playerToken: string;
-  currency: string; language: string; returnUrl: string;
-  isDemo: boolean; isMobile: boolean; ip: string;
+  gameExternalId: string
+  sessionToken: string
+  playerToken: string
+  currency: string
+  language: string
+  returnUrl: string
+  isDemo: boolean
+  isMobile: boolean
+  ip: string
 }
 export interface ParsedProviderCallback {
   action: 'authenticate' | 'balance' | 'bet' | 'win' | 'rollback'
@@ -18,10 +24,18 @@ export interface ParsedProviderCallback {
 }
 export interface GameProviderAdapter {
   getLaunchUrl(params: LaunchParams): Promise<{ url: string }>
-  fetchGameList(): Promise<Array<{
-    externalGameId: string; name: string; type?: string | undefined; category?: string | undefined;
-    thumbnailUrl?: string | undefined; hasDemo: boolean; rtp?: number | undefined; metadata?: any
-  }>>
+  fetchGameList(): Promise<
+    Array<{
+      externalGameId: string
+      name: string
+      type?: string | undefined
+      category?: string | undefined
+      thumbnailUrl?: string | undefined
+      hasDemo: boolean
+      rtp?: number | undefined
+      metadata?: any
+    }>
+  >
   verifyCallback(headers: any, body: any): boolean
   parseCallback(headers: any, body: any): ParsedProviderCallback
   formatSuccessResponse(balance: string, transactionId?: string): any

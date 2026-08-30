@@ -26,13 +26,18 @@ export class SelfExclusionUseCase {
    * periodHours: number of hours OR 0 = permanent
    */
   async exclude(userId: string, periodHours: number): Promise<{ excludedUntil: Date | null }> {
-    if (periodHours < 0) throw new Error('INVALID_PERIOD')
+    if (periodHours < 0) {
+      throw new Error('INVALID_PERIOD')
+    }
     // Minimum 24 hours — we enforce this server-side regardless of client input
-    if (periodHours > 0 && periodHours < 24) periodHours = 24
+    if (periodHours > 0 && periodHours < 24) {
+      periodHours = 24
+    }
 
-    const excludedUntil = periodHours === 0
-      ? new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000) // 100 years ~ permanent
-      : new Date(Date.now() + periodHours * 60 * 60 * 1000)
+    const excludedUntil =
+      periodHours === 0
+        ? new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000) // 100 years ~ permanent
+        : new Date(Date.now() + periodHours * 60 * 60 * 1000)
 
     // Upsert UserSettings
     await prisma.userSettings.upsert({

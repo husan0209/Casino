@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@modules/*": ["./src/modules/*"],
+      "@casino/shared-types": ["../../packages/shared-types/dist"],
+      "@casino/shared-utils": ["../../packages/shared-utils/dist"],
+      "@casino/shared-config": ["../../packages/shared-config/dist"],
+      "@casino/database": ["../../packages/database/dist"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "test"]
+}

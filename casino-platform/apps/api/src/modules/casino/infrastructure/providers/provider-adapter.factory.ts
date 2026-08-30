@@ -37,7 +37,8 @@ export class ProviderAdapterFactory {
       case 'amatic':
       case 'amusnet':
         return new GitslotparkProviderAdapter(this.config)
-      default: throw new ProviderNotSupportedError(slug)
+      default:
+        throw new ProviderNotSupportedError(slug)
     }
   }
 }

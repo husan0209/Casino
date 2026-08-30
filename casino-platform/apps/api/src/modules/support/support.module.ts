@@ -16,8 +16,11 @@ import { SupportController } from './presentation/controllers/support.controller
   controllers: [SupportController, SupportAdminController],
   providers: [
     { provide: SUPPORT_REPOSITORY, useClass: PrismaSupportRepository },
-    CreateTicketUseCase, ListUserTicketsUseCase, GetTicketUseCase,
-    SendMessageUseCase, CloseTicketUseCase,
+    CreateTicketUseCase,
+    ListUserTicketsUseCase,
+    GetTicketUseCase,
+    SendMessageUseCase,
+    CloseTicketUseCase,
   ],
 })
 export class SupportModule {}

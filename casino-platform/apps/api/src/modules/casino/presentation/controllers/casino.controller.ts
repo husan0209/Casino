@@ -44,13 +44,15 @@ export class CasinoController {
       where: { isEnabled: true },
       orderBy: { sortOrder: 'asc' },
     })
-    return rows.map((provider: { slug: string; name: string; logoUrl: any; gameCount: number; type: any }) => ({
-      slug: provider.slug,
-      name: provider.name,
-      logo_url: provider.logoUrl,
-      game_count: provider.gameCount,
-      type: provider.type,
-    }))
+    return rows.map(
+      (provider: { slug: string; name: string; logoUrl: any; gameCount: number; type: any }) => ({
+        slug: provider.slug,
+        name: provider.name,
+        logo_url: provider.logoUrl,
+        game_count: provider.gameCount,
+        type: provider.type,
+      }),
+    )
   }
 
   @Get('categories')
@@ -111,20 +113,14 @@ export class CasinoController {
 
   @Post('games/:slug/favorite')
   @UseGuards(AuthGuard)
-  async favAdd(
-    @CurrentUser() currentUser: { id: string },
-    @Param('slug') slug: string,
-  ) {
+  async favAdd(@CurrentUser() currentUser: { id: string }, @Param('slug') slug: string) {
     await this.favoritesUseCase.add(currentUser.id, slug)
     return { ok: true }
   }
 
   @Delete('games/:slug/favorite')
   @UseGuards(AuthGuard)
-  async favDel(
-    @CurrentUser() currentUser: { id: string },
-    @Param('slug') slug: string,
-  ) {
+  async favDel(@CurrentUser() currentUser: { id: string }, @Param('slug') slug: string) {
     await this.favoritesUseCase.remove(currentUser.id, slug)
     return { ok: true }
   }

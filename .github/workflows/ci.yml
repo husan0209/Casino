@@ -1,5 +1,9 @@
 name: CI
 
+# Единый CI репозитория. Проект живёт в casino-platform/ (defaults.working-directory).
+# Job-имена = обязательные status-чеки ruleset: lint-typecheck-test, docker-build
+# (+ Secrets scan, Commit messages, Deploy — см. docs/BRANCH_PROTECTION.md).
+
 on:
   push:
     branches: [main, dev]
@@ -19,8 +23,8 @@ defaults:
     working-directory: casino-platform
 
 env:
-  # На CI symlinks доступны: включаем bin-links, чтобы работали все package.json-скрипты.
-  # Локально на FAT/sdcard действует .npmrc (bin-links=false), там используются scripts/bin/*.
+  # На CI symlinks доступны: bin-links нужны, чтобы package.json-скрипты резолвили tsc/eslint/nest.
+  # Локально на FAT/sdcard действует .npmrc (bin-links=false) — там вызовы через node <bin>.
   npm_config_bin_links: 'true'
 
 jobs:
@@ -63,8 +67,8 @@ jobs:
           echo "Committing range: ${FROM}..HEAD"
           pnpm exec commitlint --from "${FROM}" --to HEAD
 
-  quality:
-    name: Lint + Typecheck + Test + Build
+  lint-typecheck-test:
+    name: Lint + Typecheck + Test
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -104,6 +108,10 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Prisma generate
         run: pnpm db:generate
+      # Workspace-пакеты → dist ДО lint/typecheck: shared-utils ссылается на собранный
+      # shared-types (TS6305 на свежем дереве), tsconfig.build.json api резолвит @casino/* на dist
+      - name: Build workspace packages
+        run: pnpm --filter @casino/shared-types --filter @casino/shared-utils --filter @casino/shared-config --filter @casino/database build
       - name: Lint
         run: pnpm lint
       - name: Typecheck
@@ -113,9 +121,26 @@ jobs:
       - name: Build
         run: pnpm build
 
+  docker-build:
+    name: Docker build (API)
+    runs-on: ubuntu-latest
+    needs: [lint-typecheck-test]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build API (test)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./casino-platform/infra/docker/api.prod.Dockerfile
+          push: false
+          tags: casino-api:test
+
   deploy:
     name: Deploy to VPS (only after green CI)
-    needs: [secrets-scan, commitlint, quality]
+    needs: [secrets-scan, commitlint, lint-typecheck-test, docker-build]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     steps:

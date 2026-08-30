@@ -18,8 +18,12 @@ import { ProviderCallbackController } from './presentation/controllers/provider-
   imports: [ConfigModule, AuthModule, WalletModule, AdminModule],
   controllers: [CasinoController, ProviderCallbackController, CasinoAdminController],
   providers: [
-    ProviderAdapterFactory, DemoProviderAdapter,
-    GameCallbackService, LaunchGameUseCase, ListGamesUseCase, FavoritesUseCase,
+    ProviderAdapterFactory,
+    DemoProviderAdapter,
+    GameCallbackService,
+    LaunchGameUseCase,
+    ListGamesUseCase,
+    FavoritesUseCase,
   ],
   exports: [ProviderAdapterFactory],
 })

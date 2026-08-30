@@ -16,8 +16,22 @@ import { PaymentRequestRepository } from '../payments/infrastructure/repositorie
 
 @Module({
   imports: [WalletModule],
-  controllers: [AdminAuthController, AdminUsersController, AdminAuditController, AdminAdminsController, AdminFinanceController, AdminDashboardController],
-  providers: [AdminAuthService, AdminAuthGuard, AuditLogService, AdminUsersService, DashboardService, PaymentRequestRepository],
+  controllers: [
+    AdminAuthController,
+    AdminUsersController,
+    AdminAuditController,
+    AdminAdminsController,
+    AdminFinanceController,
+    AdminDashboardController,
+  ],
+  providers: [
+    AdminAuthService,
+    AdminAuthGuard,
+    AuditLogService,
+    AdminUsersService,
+    DashboardService,
+    PaymentRequestRepository,
+  ],
   exports: [AuditLogService, AdminAuthGuard],
 })
 export class AdminModule {}

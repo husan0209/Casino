@@ -15,8 +15,17 @@ export interface AuthProviderView {
 }
 
 export interface IAuthProviderRepository {
-  findByProvider(provider: AuthProviderKind, providerUserId: string): Promise<AuthProviderView | null>
-  create(input: { userId: string; provider: AuthProviderKind; providerUserId?: string | undefined; providerEmail?: string | undefined; providerData?: unknown }): Promise<AuthProviderView>
+  findByProvider(
+    provider: AuthProviderKind,
+    providerUserId: string,
+  ): Promise<AuthProviderView | null>
+  create(input: {
+    userId: string
+    provider: AuthProviderKind
+    providerUserId?: string | undefined
+    providerEmail?: string | undefined
+    providerData?: unknown
+  }): Promise<AuthProviderView>
 }
 
 export const AUTH_PROVIDER_REPOSITORY = Symbol('AUTH_PROVIDER_REPOSITORY')

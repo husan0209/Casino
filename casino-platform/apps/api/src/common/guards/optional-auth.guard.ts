@@ -12,7 +12,9 @@ export class OptionalAuthGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest<Request & { user?: any }>()
     const auth = req.headers.authorization || ''
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
-    if (!token) return true
+    if (!token) {
+      return true
+    }
     try {
       const payload = this.jwt.verifyAccess(token)
       req.user = { id: payload.sub, role: payload.role, sessionId: payload.session_id }

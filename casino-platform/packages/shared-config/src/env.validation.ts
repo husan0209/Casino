@@ -129,8 +129,10 @@ export type Env = z.infer<typeof envSchema>
 export function validateEnv(input: NodeJS.ProcessEnv = process.env): Env {
   const parsed = envSchema.safeParse(input)
   if (!parsed.success) {
-    console.error('❌ Invalid env:', parsed.error.flatten().fieldErrors)
-    throw new Error('Invalid environment variables')
+    const details = parsed.error.flatten().fieldErrors
+    console.error('❌ Invalid env:', details)
+    // Детали в сообщении: иначе при старте прода в логе — головоломка без контекста
+    throw new Error(`Invalid environment variables: ${JSON.stringify(details)}`)
   }
   return parsed.data
 }

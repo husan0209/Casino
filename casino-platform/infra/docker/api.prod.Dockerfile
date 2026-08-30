@@ -6,6 +6,8 @@ COPY packages ./packages
 COPY apps/api ./apps/api
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @casino/database generate
+# Workspace-пакеты → dist (main: dist/index.js) ДО сборки api: tsconfig.build.json резолвит @casino/* на dist
+RUN pnpm --filter @casino/shared-types --filter @casino/shared-utils --filter @casino/shared-config --filter @casino/database build
 RUN pnpm --filter @casino/api build
 
 FROM node:20-alpine

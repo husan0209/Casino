@@ -4,8 +4,11 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { PaymentProviderNotConfiguredError } from '../../../../payments/infrastructure/clients/rukassa.client'
-import { type GameProviderAdapter, type LaunchParams, type ParsedProviderCallback } from '../../../domain/provider-adapter.interface'
-
+import {
+  type GameProviderAdapter,
+  type LaunchParams,
+  type ParsedProviderCallback,
+} from '../../../domain/provider-adapter.interface'
 
 const has = (v: unknown): boolean => v !== null && v !== undefined
 
@@ -34,7 +37,12 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
     const agentId = this.config.get<string>('GITSLOTPARK_AGENT_ID')
     const apiToken = this.config.get<string>('GITSLOTPARK_API_TOKEN')
     const secret = this.config.get<string>('GITSLOTPARK_SECRET_KEY')
-    if (!agentId || !apiToken || !secret) throw new PaymentProviderNotConfiguredError('GitSlotPark', 'GITSLOTPARK_AGENT_ID, GITSLOTPARK_API_TOKEN, GITSLOTPARK_SECRET_KEY')
+    if (!agentId || !apiToken || !secret) {
+      throw new PaymentProviderNotConfiguredError(
+        'GitSlotPark',
+        'GITSLOTPARK_AGENT_ID, GITSLOTPARK_API_TOKEN, GITSLOTPARK_SECRET_KEY',
+      )
+    }
     return { agentId, apiToken, secret }
   }
 
@@ -60,11 +68,15 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
       }),
       signal: AbortSignal.timeout(30_000),
     })
-    if (!res.ok) throw new Error(`userAuth HTTP ${res.status}`)
+    if (!res.ok) {
+      throw new Error(`userAuth HTTP ${res.status}`)
+    }
     const d = (await res.json()) as Record<string, any>
     // ответ: {status:0, game_url|url|launch_url} — парсим defensively
     const url = String(d.game_url ?? d.url ?? d.launch_url ?? '')
-    if (String(d.status ?? '0') !== '0' || !url) throw new Error(`userAuth failed: ${JSON.stringify(d).slice(0, 200)}`)
+    if (String(d.status ?? '0') !== '0' || !url) {
+      throw new Error(`userAuth failed: ${JSON.stringify(d).slice(0, 200)}`)
+    }
     return { url }
   }
 
@@ -72,10 +84,14 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
   async fetchGameList() {
     const { apiToken } = this.creds()
     const base = this.config.get<string>('GITSLOTPARK_API_BASE') || 'https://apiv2.gitslotpark.com'
-    const res = await fetch(`${base}/gamelist?api_token=${encodeURIComponent(apiToken)}`, { signal: AbortSignal.timeout(30_000) })
-    if (!res.ok) throw new Error(`gamelist HTTP ${res.status}`)
+    const res = await fetch(`${base}/gamelist?api_token=${encodeURIComponent(apiToken)}`, {
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (!res.ok) {
+      throw new Error(`gamelist HTTP ${res.status}`)
+    }
     const d = (await res.json()) as any
-    const list: any[] = Array.isArray(d) ? d : d.games ?? d.data ?? []
+    const list: any[] = Array.isArray(d) ? d : (d.games ?? d.data ?? [])
     return list.map((g) => ({
       externalGameId: String(g.gameid ?? g.id ?? g.game_id),
       name: String(g.name ?? g.gameName ?? ''),
@@ -142,8 +158,16 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
       // Seamless-модель: игрок идентифицируется по userID, не по session-token
       playerToken: has(body.userID) ? `uid:${body.userID}` : undefined,
       playerId: has(body.userID) ? String(body.userID) : undefined,
-      betAmount: has(body.amount) ? String(body.amount) : has(body.betAmount) ? String(body.betAmount) : undefined,
-      winAmount: has(body.winAmount) ? String(body.winAmount) : has(body.amount) ? String(body.amount) : undefined,
+      betAmount: has(body.amount)
+        ? String(body.amount)
+        : has(body.betAmount)
+          ? String(body.betAmount)
+          : undefined,
+      winAmount: has(body.winAmount)
+        ? String(body.winAmount)
+        : has(body.amount)
+          ? String(body.amount)
+          : undefined,
       roundId: has(body.roundID) ? String(body.roundID) : undefined,
       transactionId: has(body.transactionID) ? String(body.transactionID) : undefined,
       rollbackTransactionId: has(body.refTransactionID) ? String(body.refTransactionID) : undefined,

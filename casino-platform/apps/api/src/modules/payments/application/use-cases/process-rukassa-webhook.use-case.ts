@@ -21,7 +21,9 @@ export class ProcessRukassaWebhookUseCase {
     const cb = await this.repo.saveCallback({
       provider: 'rukassa',
       externalId: body?.order_id || body?.payment_id,
-      rawHeaders, rawBody, ipAddress: ip
+      rawHeaders,
+      rawBody,
+      ipAddress: ip,
     })
     try {
       if (!this.rukassa.verifyCallback(rawHeaders, body)) {
@@ -30,12 +32,23 @@ export class ProcessRukassaWebhookUseCase {
         return { ok: true }
       }
       const externalId = body.order_id || body.merchant_order_id || body.payment_id
-      if (!externalId) { await this.repo.markCallbackProcessed(cb.id, 'no_external_id'); return { ok: true } }
+      if (!externalId) {
+        await this.repo.markCallbackProcessed(cb.id, 'no_external_id')
+        return { ok: true }
+      }
       // try find by externalId or by payment_request.id
       let pr = await this.repo.findByExternalId(externalId, 'rukassa')
-      if (!pr) pr = await this.repo.findById(externalId)
-      if (!pr) { await this.repo.markCallbackProcessed(cb.id, 'payment_request_not_found'); return { ok: true } }
-      if (pr.status === 'completed') { await this.repo.markCallbackProcessed(cb.id, 'duplicate'); return { ok: true } }
+      if (!pr) {
+        pr = await this.repo.findById(externalId)
+      }
+      if (!pr) {
+        await this.repo.markCallbackProcessed(cb.id, 'payment_request_not_found')
+        return { ok: true }
+      }
+      if (pr.status === 'completed') {
+        await this.repo.markCallbackProcessed(cb.id, 'duplicate')
+        return { ok: true }
+      }
       const status = (body.status || body.state || '').toString()
       const outcome = classifyPaymentStatus(status)
       if (outcome === 'success') {
@@ -47,10 +60,13 @@ export class ProcessRukassaWebhookUseCase {
           type: 'DEPOSIT',
           idempotencyKey: 'deposit_' + pr.id,
           description: 'Пополнение через Rukassa',
-          metadata: { provider: 'rukassa', external_id: externalId }
+          metadata: { provider: 'rukassa', external_id: externalId },
         })
         await this.users.onDepositCompleted(pr.userId, currency, pr.method || 'card')
-        await this.repo.updateStatus(pr.id, 'completed', { completedAt: new Date(), externalStatus: status })
+        await this.repo.updateStatus(pr.id, 'completed', {
+          completedAt: new Date(),
+          externalStatus: status,
+        })
       } else if (outcome === 'failure') {
         await this.repo.updateStatus(pr.id, 'failed', { externalStatus: status })
       } else {
@@ -58,7 +74,7 @@ export class ProcessRukassaWebhookUseCase {
       }
       await this.repo.markCallbackProcessed(cb.id, 'ok')
       return { ok: true }
-    } catch(e:any) {
+    } catch (e: any) {
       this.logger.error('Rukassa webhook err ' + e.message)
       await this.repo.markCallbackProcessed(cb.id, 'error: ' + e.message)
       return { ok: true } // always 200 to provider

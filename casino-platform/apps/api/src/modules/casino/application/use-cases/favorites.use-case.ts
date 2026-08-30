@@ -6,31 +6,36 @@ import { prisma } from '@casino/database'
 @Injectable()
 export class FavoritesUseCase {
   async add(userId: string, slug: string) {
-    const game = await prisma.game.findUnique({ where: { slug }})
-    if (!game) throw new Error('GAME_NOT_FOUND')
+    const game = await prisma.game.findUnique({ where: { slug } })
+    if (!game) {
+      throw new Error('GAME_NOT_FOUND')
+    }
     await prisma.gameFavorite.upsert({
-      where: { userId_gameId: { userId, gameId: game.id }},
+      where: { userId_gameId: { userId, gameId: game.id } },
       update: {},
-      create: { userId, gameId: game.id }
+      create: { userId, gameId: game.id },
     })
     return { ok: true }
   }
   async remove(userId: string, slug: string) {
-    const game = await prisma.game.findUnique({ where: { slug }})
-    if (game) await prisma.gameFavorite.deleteMany({ where: { userId, gameId: game.id }})
+    const game = await prisma.game.findUnique({ where: { slug } })
+    if (game) {
+      await prisma.gameFavorite.deleteMany({ where: { userId, gameId: game.id } })
+    }
     return { ok: true }
   }
-  async list(userId: string, page=1, perPage=24) {
+  async list(userId: string, page = 1, perPage = 24) {
     const [rows, total] = await Promise.all([
       prisma.gameFavorite.findMany({
-        where: { userId, game: { isEnabled: true }},
-        skip: (page-1)*perPage, take: perPage,
+        where: { userId, game: { isEnabled: true } },
+        skip: (page - 1) * perPage,
+        take: perPage,
         orderBy: { createdAt: 'desc' },
-        include: { game: { include: { provider: { select: { slug:true, name:true }}}}}
+        include: { game: { include: { provider: { select: { slug: true, name: true } } } } },
       }),
-      prisma.gameFavorite.count({ where: { userId }})
+      prisma.gameFavorite.count({ where: { userId } }),
     ])
-    return { items: rows.map((r: { game: any })=>r.game), total }
+    return { items: rows.map((r: { game: any }) => r.game), total }
   }
   async recent(userId: string) {
     const sessions = await prisma.gameSession.findMany({
@@ -38,19 +43,26 @@ export class FavoritesUseCase {
       orderBy: { lastActivityAt: 'desc' },
       distinct: ['gameId'],
       take: 20,
-      include: { game: { include: { provider: true }}}
+      include: { game: { include: { provider: true } } },
     })
     return sessions.map((s: { game: any }) => s.game)
   }
-  async history(userId: string, page=1, perPage=20, gameId?: string) {
-    const where:any = { userId }
-    if (gameId) where.gameId = gameId
+  async history(userId: string, page = 1, perPage = 20, gameId?: string) {
+    const where: any = { userId }
+    if (gameId) {
+      where.gameId = gameId
+    }
     const [rounds, total] = await Promise.all([
       prisma.gameRound.findMany({
-        where, skip:(page-1)*perPage, take:perPage, orderBy:{createdAt:'desc'},
-        include: { game: { select: { slug:true, name:true, provider: { select:{ name:true }}}}}
+        where,
+        skip: (page - 1) * perPage,
+        take: perPage,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          game: { select: { slug: true, name: true, provider: { select: { name: true } } } },
+        },
       }),
-      prisma.gameRound.count({ where })
+      prisma.gameRound.count({ where }),
     ])
     const data = rounds.map((r: any) => ({
       round_id: r.id,

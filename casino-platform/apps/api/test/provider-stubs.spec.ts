@@ -1,39 +1,35 @@
-import { Test, TestingModule } from '@nestjs/testing'
-import { ConfigModule, ConfigService } from '@nestjs/config'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { ConfigService } from '@nestjs/config'
+
 import { RukassaClient } from '../src/modules/payments/infrastructure/clients/rukassa.client'
 import { NOWPaymentsClient } from '../src/modules/payments/infrastructure/clients/nowpayments.client'
 import { DemoProviderAdapter } from '../src/modules/casino/infrastructure/providers/demo/demo-provider.adapter'
 import { ProviderAdapterFactory } from '../src/modules/casino/infrastructure/providers/provider-adapter.factory'
 
+/**
+ * Прямое инстанцирование вместо DI (@nestjs/testing): тест проверяет
+ * поведение клиентов, а не сборку зависимостей. Утверждения актуализированы
+ * под fail-closed реализацию (клиенты бросают ошибку отсутствующих ключей
+ * в проде — см. историю PR-0): jest.spyOn → vi.spyOn (проект на vitest).
+ */
 describe('Provider Stubs Security', () => {
-  let app: TestingModule
   let config: ConfigService
   let rukassaClient: RukassaClient
   let nowpaymentsClient: NOWPaymentsClient
   let demoAdapter: DemoProviderAdapter
   let factory: ProviderAdapterFactory
 
-  beforeEach(async () => {
-    app = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-          envFilePath: '.env.test',
-        }),
-      ],
-      providers: [RukassaClient, NOWPaymentsClient, DemoProviderAdapter, ProviderAdapterFactory],
-    }).compile()
-
-    config = app.get(ConfigService)
-    rukassaClient = app.get(RukassaClient)
-    nowpaymentsClient = app.get(NOWPaymentsClient)
-    demoAdapter = app.get(DemoProviderAdapter)
-    factory = app.get(ProviderAdapterFactory)
+  beforeEach(() => {
+    config = new ConfigService()
+    rukassaClient = new RukassaClient(config)
+    nowpaymentsClient = new NOWPaymentsClient(config)
+    demoAdapter = new DemoProviderAdapter(config)
+    factory = new ProviderAdapterFactory(config)
   })
 
   describe('Rukassa Client', () => {
-    it('throws in production when creating payment', async () => {
-      jest.spyOn(config, 'get').mockImplementation((key: string) => {
+    it('fails closed in production when keys are not configured', async () => {
+      vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'production'
         return undefined
       })
@@ -47,22 +43,22 @@ describe('Provider Stubs Security', () => {
           successUrl: 'http://localhost/success',
           failUrl: 'http://localhost/fail',
         }),
-      ).rejects.toThrow('RUKASSA_CREATE_PAYMENT_NOT_IMPLEMENTED')
+      ).rejects.toThrow(/обязательные ключи/)
     })
 
-    it('throws in production when verifying callback', () => {
-      jest.spyOn(config, 'get').mockImplementation((key: string) => {
+    it('fails closed in production when verifying callback without secret', () => {
+      vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'production'
         return undefined
       })
 
       expect(() =>
         rukassaClient.verifyCallback({}, { order_id: '123', amount: '100' }),
-      ).toThrow('RUKASSA_SIGNATURE_VERIFIER_NOT_IMPLEMENTED')
+      ).toThrow(/обязательные ключи/)
     })
 
     it('returns false in development when secret is not configured', () => {
-      jest.spyOn(config, 'get').mockImplementation((key: string) => {
+      vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'development'
         if (key === 'RUKASSA_SECRET_KEY') return undefined
         return undefined
@@ -78,8 +74,8 @@ describe('Provider Stubs Security', () => {
   })
 
   describe('NOWPayments Client', () => {
-    it('throws in production when creating payment', async () => {
-      jest.spyOn(config, 'get').mockImplementation((key: string) => {
+    it('fails closed in production when keys are not configured', async () => {
+      vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'production'
         return undefined
       })
@@ -92,11 +88,11 @@ describe('Provider Stubs Security', () => {
           orderId: 'order_1',
           ipnCallbackUrl: 'http://localhost/webhook',
         }),
-      ).rejects.toThrow('NOWPAYMENTS_CREATE_PAYMENT_NOT_IMPLEMENTED')
+      ).rejects.toThrow(/обязательные ключи/)
     })
 
-    it('throws in production when verifying IPN', () => {
-      jest.spyOn(config, 'get').mockImplementation((key: string) => {
+    it('fails closed in production when verifying IPN without secret', () => {
+      vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'production'
         return undefined
       })
@@ -106,11 +102,11 @@ describe('Provider Stubs Security', () => {
           { order_id: '123', amount: '100' },
           'fake_signature',
         ),
-      ).toThrow('NOWPAYMENTS_SIGNATURE_VERIFIER_NOT_IMPLEMENTED')
+      ).toThrow(/обязательные ключи/)
     })
 
     it('returns false in development when secret is not configured', () => {
-      jest.spyOn(config, 'get').mockImplementation((key: string) => {
+      vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'development'
         if (key === 'NOWPAYMENTS_IPN_SECRET') return undefined
         return undefined
@@ -127,7 +123,7 @@ describe('Provider Stubs Security', () => {
 
   describe('Demo Provider Adapter', () => {
     it('throws in production when verifying callback', () => {
-      jest.spyOn(config, 'get').mockImplementation((key: string) => {
+      vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'production'
         return undefined
       })
@@ -136,7 +132,7 @@ describe('Provider Stubs Security', () => {
     })
 
     it('returns true in development', () => {
-      jest.spyOn(config, 'get').mockImplementation((key: string) => {
+      vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'development'
         return undefined
       })
@@ -148,7 +144,7 @@ describe('Provider Stubs Security', () => {
 
   describe('Provider Adapter Factory', () => {
     it('throws when requesting demo provider in production', () => {
-      jest.spyOn(config, 'get').mockImplementation((key: string) => {
+      vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'production'
         if (key === 'DEMO_PROVIDER_ENABLED') return false
         return undefined
@@ -160,7 +156,7 @@ describe('Provider Stubs Security', () => {
     })
 
     it('throws when demo provider is disabled', () => {
-      jest.spyOn(config, 'get').mockImplementation((key: string) => {
+      vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'development'
         if (key === 'DEMO_PROVIDER_ENABLED') return false
         return undefined
@@ -172,7 +168,7 @@ describe('Provider Stubs Security', () => {
     })
 
     it('returns demo adapter when enabled in development', () => {
-      jest.spyOn(config, 'get').mockImplementation((key: string) => {
+      vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') return 'development'
         if (key === 'DEMO_PROVIDER_ENABLED') return true
         return undefined

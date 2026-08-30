@@ -24,8 +24,19 @@ import { QueuesModule } from './queues/queues.module'
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
-    HealthModule, AuthModule, UsersModule, KycModule, AdminModule, GeoModule,
-    WalletModule, PaymentsModule, CasinoModule, SupportModule, ReferralsModule, NotificationsModule, QueuesModule,
+    HealthModule,
+    AuthModule,
+    UsersModule,
+    KycModule,
+    AdminModule,
+    GeoModule,
+    WalletModule,
+    PaymentsModule,
+    CasinoModule,
+    SupportModule,
+    ReferralsModule,
+    NotificationsModule,
+    QueuesModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },

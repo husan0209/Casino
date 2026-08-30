@@ -38,9 +38,15 @@ export type PaymentOutcome = 'success' | 'failure' | 'unknown'
  * Returns 'unknown' for statuses that don't match the whitelist.
  */
 export function classifyPaymentStatus(rawStatus: string | null | undefined): PaymentOutcome {
-  if (!rawStatus) return 'unknown'
+  if (!rawStatus) {
+    return 'unknown'
+  }
   const normalized = String(rawStatus).trim().toLowerCase()
-  if (SUCCESS_STATUSES.has(normalized)) return 'success'
-  if (FAILURE_STATUSES.has(normalized)) return 'failure'
+  if (SUCCESS_STATUSES.has(normalized)) {
+    return 'success'
+  }
+  if (FAILURE_STATUSES.has(normalized)) {
+    return 'failure'
+  }
   return 'unknown'
 }

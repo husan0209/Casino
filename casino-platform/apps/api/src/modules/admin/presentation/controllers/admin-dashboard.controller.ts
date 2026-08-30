@@ -17,7 +17,10 @@ export class AdminDashboardController {
   // UC-ADMIN-DASH-02
   @Get('charts')
   charts(@Query('period') period?: DashPeriod, @Query('type') type?: 'revenue' | 'registrations') {
-    return this.dashboard.charts(period ?? '7d', type === 'registrations' ? 'registrations' : 'revenue')
+    return this.dashboard.charts(
+      period ?? '7d',
+      type === 'registrations' ? 'registrations' : 'revenue',
+    )
   }
 
   // UC-ADMIN-DASH-03

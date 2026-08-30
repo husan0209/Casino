@@ -20,23 +20,27 @@ export class EmailWorker implements OnModuleDestroy {
   ) {
     const hasRedis = Boolean(config.get<string>('REDIS_URL'))
     const isTest = config.get<string>('NODE_ENV') === 'test'
-    if (!hasRedis || isTest) return
-    this.worker = new Worker<EmailJobData>(
-      QUEUES.EMAIL,
-      async (job) => this.handle(job.data),
-      { connection: queueConnection(config) },
+    if (!hasRedis || isTest) {
+      return
+    }
+    this.worker = new Worker<EmailJobData>(QUEUES.EMAIL, async (job) => this.handle(job.data), {
+      connection: queueConnection(config),
+    })
+    this.worker.on('failed', (job, err) =>
+      this.logger.error(`Email job #${job?.id} failed: ${err.message}`),
     )
-    this.worker.on('failed', (job, err) => this.logger.error(`Email job #${job?.id} failed: ${err.message}`))
     this.logger.log(`Email worker started on queue "${QUEUES.EMAIL}"`)
   }
 
   private async handle(job: EmailJobData) {
     await this.mailer.send({ to: job.to, subject: job.subject, text: job.text, html: job.html })
     if (job.notificationId) {
-      await prisma.notification.update({
-        where: { id: job.notificationId },
-        data: { sentAt: new Date() },
-      }).catch(() => this.logger.warn(`sentAt update failed for ${job.notificationId}`))
+      await prisma.notification
+        .update({
+          where: { id: job.notificationId },
+          data: { sentAt: new Date() },
+        })
+        .catch(() => this.logger.warn(`sentAt update failed for ${job.notificationId}`))
     }
   }
 
