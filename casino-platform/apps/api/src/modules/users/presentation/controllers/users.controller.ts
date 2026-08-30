@@ -27,6 +27,11 @@ import { SelfExclusionUseCase } from '../../application/use-cases/self-exclusion
 import { UpdateCurrencyPreferenceUseCase } from '../../application/use-cases/update-currency-preference.use-case'
 import { UpdateProfileUseCase } from '../../application/use-cases/update-profile.use-case'
 import { UpdateSettingsUseCase } from '../../application/use-cases/update-settings.use-case'
+import {
+  SelfExcludeSchema,
+  UpdateProfileSchema,
+  UpdateSettingsSchema,
+} from '../dto/profile-settings.dto'
 import { UpdateCurrencySchema } from '../dto/update-currency.dto'
 
 @UseGuards(AuthGuard)
@@ -48,6 +53,7 @@ export class UsersController {
   }
 
   @Patch('me/profile')
+  @UsePipes(new ZodValidationPipe(UpdateProfileSchema))
   updateProfileCtl(
     @CurrentUser() user: any,
     @Body()
@@ -63,6 +69,7 @@ export class UsersController {
   }
 
   @Patch('me/settings')
+  @UsePipes(new ZodValidationPipe(UpdateSettingsSchema))
   updateSettingsCtl(
     @CurrentUser() user: any,
     @Body()
@@ -112,6 +119,7 @@ export class UsersController {
    * Body: { period_hours: number } — 0 = permanent, min 24
    */
   @Post('me/self-exclude')
+  @UsePipes(new ZodValidationPipe(SelfExcludeSchema))
   selfExclude(@CurrentUser() user: any, @Body() body: { period_hours: number }) {
     const hours = typeof body.period_hours === 'number' ? body.period_hours : 24
     return this.selfExclusion.exclude(user.id, hours)

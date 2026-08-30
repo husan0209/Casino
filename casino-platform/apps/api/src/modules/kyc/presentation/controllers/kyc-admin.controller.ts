@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards, Inject } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes, Inject } from '@nestjs/common'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { RolesGuard, Roles } from '../../../auth/presentation/guards/roles.guard'
 import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
+import { KycDecisionReasonSchema } from '../dto/kyc.dto'
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
@@ -32,11 +34,13 @@ export class KycAdminController {
     return { ok: true }
   }
   @Post(':id/reject')
+  @UsePipes(new ZodValidationPipe(KycDecisionReasonSchema))
   async reject(@Param('id') id: string, @Body() b: { reason: string }, @CurrentUser() u: any) {
     await this.repo.setStatus(id, 'rejected', b.reason, u.id)
     return { ok: true }
   }
   @Post(':id/request-resubmission')
+  @UsePipes(new ZodValidationPipe(KycDecisionReasonSchema))
   async resubmit(@Param('id') id: string, @Body() b: { reason: string }, @CurrentUser() u: any) {
     await this.repo.setStatus(id, 'requires_resubmission', b.reason, u.id)
     return { ok: true }

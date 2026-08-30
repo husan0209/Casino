@@ -1,15 +1,22 @@
 import { randomUUID } from 'crypto'
 
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
 
 import { prisma } from '@casino/database'
 import { AppError } from '@casino/shared-utils'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { PaymentRequestRepository } from '../../../payments/infrastructure/repositories/payment-request.repository'
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
+import {
+  BatchApproveSchema,
+  BatchRejectSchema,
+  RejectWithdrawalSchema,
+  WalletAdjustSchema,
+} from '../dto/admin-finance.dto'
 
 export class WithdrawalInvalidStatusError extends AppError {
   readonly code = 'WITHDRAWAL_INVALID_STATUS'
@@ -188,6 +195,7 @@ export class AdminFinanceController {
 
   // UC-PAY-12 reject
   @Post('withdrawals/:id/reject')
+  @UsePipes(new ZodValidationPipe(RejectWithdrawalSchema))
   async reject(
     @Param('id') id: string,
     @Body() body: { reason: string },
@@ -200,6 +208,7 @@ export class AdminFinanceController {
 
   // UC-ADMIN-FIN-05 batch approve – каждая заявка обрабатывается независимо (TZ part 6 §6.3)
   @Post('withdrawals/batch-approve')
+  @UsePipes(new ZodValidationPipe(BatchApproveSchema))
   async batchApprove(@Body() body: { ids: string[] }, @CurrentUser() admin: any, @Req() req: any) {
     const failed: Array<{ id: string; error: string }> = []
     let approved = 0
@@ -224,6 +233,7 @@ export class AdminFinanceController {
 
   // UC-ADMIN-FIN-05 batch reject – общая причина, независимая обработка
   @Post('withdrawals/batch-reject')
+  @UsePipes(new ZodValidationPipe(BatchRejectSchema))
   async batchReject(
     @Body() body: { ids: string[]; reason: string },
     @CurrentUser() admin: any,
@@ -257,6 +267,7 @@ export class AdminFinanceController {
 
   // UC-PAY-14 credit
   @Post('wallet/:user_id/credit')
+  @UsePipes(new ZodValidationPipe(WalletAdjustSchema))
   async adminCredit(
     @Param('user_id') userId: string,
     @Body() b: { amount: string; currency: string; reason: string },
@@ -289,6 +300,7 @@ export class AdminFinanceController {
 
   // UC-PAY-15 debit
   @Post('wallet/:user_id/debit')
+  @UsePipes(new ZodValidationPipe(WalletAdjustSchema))
   async adminDebit(
     @Param('user_id') userId: string,
     @Body() b: { amount: string; currency: string; reason: string },

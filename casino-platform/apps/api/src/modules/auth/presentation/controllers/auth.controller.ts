@@ -17,6 +17,7 @@ import { RegisterUseCase } from '../../application/use-cases/register.use-case'
 import { ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case'
 import { VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case'
 import { LoginSchema, type LoginDto } from '../dto/login.dto'
+import { GoogleLoginSchema, TelegramLoginSchema } from '../dto/oauth.dto'
 import { ForgotPasswordSchema, ResetPasswordSchema } from '../dto/password-reset.dto'
 import { RegisterSchema, type RegisterDto } from '../dto/register.dto'
 
@@ -119,6 +120,7 @@ export class AuthController {
   }
 
   @Post('google')
+  @UsePipes(new ZodValidationPipe(GoogleLoginSchema))
   async google(
     @Body() body: { code: string; redirect_uri?: string; state?: string; referral_code?: string },
     @Req() req: Request,
@@ -137,6 +139,7 @@ export class AuthController {
   }
 
   @Post('telegram')
+  @UsePipes(new ZodValidationPipe(TelegramLoginSchema))
   async telegram(
     @Body() payload: Record<string, unknown>,
     @Req() req: Request,

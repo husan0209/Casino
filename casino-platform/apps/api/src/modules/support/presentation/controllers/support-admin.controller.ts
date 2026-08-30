@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, Inject } from '@nestjs/common'
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes, Inject } from '@nestjs/common'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { RolesGuard, Roles } from '../../../auth/presentation/guards/roles.guard'
 import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
@@ -11,6 +12,11 @@ import {
   SUPPORT_REPOSITORY,
   type TicketPriority,
 } from '../../domain/repositories/support.repository'
+import {
+  AddAdminMessageSchema,
+  AssignTicketSchema,
+  SetPrioritySchema,
+} from '../dto/support.dto'
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
@@ -61,6 +67,7 @@ export class SupportAdminController {
   }
 
   @Post('tickets/:id/messages')
+  @UsePipes(new ZodValidationPipe(AddAdminMessageSchema))
   send(
     @CurrentUser() currentUser: { id: string },
     @Param('id') ticketId: string,
@@ -76,12 +83,14 @@ export class SupportAdminController {
   }
 
   @Post('tickets/:id/assign')
+  @UsePipes(new ZodValidationPipe(AssignTicketSchema))
   async assign(@Param('id') ticketId: string, @Body() dto: { admin_id?: string }) {
     await this.supportRepo.assign(ticketId, dto.admin_id || null)
     return { ok: true }
   }
 
   @Patch('tickets/:id/priority')
+  @UsePipes(new ZodValidationPipe(SetPrioritySchema))
   async priority(@Param('id') ticketId: string, @Body() dto: { priority: string }) {
     await this.supportRepo.setPriority(ticketId, dto.priority as TicketPriority)
     return { ok: true }

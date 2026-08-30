@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
 
+import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AdminUsersService } from '../../application/admin-users.service'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
+import { CreateAdminSchema } from '../dto/admin-admins.dto'
 
 function isSuper(req: any) {
   return req.user?.role === 'superadmin'
@@ -19,6 +21,7 @@ export class AdminAdminsController {
     return r.items
   }
   @Post()
+  @UsePipes(new ZodValidationPipe(CreateAdminSchema))
   async create(@Body() body: Record<string, unknown>, @Req() req: any) {
     if (!isSuper(req)) {
       return { success: false, error: { code: 'FORBIDDEN', message: 'superadmin only' } }
