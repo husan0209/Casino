@@ -7,3 +7,4 @@ COPY apps/api ./apps/api
 RUN pnpm install --filter @casino/api...
 RUN pnpm --filter @casino/database generate || true
 CMD ["pnpm","--filter","@casino/api","dev"]
+USER node

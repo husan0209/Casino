@@ -1,8 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common'
 import Decimal from 'decimal.js'
 
-import { GAME_CATALOG_REPOSITORY, GAME_FAVORITES_REPOSITORY } from '../../domain/repositories/casino.repository'
-import type { IGameCatalogRepository, IGameFavoritesRepository } from '../../domain/repositories/casino.repository'
+import {
+  GAME_CATALOG_REPOSITORY,
+  GAME_FAVORITES_REPOSITORY,
+  IGameCatalogRepository,
+  IGameFavoritesRepository,
+} from '../../domain/repositories/casino.repository'
 
 @Injectable()
 export class FavoritesUseCase {
@@ -30,14 +34,8 @@ export class FavoritesUseCase {
 
   async list(userId: string, page = 1, perPage = 24) {
     const [rows, total] = await Promise.all([
-      this.favorites.findWithGame({
-        where: { userId, game: { isEnabled: true } },
-        skip: (page - 1) * perPage,
-        take: perPage,
-        orderBy: { createdAt: 'desc' },
-        include: { game: { include: { provider: { select: { slug: true, name: true } } } } },
-      }),
-      this.favorites.count({ where: { userId } }),
+      this.favorites.findFavorites(userId, (page - 1) * perPage, perPage),
+      this.favorites.countFavorites(userId),
     ])
     return { items: rows.map((r) => r.game), total }
   }
@@ -48,21 +46,9 @@ export class FavoritesUseCase {
   }
 
   async history(userId: string, page = 1, perPage = 20, gameId?: string) {
-    const where: { userId: string; gameId?: string } = { userId }
-    if (gameId) {
-      where.gameId = gameId
-    }
     const [rounds, total] = await Promise.all([
-      this.favorites.findRounds({
-        where,
-        skip: (page - 1) * perPage,
-        take: perPage,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          game: { select: { slug: true, name: true, provider: { select: { name: true } } } },
-        },
-      }),
-      this.favorites.countRounds(where),
+      this.favorites.findRoundsWithGame(userId, gameId, (page - 1) * perPage, perPage),
+      this.favorites.countRounds(userId, gameId),
     ])
     const data = rounds.map((r) => ({
       round_id: r.id,

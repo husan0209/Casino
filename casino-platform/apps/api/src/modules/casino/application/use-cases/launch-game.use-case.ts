@@ -11,7 +11,6 @@ import {
   GameNotFoundError,
   ProviderDisabledError,
 } from '../../domain/errors'
-import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 import {
   GAME_CATALOG_REPOSITORY,
   GAME_PLAY_REPOSITORY,
@@ -19,6 +18,7 @@ import {
   type IGameCatalogRepository,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
+import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 
 interface LaunchGameInput {
   userId?: string | null

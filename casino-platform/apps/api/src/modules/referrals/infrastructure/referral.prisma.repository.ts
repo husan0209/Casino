@@ -8,7 +8,7 @@ import {
   type IReferralRepository,
   type ReferredUserRow,
   type ReferralRewardRow,
-} from '../../domain/referral.repository'
+} from '../domain/referral.repository'
 
 @Injectable()
 export class PrismaReferralRepository implements IReferralRepository {

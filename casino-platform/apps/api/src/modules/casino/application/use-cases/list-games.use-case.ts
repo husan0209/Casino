@@ -1,8 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common'
 
+import { GAME_CATALOG_REPOSITORY, type IGameCatalogRepository } from '../../domain/repositories/casino.repository'
+
 import type { Prisma } from '@prisma/client'
 
-import { GAME_CATALOG_REPOSITORY, type IGameCatalogRepository } from '../../domain/repositories/casino.repository'
 
 interface CatalogQuery {
   page?: string
@@ -68,13 +69,14 @@ export class ListGamesUseCase {
   private buildWhere(q: CatalogQuery): Prisma.GameWhereInput {
     const where: Prisma.GameWhereInput = { isEnabled: true, provider: { isEnabled: true } }
     if (q.category) {
-      where.category = q.category
+      where.category = q.category as never
     }
     if (q.type) {
-      where.type = q.type
+      where.type = q.type as never
     }
     if (q.provider) {
-      where.provider = { ...where.provider, slug: q.provider }
+      const provider: Prisma.GameProviderWhereInput = { ...where.provider, slug: q.provider }
+      where.provider = provider
     }
     if (q.is_featured === 'true') {
       where.isFeatured = true

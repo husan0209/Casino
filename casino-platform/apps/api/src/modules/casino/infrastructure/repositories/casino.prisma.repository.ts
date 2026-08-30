@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
 import { prisma } from '@casino/database'
-import type { Prisma } from '@prisma/client'
 
 import {
   type IGameCatalogRepository,
@@ -13,8 +12,13 @@ import {
   type GameRow,
   type GameTransactionRow,
   type RecentSessionRow,
+  type FavoriteWithGame,
+  type RoundHistoryRow,
   type GameCatalogQuery,
 } from '../../domain/repositories/casino.repository'
+
+import type { Prisma } from '@prisma/client'
+
 
 @Injectable()
 export class PrismaGameCatalogRepository implements IGameCatalogRepository {
@@ -57,24 +61,18 @@ export class PrismaGameFavoritesRepository implements IGameFavoritesRepository {
     await prisma.gameFavorite.deleteMany({ where: { userId, gameId } })
   }
 
-  findWithGame<I extends Prisma.GameFavoriteInclude>(query: {
-    where: Prisma.GameFavoriteWhereInput
-    skip: number
-    take: number
-    orderBy: Prisma.GameFavoriteOrderByWithRelationInput
-    include: I
-  }): Promise<Prisma.GameFavoriteGetPayload<{ include: I }>[]> {
+  findFavorites(userId: string, skip: number, take: number): Promise<FavoriteWithGame[]> {
     return prisma.gameFavorite.findMany({
-      where: query.where,
-      skip: query.skip,
-      take: query.take,
-      orderBy: query.orderBy,
-      include: query.include,
+      where: { userId, game: { isEnabled: true } },
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' },
+      include: { game: { include: { provider: { select: { slug: true, name: true } } } } },
     })
   }
 
-  count(where: Prisma.GameFavoriteWhereInput): Promise<number> {
-    return prisma.gameFavorite.count({ where })
+  countFavorites(userId: string): Promise<number> {
+    return prisma.gameFavorite.count({ where: { userId } })
   }
 
   findRecentSessions(userId: string, take: number): Promise<RecentSessionRow[]> {
@@ -87,24 +85,25 @@ export class PrismaGameFavoritesRepository implements IGameFavoritesRepository {
     })
   }
 
-  findRounds<I extends Prisma.GameRoundInclude>(query: {
-    where: Prisma.GameRoundWhereInput
-    skip: number
-    take: number
-    orderBy: Prisma.GameRoundOrderByWithRelationInput
-    include: I
-  }): Promise<Prisma.GameRoundGetPayload<{ include: I }>[]> {
+  findRoundsWithGame(
+    userId: string,
+    gameId: string | undefined,
+    skip: number,
+    take: number,
+  ): Promise<RoundHistoryRow[]> {
     return prisma.gameRound.findMany({
-      where: query.where,
-      skip: query.skip,
-      take: query.take,
-      orderBy: query.orderBy,
-      include: query.include,
+      where: { userId, ...(gameId ? { gameId } : {}) },
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        game: { select: { slug: true, name: true, provider: { select: { name: true } } } },
+      },
     })
   }
 
-  countRounds(where: Prisma.GameRoundWhereInput): Promise<number> {
-    return prisma.gameRound.count({ where })
+  countRounds(userId: string, gameId?: string): Promise<number> {
+    return prisma.gameRound.count({ where: { userId, ...(gameId ? { gameId } : {}) } })
   }
 }
 

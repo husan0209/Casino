@@ -1,18 +1,26 @@
 import { Injectable } from '@nestjs/common'
 
 import { prisma } from '@casino/database'
-import type { Prisma } from '@prisma/client'
 
 import {
   type CreateNotificationInput,
   type INotificationRepository,
   type NotificationRow,
-} from '../../domain/notification.repository'
+} from '../domain/notification.repository'
+
+import type { Prisma } from '@prisma/client'
+
 
 @Injectable()
 export class PrismaNotificationRepository implements INotificationRepository {
   create(data: CreateNotificationInput): Promise<NotificationRow> {
-    return prisma.notification.create({ data })
+    return prisma.notification.create({
+      data: {
+        ...data,
+        type: data.type as never,
+        channel: data.channel as never,
+      },
+    })
   }
 
   async markSent(id: string, sentAt: Date): Promise<void> {

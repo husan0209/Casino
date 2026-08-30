@@ -8,8 +8,6 @@ import {
   GAME_PLAY_REPOSITORY,
   type GameRow,
   type GameSessionWithGame,
-  type GameSessionWithUser,
-  type GameTransactionRow,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
 

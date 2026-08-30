@@ -15,6 +15,7 @@ import type {
   GameTransaction,
   User,
 } from '@prisma/client'
+import type { Decimal } from 'decimal.js'
 
 export type GameWithProvider = Game & { provider: GameProvider }
 export type GameSessionWithUser = GameSession & { user: User }
@@ -42,28 +43,37 @@ export interface IGameCatalogRepository {
 
 export const GAME_CATALOG_REPOSITORY = Symbol('GAME_CATALOG_REPOSITORY')
 
+export interface FavoriteWithGame {
+  id: string
+  createdAt: Date
+  game: Game & { provider: { slug: string; name: string } }
+}
+
+export interface RoundHistoryRow {
+  id: string
+  currency: string
+  totalBet: Decimal
+  totalWin: Decimal
+  status: string
+  createdAt: Date
+  game: { slug: string; name: string; provider: { name: string } }
+}
+
 /** Избранное и история игрока. */
 export interface IGameFavoritesRepository {
   upsert(userId: string, gameId: string): Promise<void>
   remove(userId: string, gameId: string): Promise<void>
-  findWithGame<I extends Prisma.GameFavoriteInclude>(query: {
-    where: Prisma.GameFavoriteWhereInput
-    skip: number
-    take: number
-    orderBy: Prisma.GameFavoriteOrderByWithRelationInput
-    include: I
-  }): Promise<Prisma.GameFavoriteGetPayload<{ include: I }>[]>
-  count(where: Prisma.GameFavoriteWhereInput): Promise<number>
+  findFavorites(userId: string, skip: number, take: number): Promise<FavoriteWithGame[]>
+  countFavorites(userId: string): Promise<number>
   /** Последние уникальные игры игрока (distinct по gameId, только реальные сессии). */
   findRecentSessions(userId: string, take: number): Promise<RecentSessionRow[]>
-  findRounds<I extends Prisma.GameRoundInclude>(query: {
-    where: Prisma.GameRoundWhereInput
-    skip: number
-    take: number
-    orderBy: Prisma.GameRoundOrderByWithRelationInput
-    include: I
-  }): Promise<Prisma.GameRoundGetPayload<{ include: I }>[]>
-  countRounds(where: Prisma.GameRoundWhereInput): Promise<number>
+  findRoundsWithGame(
+    userId: string,
+    gameId: string | undefined,
+    skip: number,
+    take: number,
+  ): Promise<RoundHistoryRow[]>
+  countRounds(userId: string, gameId?: string): Promise<number>
 }
 
 export const GAME_FAVORITES_REPOSITORY = Symbol('GAME_FAVORITES_REPOSITORY')

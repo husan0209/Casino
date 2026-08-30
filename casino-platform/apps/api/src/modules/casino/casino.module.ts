@@ -13,13 +13,13 @@ import {
   GAME_FAVORITES_REPOSITORY,
   GAME_PLAY_REPOSITORY,
 } from './domain/repositories/casino.repository'
+import { DemoProviderAdapter } from './infrastructure/providers/demo/demo-provider.adapter'
+import { ProviderAdapterFactory } from './infrastructure/providers/provider-adapter.factory'
 import {
   PrismaGameCatalogRepository,
   PrismaGameFavoritesRepository,
   PrismaGamePlayRepository,
 } from './infrastructure/repositories/casino.prisma.repository'
-import { DemoProviderAdapter } from './infrastructure/providers/demo/demo-provider.adapter'
-import { ProviderAdapterFactory } from './infrastructure/providers/provider-adapter.factory'
 import { CasinoAdminController } from './presentation/controllers/casino-admin.controller'
 import { CasinoController } from './presentation/controllers/casino.controller'
 import { ProviderCallbackController } from './presentation/controllers/provider-callback.controller'
