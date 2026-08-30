@@ -6,3 +6,4 @@ COPY packages ./packages
 COPY apps/web ./apps/web
 RUN pnpm install --filter @casino/web...
 CMD ["pnpm","--filter","@casino/web","dev"]
+USER node

@@ -8,8 +8,11 @@ export const emailTemplates = {
   password_reset: (link: string) => `Сброс пароля: ${link}`,
   kyc_approved: () => `Верификация пройдена!`,
   kyc_rejected: (reason: string) => `KYC отклонён: ${reason}`,
-  deposit_completed: (amount: string, currency: string) => `Баланс пополнен на ${amount} ${currency}`,
-  withdrawal_completed: (amount: string, currency: string) => `Вывод ${amount} ${currency} обработан`,
+  deposit_completed: (amount: string, currency: string) =>
+    `Баланс пополнен на ${amount} ${currency}`,
+  withdrawal_completed: (amount: string, currency: string) =>
+    `Вывод ${amount} ${currency} обработан`,
   support_reply: (ticketId: string) => `Ответ по обращению #${ticketId}`,
-  referral_reward: (amount: string, currency: string) => `Реферальное вознаграждение ${amount} ${currency}`,
+  referral_reward: (amount: string, currency: string) =>
+    `Реферальное вознаграждение ${amount} ${currency}`,
 }

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Shim: resolves commitlint from node_modules without symlinks
+PLAT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+exec node "$PLAT/node_modules/@commitlint/cli/lib/cli.js" "$@"

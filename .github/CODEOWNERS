@@ -1,0 +1,9 @@
+# Default: tech lead approves everything
+* @husan0209
+
+# Critical paths require extra review
+/casino-platform/apps/api/src/modules/payments/ @husan0209
+/apps/api/src/modules/wallet/   @husan0209
+/apps/api/src/modules/auth/     @husan0209
+/infra/                         @husan0209
+/packages/database/prisma/      @husan0209

@@ -1,5 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { USER_PROFILE_REPOSITORY, IUserProfileRepository } from '../../domain/repositories/user-profile.repository'
+
+import {
+  USER_PROFILE_REPOSITORY,
+  IUserProfileRepository,
+} from '../../domain/repositories/user-profile.repository'
+
 @Injectable()
 export class UpdateSettingsUseCase {
   constructor(@Inject(USER_PROFILE_REPOSITORY) private repo: IUserProfileRepository) {}

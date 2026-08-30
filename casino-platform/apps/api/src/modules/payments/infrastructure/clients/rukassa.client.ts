@@ -1,6 +1,8 @@
+import { createHmac, timingSafeEqual } from 'crypto'
+
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { createHmac, timingSafeEqual } from 'crypto'
+
 import { AppError } from '@casino/shared-utils'
 
 export class PaymentProviderNotConfiguredError extends AppError {
@@ -12,7 +14,12 @@ export class PaymentProviderNotConfiguredError extends AppError {
 }
 
 export interface RukassaCreatePayment {
-  amount: string; orderId: string; method?: string; webhookUrl: string; successUrl: string; failUrl: string
+  amount: string
+  orderId: string
+  method?: string
+  webhookUrl: string
+  successUrl: string
+  failUrl: string
 }
 
 const TIMEOUT_MS = 30_000 // TZ part 3 §5.3
@@ -33,19 +40,32 @@ export class RukassaClient {
   private readonly logger = new Logger(RukassaClient.name)
   constructor(private config: ConfigService) {}
 
-  private isProd(): boolean { return this.config.get<string>('NODE_ENV') === 'production' }
+  private isProd(): boolean {
+    return this.config.get<string>('NODE_ENV') === 'production'
+  }
 
   private assertConfigured(): { base: string; shopId: string; apiKey: string } {
     const shopId = this.config.get<string>('RUKASSA_SHOP_ID')
     const apiKey = this.config.get<string>('RUKASSA_API_KEY')
-    if (!shopId || !apiKey) throw new PaymentProviderNotConfiguredError('Rukassa', 'RUKASSA_SHOP_ID, RUKASSA_API_KEY')
-    return { base: this.config.get<string>('RUKASSA_API_BASE') || 'https://pay.rukassa.is', shopId, apiKey }
+    if (!shopId || !apiKey) {
+      throw new PaymentProviderNotConfiguredError('Rukassa', 'RUKASSA_SHOP_ID, RUKASSA_API_KEY')
+    }
+    return {
+      base: this.config.get<string>('RUKASSA_API_BASE') || 'https://pay.rukassa.is',
+      shopId,
+      apiKey,
+    }
   }
 
-  async createPayment(params: RukassaCreatePayment): Promise<{ paymentId: string; paymentUrl: string }> {
+  async createPayment(
+    params: RukassaCreatePayment,
+  ): Promise<{ paymentId: string; paymentUrl: string }> {
     if (!this.isProd() && !this.config.get<string>('RUKASSA_SHOP_ID')) {
       this.logger.log(`Rukassa DEV-STUB create ${params.amount} RUB order=${params.orderId}`)
-      return { paymentId: `rk_${params.orderId}`, paymentUrl: `${params.successUrl}&stub=rukassa&order=${params.orderId}` }
+      return {
+        paymentId: `rk_${params.orderId}`,
+        paymentUrl: `${params.successUrl}&stub=rukassa&order=${params.orderId}`,
+      }
     }
     const { base, shopId, apiKey } = this.assertConfigured()
     try {
@@ -63,11 +83,15 @@ export class RukassaClient {
         }),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
+      }
       const data = (await res.json()) as Record<string, any>
       const paymentId = String(data.payment_id ?? data.id ?? data.order_id ?? '')
       const paymentUrl = String(data.payment_url ?? data.url ?? data.location ?? '')
-      if (!paymentId || !paymentUrl) throw new Error(`unexpected response shape: ${JSON.stringify(data).slice(0, 200)}`)
+      if (!paymentId || !paymentUrl) {
+        throw new Error(`unexpected response shape: ${JSON.stringify(data).slice(0, 200)}`)
+      }
       this.logger.log(`Rukassa order created: ${paymentId}`)
       return { paymentId, paymentUrl }
     } catch (e: any) {
@@ -78,15 +102,22 @@ export class RukassaClient {
   }
 
   async getPaymentStatus(paymentId: string): Promise<{ status: string; amount: string }> {
-    if (!this.config.get<string>('RUKASSA_SHOP_ID')) return { status: 'unknown', amount: '0' }
+    if (!this.config.get<string>('RUKASSA_SHOP_ID')) {
+      return { status: 'unknown', amount: '0' }
+    }
     const { base, shopId, apiKey } = this.assertConfigured()
     const res = await fetch(`${base}/api/v1/order/status/${encodeURIComponent(paymentId)}`, {
       headers: { shop_id: shopId, api_key: apiKey },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`)
+    }
     const d = (await res.json()) as Record<string, any>
-    return { status: String(d.status ?? d.payment_status ?? 'unknown'), amount: String(d.amount ?? '0') }
+    return {
+      status: String(d.status ?? d.payment_status ?? 'unknown'),
+      amount: String(d.amount ?? '0'),
+    }
   }
 
   /**
@@ -96,12 +127,19 @@ export class RukassaClient {
   verifyCallback(headers: Record<string, string>, body: any): boolean {
     const secret = this.config.get<string>('RUKASSA_SECRET_KEY')
     if (!secret) {
-      if (this.isProd()) throw new PaymentProviderNotConfiguredError('Rukassa', 'RUKASSA_SECRET_KEY')
+      if (this.isProd()) {
+        throw new PaymentProviderNotConfiguredError('Rukassa', 'RUKASSA_SECRET_KEY')
+      }
       this.logger.error('RUKASSA_SECRET_KEY not set — rejecting callback (fail-closed dev)')
       return false
     }
-    const receivedSig: string = headers['x-signature'] || body?.sign || ''
-    if (!receivedSig) return false
+    // Signature MUST come from the header only. Reading `body.sign` would
+    // let an attacker bypass the signature check by simply including a
+    // pre-computed `sign` field in the payload.
+    const receivedSig: string = headers['x-signature'] || ''
+    if (!receivedSig) {
+      return false
+    }
 
     const shopId = this.config.get('RUKASSA_SHOP_ID') || ''
     const orderId = String(body?.order_id || body?.merchant_order_id || '')

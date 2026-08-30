@@ -1,3 +1,16 @@
 #!/bin/sh
+ROOT="$(git rev-parse --show-toplevel)"
+PLAT="$ROOT/casino-platform"
+cd "$PLAT" || exit 1
 
-pnpm typecheck && pnpm test
+# FAT/sdcard: shims are not executable, pnpm scripts can't resolve
+# bare `tsc`/`vitest` — skip gracefully; CI enforces these checks.
+if [ ! -x "$PLAT/scripts/bin/tsc" ] && ! command -v tsc >/dev/null 2>&1; then
+  echo "SKIP: pre-push checks skipped (FAT/sdcard filesystem). CI enforces typecheck + tests."
+  exit 0
+fi
+
+echo "Running typecheck..."
+pnpm typecheck || exit 1
+echo "Running tests..."
+pnpm test || exit 1

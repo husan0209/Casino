@@ -3,7 +3,7 @@ title: Module Template
 description: Пошаговый чеклист создания нового backend модуля (NestJS, 4-layer структура)
 audience: AI agents + разработчики
 status: living document
-last_updated: 2026-06-19
+last_updated: 2026-08-28
 ---
 
 # Module Template
@@ -25,7 +25,7 @@ last_updated: 2026-06-19
 -   [ ] Прочитан [ARCHITECTURE.md](./ARCHITECTURE.md) §5 — 4 слоя и их зависимости
 -   [ ] Проверены `packages/shared-types/src/` — какие enum/types уже есть (не дублировать)
 -   [ ] Проверены `packages/shared-utils/src/` — какие helpers есть (money, error, etc.)
--   [ ] Проверены `packages/database/prisma/schema/` — какие таблицы уже есть
+-   [ ] Проверены `packages/database/prisma/schema.prisma` — какие таблицы уже есть
 
 **Если хотя бы один пункт неясен — спроси пользователя ДО начала работы.**
 
@@ -110,7 +110,7 @@ apps/api/src/modules/<module-name>/
 
 ### 3.1. Где
 
-`packages/database/prisma/schema/<area>.prisma` — schema разделена по доменам (users.prisma, wallet.prisma, casino.prisma и т.д.).
+`packages/database/prisma/schema.prisma` — единый файл схемы (все домены в одном файле).
 
 ### 3.2. Что указать в каждой модели
 
@@ -195,7 +195,7 @@ export enum XxxStatus {
 }
 ```
 
-⚠️ Если enum нужен **более чем одному модулю** — вынести в `packages/shared-types/src/enums/`.
+⚠️ Если enum нужен **более чем одному модулю** — вынести в `packages/shared-types/src/enums.ts`.
 
 ### 4.4. Errors
 
@@ -349,12 +349,14 @@ export const CreditXxxInputSchema = z.object({
 
 ### 5.4. События модуля
 
+> ⚠️ **Реальность кода:** центральный EventBus пока не реализован. Межмодульная асинхронщина — BullMQ-очереди (`apps/api/src/queues/queue.types.ts`). Раздел ниже — конвенция на будущее.
+
 Файл: `application/events/<module-name>.events.ts`
 
 ```typescript
 import { EventTypes } from '../../../events/events'
 
-// Re-export из центрального events.ts
+// Re-export из центрального events.ts (когда будет введён EventBus)
 // Handler регистрируется в модуле:
 @Injectable()
 export class XxxEventHandler {
@@ -675,7 +677,7 @@ describe('CreditXxxUseCase', () => {
 После создания модуля:
 
 -   [ ] Добавить модуль в карту в [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md) § 1 и § 15 (dependency graph)
--   [ ] Добавить новые события в `apps/api/src/events/events.ts` (если есть)
+-   [ ] Если модуль ставит задачи в очередь — добавить тип job в `apps/api/src/queues/queue.types.ts`
 -   [ ] Добавить новые типы в `packages/shared-types/` (если типы cross-module)
 -   [ ] Добавить новые endpoints в [API_CONVENTIONS.md](./API_CONVENTIONS.md) (если публичные)
 -   [ ] Обновить `apps/api/src/modules/<module-name>/README.md` если менялся use case список
@@ -700,14 +702,14 @@ describe('CreditXxxUseCase', () => {
 ```
 packages/
   shared-types/src/
-    enums/                    ← enum если нужен > 1 модулю
+    enums.ts                  ← enum если нужен > 1 модулю
     money.ts                  ← MoneyAmount type
     api-responses.ts          ← ApiResponse, successResponse, errorResponse
   shared-utils/src/
     errors/                   ← AppError abstract class
     money.ts                  ← money helpers (add/sub/mul/div)
-  database/prisma/schema/
-    <area>.prisma             ← модели модуля
+  database/prisma/
+    schema.prisma             ← модели модуля (единый файл)
 
 apps/api/src/modules/<module-name>/
   domain/                    ← ТОЛЬКО бизнес (no I/O)
@@ -718,9 +720,9 @@ apps/api/src/modules/<module-name>/
   README.md                  ← описание модуля (+ UC список)
   __tests__/                 ← vitest unit tests
 
-apps/api/src/events/
-  events.ts                  ← все EventTypes + EventPayloads
-  event-bus.ts               ← глобальный EventBus
+apps/api/src/queues/
+  queue.types.ts             ← токены очередей + типы job (BullMQ)
+  queues.module.ts           ← регистрация очередей
 
 docs/
   MODULE_BOUNDARIES.md       ← карта модулей (обновить!)

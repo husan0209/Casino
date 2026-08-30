@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common'
+
 import { UsersFacade } from '../../../users/facade/users.facade'
 import { resolveGeoConfig } from '../../domain/geo-config.policy'
 
 export interface ResolveGeoInput {
-  hostname?: string
+  hostname?: string | undefined
   countryCode?: string | null
   userId?: string | null
 }

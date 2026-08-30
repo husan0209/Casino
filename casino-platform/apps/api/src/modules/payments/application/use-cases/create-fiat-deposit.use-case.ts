@@ -1,18 +1,17 @@
-import { Injectable } from '@nestjs/common'
 import { randomUUID } from 'crypto'
-import { money } from '@casino/shared-utils'
-import type { DisplayCurrency } from '@casino/shared-config'
-import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
-import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
-import { KycCheckService } from '../../../kyc/application/use-cases/kyc-check.service'
-import {
-  AmountTooLargeError,
-  AmountTooSmallError,
-  PaymentProviderError,
-} from '../../domain/errors'
+
+import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+
+import type { DisplayCurrency } from '@casino/shared-config'
+import { money } from '@casino/shared-utils'
+
 import { GeoFacade } from '../../../geo/facade/geo.facade'
+import { KycCheckService } from '../../../kyc/application/use-cases/kyc-check.service'
 import { UsersFacade } from '../../../users/facade/users.facade'
+import { AmountTooLargeError, AmountTooSmallError, PaymentProviderError } from '../../domain/errors'
+import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
+import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 
 export interface CreateFiatDepositInput {
   amount: string
@@ -63,8 +62,11 @@ export class CreateFiatDepositUseCase {
       expiresAt: new Date(Date.now() + 2 * 3600 * 1000),
     })
 
-    const webhookUrl = this.config.get('RUKASSA_WEBHOOK_URL') || 'http://localhost:3001/api/v1/payments/webhooks/rukassa'
-    const successUrl = this.config.get('RUKASSA_SUCCESS_URL') || 'http://localhost:3000/?deposit=success'
+    const webhookUrl =
+      this.config.get('RUKASSA_WEBHOOK_URL') ||
+      'http://localhost:3001/api/v1/payments/webhooks/rukassa'
+    const successUrl =
+      this.config.get('RUKASSA_SUCCESS_URL') || 'http://localhost:3000/?deposit=success'
     const failUrl = this.config.get('RUKASSA_FAIL_URL') || 'http://localhost:3000/?deposit=failed'
 
     try {
@@ -76,7 +78,10 @@ export class CreateFiatDepositUseCase {
         successUrl,
         failUrl,
       })
-      await this.repo.updateStatus(pr.id, 'pending', { externalId: res.paymentId, paymentUrl: res.paymentUrl })
+      await this.repo.updateStatus(pr.id, 'pending', {
+        externalId: res.paymentId,
+        paymentUrl: res.paymentUrl,
+      })
       return { payment_request_id: pr.id, payment_url: res.paymentUrl, currency, method }
     } catch (e: any) {
       await this.repo.updateStatus(pr.id, 'failed', { errorMessage: e.message })

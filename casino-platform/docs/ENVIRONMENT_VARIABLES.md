@@ -2,7 +2,7 @@
 title: Environment Variables
 description: Все env-переменные casino-platform: группы, дефолты, валидация
 status: living document
-last_updated: 2026-06-19
+last_updated: 2026-08-28
 ---
 
 # Environment Variables
@@ -28,7 +28,7 @@ last_updated: 2026-06-19
 ### 1.3. Валидация при старте
 
 ```typescript
-// apps/api/src/config/env.validation.ts
+// packages/shared-config/src/env.validation.ts
 import { z } from 'zod'
 
 const envSchema = z.object({
@@ -86,7 +86,6 @@ export function validateEnv() {
 | `DATABASE_URL` | URL | ✅ | — | `postgresql://user:pass@host:5432/db` |
 | `DB_POOL_SIZE` | int | ❌ | `10` | Prisma connection pool |
 | `DB_LOG_QUERIES` | bool | ❌ | `false` | Логировать все SQL запросы (только dev) |
-| `DB_MIGRATE_ON_START` | bool | ❌ | `false` | Auto-migrate при старте (НЕ для prod) |
 
 **Генерация DATABASE_URL:**
 
@@ -154,7 +153,7 @@ openssl rand -hex 64
 | `RUKASSA_SHOP_ID` | string | ✅ | — | Shop ID |
 | `RUKASSA_API_KEY` | string | ✅ | — | API key |
 | `RUKASSA_SECRET_KEY` | string | ✅ | — | HMAC secret |
-| `RUKASSA_API_URL` | URL | ❌ | `https://lk.rukassa.is/api/v1` | API base |
+| `RUKASSA_API_BASE` | URL | ❌ | `https://pay.rukassa.is` | База API (клиент дописывает `/api/v1/...`) |
 | `RUKASSA_WEBHOOK_URL` | URL | ✅ | — | Public URL для callback |
 | `RUKASSA_SUCCESS_URL` | URL | ✅ | — | Redirect после успеха |
 | `RUKASSA_FAIL_URL` | URL | ✅ | — | Redirect после неудачи |
@@ -171,7 +170,7 @@ openssl rand -hex 64
 |----------|------|----------|---------|-------------|
 | `NOWPAYMENTS_API_KEY` | string | ✅ | — | API key |
 | `NOWPAYMENTS_IPN_SECRET` | string | ✅ | — | HMAC secret для IPN |
-| `NOWPAYMENTS_API_URL` | URL | ❌ | `https://api.nowpayments.io/v1` | API base |
+| `NOWPAYMENTS_API_BASE` | URL | ❌ | `https://api.nowpayments.io/v1` | API base |
 | `NOWPAYMENTS_WEBHOOK_URL` | URL | ✅ | — | Public URL для IPN |
 
 ---
@@ -304,7 +303,17 @@ Frontend env доступны после `NEXT_PUBLIC_` prefix. Все оста�
 
 ---
 
-## 21. Полный `.env.example`
+## 21. Casino Demo Provider
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `DEMO_PROVIDER_ENABLED` | bool | ❌ | `false` (не задана) | Включить DemoProvider. Dev/staging only; в production должен быть выключен — см. README «Payment security (fail-closed)» |
+
+Код: `apps/api/src/modules/casino/infrastructure/providers/provider-adapter.factory.ts`.
+
+---
+
+## 22. Полный `.env.example`
 
 ```bash
 # ── Application ────────────────────────────────────────────
@@ -318,7 +327,6 @@ DOMAIN=localhost
 DATABASE_URL=postgresql://casino:casino_dev_password@localhost:5432/casino_dev
 DB_POOL_SIZE=10
 DB_LOG_QUERIES=false
-DB_MIGRATE_ON_START=true
 
 # ── Redis ──────────────────────────────────────────────────
 REDIS_URL=redis://:casino_dev_password@localhost:6379
@@ -329,6 +337,9 @@ JWT_ACCESS_SECRET=replace_with_64_chars_random_for_development_use_only
 JWT_REFRESH_SECRET=replace_with_another_64_chars_random_for_development_use_only
 JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=30d
+JWT_ISSUER=casino-platform
+JWT_AUDIENCE_USER=user
+JWT_AUDIENCE_ADMIN=admin
 
 # ── Google OAuth ───────────────────────────────────────────
 GOOGLE_CLIENT_ID=your_dev_client_id
@@ -343,7 +354,6 @@ TELEGRAM_BOT_NAME=your_dev_bot
 RUKASSA_SHOP_ID=dev_shop_id
 RUKASSA_API_KEY=dev_api_key
 RUKASSA_SECRET_KEY=dev_secret_key
-RUKASSA_API_URL=https://lk.rukassa.is/api/v1
 RUKASSA_WEBHOOK_URL=http://localhost:3001/api/v1/payments/webhooks/rukassa
 RUKASSA_SUCCESS_URL=http://localhost:3000/wallet?deposit=success
 RUKASSA_FAIL_URL=http://localhost:3000/wallet?deposit=failed
@@ -351,8 +361,11 @@ RUKASSA_FAIL_URL=http://localhost:3000/wallet?deposit=failed
 # ── NOWPayments ────────────────────────────────────────────
 NOWPAYMENTS_API_KEY=dev_nowpayments_key
 NOWPAYMENTS_IPN_SECRET=dev_ipn_secret
-NOWPAYMENTS_API_URL=https://api.nowpayments.io/v1
 NOWPAYMENTS_WEBHOOK_URL=http://localhost:3001/api/v1/payments/webhooks/nowpayments
+# NOWPAYMENTS_API_BASE=https://api.nowpayments.io/v1  # опционально: дефолт в коде
+
+# ── Casino & Game Providers ─────────────────────────────────
+DEMO_PROVIDER_ENABLED=true
 
 # ── SMTP ───────────────────────────────────────────────────
 SMTP_HOST=smtp.resend.com

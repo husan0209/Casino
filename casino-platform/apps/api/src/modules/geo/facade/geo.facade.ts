@@ -1,4 +1,11 @@
 import { Injectable } from '@nestjs/common'
+
+import type { DisplayCurrency, LegalCountry } from '@casino/shared-config'
+
+import {
+  GetGeoConfigUseCase,
+  type ResolveGeoInput,
+} from '../application/use-cases/get-geo-config.use-case'
 import {
   assertFiatDepositMethod,
   convertRubToDisplayAmount,
@@ -6,8 +13,6 @@ import {
   resolveLegalCountryForUser,
   toRubEquivalent,
 } from '../domain/geo-config.policy'
-import type { DisplayCurrency, LegalCountry } from '@casino/shared-config'
-import { GetGeoConfigUseCase, ResolveGeoInput } from '../application/use-cases/get-geo-config.use-case'
 
 @Injectable()
 export class GeoFacade {

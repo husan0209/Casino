@@ -1,3 +1,10 @@
+---
+part: 3
+total_parts: 7
+version: 1.0
+status: "frozen spec v1.0"
+---
+
 # ТЗ — Часть 3. Wallet, Fiat/Crypto Payments, Transaction Ledger
 
 > Третья часть ТЗ casino-платформы. Описывает финансовое ядро: мультивалютный кошелёк, двойной ledger, интеграции с Rukassa (фиат) и NOWPayments (крипто), выводы, конвертации и admin-операции с балансом.

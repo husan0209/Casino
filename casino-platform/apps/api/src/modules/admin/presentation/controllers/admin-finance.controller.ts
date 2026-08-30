@@ -1,17 +1,22 @@
+import { randomUUID } from 'crypto'
+
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
 import { AppError } from '@casino/shared-utils'
-import { AdminAuthGuard } from '../admin-auth.guard'
-import { WalletFacade } from '../../../wallet/application/wallet.facade'
-import { PaymentRequestRepository } from '../../../payments/infrastructure/repositories/payment-request.repository'
-import { AuditLogService } from '../../application/audit-log.service'
+
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { randomUUID } from 'crypto'
+import { PaymentRequestRepository } from '../../../payments/infrastructure/repositories/payment-request.repository'
+import { WalletFacade } from '../../../wallet/application/wallet.facade'
+import { AuditLogService } from '../../application/audit-log.service'
+import { AdminAuthGuard } from '../admin-auth.guard'
 
 export class WithdrawalInvalidStatusError extends AppError {
   readonly code = 'WITHDRAWAL_INVALID_STATUS'
   readonly httpStatus = 409
-  constructor() { super('Заявка не найдена или уже обработана') }
+  constructor() {
+    super('Заявка не найдена или уже обработана')
+  }
 }
 
 @UseGuards(AdminAuthGuard)
@@ -25,74 +30,153 @@ export class AdminFinanceController {
 
   // UC-PAY-16 transactions
   @Get('transactions')
-  async transactions(@Query() q:any){
-    const page=parseInt(q.page)||1, perPage=Math.min(parseInt(q.per_page)||50,200)
-    const where:any = {}
-    if(q.user_id) where.userId = q.user_id
-    if(q.type) where.type = q.type
-    if(q.currency) where.walletAccount = { currency: q.currency }
-    const [items,total] = await Promise.all([
-      prisma.ledgerEntry.findMany({ where, skip:(page-1)*perPage, take:perPage, orderBy:{createdAt:'desc'}, include:{ walletAccount:{ select:{ currency:true }}, user:{ select:{ email:true }}} }),
-      prisma.ledgerEntry.count({ where })
+  async transactions(@Query() q: any) {
+    const page = parseInt(q.page) || 1,
+      perPage = Math.min(parseInt(q.per_page) || 50, 200)
+    const where: any = {}
+    if (q.user_id) {
+      where.userId = q.user_id
+    }
+    if (q.type) {
+      where.type = q.type
+    }
+    if (q.currency) {
+      where.walletAccount = { currency: q.currency }
+    }
+    const [items, total] = await Promise.all([
+      prisma.ledgerEntry.findMany({
+        where,
+        skip: (page - 1) * perPage,
+        take: perPage,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          walletAccount: { select: { currency: true } },
+          user: { select: { email: true } },
+        },
+      }),
+      prisma.ledgerEntry.count({ where }),
     ])
-    return { items, meta:{ page, perPage, total }}
+    return { items, meta: { page, perPage, total } }
   }
 
   // UC-PAY-17 payment_requests
   @Get('payment-requests')
-  async paymentRequests(@Query() q:any){
-    const page=parseInt(q.page)||1, perPage=Math.min(parseInt(q.per_page)||50,200)
-    const where:any = {}
-    if(q.user_id) where.userId = q.user_id
-    if(q.type) where.type = q.type
-    if(q.status) where.status = q.status
-    if(q.provider) where.provider = q.provider
-    const [items,total] = await Promise.all([
-      prisma.paymentRequest.findMany({ where, skip:(page-1)*perPage, take:perPage, orderBy:{createdAt:'desc'}, include:{ user:{ select:{ email:true }}} }),
-      prisma.paymentRequest.count({ where })
+  async paymentRequests(@Query() q: any) {
+    const page = parseInt(q.page) || 1,
+      perPage = Math.min(parseInt(q.per_page) || 50, 200)
+    const where: any = {}
+    if (q.user_id) {
+      where.userId = q.user_id
+    }
+    if (q.type) {
+      where.type = q.type
+    }
+    if (q.status) {
+      where.status = q.status
+    }
+    if (q.provider) {
+      where.provider = q.provider
+    }
+    const [items, total] = await Promise.all([
+      prisma.paymentRequest.findMany({
+        where,
+        skip: (page - 1) * perPage,
+        take: perPage,
+        orderBy: { createdAt: 'desc' },
+        include: { user: { select: { email: true } } },
+      }),
+      prisma.paymentRequest.count({ where }),
     ])
-    return { items, meta:{ page, perPage, total }}
+    return { items, meta: { page, perPage, total } }
   }
 
   // UC-PAY-18 details
   @Get('payment-requests/:id')
   async paymentDetail(@Param('id') id: string) {
-    const pr = await prisma.paymentRequest.findUnique({ where:{id}, include:{ callbacks: true, user: { select:{ email:true }}}})
-    const ledger = await prisma.ledgerEntry.findMany({ where:{ metadata:{ path:['payment_request_id'], equals: id }}}).catch(()=>[])
+    const pr = await prisma.paymentRequest.findUnique({
+      where: { id },
+      include: { callbacks: true, user: { select: { email: true } } },
+    })
+    const ledger = await prisma.ledgerEntry
+      .findMany({ where: { metadata: { path: ['payment_request_id'], equals: id } } })
+      .catch(() => [])
     return { payment_request: pr, callbacks: pr?.callbacks, ledger_entries: ledger }
   }
 
   // UC-PAY-10 withdrawals list
   @Get('withdrawals')
-  async withdrawals(@Query() q:any){
-    const page=parseInt(q.page)||1, perPage=Math.min(parseInt(q.per_page)||50,200)
-    const where:any = { type: 'withdrawal' }
-    if(q.status) where.status = q.status
-    if(q.user_id) where.userId = q.user_id
-    if(q.currency) where.currency = q.currency
-    const [items,total] = await Promise.all([
-      prisma.paymentRequest.findMany({ where, skip:(page-1)*perPage, take:perPage, orderBy:{createdAt:'desc'}, include:{ user:{ select:{ email:true }}} }),
-      prisma.paymentRequest.count({ where })
+  async withdrawals(@Query() q: any) {
+    const page = parseInt(q.page) || 1,
+      perPage = Math.min(parseInt(q.per_page) || 50, 200)
+    const where: any = { type: 'withdrawal' }
+    if (q.status) {
+      where.status = q.status
+    }
+    if (q.user_id) {
+      where.userId = q.user_id
+    }
+    if (q.currency) {
+      where.currency = q.currency
+    }
+    const [items, total] = await Promise.all([
+      prisma.paymentRequest.findMany({
+        where,
+        skip: (page - 1) * perPage,
+        take: perPage,
+        orderBy: { createdAt: 'desc' },
+        include: { user: { select: { email: true } } },
+      }),
+      prisma.paymentRequest.count({ where }),
     ])
-    return { items, meta:{ page, perPage, total }}
+    return { items, meta: { page, perPage, total } }
   }
 
   /** Общая логика одобрения одной заявки (single + batch). */
   private async approveOne(id: string, admin: any, req: any) {
     const wd = await this.payments.findById(id)
-    if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') throw new WithdrawalInvalidStatusError()
-    await this.wallet.confirmWithdrawal(wd.userId, wd.currency as any, wd.amount.toString(), `wd_confirm_${wd.id}`)
+    if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') {
+      throw new WithdrawalInvalidStatusError()
+    }
+    await this.wallet.confirmWithdrawal(
+      wd.userId,
+      wd.currency as any,
+      wd.amount.toString(),
+      `wd_confirm_${wd.id}`,
+    )
     await this.payments.updateStatus(id, 'completed', { completedAt: new Date() })
-    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.withdrawal.approved', targetType:'payment_request', targetId: id, ipAddress: req.ip, userAgent: req.headers['user-agent'] })
+    await this.audit.log({
+      actorType: 'admin',
+      actorId: admin.id,
+      action: 'admin.withdrawal.approved',
+      targetType: 'payment_request',
+      targetId: id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
   }
 
   /** Общая логика отклонения одной заявки (single + batch). */
   private async rejectOne(id: string, reason: string | undefined, admin: any, req: any) {
     const wd = await this.payments.findById(id)
-    if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') throw new WithdrawalInvalidStatusError()
-    await this.wallet.unlock(wd.userId, wd.currency as any, wd.amount.toString(), `wd_unlock_${wd.id}_${randomUUID()}`)
+    if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') {
+      throw new WithdrawalInvalidStatusError()
+    }
+    await this.wallet.unlock(
+      wd.userId,
+      wd.currency as any,
+      wd.amount.toString(),
+      `wd_unlock_${wd.id}_${randomUUID()}`,
+    )
     await this.payments.updateStatus(id, 'cancelled', { errorMessage: reason })
-    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.withdrawal.rejected', targetType:'payment_request', targetId: id, payload:{ reason }, ipAddress: req.ip })
+    await this.audit.log({
+      actorType: 'admin',
+      actorId: admin.id,
+      action: 'admin.withdrawal.rejected',
+      targetType: 'payment_request',
+      targetId: id,
+      payload: { reason },
+      ipAddress: req.ip,
+    })
   }
 
   // UC-PAY-11 approve
@@ -104,8 +188,13 @@ export class AdminFinanceController {
 
   // UC-PAY-12 reject
   @Post('withdrawals/:id/reject')
-  async reject(@Param('id') id: string, @Body() body: { reason: string }, @CurrentUser() admin: any, @Req() req: any) {
-    await this.rejectOne(id, body?.reason, admin, req)
+  async reject(
+    @Param('id') id: string,
+    @Body() body: { reason: string },
+    @CurrentUser() admin: any,
+    @Req() req: any,
+  ) {
+    await this.rejectOne(id, body.reason, admin, req)
     return { ok: true }
   }
 
@@ -115,53 +204,118 @@ export class AdminFinanceController {
     const failed: Array<{ id: string; error: string }> = []
     let approved = 0
     for (const id of body.ids ?? []) {
-      try { await this.approveOne(id, admin, req); approved++ }
-      catch (e: any) { failed.push({ id, error: e.code ?? e.message }) }
+      try {
+        await this.approveOne(id, admin, req)
+        approved++
+      } catch (e: any) {
+        failed.push({ id, error: e.code ?? e.message })
+      }
     }
-    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.withdrawal.batch_approved', targetType:'payment_request', payload:{ requested: body.ids?.length ?? 0, approved, failed: failed.length }, ipAddress: req.ip })
+    await this.audit.log({
+      actorType: 'admin',
+      actorId: admin.id,
+      action: 'admin.withdrawal.batch_approved',
+      targetType: 'payment_request',
+      payload: { requested: body.ids.length ?? 0, approved, failed: failed.length },
+      ipAddress: req.ip,
+    })
     return { ok: true, approved, failed }
   }
 
   // UC-ADMIN-FIN-05 batch reject – общая причина, независимая обработка
   @Post('withdrawals/batch-reject')
-  async batchReject(@Body() body: { ids: string[]; reason: string }, @CurrentUser() admin: any, @Req() req: any) {
+  async batchReject(
+    @Body() body: { ids: string[]; reason: string },
+    @CurrentUser() admin: any,
+    @Req() req: any,
+  ) {
     const failed: Array<{ id: string; error: string }> = []
     let rejected = 0
     for (const id of body.ids ?? []) {
-      try { await this.rejectOne(id, body.reason, admin, req); rejected++ }
-      catch (e: any) { failed.push({ id, error: e.code ?? e.message }) }
+      try {
+        await this.rejectOne(id, body.reason, admin, req)
+        rejected++
+      } catch (e: any) {
+        failed.push({ id, error: e.code ?? e.message })
+      }
     }
-    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.withdrawal.batch_rejected', targetType:'payment_request', payload:{ requested: body.ids?.length ?? 0, rejected, failed: failed.length, reason: body.reason }, ipAddress: req.ip })
+    await this.audit.log({
+      actorType: 'admin',
+      actorId: admin.id,
+      action: 'admin.withdrawal.batch_rejected',
+      targetType: 'payment_request',
+      payload: {
+        requested: body.ids.length ?? 0,
+        rejected,
+        failed: failed.length,
+        reason: body.reason,
+      },
+      ipAddress: req.ip,
+    })
     return { ok: true, rejected, failed }
   }
 
   // UC-PAY-14 credit
   @Post('wallet/:user_id/credit')
-  async adminCredit(@Param('user_id') userId: string, @Body() b: { amount: string; currency: string; reason: string }, @CurrentUser() admin: any, @Req() req:any) {
-    if (admin.role !== 'superadmin') throw new Error('FORBIDDEN')
+  async adminCredit(
+    @Param('user_id') userId: string,
+    @Body() b: { amount: string; currency: string; reason: string },
+    @CurrentUser() admin: any,
+    @Req() req: any,
+  ) {
+    if (admin.role !== 'superadmin') {
+      throw new Error('FORBIDDEN')
+    }
     const res = await this.wallet.credit({
-      userId, currency: b.currency as any, amount: b.amount,
+      userId,
+      currency: b.currency as any,
+      amount: b.amount,
       type: 'ADMIN_CREDIT',
       idempotencyKey: `adm_credit_${admin.id}_${Date.now()}`,
       description: b.reason,
-      metadata: { admin_id: admin.id }
+      metadata: { admin_id: admin.id },
     })
-    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.balance.adjusted', targetType:'user', targetId: userId, payload:{ direction:'credit', amount:b.amount, currency:b.currency, reason:b.reason }, ipAddress: req.ip })
+    await this.audit.log({
+      actorType: 'admin',
+      actorId: admin.id,
+      action: 'admin.balance.adjusted',
+      targetType: 'user',
+      targetId: userId,
+      payload: { direction: 'credit', amount: b.amount, currency: b.currency, reason: b.reason },
+      ipAddress: req.ip,
+    })
     return res
   }
 
   // UC-PAY-15 debit
   @Post('wallet/:user_id/debit')
-  async adminDebit(@Param('user_id') userId: string, @Body() b: { amount: string; currency: string; reason: string }, @CurrentUser() admin: any, @Req() req:any) {
-    if (admin.role !== 'superadmin') throw new Error('FORBIDDEN')
+  async adminDebit(
+    @Param('user_id') userId: string,
+    @Body() b: { amount: string; currency: string; reason: string },
+    @CurrentUser() admin: any,
+    @Req() req: any,
+  ) {
+    if (admin.role !== 'superadmin') {
+      throw new Error('FORBIDDEN')
+    }
     const res = await this.wallet.debit({
-      userId, currency: b.currency as any, amount: b.amount,
+      userId,
+      currency: b.currency as any,
+      amount: b.amount,
       type: 'ADMIN_DEBIT',
       idempotencyKey: `adm_debit_${admin.id}_${Date.now()}`,
       description: b.reason,
-      metadata: { admin_id: admin.id }
+      metadata: { admin_id: admin.id },
     })
-    await this.audit.log({ actorType:'admin', actorId: admin.id, action:'admin.balance.adjusted', targetType:'user', targetId: userId, payload:{ direction:'debit', amount:b.amount, currency:b.currency, reason:b.reason }, ipAddress: req.ip })
+    await this.audit.log({
+      actorType: 'admin',
+      actorId: admin.id,
+      action: 'admin.balance.adjusted',
+      targetType: 'user',
+      targetId: userId,
+      payload: { direction: 'debit', amount: b.amount, currency: b.currency, reason: b.reason },
+      ipAddress: req.ip,
+    })
     return res
   }
 }

@@ -1,9 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { money } from '@casino/shared-utils'
-import type { DisplayCurrency } from '@casino/shared-config'
 import { ConfigService } from '@nestjs/config'
-import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
+
+import type { DisplayCurrency } from '@casino/shared-config'
+import { money } from '@casino/shared-utils'
+
 import { GeoFacade } from '../../../geo/facade/geo.facade'
+import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
 
 @Injectable()
 export class GetKycStatusUseCase {

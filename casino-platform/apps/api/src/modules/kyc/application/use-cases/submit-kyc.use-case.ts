@@ -1,5 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
+
 import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
+
 @Injectable()
 export class SubmitKycUseCase {
   constructor(@Inject(KYC_REPOSITORY) private repo: IKycRepository) {}

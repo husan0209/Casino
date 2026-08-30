@@ -171,18 +171,18 @@ import { UserEntity } from '../entities/user.entity'
 
 ### 4.1. Один файл = одна ответственность
 
-| Файл | Что внутри |
-|------|------------|
-| `*.entity.ts` | Domain entity |
-| `*.repository.ts` | Repository interface |
-| `*.repository.impl.ts` или в `infrastructure/repositories` | Repository implementation |
-| `*.use-case.ts` | Один use case |
-| `*.controller.ts` | HTTP controller |
-| `*.service.ts` | Только для БОЛЬШИХ use cases (>50 строк логики) |
-| `*.dto.ts` | Request/Response DTOs |
-| `*.errors.ts` | Error classes |
-| `*.events.ts` | Domain events |
-| `*.mapper.ts` | DB row → entity mapper |
+| Файл                                                       | Что внутри                                      |
+| ---------------------------------------------------------- | ----------------------------------------------- |
+| `*.entity.ts`                                              | Domain entity                                   |
+| `*.repository.ts`                                          | Repository interface                            |
+| `*.repository.impl.ts` или в `infrastructure/repositories` | Repository implementation                       |
+| `*.use-case.ts`                                            | Один use case                                   |
+| `*.controller.ts`                                          | HTTP controller                                 |
+| `*.service.ts`                                             | Только для БОЛЬШИХ use cases (>50 строк логики) |
+| `*.dto.ts`                                                 | Request/Response DTOs                           |
+| `*.errors.ts`                                              | Error classes                                   |
+| `*.events.ts`                                              | Domain events                                   |
+| `*.mapper.ts`                                              | DB row → entity mapper                          |
 
 ### 4.2. Не использовать utils.ts (god-file)
 
@@ -196,19 +196,26 @@ utils/
 └── pagination.ts
 ```
 
-### 4.3. Максимальная длина method
+### 4.3. Максимальная длина метода
 
-Метод не должен превышать **30 строк**. Если превышает — выделить приватные методы.
+Метод не должен превышать **30 строк логики**. Если метод длинный — выделите приватные методы или отдельные Use Cases.
+
+> ⚠️ **ВАЖНО:** Лимит 30 строк касается **логической сложности**, а не форматирования.
+> **Категорически запрещено сжимать код в одну строку** (писать однострочные методы, убирать переносы или объединять переменные через запятую) ради экономии строк. Каждое выражение и тело метода должны быть развернуты на отдельных строках с правильными отступами.
 
 ```typescript
+// ✅ ПРАВИЛЬНО — читаемый, многострочный метод (8 строк, легко читать):
 async register(input: RegisterInput): Promise<RegisterResult> {
   await this.validateNotExists(input.email)
   const hashedPassword = await this.hashPassword(input.password)
   const user = await this.createUserEntity(input, hashedPassword)
   await this.userRepository.save(user)
   await this.sendVerificationEmail(user)
-  return { user, verificationToken: ... }
+  return { user, verificationToken: user.token }
 }
+
+// ❌ ЗАПРЕЩЕНО — искусственное сжатие в одну строку:
+async register(i:any){ await this.val(i.e); return this.repo.save(await this.create(i)) }
 ```
 
 ### 4.4. Один use case = один файл
@@ -227,14 +234,16 @@ export class VerifyEmailUseCase {
 
 ---
 
-## 5. Деньги — Single Source of Truth
+## 5. Деньги — реализация (типы и helpers)
+
+> Правило поведения (запреты `number`/`float`, обязательные паттерны) — **AI_DEVELOPMENT_RULES.md §1**. Здесь — владелец реализации: типы, helpers, ZERO-таблица.
 
 ### 5.1. Типы в `shared-types`
 
 ```typescript
 // packages/shared-types/src/money.ts
 
-export type MoneyAmount = string  // "1500.00"
+export type MoneyAmount = string // "1500.00"
 
 export type Currency = 'RUB' | 'USDT_TRC20' | 'BTC' | 'TON' | 'TRX' | 'LTC'
 
@@ -329,8 +338,11 @@ export const money = {
 export abstract class AppError extends Error {
   abstract readonly code: string
   abstract readonly httpStatus: number
-  
-  constructor(message: string, public readonly context?: Record<string, unknown>) {
+
+  constructor(
+    message: string,
+    public readonly context?: Record<string, unknown>,
+  ) {
     super(message)
     this.name = this.constructor.name
   }
@@ -339,11 +351,14 @@ export abstract class AppError extends Error {
 export class InsufficientFundsError extends AppError {
   readonly code = 'INSUFFICIENT_FUNDS'
   readonly httpStatus = 422
-  constructor(public readonly required: MoneyAmount, public readonly available: MoneyAmount) {
-    super(
-      `Insufficient funds: required ${required}, available ${available}`,
-      { required, available }
-    )
+  constructor(
+    public readonly required: MoneyAmount,
+    public readonly available: MoneyAmount,
+  ) {
+    super(`Insufficient funds: required ${required}, available ${available}`, {
+      required,
+      available,
+    })
   }
 }
 
@@ -366,7 +381,7 @@ export class DuplicateRequestError extends AppError {
 ```typescript
 // application/use-cases/debit-wallet.use-case.ts
 if (!money.isGreaterOrEqual(balance, amount)) {
-  throw new InsufficientFundsError(amount, balance)  // ✅ throws domain error
+  throw new InsufficientFundsError(amount, balance) // ✅ throws domain error
 }
 ```
 
@@ -378,7 +393,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (exception instanceof AppError) {
       return errorResponse(exception.code, exception.message, ...)
     }
-    
+
     // Unexpected: log and return generic 500
     logger.error('Unhandled exception', exception)
     return errorResponse('INTERNAL_ERROR', 'Something went wrong')
@@ -401,19 +416,23 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 ```typescript
 import { Logger } from 'pino'
 
-this.logger.info({
-  module: 'wallet',
-  action: 'deposit_completed',
-  userId: user.id,
-  currency: 'RUB',
-  amount: '5000.00',
-  paymentRequestId: 'dep_abc123',
-}, 'Deposit completed successfully')
+this.logger.info(
+  {
+    module: 'wallet',
+    action: 'deposit_completed',
+    userId: user.id,
+    currency: 'RUB',
+    amount: '5000.00',
+    paymentRequestId: 'dep_abc123',
+  },
+  'Deposit completed successfully',
+)
 ```
 
 ### 7.2. Обязательные поля
 
 Каждый log имеет:
+
 - `timestamp` (ISO)
 - `level` (info, warn, error, debug)
 - `service` (имя приложения)
@@ -433,12 +452,12 @@ this.logger.info({
 
 ### 7.4. Уровни
 
-| Level | Когда |
-|-------|-------|
-| `error` | Критичные: payment failure, DB error |
-| `warn` | Подозрительное: invalid signature, rate limit |
-| `info` | Важные события: login, deposit completed |
-| `debug` | Подробности для разработки (НЕ в prod) |
+| Level   | Когда                                         |
+| ------- | --------------------------------------------- |
+| `error` | Критичные: payment failure, DB error          |
+| `warn`  | Подозрительное: invalid signature, rate limit |
+| `info`  | Важные события: login, deposit completed      |
+| `debug` | Подробности для разработки (НЕ в prod)        |
 
 ---
 
@@ -539,23 +558,28 @@ Template:
 
 ```markdown
 ## Что делает
+
 [краткое описание]
 
 ## Связанные задачи
+
 Closes #123
 
 ## Тип изменений
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Breaking change
 - [ ] Docs
 
 ## Тестирование
+
 - [ ] Unit tests pass
 - [ ] Integration tests pass
 - [ ] Manual E2E test
 
 ## Checklist
+
 - [ ] TypeScript compiles
 - [ ] Lint passes
 - [ ] No new lint warnings

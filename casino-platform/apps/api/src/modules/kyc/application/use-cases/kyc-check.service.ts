@@ -10,7 +10,9 @@ export class KycCheckService {
   constructor(@Inject(KYC_REPOSITORY) private repo: IKycRepository) {}
   async assertCanDeposit(userId: string, newDepositRub: string, limitRub = '5000') {
     const status = await this.repo.getStatus(userId)
-    if (status?.status === 'approved') return
+    if (status?.status === 'approved') {
+      return
+    }
     const total = (await this.repo.getTotalDepositedRub(userId)) || '0'
     if (money.isGreaterThan(money.add(total, newDepositRub), limitRub)) {
       throw new KycRequiredError(`Превышен лимит ${limitRub} RUB без KYC. Пройдите верификацию.`)
@@ -18,6 +20,8 @@ export class KycCheckService {
   }
   async assertCanWithdraw(userId: string) {
     const status = await this.repo.getStatus(userId)
-    if (status?.status !== 'approved') throw new KycRequiredError('Вывод средств требует KYC верификации')
+    if (status?.status !== 'approved') {
+      throw new KycRequiredError('Вывод средств требует KYC верификации')
+    }
   }
 }

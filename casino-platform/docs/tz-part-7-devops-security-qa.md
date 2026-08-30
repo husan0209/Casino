@@ -2,7 +2,7 @@
 title: "ТЗ — Часть 7. DevOps, Security, Logging, QA, Release Prep"
 part: 7
 total_parts: 7
-status: "final"
+status: "frozen spec v1.0"
 project: "Online Casino Platform"
 stack: "NestJS + TypeScript + Prisma + PostgreSQL + Redis + Next.js"
 created: "2026-06-19"
@@ -836,7 +836,7 @@ TELEGRAM_BOT_NAME=your_casino_bot
 RUKASSA_SHOP_ID=your_shop_id
 RUKASSA_API_KEY=your_api_key
 RUKASSA_SECRET_KEY=your_secret_key
-RUKASSA_API_URL=https://lk.rukassa.is/api/v1
+RUKASSA_API_BASE=https://pay.rukassa.is
 RUKASSA_WEBHOOK_URL=https://casino.example.com/api/v1/payments/webhooks/rukassa
 RUKASSA_SUCCESS_URL=https://casino.example.com/wallet?deposit=success
 RUKASSA_FAIL_URL=https://casino.example.com/wallet?deposit=failed
@@ -844,7 +844,7 @@ RUKASSA_FAIL_URL=https://casino.example.com/wallet?deposit=failed
 # ── NOWPayments ────────────────────────────────────────────
 NOWPAYMENTS_API_KEY=your_nowpayments_api_key
 NOWPAYMENTS_IPN_SECRET=your_ipn_secret
-NOWPAYMENTS_API_URL=https://api.nowpayments.io/v1
+NOWPAYMENTS_API_BASE=https://api.nowpayments.io/v1
 NOWPAYMENTS_WEBHOOK_URL=https://casino.example.com/api/v1/payments/webhooks/nowpayments
 
 # ── Email / SMTP ───────────────────────────────────────────
@@ -2253,7 +2253,7 @@ DB логика ТОЛЬКО в infrastructure/repositories/.
 ### 9. Перед созданием нового модуля
 1. Прочитай docs/MODULE_BOUNDARIES.md
 2. Проверь packages/shared-types/ на существующие типы
-3. Проверь events/events.ts на существующие события
+3. Проверь apps/api/src/queues/queue.types.ts на существующие типы очередей
 4. Следуй точной структуре модуля
 
 ### 10. Тесты

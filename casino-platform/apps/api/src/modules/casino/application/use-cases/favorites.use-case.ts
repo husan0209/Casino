@@ -1,56 +1,56 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import Decimal from 'decimal.js'
-import { prisma } from '@casino/database'
+
+import {
+  GAME_CATALOG_REPOSITORY,
+  GAME_FAVORITES_REPOSITORY,
+  IGameCatalogRepository,
+  IGameFavoritesRepository,
+} from '../../domain/repositories/casino.repository'
+
 @Injectable()
 export class FavoritesUseCase {
+  constructor(
+    @Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository,
+    @Inject(GAME_FAVORITES_REPOSITORY) private readonly favorites: IGameFavoritesRepository,
+  ) {}
+
   async add(userId: string, slug: string) {
-    const game = await prisma.game.findUnique({ where: { slug }})
-    if (!game) throw new Error('GAME_NOT_FOUND')
-    await prisma.gameFavorite.upsert({
-      where: { userId_gameId: { userId, gameId: game.id }},
-      update: {},
-      create: { userId, gameId: game.id }
-    })
+    const game = await this.catalog.findBySlug(slug)
+    if (!game) {
+      throw new Error('GAME_NOT_FOUND')
+    }
+    await this.favorites.upsert(userId, game.id)
     return { ok: true }
   }
+
   async remove(userId: string, slug: string) {
-    const game = await prisma.game.findUnique({ where: { slug }})
-    if (game) await prisma.gameFavorite.deleteMany({ where: { userId, gameId: game.id }})
+    const game = await this.catalog.findBySlug(slug)
+    if (game) {
+      await this.favorites.remove(userId, game.id)
+    }
     return { ok: true }
   }
-  async list(userId: string, page=1, perPage=24) {
+
+  async list(userId: string, page = 1, perPage = 24) {
     const [rows, total] = await Promise.all([
-      prisma.gameFavorite.findMany({
-        where: { userId, game: { isEnabled: true }},
-        skip: (page-1)*perPage, take: perPage,
-        orderBy: { createdAt: 'desc' },
-        include: { game: { include: { provider: { select: { slug:true, name:true }}}}}
-      }),
-      prisma.gameFavorite.count({ where: { userId }})
+      this.favorites.findFavorites(userId, (page - 1) * perPage, perPage),
+      this.favorites.countFavorites(userId),
     ])
-    return { items: rows.map((r: { game: any })=>r.game), total }
+    return { items: rows.map((r) => r.game), total }
   }
+
   async recent(userId: string) {
-    const sessions = await prisma.gameSession.findMany({
-      where: { userId, isDemo: false },
-      orderBy: { lastActivityAt: 'desc' },
-      distinct: ['gameId'],
-      take: 20,
-      include: { game: { include: { provider: true }}}
-    })
-    return sessions.map((s: { game: any }) => s.game)
+    const sessions = await this.favorites.findRecentSessions(userId, 20)
+    return sessions.map((s) => s.game)
   }
-  async history(userId: string, page=1, perPage=20, gameId?: string) {
-    const where:any = { userId }
-    if (gameId) where.gameId = gameId
+
+  async history(userId: string, page = 1, perPage = 20, gameId?: string) {
     const [rounds, total] = await Promise.all([
-      prisma.gameRound.findMany({
-        where, skip:(page-1)*perPage, take:perPage, orderBy:{createdAt:'desc'},
-        include: { game: { select: { slug:true, name:true, provider: { select:{ name:true }}}}}
-      }),
-      prisma.gameRound.count({ where })
+      this.favorites.findRoundsWithGame(userId, gameId, (page - 1) * perPage, perPage),
+      this.favorites.countRounds(userId, gameId),
     ])
-    const data = rounds.map((r: any) => ({
+    const data = rounds.map((r) => ({
       round_id: r.id,
       game: { slug: r.game.slug, name: r.game.name, provider: r.game.provider.name },
       currency: r.currency,

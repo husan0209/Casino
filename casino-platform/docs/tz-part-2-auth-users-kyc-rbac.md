@@ -1,3 +1,10 @@
+---
+part: 2
+total_parts: 7
+version: 1.0
+status: "frozen spec v1.0"
+---
+
 # ТЗ — Часть 2. Backend Core: Auth, Users, KYC, RBAC
 
 > Вторая часть ТЗ casino-платформы. Описывает полную реализацию регистрации/входа, OAuth, Telegram Login, JWT-сессий, профиля пользователя, RBAC и KYC по лимитам.

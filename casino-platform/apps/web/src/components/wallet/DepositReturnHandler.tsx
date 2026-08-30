@@ -1,33 +1,46 @@
 'use client'
-import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
+
 import { pollDepositStatus } from '@/lib/api/wallet.api'
-import { useWalletStore } from '@/stores/wallet'
-import { useUIStore } from '@/stores/ui'
 import { formatAmount } from '@/lib/format/currency'
+import { useUIStore } from '@/stores/ui'
+import { useWalletStore } from '@/stores/wallet'
 
 const PAYMENT_KEY = 'casino_pending_payment_id'
 const GAME_KEY = 'casino_pending_game_slug'
 
 export function saveDepositContext(paymentId: string, gameSlug?: string | null) {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined') {
+    return
+  }
   sessionStorage.setItem(PAYMENT_KEY, paymentId)
-  if (gameSlug) sessionStorage.setItem(GAME_KEY, gameSlug)
+  if (gameSlug) {
+    sessionStorage.setItem(GAME_KEY, gameSlug)
+  }
 }
 
 export function DepositReturnHandler() {
   const router = useRouter()
   const { fetchWallets } = useWalletStore()
   const { pendingGameSlug } = useUIStore()
-  const [success, setSuccess] = useState<{ amount: string; currency: string; gameSlug: string | null } | null>(null)
+  const [success, setSuccess] = useState<{
+    amount: string
+    currency: string
+    gameSlug: string | null
+  } | null>(null)
   const polled = useRef(false)
 
   useEffect(() => {
-    if (polled.current || typeof window === 'undefined') return
+    if (polled.current || typeof window === 'undefined') {
+      return
+    }
 
     const params = new URLSearchParams(window.location.search)
     const depositParam = params.get('deposit')
-    if (depositParam !== 'success' && depositParam !== 'pending') return
+    if (depositParam !== 'success' && depositParam !== 'pending') {
+      return
+    }
 
     polled.current = true
     const paymentId = sessionStorage.getItem(PAYMENT_KEY)
@@ -39,7 +52,9 @@ export function DepositReturnHandler() {
     }
     cleanUrl()
 
-    if (!paymentId) return
+    if (!paymentId) {
+      return
+    }
 
     let attempts = 0
     const maxAttempts = 30
@@ -65,13 +80,17 @@ export function DepositReturnHandler() {
       } catch {
         /* retry */
       }
-      if (attempts < maxAttempts) setTimeout(tick, 2000)
+      if (attempts < maxAttempts) {
+        setTimeout(tick, 2000)
+      }
     }
 
-    tick()
+    void tick()
   }, [fetchWallets, pendingGameSlug])
 
-  if (!success) return null
+  if (!success) {
+    return null
+  }
 
   const returnToGame = () => {
     setSuccess(null)

@@ -10,9 +10,14 @@ export function setActiveCurrency(currency: string) {
 }
 
 export function createFiatDeposit(input: { amount: string; currency: string; method: string }) {
-  return apiPost<{ payment_request_id: string; payment_url: string }>('/payments/deposit/fiat', input)
+  return apiPost<{ payment_request_id: string; payment_url: string }>(
+    '/payments/deposit/fiat',
+    input,
+  )
 }
 
 export function pollDepositStatus(id: string) {
-  return apiGet<{ id: string; status: string; currency: string; amount: string }>(`/payments/deposit/${id}/status`)
+  return apiGet<{ id: string; status: string; currency: string; amount: string }>(
+    `/payments/deposit/${id}/status`,
+  )
 }

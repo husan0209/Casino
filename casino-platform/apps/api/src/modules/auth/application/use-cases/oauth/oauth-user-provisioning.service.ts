@@ -1,7 +1,17 @@
+import { randomBytes } from 'node:crypto'
+
 import { Inject, Injectable } from '@nestjs/common'
+
+import {
+  IAuthProviderRepository,
+  AUTH_PROVIDER_REPOSITORY,
+  type AuthProviderKind,
+} from '../../../domain/repositories/auth-provider.repository'
+import {
+  ISessionRepository,
+  SESSION_REPOSITORY,
+} from '../../../domain/repositories/session.repository'
 import { IUserRepository, USER_REPOSITORY } from '../../../domain/repositories/user.repository'
-import { IAuthProviderRepository, AUTH_PROVIDER_REPOSITORY, AuthProviderKind } from '../../../domain/repositories/auth-provider.repository'
-import { ISessionRepository, SESSION_REPOSITORY } from '../../../domain/repositories/session.repository'
 import { JwtTokenService } from '../../../infrastructure/services/jwt.service'
 
 export interface ProviderSignInInput {
@@ -9,10 +19,10 @@ export interface ProviderSignInInput {
   providerUserId: string
   /** email от провайдера (у Telegram его нет) */
   email?: string | null
-  displayName?: string
-  referralCode?: string
-  ip?: string
-  userAgent?: string
+  displayName?: string | undefined
+  referralCode?: string | undefined
+  ip?: string | undefined
+  userAgent?: string | undefined
 }
 
 /**
@@ -34,10 +44,14 @@ export class OAuthUserProvisioningService {
   private async generateReferralCode(): Promise<string> {
     const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
     for (let attempt = 0; attempt < 5; attempt++) {
-      const bytes = require('crypto').randomBytes(8) as Buffer
+      const bytes = randomBytes(8)
       let code = ''
-      for (let i = 0; i < 8; i++) code += alphabet[bytes[i]! % alphabet.length]
-      if (!(await this.users.referralCodeExists(code))) return code
+      for (let i = 0; i < 8; i++) {
+        code += alphabet[bytes[i]! % alphabet.length]
+      }
+      if (!(await this.users.referralCodeExists(code))) {
+        return code
+      }
     }
     throw new Error('REFERRAL_CODE_GENERATION_FAILED')
   }
@@ -55,8 +69,12 @@ export class OAuthUserProvisioningService {
       const referralCode = await this.generateReferralCode()
       let referredBy: string | null = null
       if (input.referralCode) {
-        const referrer = await this.users.findByReferralCode(input.referralCode.toUpperCase().trim())
-        if (referrer) referredBy = referrer.id
+        const referrer = await this.users.findByReferralCode(
+          input.referralCode.toUpperCase().trim(),
+        )
+        if (referrer) {
+          referredBy = referrer.id
+        }
       }
       user = await this.users.create({
         email: input.email ? input.email.toLowerCase().trim() : null,
@@ -87,6 +105,11 @@ export class OAuthUserProvisioningService {
     })
     const accessToken = this.jwt.signAccess(user.id, user.role, session.id)
 
-    return { accessToken, refreshToken, user: { id: user.id, email: user.email, role: user.role }, wasLinked }
+    return {
+      accessToken,
+      refreshToken,
+      user: { id: user.id, email: user.email, role: user.role },
+      wasLinked,
+    }
   }
 }

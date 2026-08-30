@@ -1,9 +1,10 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
+
+import { GameCard } from '@/components/casino/GameCard'
 import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
-import { GameCard } from '@/components/casino/GameCard'
 
 export default function Home() {
   const { user } = useAuth()
@@ -49,8 +50,11 @@ export default function Home() {
               name={g.name_ru || g.name}
               provider={g.provider?.name || 'Demo'}
               onPlay={() => {
-                if (!user) openLogin(g.slug)
-                else window.location.href = `/casino/${g.slug}?launch=1`
+                if (!user) {
+                  openLogin(g.slug)
+                } else {
+                  window.location.href = `/casino/${g.slug}?launch=1`
+                }
               }}
             />
           ))}

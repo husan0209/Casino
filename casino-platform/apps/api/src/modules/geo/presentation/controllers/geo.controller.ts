@@ -1,5 +1,6 @@
 import { Controller, Get, Req, UseGuards } from '@nestjs/common'
-import { Request } from 'express'
+import { type Request } from 'express'
+
 import { OptionalAuthGuard } from '../../../../common/guards/optional-auth.guard'
 import { GeoFacade } from '../../facade/geo.facade'
 

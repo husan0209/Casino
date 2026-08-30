@@ -1,10 +1,12 @@
-import { Worker } from 'bullmq'
-import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
+import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { Worker } from 'bullmq'
+
 import { prisma } from '@casino/database'
-import { EmailJobData, QUEUES } from '../queue.types'
+
 import { queueConnection } from '../infrastructure/email.queue'
 import { MAILER_PORT, MailerPort } from '../infrastructure/mailer.port'
+import { type EmailJobData, QUEUES } from '../queue.types'
 
 /** Воркер: разбирает очередь `email` и шлёт через MailerPort (SMTP/dev-log). */
 @Injectable()
@@ -18,23 +20,27 @@ export class EmailWorker implements OnModuleDestroy {
   ) {
     const hasRedis = Boolean(config.get<string>('REDIS_URL'))
     const isTest = config.get<string>('NODE_ENV') === 'test'
-    if (!hasRedis || isTest) return
-    this.worker = new Worker<EmailJobData>(
-      QUEUES.EMAIL,
-      async (job) => this.handle(job.data),
-      { connection: queueConnection(config) },
+    if (!hasRedis || isTest) {
+      return
+    }
+    this.worker = new Worker<EmailJobData>(QUEUES.EMAIL, async (job) => this.handle(job.data), {
+      connection: queueConnection(config),
+    })
+    this.worker.on('failed', (job, err) =>
+      this.logger.error(`Email job #${job?.id} failed: ${err.message}`),
     )
-    this.worker.on('failed', (job, err) => this.logger.error(`Email job #${job?.id} failed: ${err.message}`))
     this.logger.log(`Email worker started on queue "${QUEUES.EMAIL}"`)
   }
 
   private async handle(job: EmailJobData) {
     await this.mailer.send({ to: job.to, subject: job.subject, text: job.text, html: job.html })
     if (job.notificationId) {
-      await prisma.notification.update({
-        where: { id: job.notificationId },
-        data: { sentAt: new Date() },
-      }).catch(() => this.logger.warn(`sentAt update failed for ${job.notificationId}`))
+      await prisma.notification
+        .update({
+          where: { id: job.notificationId },
+          data: { sentAt: new Date() },
+        })
+        .catch(() => this.logger.warn(`sentAt update failed for ${job.notificationId}`))
     }
   }
 

@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { GameProviderAdapter } from '../../domain/provider-adapter.interface'
+
 import { DemoProviderAdapter } from './demo/demo-provider.adapter'
 import { GitslotparkProviderAdapter } from './gitslotpark/gitslotpark.adapter'
 import { ProviderNotSupportedError } from '../../domain/errors'
+import { type GameProviderAdapter } from '../../domain/provider-adapter.interface'
 
 @Injectable()
 export class ProviderAdapterFactory {
@@ -29,14 +30,15 @@ export class ProviderAdapterFactory {
 
         return new DemoProviderAdapter(this.config)
       }
-      case 'gitslotpark':
       // Бренды-агрегатора: один seamless-протокол на всех
+      case 'gitslotpark':
       case 'pragmatic-play':
       case 'pgsoft':
       case 'amatic':
       case 'amusnet':
         return new GitslotparkProviderAdapter(this.config)
-      default: throw new ProviderNotSupportedError(slug)
+      default:
+        throw new ProviderNotSupportedError(slug)
     }
   }
 }

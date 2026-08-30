@@ -1,12 +1,19 @@
 import { Body, Controller, Headers, Post, Req, HttpCode } from '@nestjs/common'
-import { ProcessRukassaWebhookUseCase } from '../../application/use-cases/process-rukassa-webhook.use-case'
+
 import { ProcessNOWPaymentsWebhookUseCase } from '../../application/use-cases/process-nowpayments-webhook.use-case'
+import { ProcessRukassaWebhookUseCase } from '../../application/use-cases/process-rukassa-webhook.use-case'
 
 /**
  * Webhook controller.
- * IMPORTANT: rawBody capture requires express bodyParser to be configured with `verify`
- * callback in main.ts so that req['rawBody'] is available.
- * Both handlers must pass raw bytes to HMAC functions — never re-serialised JSON.
+ *
+ * HMAC signature MUST be verified against the raw bytes of the HTTP body
+ * (`req.rawBody`), not against the re-serialised JSON object. Re-serialised
+ * JSON differs from the original in key order, whitespace, and number
+ * formatting — which can both reject legitimate webhooks and (in some
+ * implementations) let an attacker forge signatures.
+ *
+ * The rawBody is captured by express.json({ verify }) in main.ts and exposed
+ * as req.rawBody (string). It is the ONLY reliable input for HMAC.
  */
 @Controller('payments/webhooks')
 export class PaymentsWebhookController {
@@ -17,15 +24,21 @@ export class PaymentsWebhookController {
 
   @Post('rukassa')
   @HttpCode(200)
-  async rukassaCb(@Headers() headers: any, @Body() body: any, @Req() req: any) {
-    // headers contains x-signature from Rukassa
-    return this.rukassa.execute(headers, body, req.ip)
+  async rukassaCb(
+    @Headers() headers: Record<string, string>,
+    @Body() body: unknown,
+    @Req() req: { rawBody?: string; ip?: string },
+  ) {
+    return this.rukassa.execute(headers, body, req.rawBody ?? '', req.ip ?? '')
   }
 
   @Post('nowpayments')
   @HttpCode(200)
-  async npCb(@Headers() headers: any, @Body() body: any, @Req() req: any) {
-    return this.np.execute(headers, body, req.ip)
+  async npCb(
+    @Headers() headers: Record<string, string>,
+    @Body() body: unknown,
+    @Req() req: { rawBody?: string; ip?: string },
+  ) {
+    return this.np.execute(headers, body, req.rawBody ?? '', req.ip ?? '')
   }
 }
-

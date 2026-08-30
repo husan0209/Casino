@@ -1,9 +1,8 @@
 import { prisma } from './index'
 import * as argon2 from 'argon2'
-import { randomBytes } from 'crypto'
 async function main(){
-  const adminEmail = process.env.SEED_ADMIN_EMAIL || 'superadmin@casino.example.com'
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'dev_superadmin_password_123'
+  const adminEmail = process.env['SEED_ADMIN_EMAIL'] || 'superadmin@casino.example.com'
+  const adminPassword = process.env['SEED_ADMIN_PASSWORD'] || 'dev_superadmin_password_123'
   let admin = await prisma.adminUser.findUnique({ where: { email: adminEmail }})
   if(!admin){
     const passwordHash = await argon2.hash(adminPassword, { type: argon2.argon2id, memoryCost: 65536, timeCost: 3, parallelism: 4 })

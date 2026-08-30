@@ -3,7 +3,7 @@ title: Agent Instructions
 description: Machine-readable правила для AI IDE (Cursor/Windsurf/Cline/Claude Code): два формата инструкций в одном файле
 audience: AI agents (Cursor, Windsurf, Cline, Claude Code и аналоги)
 status: living document
-last_updated: 2026-06-19
+last_updated: 2026-08-28
 ---
 
 # Agent Instructions
@@ -29,10 +29,10 @@ last_updated: 2026-06-19
 # ── Project context ────────────────────────────────────────
 You are working on casino-platform — an online casino for the CIS market (Russian language only on MVP).
 Stack: TypeScript + NestJS 11 (modular monolith) + Prisma + PostgreSQL + Redis + BullMQ + Next.js 14.
-Architecture: Monorepo (pnpm workspaces + Turborepo), 4-layer modules (domain / application / infrastructure / presentation).
+Architecture: Monorepo (pnpm workspaces), 4-layer modules (domain / application / infrastructure / presentation).
 
 # ── Project structure ──────────────────────────────────────
--   Monorepo root: package.json, pnpm-workspace.yaml, turbo.json
+-   Monorepo root: package.json, pnpm-workspace.yaml
 -   Backend:        apps/api/ (NestJS)
 -   Frontend:       apps/web/ (Next.js public), apps/admin/ (Next.js admin)
 -   Shared:         packages/shared-types, packages/shared-utils, packages/shared-config, packages/database
@@ -131,19 +131,18 @@ MUST read in order:
     4.  Relevant docs/CONVENTIONS.md sections
     5.  Relevant TZ part (tz-part-*.md)
     6.  packages/shared-types/ for existing types/enums
-    7.  packages/database/prisma/schema/ for current DB structure
+    7.  packages/database/prisma/schema.prisma for current DB structure
 
 # ── Before modifying existing code ─────────────────────────
 Check:
     -   This module's README.md (if exists)
     -   Other modules' Facades that may consume what you're changing
     -   Whether shared-types/ has a type you should reuse
-    -   Whether events.ts has an event you should emit
+    -   Whether queues/queue.types.ts has a queue/job type you should reuse
 
 # ── Database ───────────────────────────────────────────────
--   Schema is SPLIT into multiple files: packages/database/prisma/schema/<area>.prisma
-    Schema root:    prisma/schema.prisma (imports all)
-    Migrations:     prisma/migrations/
+-   Schema: ONE file — packages/database/prisma/schema.prisma
+    Migrations:     packages/database/prisma/migrations/
 -   ALWAYS use $transaction for multi-table financial ops
 -   Use optimistic locking via version field on wallet_accounts
 -   On OptimisticLockError → retry 3 times with exponential backoff
@@ -211,7 +210,7 @@ Online casino платформа для рынка СНГ. MVP на русско
 5.  `docs/MODULE_TEMPLATE.md` — пошаговый шаблон создания модуля
 6.  Релевантная TZ-часть (tz-part-1 ... tz-part-7)
 7.  `packages/shared-types/src/` — существующие типы и enum-ы
-8.  `packages/database/prisma/schema/` — текущая структура БД
+8.  `packages/database/prisma/schema.prisma` — текущая структура БД
 
 Если задача — создать новый модуль — ОБЯЗАТЕЛЬНО прочитай `MODULE_TEMPLATE.md` и следуй ему.
 
@@ -239,13 +238,14 @@ Online casino платформа для рынка СНГ. MVP на русско
 → Никогда не добавлять логику прямо в controller
 → Использовать `successResponse()` в controller, exceptions — `throw new XxxError()`
 
-### Добавить новое событие
-→ Добавить тип в `apps/api/src/events/events.ts`
-→ Добавить handler в подписчике (обычно в `application/events/handlers/`)
+### Добавить новую задачу в очередь (BullMQ)
+→ Добавить тип job в `apps/api/src/queues/queue.types.ts`
+→ Продюсер — через Queue-адаптер в `apps/api/src/queues/infrastructure/`
+→ Консьюмер — worker в `apps/api/src/queues/application/`
 → Документировать в `MODULE_BOUNDARIES.md` как cross-module связь
 
 ### Добавить новую таблицу
-→ Schema вынесена в файлы по доменам: `packages/database/prisma/schema/<area>.prisma`
+→ Schema: `packages/database/prisma/schema.prisma` (единый файл)
 → Создать миграцию: `pnpm db:migrate --name <name>`
 → Обновить seed если данные фиксированные
 

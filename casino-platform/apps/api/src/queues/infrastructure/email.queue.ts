@@ -1,11 +1,15 @@
-import { Queue } from 'bullmq'
-import Redis from 'ioredis'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { EmailJobData, EmailQueuePort, EnqueueResult, QUEUES } from '../queue.types'
+import { Queue } from 'bullmq'
+import Redis from 'ioredis'
+
+import { type EmailJobData, type EmailQueuePort, type EnqueueResult, QUEUES } from '../queue.types'
 
 export function queueConnection(config: ConfigService): Redis {
-  return new Redis(config.get<string>('REDIS_URL')!, { maxRetriesPerRequest: null, lazyConnect: true })
+  return new Redis(config.get<string>('REDIS_URL')!, {
+    maxRetriesPerRequest: null,
+    lazyConnect: true,
+  })
 }
 
 /** Продюсер: пишет письма в BullMQ-очередь `email`. Сбой постановки не роняет HTTP-запрос. */

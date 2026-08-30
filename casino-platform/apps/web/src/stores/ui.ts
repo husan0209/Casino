@@ -16,7 +16,7 @@ interface UIState {
   launchCurrencySheet: boolean
   launchCurrencyOptions: LaunchCurrencyOptions | null
   pendingGameSlug: string | null
-  depositCurrency?: string
+  depositCurrency?: string | undefined
   openLogin: (gameSlug?: string) => void
   closeLogin: () => void
   openDeposit: (currency?: string) => void

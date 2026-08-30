@@ -1,6 +1,7 @@
 'use client'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+
 import { fetchBalances, setActiveCurrency } from '@/lib/api/wallet.api'
 import type { WalletBalance } from '@/types/wallet'
 
@@ -30,7 +31,11 @@ export const useWalletStore = create<WalletState>()(
         try {
           const wallets = await fetchBalances()
           const active = get().activeCurrency
-          set({ wallets, isLoading: false, activeCurrency: active || wallets[0]?.currency || 'RUB' })
+          set({
+            wallets,
+            isLoading: false,
+            activeCurrency: active || wallets[0]?.currency || 'RUB',
+          })
         } catch {
           set({ isLoading: false })
         }
@@ -38,16 +43,25 @@ export const useWalletStore = create<WalletState>()(
       setActiveCurrency: async (currency) => {
         try {
           await setActiveCurrency(currency)
-        } catch { /* guest / offline */ }
+        } catch {
+          /* guest / offline */
+        }
         set({ activeCurrency: currency })
       },
-      setLastPlayed: (slug, currency) => set({ lastPlayedSlug: slug, lastPlayedCurrency: currency }),
+      setLastPlayed: (slug, currency) =>
+        set({ lastPlayedSlug: slug, lastPlayedCurrency: currency }),
       getActiveWallet: () => {
         const { wallets, activeCurrency } = get()
         return wallets.find((w) => w.currency === activeCurrency)
       },
       refreshActive: async () => get().fetchWallets(),
     }),
-    { name: 'casino-web-wallet', partialize: (s) => ({ activeCurrency: s.activeCurrency, lastPlayedCurrency: s.lastPlayedCurrency }) },
+    {
+      name: 'casino-web-wallet',
+      partialize: (s) => ({
+        activeCurrency: s.activeCurrency,
+        lastPlayedCurrency: s.lastPlayedCurrency,
+      }),
+    },
   ),
 )

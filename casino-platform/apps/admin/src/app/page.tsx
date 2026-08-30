@@ -1,9 +1,10 @@
 'use client'
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAuthStore } from '@/stores/auth'
+import { useState } from 'react'
+
 import { Btn, ErrorBox, Input } from '@/components/ui'
 import { errText } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -35,12 +36,29 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0b0b12]">
-      <form onSubmit={submit} className="w-full max-w-sm bg-[#141420] border border-white/10 rounded-2xl p-6">
+      <form
+        onSubmit={submit}
+        className="w-full max-w-sm bg-[#141420] border border-white/10 rounded-2xl p-6"
+      >
         <h1 className="text-xl font-bold mb-1">Admin Panel</h1>
         <p className="text-sm text-[#8b8ba7] mb-4">Вход для администраторов</p>
         <ErrorBox msg={err} />
-        <Input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mb-3 w-full" />
-        <Input type="password" placeholder="Пароль" value={password} onChange={(e) => setPassword(e.target.value)} required className="mb-4 w-full" />
+        <Input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className="mb-3 w-full"
+        />
+        <Input
+          type="password"
+          placeholder="Пароль"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          className="mb-4 w-full"
+        />
         <Btn disabled={busy}>{busy ? 'Вход…' : 'Войти'}</Btn>
       </form>
     </div>

@@ -1,6 +1,8 @@
+import { createHmac, timingSafeEqual } from 'crypto'
+
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { createHmac, timingSafeEqual } from 'crypto'
+
 import { PaymentProviderNotConfiguredError } from './rukassa.client'
 
 const MAP: Record<string, string> = {
@@ -31,11 +33,15 @@ export class NOWPaymentsClient {
   private readonly logger = new Logger(NOWPaymentsClient.name)
   constructor(private config: ConfigService) {}
 
-  private isProd(): boolean { return this.config.get<string>('NODE_ENV') === 'production' }
+  private isProd(): boolean {
+    return this.config.get<string>('NODE_ENV') === 'production'
+  }
 
   private assertApiKey(): string {
     const key = this.config.get<string>('NOWPAYMENTS_API_KEY')
-    if (!key) throw new PaymentProviderNotConfiguredError('NOWPayments', 'NOWPAYMENTS_API_KEY')
+    if (!key) {
+      throw new PaymentProviderNotConfiguredError('NOWPayments', 'NOWPAYMENTS_API_KEY')
+    }
     return key
   }
 
@@ -43,11 +49,21 @@ export class NOWPaymentsClient {
     return this.config.get<string>('NOWPAYMENTS_API_BASE') || 'https://api.nowpayments.io/v1'
   }
 
-  mapCurrency(ours: string) { return MAP[ours] || ours.toLowerCase() }
+  mapCurrency(ours: string) {
+    return MAP[ours] || ours.toLowerCase()
+  }
 
-  async createPayment(params: { priceAmount: string; priceCurrency: string; payCurrency: string; orderId: string; ipnCallbackUrl: string }) {
+  async createPayment(params: {
+    priceAmount: string
+    priceCurrency: string
+    payCurrency: string
+    orderId: string
+    ipnCallbackUrl: string
+  }) {
     if (!this.isProd() && !this.config.get<string>('NOWPAYMENTS_API_KEY')) {
-      this.logger.log(`NOWPayments DEV-STUB create ${params.priceAmount} ${params.priceCurrency}->${params.payCurrency} order=${params.orderId}`)
+      this.logger.log(
+        `NOWPayments DEV-STUB create ${params.priceAmount} ${params.priceCurrency}->${params.payCurrency} order=${params.orderId}`,
+      )
       const payAmount = params.priceAmount
       return {
         paymentId: `np_${params.orderId}`,
@@ -71,18 +87,24 @@ export class NOWPaymentsClient {
         }),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
+      }
       const d = (await res.json()) as Record<string, any>
       const paymentId = String(d.payment_id ?? '')
       const payAddress = String(d.pay_address ?? '')
-      if (!paymentId || !payAddress) throw new Error(`unexpected shape: ${JSON.stringify(d).slice(0, 200)}`)
+      if (!paymentId || !payAddress) {
+        throw new Error(`unexpected shape: ${JSON.stringify(d).slice(0, 200)}`)
+      }
       this.logger.log(`NOWPayments payment created: ${paymentId}`)
       return {
         paymentId,
         payAddress,
         payAmount: String(d.pay_amount ?? ''),
         payCurrency: String(d.pay_currency ?? this.mapCurrency(params.payCurrency)),
-        expirationEstimateDate: String(d.expiration_estimate_date ?? new Date(Date.now() + 3600_000).toISOString()),
+        expirationEstimateDate: String(
+          d.expiration_estimate_date ?? new Date(Date.now() + 3600_000).toISOString(),
+        ),
       }
     } catch (e: any) {
       this.logger.error(`NOWPayments createPayment failed: ${e?.message}`)
@@ -90,13 +112,17 @@ export class NOWPaymentsClient {
     }
   }
 
-  async getPaymentStatus(paymentId: string): Promise<{ paymentStatus: string; actuallyPaid: string; outcomeAmount: string }> {
+  async getPaymentStatus(
+    paymentId: string,
+  ): Promise<{ paymentStatus: string; actuallyPaid: string; outcomeAmount: string }> {
     const apiKey = this.assertApiKey()
     const res = await fetch(`${this.base()}/payment/${encodeURIComponent(paymentId)}`, {
       headers: { 'x-api-key': apiKey },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`)
+    }
     const d = (await res.json()) as Record<string, any>
     return {
       paymentStatus: String(d.payment_status ?? 'unknown'),
@@ -105,13 +131,28 @@ export class NOWPaymentsClient {
     }
   }
 
-  async getEstimatePrice(params: { amount: string; currencyFrom: string; currencyTo: string }): Promise<{ estimatedAmount: string }> {
+  async getEstimatePrice(params: {
+    amount: string
+    currencyFrom: string
+    currencyTo: string
+  }): Promise<{ estimatedAmount: string }> {
     // Dev без ключа: прежние захардкоженные курсы, чтобы флоу был проходим
     if (!this.isProd() && !this.config.get<string>('NOWPAYMENTS_API_KEY')) {
-      const rates: Record<string, number> = { USDT_TRC20: 92.5, BTC: 8500000, TON: 450, TRX: 11.3, LTC: 7800 }
-      const from = params.currencyFrom; const to = params.currencyTo
-      if (from === 'RUB' && rates[to]) return { estimatedAmount: (parseFloat(params.amount) / rates[to]).toFixed(8) }
-      if (to === 'RUB' && rates[from]) return { estimatedAmount: (parseFloat(params.amount) * rates[from]).toFixed(2) }
+      const rates: Record<string, number> = {
+        USDT_TRC20: 92.5,
+        BTC: 8500000,
+        TON: 450,
+        TRX: 11.3,
+        LTC: 7800,
+      }
+      const from = params.currencyFrom
+      const to = params.currencyTo
+      if (from === 'RUB' && rates[to]) {
+        return { estimatedAmount: (Number(params.amount) / rates[to]).toFixed(8) }
+      }
+      if (to === 'RUB' && rates[from]) {
+        return { estimatedAmount: (Number(params.amount) * rates[from]).toFixed(2) }
+      }
       return { estimatedAmount: params.amount }
     }
     const apiKey = this.assertApiKey()
@@ -124,29 +165,44 @@ export class NOWPaymentsClient {
       headers: { 'x-api-key': apiKey },
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
-    if (!res.ok) throw new Error(`estimate HTTP ${res.status}`)
+    if (!res.ok) {
+      throw new Error(`estimate HTTP ${res.status}`)
+    }
     const d = (await res.json()) as { estimated_amount?: number | string }
     return { estimatedAmount: String(d.estimated_amount ?? params.amount) }
   }
 
   /**
-   * IPN подпись: HMAC-SHA512(secret, JSON полей, отсортированных по ключу), hex-строка в нижнем регистре.
-   * Fail-closed: production без NOWPAYMENTS_IPN_SECRET — исключение.
+   * IPN signature verification.
+   *
+   * IMPORTANT: HMAC must be computed against the RAW request body bytes
+   * (captured by express.json({ verify }) in main.ts), NOT against a
+   * re-serialised JSON object. Re-serialised JSON differs from the
+   * original in key order, whitespace, and number formatting, which
+   * would reject legitimate webhooks.
+   *
+   * The `body` argument is kept for logging/fallback only — never use it
+   * for the HMAC computation.
+   *
+   * Fail-closed: production without NOWPAYMENTS_IPN_SECRET — exception.
    */
-  verifyIPN(body: any, signature: string): boolean {
+  verifyIPN(rawBody: string, signature: string): boolean {
     const secret = this.config.get<string>('NOWPAYMENTS_IPN_SECRET')
     if (!secret) {
-      if (this.isProd()) throw new PaymentProviderNotConfiguredError('NOWPayments', 'NOWPAYMENTS_IPN_SECRET')
+      if (this.isProd()) {
+        throw new PaymentProviderNotConfiguredError('NOWPayments', 'NOWPAYMENTS_IPN_SECRET')
+      }
       this.logger.error('NOWPAYMENTS_IPN_SECRET not set — rejecting IPN (fail-closed dev)')
       return false
     }
-    if (!signature) return false
+    if (!signature) {
+      return false
+    }
+    if (!rawBody) {
+      return false
+    }
 
-    const sortedBody = Object.keys(body)
-      .sort()
-      .reduce((acc: Record<string, unknown>, key) => { acc[key] = body[key]; return acc }, {})
-    const payload = JSON.stringify(sortedBody)
-    const expected = createHmac('sha512', secret).update(payload).digest('hex')
+    const expected = createHmac('sha512', secret).update(rawBody, 'utf8').digest('hex')
 
     try {
       const a = Buffer.from(signature.toLowerCase())

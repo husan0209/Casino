@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { EMAIL_QUEUE_PORT, MAILER_PORT } from './queue.types'
+
+import { EmailWorker } from './application/email.worker'
 import { BullMqEmailQueue, DevLogEmailQueue } from './infrastructure/email.queue'
 import { mailerFactory } from './infrastructure/smtp.mailer'
-import { EmailWorker } from './application/email.worker'
+import { EMAIL_QUEUE_PORT, MAILER_PORT } from './queue.types'
 
 /**
  * BullMQ-очереди (TZ part 6 §11, IMPLEMENTATION_GAPS GAP-02):
@@ -22,8 +23,12 @@ import { EmailWorker } from './application/email.worker'
     {
       provide: EMAIL_QUEUE_PORT,
       useFactory: (config: ConfigService): any => {
-        if (config.get<string>('REDIS_URL')) return new BullMqEmailQueue(config)
-        if (config.get<string>('NODE_ENV') === 'production') throw new Error('REDIS_URL_REQUIRED_IN_PRODUCTION')
+        if (config.get<string>('REDIS_URL')) {
+          return new BullMqEmailQueue(config)
+        }
+        if (config.get<string>('NODE_ENV') === 'production') {
+          throw new Error('REDIS_URL_REQUIRED_IN_PRODUCTION')
+        }
         return new DevLogEmailQueue()
       },
       inject: [ConfigService],

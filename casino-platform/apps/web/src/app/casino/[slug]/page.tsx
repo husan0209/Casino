@@ -1,14 +1,15 @@
 'use client'
-import { useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { apiGet, apiPost, errText } from '@/lib/api'
-import { useAuth } from '@/stores/auth'
-import { useUIStore } from '@/stores/ui'
-import { useWalletStore } from '@/stores/wallet'
-import { useGeoStore } from '@/stores/geo'
 import Link from 'next/link'
 import { useParams, useSearchParams } from 'next/navigation'
+import { useEffect } from 'react'
+
 import { toast } from '@/components/ui/toaster'
+import { apiGet, apiPost, errText } from '@/lib/api'
+import { useAuth } from '@/stores/auth'
+import { useGeoStore } from '@/stores/geo'
+import { useUIStore } from '@/stores/ui'
+import { useWalletStore } from '@/stores/wallet'
 
 export default function GamePage() {
   const { slug } = useParams() as { slug: string }
@@ -16,7 +17,7 @@ export default function GamePage() {
   const shouldLaunch = search.get('launch') === '1'
   const { user } = useAuth()
   const { openLogin, openDeposit } = useUIStore()
-  const { activeCurrency, fetchWallets, setLastPlayedCurrency } = useWalletStore()
+  const { activeCurrency, fetchWallets, setLastPlayed } = useWalletStore()
   const { config, load } = useGeoStore()
 
   const currency = config?.activeCurrency || activeCurrency
@@ -33,7 +34,7 @@ export default function GamePage() {
         return_url: window.location.href,
       }),
     onSuccess: (res) => {
-      setLastPlayedCurrency(currency)
+      setLastPlayed(slug, currency)
       window.location.href = `/casino/${slug}/play?url=${encodeURIComponent(res.launch_url)}`
     },
     onError: (e: any) => {
@@ -51,21 +52,28 @@ export default function GamePage() {
   })
 
   useEffect(() => {
-    load()
-    if (user) fetchWallets()
+    void load()
+    if (user) {
+      void fetchWallets()
+    }
   }, [user, load, fetchWallets])
 
   useEffect(() => {
     if (!user) {
-      if (shouldLaunch) openLogin(slug)
+      if (shouldLaunch) {
+        openLogin(slug)
+      }
       return
     }
     if (shouldLaunch && game && !launch.isPending && !launch.isSuccess) {
       launch.mutate()
     }
-  }, [user, shouldLaunch, game])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `launch` исключён намеренно: его изменение вызывало бы повторные mutate после ошибки
+  }, [user, shouldLaunch, game, slug, openLogin])
 
-  if (!game) return <div className="container-1 py-8 text-muted">Загрузка…</div>
+  if (!game) {
+    return <div className="container-1 py-8 text-muted">Загрузка…</div>
+  }
 
   return (
     <div className="container-1 py-6">
@@ -77,11 +85,17 @@ export default function GamePage() {
         <div className="text-sm text-muted">{game.provider?.name}</div>
         {game.rtp && <div className="text-sm">RTP {game.rtp}%</div>}
         {user ? (
-          <button disabled={launch.isPending} onClick={() => launch.mutate()} className="btn w-full">
+          <button
+            disabled={launch.isPending}
+            onClick={() => launch.mutate()}
+            className="btn w-full"
+          >
             {launch.isPending ? 'Запуск…' : 'Играть'}
           </button>
         ) : (
-          <button type="button" className="btn w-full" onClick={() => openLogin(slug)}>Войти чтобы играть</button>
+          <button type="button" className="btn w-full" onClick={() => openLogin(slug)}>
+            Войти чтобы играть
+          </button>
         )}
         {game.has_demo && (
           <button
@@ -89,7 +103,9 @@ export default function GamePage() {
             className="btn-ghost w-full"
             onClick={async () => {
               const res = await apiPost<any>(`/casino/games/${slug}/demo`, { currency })
-              if (res?.launch_url) window.open(res.launch_url, '_blank')
+              if (res?.launch_url) {
+                window.open(res.launch_url, '_blank')
+              }
             }}
           >
             Демо

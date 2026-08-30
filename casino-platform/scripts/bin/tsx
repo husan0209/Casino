@@ -1,0 +1,4 @@
+#!/bin/sh
+# Shim: resolves tsx from node_modules without symlinks
+PLAT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+exec node "$PLAT/node_modules/tsx/dist/cli.mjs" "$@"

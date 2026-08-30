@@ -1,7 +1,7 @@
 ---
 title: "Online Casino Platform — Technical Specification"
 description: "Полное ТЗ онлайн-казино платформы на стеке NestJS + Next.js + Prisma + PostgreSQL + Redis"
-status: "ready for implementation"
+status: "frozen spec v1.0"
 stack: ["NestJS", "TypeScript", "Prisma", "PostgreSQL", "Redis", "BullMQ", "Next.js", "Tailwind"]
 created: "2026-06-19"
 total_parts: 7
@@ -31,21 +31,21 @@ total_parts: 7
 
 ## 📂 Документация для AI-агента и разработчика
 
-Полная **структурированная документация** в папке [`docs/`](./docs/):
+Полная **структурированная документация** — в этой же папке (`docs/`). Точка входа — [INDEX.md](./INDEX.md):
 
 | Документ | Назначение |
 |----------|------------|
-| 📖 [INDEX.md](./docs/INDEX.md) | Навигация по всей документации (начните отсюда) |
-| 🚨 [**AI_DEVELOPMENT_RULES.md**](./docs/AI_DEVELOPMENT_RULES.md) | **ОБЯЗАТЕЛЬНО ПЕРВЫМ ДЕЛОМ** — 13 критичных правил для AI |
-| 🏛️ [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Архитектурные решения (Modular Monolith, слои) |
-| 📚 [STACK.md](./docs/STACK.md) | Обоснование выбора каждой технологии |
-| 📐 [API_CONVENTIONS.md](./docs/API_CONVENTIONS.md) | Стандарты REST API (URL, status codes, errors) |
-| ✍️ [CONVENTIONS.md](./docs/CONVENTIONS.md) | Code conventions (TypeScript, naming, money) |
-| 🧩 [MODULE_BOUNDARIES.md](./docs/MODULE_BOUNDARIES.md) | Ответственности модулей и зависимости |
-| 🔐 [SECURITY_BASELINE.md](./docs/SECURITY_BASELINE.md) | Безопасность на всех уровнях |
-| 💳 [PAYMENT_OVERVIEW.md](./docs/PAYMENT_OVERVIEW.md) | Платежи, идемпотентность, webhook'и |
-| 🎮 [PROVIDER_INTEGRATION_STRATEGY.md](./docs/PROVIDER_INTEGRATION_STRATEGY.md) | Game-провайдеры, Seamless Wallet API |
-| ⚙️ [ENVIRONMENT_VARIABLES.md](./docs/ENVIRONMENT_VARIABLES.md) | Все env-переменные с дефолтами и валидацией |
+| 📖 [INDEX.md](./INDEX.md) | Навигация по всей документации (начните отсюда) |
+| 🚨 [**AI_DEVELOPMENT_RULES.md**](./AI_DEVELOPMENT_RULES.md) | **ОБЯЗАТЕЛЬНО ПЕРВЫМ ДЕЛОМ** — 13 критичных правил для AI |
+| 🏛️ [ARCHITECTURE.md](./ARCHITECTURE.md) | Архитектурные решения (Modular Monolith, слои) |
+| 📚 [STACK.md](./STACK.md) | Обоснование выбора каждой технологии |
+| 📐 [API_CONVENTIONS.md](./API_CONVENTIONS.md) | Стандарты REST API (URL, status codes, errors) |
+| ✍️ [CONVENTIONS.md](./CONVENTIONS.md) | Code conventions (TypeScript, naming, money) |
+| 🧩 [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md) | Ответственности модулей и зависимости |
+| 🔐 [SECURITY_BASELINE.md](./SECURITY_BASELINE.md) | Безопасность на всех уровнях |
+| 💳 [PAYMENT_OVERVIEW.md](./PAYMENT_OVERVIEW.md) | Платежи, идемпотентность, webhook'и |
+| 🎮 [PROVIDER_INTEGRATION_STRATEGY.md](./PROVIDER_INTEGRATION_STRATEGY.md) | Game-провайдеры, Seamless Wallet API |
+| ⚙️ [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md) | Все env-переменные с дефолтами и валидацией |
 
 ---
 
@@ -230,20 +230,20 @@ total_parts: 7
 
 **Обязательный bootstrap (в этом порядке):**
 
-1. 🚨 [docs/AI_DEVELOPMENT_RULES.md](./docs/AI_DEVELOPMENT_RULES.md) — **критичные правила первым делом**
-2. 📖 [docs/INDEX.md](./docs/INDEX.md) — навигация по документации
-3. 🏛️ **Этот README.md** — общая картина проекта
-4. 🏛️ [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) — архитектурные решения
-5. 📚 [docs/STACK.md](./docs/STACK.md) — технологии
-6. ✍️ [docs/CONVENTIONS.md](./docs/CONVENTIONS.md) и [docs/API_CONVENTIONS.md](./docs/API_CONVENTIONS.md)
-7. 🧩 [docs/MODULE_BOUNDARIES.md](./docs/MODULE_BOUNDARIES.md)
-8. 🔐 [docs/SECURITY_BASELINE.md](./docs/SECURITY_BASELINE.md)
+1. 🚨 [docs/AI_DEVELOPMENT_RULES.md](./AI_DEVELOPMENT_RULES.md) — **критичные правила первым делом**
+2. 📖 [docs/INDEX.md](./INDEX.md) — навигация по документации
+3. 🏛️ **Этот файл (docs/README.md)** — общая картина ТЗ
+4. 🏛️ [docs/ARCHITECTURE.md](./ARCHITECTURE.md) — архитектурные решения
+5. 📚 [docs/STACK.md](./STACK.md) — технологии
+6. ✍️ [docs/CONVENTIONS.md](./CONVENTIONS.md) и [docs/API_CONVENTIONS.md](./API_CONVENTIONS.md)
+7. 🧩 [docs/MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md)
+8. 🔐 [docs/SECURITY_BASELINE.md](./SECURITY_BASELINE.md)
 9. Соответствующая **часть ТЗ** (`tz-part-N-*.md`)
 10. `packages/database/prisma/schema.prisma`
 
 **Если работаем с Payments/Casino** — дополнительно:
-- [docs/PAYMENT_OVERVIEW.md](./docs/PAYMENT_OVERVIEW.md)
-- [docs/PROVIDER_INTEGRATION_STRATEGY.md](./docs/PROVIDER_INTEGRATION_STRATEGY.md)
+- [docs/PAYMENT_OVERVIEW.md](./PAYMENT_OVERVIEW.md)
+- [docs/PROVIDER_INTEGRATION_STRATEGY.md](./PROVIDER_INTEGRATION_STRATEGY.md)
 
 ### Порядок подачи частей AI-агенту
 

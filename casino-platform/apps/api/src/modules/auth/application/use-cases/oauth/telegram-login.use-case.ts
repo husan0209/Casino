@@ -1,6 +1,8 @@
+import { createHash, createHmac, timingSafeEqual } from 'crypto'
+
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { createHash, createHmac, timingSafeEqual } from 'crypto'
+
 import { OAuthUserProvisioningService } from './oauth-user-provisioning.service'
 import { OAuthNotConfiguredError, OAuthExchangeError } from '../../../domain/errors'
 
@@ -29,7 +31,9 @@ export class TelegramLoginUseCase {
 
   private verify(payload: TelegramWidgetPayload): void {
     const botToken = this.config.get<string>('TELEGRAM_BOT_TOKEN')
-    if (!botToken) throw new OAuthNotConfiguredError('Telegram')
+    if (!botToken) {
+      throw new OAuthNotConfiguredError('Telegram')
+    }
 
     const { hash, ...rest } = payload
     const dataCheckString = Object.keys(rest)
@@ -52,9 +56,13 @@ export class TelegramLoginUseCase {
     }
   }
 
-  async execute(input: TelegramWidgetPayload & { referralCode?: string }, meta?: { ip?: string; userAgent?: string }) {
+  async execute(
+    input: TelegramWidgetPayload & { referralCode?: string | undefined },
+    meta?: { ip?: string | undefined; userAgent?: string | undefined },
+  ) {
     this.verify(input)
-    const displayName = [input.first_name, input.last_name].filter(Boolean).join(' ') || input.username
+    const displayName =
+      [input.first_name, input.last_name].filter(Boolean).join(' ') || input.username
     return this.provisioning.signIn({
       provider: 'telegram',
       providerUserId: String(input.id),

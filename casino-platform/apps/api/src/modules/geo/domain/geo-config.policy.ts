@@ -1,10 +1,10 @@
 import {
   DISPLAY_RUB_RATES,
   GEO_PROFILES,
-  GeoProfileDef,
-  FiatCurrency,
-  LegalCountry,
-  PaymentMethodDef,
+  type GeoProfileDef,
+  type FiatCurrency,
+  type LegalCountry,
+  type PaymentMethodDef,
   cryptoMethods,
   liveFiatCurrencies,
   resolveLegalCountry,
@@ -12,6 +12,7 @@ import {
   CURRENCY_LIMITS,
 } from '@casino/shared-config'
 import { money } from '@casino/shared-utils'
+
 import { FiatCurrencyNotLiveError, PaymentMethodUnavailableError } from './errors'
 
 export interface UserGeoContext {
@@ -36,9 +37,9 @@ export interface GeoConfigResult {
 }
 
 export function resolveGeoConfig(input: {
-  hostname?: string
-  countryCode?: string | null
-  userContext?: UserGeoContext | null
+  hostname?: string | undefined
+  countryCode?: string | null | undefined
+  userContext?: UserGeoContext | null | undefined
 }): GeoConfigResult {
   const legalCountry = resolveLegalCountry(input.userContext?.country || input.countryCode)
   const profile = GEO_PROFILES[legalCountry]
@@ -64,13 +65,19 @@ export function resolveGeoConfig(input: {
   }
 }
 
-export function assertFiatDepositMethod(country: LegalCountry, currency: string, method: string): PaymentMethodDef {
+export function assertFiatDepositMethod(
+  country: LegalCountry,
+  currency: string,
+  method: string,
+): PaymentMethodDef {
   const profile = GEO_PROFILES[country]
   if (!liveFiatCurrencies().includes(currency as FiatCurrency)) {
     throw new FiatCurrencyNotLiveError(currency)
   }
   const found = profile.fiatMethods.find((m) => m.id === method && m.currency === currency)
-  if (!found) throw new PaymentMethodUnavailableError()
+  if (!found) {
+    throw new PaymentMethodUnavailableError()
+  }
   return found
 }
 
@@ -80,17 +87,25 @@ export function getCurrencyLimits(currency: DisplayCurrency) {
 
 /** Display-only: RUB remaining → target currency (KYC UI) */
 export function convertRubToDisplayAmount(amountRub: string, currency: DisplayCurrency): string {
-  if (currency === 'RUB') return amountRub
+  if (currency === 'RUB') {
+    return amountRub
+  }
   const rate = DISPLAY_RUB_RATES[currency] || '1'
   const converted = money.divide(amountRub, rate)
   const [intPart, fracPart = ''] = converted.split('.')
-  if (currency === 'BTC') return fracPart ? `${intPart}.${fracPart.slice(0, 8)}` : intPart!
-  if (currency === 'USDT_TRC20') return fracPart ? `${intPart}.${fracPart.slice(0, 2)}` : intPart!
+  if (currency === 'BTC') {
+    return fracPart ? `${intPart}.${fracPart.slice(0, 8)}` : intPart!
+  }
+  if (currency === 'USDT_TRC20') {
+    return fracPart ? `${intPart}.${fracPart.slice(0, 2)}` : intPart!
+  }
   return intPart ?? converted
 }
 
 export function toRubEquivalent(amount: string, currency: DisplayCurrency): string {
-  if (currency === 'RUB') return amount
+  if (currency === 'RUB') {
+    return amount
+  }
   const rate = DISPLAY_RUB_RATES[currency] || '1'
   const converted = money.multiply(amount, rate)
   const [intPart, fracPart = '00'] = converted.split('.')
@@ -103,7 +118,9 @@ export function resolveLegalCountryForUser(countryCode: string | null | undefine
 
 function resolveActiveCurrency(profile: GeoProfileDef, preference?: string | null): FiatCurrency {
   const pref = preference as FiatCurrency | undefined
-  if (pref && profile.enabledFiat.includes(pref)) return pref
+  if (pref && profile.enabledFiat.includes(pref)) {
+    return pref
+  }
   return profile.defaultCurrency
 }
 
@@ -112,14 +129,20 @@ function filterMethodsForCurrency(
   currency: FiatCurrency,
   enabledFiat: FiatCurrency[],
 ): PaymentMethodDef[] {
-  if (!enabledFiat.includes(currency)) return []
+  if (!enabledFiat.includes(currency)) {
+    return []
+  }
   return methods.filter((m) => m.currency === currency && m.type === 'fiat')
 }
 
 function sortByLastMethod(methods: PaymentMethodDef[], lastId?: string | null): PaymentMethodDef[] {
-  if (!lastId) return methods
+  if (!lastId) {
+    return methods
+  }
   const idx = methods.findIndex((m) => m.id === lastId)
-  if (idx <= 0) return methods
+  if (idx <= 0) {
+    return methods
+  }
   const copy = [...methods]
   const [item] = copy.splice(idx, 1)
   return [item!, ...copy]

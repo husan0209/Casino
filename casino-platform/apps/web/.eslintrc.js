@@ -18,6 +18,7 @@ module.exports = {
     '@typescript-eslint/no-unnecessary-condition': 'warn',
     '@typescript-eslint/prefer-nullish-coalescing': 'warn',
     '@typescript-eslint/prefer-optional-chain': 'warn',
+    'import/no-cycle': 'warn',
     '@typescript-eslint/explicit-function-return-type': [
       'warn',
       {
@@ -27,4 +28,15 @@ module.exports = {
       },
     ],
   },
+  overrides: [
+    {
+      // Pages and big sheet/handler components are declarative JSX blocks, not logic functions
+      files: ['**/app/**/*.tsx', '**/components/**/*.tsx'],
+      rules: {
+        'max-lines-per-function': ['warn', { max: 140, skipBlankLines: true, skipComments: true }],
+        complexity: 'off',
+        'max-depth': 'off',
+      },
+    },
+  ],
 }

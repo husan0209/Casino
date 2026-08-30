@@ -90,6 +90,22 @@ export const envSchema = z.object({
       }
 
       // Check for unsafe placeholder secrets
+      if (env.JWT_ACCESS_SECRET && isUnsafeSecret(env.JWT_ACCESS_SECRET)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['JWT_ACCESS_SECRET'],
+          message: 'JWT_ACCESS_SECRET appears to be a placeholder. Use only real production secrets (openssl rand -hex 64).',
+        })
+      }
+
+      if (env.JWT_REFRESH_SECRET && isUnsafeSecret(env.JWT_REFRESH_SECRET)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['JWT_REFRESH_SECRET'],
+          message: 'JWT_REFRESH_SECRET appears to be a placeholder. Use only real production secrets (openssl rand -hex 64).',
+        })
+      }
+
       if (env.RUKASSA_SECRET_KEY && isUnsafeSecret(env.RUKASSA_SECRET_KEY)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -113,8 +129,10 @@ export type Env = z.infer<typeof envSchema>
 export function validateEnv(input: NodeJS.ProcessEnv = process.env): Env {
   const parsed = envSchema.safeParse(input)
   if (!parsed.success) {
-    console.error('❌ Invalid env:', parsed.error.flatten().fieldErrors)
-    throw new Error('Invalid environment variables')
+    const details = parsed.error.flatten().fieldErrors
+    console.error('❌ Invalid env:', details)
+    // Детали в сообщении: иначе при старте прода в логе — головоломка без контекста
+    throw new Error(`Invalid environment variables: ${JSON.stringify(details)}`)
   }
   return parsed.data
 }

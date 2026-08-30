@@ -3,8 +3,10 @@ title: "ТЗ — Casino Platform"
 subtitle: "Часть 6. Admin Panel, Support, Referral System, Notifications"
 version: 1.0
 date: 2026-06-19
-part: 6 / 7
-progress: ✅ Part 6 saved
+part: 6
+total_parts: 7
+status: "frozen spec v1.0"
+
 ---
 
 # ТЗ — Casino Platform

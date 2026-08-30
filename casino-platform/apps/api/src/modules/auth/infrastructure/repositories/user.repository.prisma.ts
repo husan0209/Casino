@@ -1,16 +1,28 @@
 import { Injectable } from '@nestjs/common'
+
 import { prisma } from '@casino/database'
+
 import { User } from '../../domain/entities/user.entity'
-import { CreateUserInput, IUserRepository } from '../../domain/repositories/user.repository'
+import {
+  type CreateUserInput,
+  type IUserRepository,
+} from '../../domain/repositories/user.repository'
 
 @Injectable()
 export class PrismaUserRepository implements IUserRepository {
   private toDomain(row: NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>>): User {
     return User.fromPrisma({
-      id: row.id, email: row.email, username: row.username, passwordHash: row.passwordHash,
-      status: row.status as User['props']['status'], role: row.role as User['props']['role'],
-      emailVerified: row.emailVerified, referralCode: row.referralCode,
-      referredBy: row.referredBy, lastLoginAt: row.lastLoginAt, createdAt: row.createdAt,
+      id: row.id,
+      email: row.email,
+      username: row.username,
+      passwordHash: row.passwordHash,
+      status: row.status as User['props']['status'],
+      role: row.role as User['props']['role'],
+      emailVerified: row.emailVerified,
+      referralCode: row.referralCode,
+      referredBy: row.referredBy,
+      lastLoginAt: row.lastLoginAt,
+      createdAt: row.createdAt,
     })
   }
 
@@ -34,7 +46,9 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async create(input: CreateUserInput) {
-    if (input.email === null && input.passwordHash !== null) throw new Error('OAUTH_USER_REQUIRES_NULL_PASSWORD')
+    if (input.email === null && input.passwordHash !== null) {
+      throw new Error('OAUTH_USER_REQUIRES_NULL_PASSWORD')
+    }
     const row = await prisma.user.create({
       data: {
         email: input.email,
