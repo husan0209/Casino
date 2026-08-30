@@ -11,7 +11,6 @@ import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
-
 export default function GamePage() {
   const { slug } = useParams() as { slug: string }
   const search = useSearchParams()
@@ -54,12 +53,16 @@ export default function GamePage() {
 
   useEffect(() => {
     void load()
-    if (user) void fetchWallets()
+    if (user) {
+      void fetchWallets()
+    }
   }, [user, load, fetchWallets])
 
   useEffect(() => {
     if (!user) {
-      if (shouldLaunch) openLogin(slug)
+      if (shouldLaunch) {
+        openLogin(slug)
+      }
       return
     }
     if (shouldLaunch && game && !launch.isPending && !launch.isSuccess) {
@@ -68,7 +71,9 @@ export default function GamePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `launch` исключён намеренно: его изменение вызывало бы повторные mutate после ошибки
   }, [user, shouldLaunch, game, slug, openLogin])
 
-  if (!game) return <div className="container-1 py-8 text-muted">Загрузка…</div>
+  if (!game) {
+    return <div className="container-1 py-8 text-muted">Загрузка…</div>
+  }
 
   return (
     <div className="container-1 py-6">
@@ -80,11 +85,17 @@ export default function GamePage() {
         <div className="text-sm text-muted">{game.provider?.name}</div>
         {game.rtp && <div className="text-sm">RTP {game.rtp}%</div>}
         {user ? (
-          <button disabled={launch.isPending} onClick={() => launch.mutate()} className="btn w-full">
+          <button
+            disabled={launch.isPending}
+            onClick={() => launch.mutate()}
+            className="btn w-full"
+          >
             {launch.isPending ? 'Запуск…' : 'Играть'}
           </button>
         ) : (
-          <button type="button" className="btn w-full" onClick={() => openLogin(slug)}>Войти чтобы играть</button>
+          <button type="button" className="btn w-full" onClick={() => openLogin(slug)}>
+            Войти чтобы играть
+          </button>
         )}
         {game.has_demo && (
           <button
@@ -92,7 +103,9 @@ export default function GamePage() {
             className="btn-ghost w-full"
             onClick={async () => {
               const res = await apiPost<any>(`/casino/games/${slug}/demo`, { currency })
-              if (res?.launch_url) window.open(res.launch_url, '_blank')
+              if (res?.launch_url) {
+                window.open(res.launch_url, '_blank')
+              }
             }}
           >
             Демо

@@ -8,6 +8,16 @@ import { GameCallbackService } from './application/services/game-callback.servic
 import { FavoritesUseCase } from './application/use-cases/favorites.use-case'
 import { LaunchGameUseCase } from './application/use-cases/launch-game.use-case'
 import { ListGamesUseCase } from './application/use-cases/list-games.use-case'
+import {
+  GAME_CATALOG_REPOSITORY,
+  GAME_FAVORITES_REPOSITORY,
+  GAME_PLAY_REPOSITORY,
+} from './domain/repositories/casino.repository'
+import {
+  PrismaGameCatalogRepository,
+  PrismaGameFavoritesRepository,
+  PrismaGamePlayRepository,
+} from './infrastructure/repositories/casino.prisma.repository'
 import { DemoProviderAdapter } from './infrastructure/providers/demo/demo-provider.adapter'
 import { ProviderAdapterFactory } from './infrastructure/providers/provider-adapter.factory'
 import { CasinoAdminController } from './presentation/controllers/casino-admin.controller'
@@ -20,6 +30,9 @@ import { ProviderCallbackController } from './presentation/controllers/provider-
   providers: [
     ProviderAdapterFactory,
     DemoProviderAdapter,
+    { provide: GAME_CATALOG_REPOSITORY, useClass: PrismaGameCatalogRepository },
+    { provide: GAME_FAVORITES_REPOSITORY, useClass: PrismaGameFavoritesRepository },
+    { provide: GAME_PLAY_REPOSITORY, useClass: PrismaGamePlayRepository },
     GameCallbackService,
     LaunchGameUseCase,
     ListGamesUseCase,

@@ -50,8 +50,11 @@ export default function Home() {
               name={g.name_ru || g.name}
               provider={g.provider?.name || 'Demo'}
               onPlay={() => {
-                if (!user) openLogin(g.slug)
-                else window.location.href = `/casino/${g.slug}?launch=1`
+                if (!user) {
+                  openLogin(g.slug)
+                } else {
+                  window.location.href = `/casino/${g.slug}?launch=1`
+                }
               }}
             />
           ))}

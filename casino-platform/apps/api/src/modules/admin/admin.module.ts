@@ -3,7 +3,17 @@ import { Module } from '@nestjs/common'
 import { AdminUsersService } from './application/admin-users.service'
 import { AuditLogService } from './application/audit-log.service'
 import { DashboardService } from './application/dashboard.service'
+import {
+  ADMIN_USER_REPOSITORY,
+  AUDIT_LOG_REPOSITORY,
+  DASHBOARD_REPOSITORY,
+} from './domain/admin.repository'
 import { AdminAuthService } from './infrastructure/admin-jwt.service'
+import {
+  PrismaAdminUserRepository,
+  PrismaAuditLogRepository,
+  PrismaDashboardRepository,
+} from './infrastructure/repositories/admin.prisma.repository'
 import { AdminAuthGuard } from './presentation/admin-auth.guard'
 import { WalletModule } from '../wallet/wallet.module'
 import { AdminAdminsController } from './presentation/controllers/admin-admins.controller'
@@ -27,6 +37,9 @@ import { PaymentRequestRepository } from '../payments/infrastructure/repositorie
   providers: [
     AdminAuthService,
     AdminAuthGuard,
+    { provide: ADMIN_USER_REPOSITORY, useClass: PrismaAdminUserRepository },
+    { provide: AUDIT_LOG_REPOSITORY, useClass: PrismaAuditLogRepository },
+    { provide: DASHBOARD_REPOSITORY, useClass: PrismaDashboardRepository },
     AuditLogService,
     AdminUsersService,
     DashboardService,

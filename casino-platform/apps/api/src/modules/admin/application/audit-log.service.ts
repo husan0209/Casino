@@ -1,19 +1,16 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import {
+  AUDIT_LOG_REPOSITORY,
+  type AuditLogInput,
+  type IAuditLogRepository,
+} from '../domain/admin.repository'
 
 @Injectable()
 export class AuditLogService {
-  async log(input: {
-    actorType: 'user' | 'admin' | 'system'
-    actorId: string
-    action: string
-    targetType?: string
-    targetId?: string
-    payload?: any
-    ipAddress?: string
-    userAgent?: string
-  }) {
-    await prisma.auditLog.create({ data: input })
+  constructor(@Inject(AUDIT_LOG_REPOSITORY) private readonly repo: IAuditLogRepository) {}
+
+  async log(input: AuditLogInput) {
+    await this.repo.log(input)
   }
 }

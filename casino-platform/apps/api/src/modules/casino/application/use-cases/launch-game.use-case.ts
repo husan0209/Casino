@@ -1,9 +1,7 @@
 import { randomBytes } from 'crypto'
 
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import Decimal from 'decimal.js'
-
-import { prisma, type Prisma } from '@casino/database'
 
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
 import { InsufficientFundsError } from '../../../wallet/domain/errors'
@@ -14,8 +12,13 @@ import {
   ProviderDisabledError,
 } from '../../domain/errors'
 import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
-
-type GameWithProvider = Prisma.GameGetPayload<{ include: { provider: true } }>
+import {
+  GAME_CATALOG_REPOSITORY,
+  GAME_PLAY_REPOSITORY,
+  type GameWithProvider,
+  type IGameCatalogRepository,
+  type IGamePlayRepository,
+} from '../../domain/repositories/casino.repository'
 
 interface LaunchGameInput {
   userId?: string | null
@@ -38,13 +41,12 @@ export class LaunchGameUseCase {
   constructor(
     private adapters: ProviderAdapterFactory,
     private wallet: WalletFacade,
+    @Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository,
+    @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
   ) {}
 
   async execute(input: LaunchGameInput) {
-    const game = await prisma.game.findUnique({
-      where: { slug: input.gameSlug },
-      include: { provider: true },
-    })
+    const game = await this.catalog.findBySlug(input.gameSlug)
     if (!game) {
       throw new GameNotFoundError(input.gameSlug)
     }
@@ -101,24 +103,18 @@ export class LaunchGameUseCase {
     input: LaunchGameInput,
   ): Promise<ActiveGameSession> {
     const userId = input.userId as string
-    await prisma.gameSession.updateMany({
-      where: { userId, providerId: game.providerId, status: 'active' },
-      data: { status: 'closed', closedAt: new Date() },
+    await this.play.closeActiveSessions(userId, game.providerId)
+    const session = await this.play.createSession({
+      userId,
+      gameId: game.id,
+      providerId: game.providerId,
+      sessionToken: randomBytes(32).toString('hex'),
+      currency: input.currency,
+      isDemo: false,
+      status: 'active',
+      ipAddress: input.ip,
     })
-    const sessionToken = randomBytes(32).toString('hex')
-    const session = await prisma.gameSession.create({
-      data: {
-        userId,
-        gameId: game.id,
-        providerId: game.providerId,
-        sessionToken,
-        currency: input.currency,
-        isDemo: false,
-        status: 'active',
-        ipAddress: input.ip,
-      },
-    })
-    await prisma.game.update({ where: { id: game.id }, data: { launchCount: { increment: 1 } } })
+    await this.catalog.incrementLaunchCount(game.id)
     return session
   }
 }

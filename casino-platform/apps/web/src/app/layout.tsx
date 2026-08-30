@@ -6,7 +6,6 @@ import { Providers } from './providers'
 
 import type { Metadata } from 'next'
 
-
 export const metadata: Metadata = {
   title: 'Casino',
   description: 'Mobile-first слоты для СНГ',

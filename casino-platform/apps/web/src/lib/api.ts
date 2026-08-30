@@ -9,7 +9,9 @@ export const api = axios.create({ baseURL: API_URL })
 
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
   return config
 })
 
@@ -40,11 +42,19 @@ export async function apiPatch<T = any>(url: string, body?: unknown): Promise<T>
 }
 
 export function setAccessToken(token: string) {
-  if (token) api.defaults.headers.common.Authorization = `Bearer ${token}`
-  else delete api.defaults.headers.common.Authorization
+  if (token) {
+    api.defaults.headers.common.Authorization = `Bearer ${token}`
+  } else {
+    delete api.defaults.headers.common.Authorization
+  }
 }
 
 export function errText(e: unknown): string {
   const ax = e as AxiosError<any>
-  return ax.response?.data?.error?.message ?? ax.response?.data?.message ?? (e as Error).message ?? 'Ошибка'
+  return (
+    ax.response?.data?.error?.message ??
+    ax.response?.data?.message ??
+    (e as Error).message ??
+    'Ошибка'
+  )
 }

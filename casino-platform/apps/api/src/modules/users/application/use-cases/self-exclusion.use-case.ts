@@ -1,6 +1,9 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import {
+  USER_SETTINGS_REPOSITORY,
+  type IUserSettingsRepository,
+} from '../../domain/repositories/user-settings.repository'
 
 // Minimum cooloff before self-exclusion can be lifted (72 hours)
 const MIN_COOLOFF_MS = 72 * 60 * 60 * 1000
@@ -21,6 +24,10 @@ export class SelfExclusionCooloffError extends Error {
 
 @Injectable()
 export class SelfExclusionUseCase {
+  constructor(
+    @Inject(USER_SETTINGS_REPOSITORY) private readonly settings: IUserSettingsRepository,
+  ) {}
+
   /**
    * Activate self-exclusion for a user.
    * periodHours: number of hours OR 0 = permanent
@@ -40,25 +47,10 @@ export class SelfExclusionUseCase {
         : new Date(Date.now() + periodHours * 60 * 60 * 1000)
 
     // Upsert UserSettings
-    await prisma.userSettings.upsert({
-      where: { userId },
-      update: { selfExcludedUntil: excludedUntil },
-      create: {
-        userId,
-        selfExcludedUntil: excludedUntil,
-        notificationsEmail: true,
-        notificationsPush: true,
-        twoFaEnabled: false,
-        language: 'ru',
-        timezone: 'Europe/Moscow',
-      },
-    })
+    await this.settings.upsertExclusion(userId, excludedUntil)
 
     // Revoke all active sessions immediately
-    await prisma.session.updateMany({
-      where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
-      data: { revokedAt: new Date() },
-    })
+    await this.settings.revokeActiveSessions(userId)
 
     return { excludedUntil }
   }
@@ -69,7 +61,7 @@ export class SelfExclusionUseCase {
    * via the updatedAt column).
    */
   async lift(userId: string): Promise<{ ok: boolean }> {
-    const settings = await prisma.userSettings.findUnique({ where: { userId } })
+    const settings = await this.settings.find(userId)
 
     if (!settings?.selfExcludedUntil) {
       // Not excluded — nothing to do
@@ -83,10 +75,7 @@ export class SelfExclusionUseCase {
       throw new SelfExclusionCooloffError(canLiftAt)
     }
 
-    await prisma.userSettings.update({
-      where: { userId },
-      data: { selfExcludedUntil: null },
-    })
+    await this.settings.clearExclusion(userId)
 
     return { ok: true }
   }
@@ -96,7 +85,7 @@ export class SelfExclusionUseCase {
    * Call this from LoginUseCase.
    */
   async assertNotExcluded(userId: string): Promise<void> {
-    const settings = await prisma.userSettings.findUnique({ where: { userId } })
+    const settings = await this.settings.find(userId)
     if (settings?.selfExcludedUntil && settings.selfExcludedUntil > new Date()) {
       throw new SelfExclusionActiveError(settings.selfExcludedUntil)
     }

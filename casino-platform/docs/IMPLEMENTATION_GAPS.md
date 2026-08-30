@@ -54,7 +54,7 @@
 | GAP-19 | N3 | ThrottlerModule (app-level rate limit) — `@nestjs/throttler` не установлен | `app.module.ts`, `apps/api/package.json` | P0 |
 | GAP-20 | N4 | helmet() middleware — не установлен | `main.ts`, `apps/api/package.json` | P0 |
 | GAP-21 | N8, N9, C3 | Zod-валидация на всех `@Body` inputs: forgot-password (`auth.controller.ts:79`), все deposit/withdrawal (`payments.controller.ts`), остальные контроллеры | `apps/api/src/modules/*/presentation/controllers/` | P1 |
-| GAP-22 | A1, C5, C6 | Wallet-модуль: вынести lock/unlock/confirmWithdrawal в `application/use-cases/` (4-слойка); убрать `toMoney(n: any)` (`wallet.ledger.prisma.ts:21`); разбить `runCreditDebit` (~50 строк > 30) | `modules/wallet/` | P2 |
+| GAP-22 | A1, C5, C6 | Wallet-модуль: вынести lock/unlock/confirmWithdrawal в `application/use-cases/` (4-слойка); убрать `toMoney(n: any)` (`wallet.ledger.prisma.ts:21`); разбить `runCreditDebit` (~50 строк > 30). **2026-08-30: G1-часть закрыта** — репозитории извлечены для casino (IGameCatalog/IGameFavorites/IGamePlay), notifications (INotification), referrals (IReferral), users (IUserSettings), admin (IAdminUser/IAuditLog/IDashboard); prisma — только в infrastructure; cross-module чтения помечены TODO(GAP-22) на Facade | `modules/wallet/` | P2 |
 | GAP-23 | H6 | Pino + redact вместо Nest Logger (пароли/токены могут попасть в логи) | все `*.use-case.ts`, `*.service.ts` | P1 |
 | GAP-24 | A5, A6 | Покрытие тестами: сейчас 2 spec-файла на монорепо; минимум — money flow + idempotency (план: ENGINEERING_EXCELLENCE_PLAN.md Этап 1) | `apps/api` | P2 |
 | GAP-25 | A7 | Довести ESLint до обещанного в QUALITY_GATES §2.1: `max-params` warn(4)→error(3), `complexity` warn(10)→error(10) | `.eslintrc.js:66,70` | P2 |

@@ -12,9 +12,11 @@ import { UpdateProfileUseCase } from './application/use-cases/update-profile.use
 import { UpdateSettingsUseCase } from './application/use-cases/update-settings.use-case'
 import { USER_PROFILE_REPOSITORY } from './domain/repositories/user-profile.repository'
 import { USER_SESSION_REPOSITORY } from './domain/repositories/user-session.repository'
+import { USER_SETTINGS_REPOSITORY } from './domain/repositories/user-settings.repository'
 import { UsersFacade } from './facade/users.facade'
 import { PrismaUserProfileRepository } from './infrastructure/repositories/user-profile.prisma'
 import { PrismaUserSessionRepository } from './infrastructure/repositories/user-session.prisma'
+import { PrismaUserSettingsRepository } from './infrastructure/repositories/user-settings.prisma'
 import { UsersController } from './presentation/controllers/users.controller'
 
 @Module({
@@ -33,6 +35,7 @@ import { UsersController } from './presentation/controllers/users.controller'
     UsersFacade,
     { provide: USER_PROFILE_REPOSITORY, useClass: PrismaUserProfileRepository },
     { provide: USER_SESSION_REPOSITORY, useClass: PrismaUserSessionRepository },
+    { provide: USER_SETTINGS_REPOSITORY, useClass: PrismaUserSettingsRepository },
   ],
   exports: [UsersFacade, SelfExclusionUseCase],
 })

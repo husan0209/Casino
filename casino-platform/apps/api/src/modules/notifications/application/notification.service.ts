@@ -1,13 +1,20 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
-
 import { EMAIL_QUEUE_PORT, EmailQueuePort } from '../../../queues/queue.types'
+import {
+  NOTIFICATION_REPOSITORY,
+  type CreateNotificationInput,
+  type INotificationRepository,
+} from '../domain/notification.repository'
 
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name)
-  constructor(@Inject(EMAIL_QUEUE_PORT) private readonly emailQueue: EmailQueuePort) {}
+  constructor(
+    @Inject(EMAIL_QUEUE_PORT) private readonly emailQueue: EmailQueuePort,
+    @Inject(NOTIFICATION_REPOSITORY) private readonly repo: INotificationRepository,
+  ) {}
+
   async send(input: {
     userId: string
     type: string
@@ -16,37 +23,31 @@ export class NotificationService {
     message: string
     data?: any
   }) {
-    const n = await prisma.notification.create({
-      data: {
-        userId: input.userId,
-        type: input.type,
-        channel: (input.channel || 'internal') as any,
-        title: input.title,
-        message: input.message,
-        data: input.data || {},
-      },
-    })
+    const createData: CreateNotificationInput = {
+      userId: input.userId,
+      type: input.type,
+      channel: input.channel || 'internal',
+      title: input.title,
+      message: input.message,
+      data: (input.data || {}) as CreateNotificationInput['data'],
+    }
+    const n = await this.repo.create(createData)
     if ((input.channel || 'internal') === 'email') {
       // Check user settings before queuing email
-      const settings = await prisma.userSettings
-        .findUnique({ where: { userId: input.userId } })
-        .catch(() => null)
+      const settings = await this.repo.findUserSettings(input.userId).catch(() => null)
       const emailEnabled = settings?.notificationsEmail ?? true
       if (!emailEnabled) {
         this.logger.log(`Email notification ${n.id} skipped – user ${input.userId} disabled email`)
       } else {
-        const user = await prisma.user.findUnique({
-          where: { id: input.userId },
-          select: { email: true },
-        })
-        if (!user?.email) {
+        const email = await this.repo.findUserEmail(input.userId)
+        if (!email) {
           this.logger.warn(
             `Email notification ${n.id}: у пользователя ${input.userId} нет email – пропущено`,
           )
         } else {
           // UC-NOTIF-01: постановка в очередь; sentAt проставит EmailWorker после фактической отправки
           await this.emailQueue.enqueue({
-            to: user.email,
+            to: email,
             subject: input.title,
             text: input.message,
             html: input.message,
@@ -55,43 +56,36 @@ export class NotificationService {
         }
       }
     } else {
-      await prisma.notification.update({ where: { id: n.id }, data: { sentAt: new Date() } })
+      await this.repo.markSent(n.id, new Date())
     }
     return n
   }
+
   async list(userId: string, page = 1, perPage = 20, isRead?: boolean) {
-    const where: any = { userId }
+    const where: { userId: string; isRead?: boolean } = { userId }
     if (isRead !== undefined) {
       where.isRead = isRead
     }
     const [items, total, unreadCount] = await Promise.all([
-      prisma.notification.findMany({
-        where,
-        skip: (page - 1) * perPage,
-        take: perPage,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.notification.count({ where }),
-      prisma.notification.count({ where: { userId, isRead: false } }),
+      this.repo.findMany(where, (page - 1) * perPage, perPage),
+      this.repo.count(where),
+      this.repo.count({ userId, isRead: false }),
     ])
     return { items, total, unreadCount }
   }
+
   async markRead(userId: string, id: string) {
-    await prisma.notification.updateMany({
-      where: { id, userId },
-      data: { isRead: true, readAt: new Date() },
-    })
+    await this.repo.markRead(userId, id)
     return { ok: true }
   }
+
   async markAllRead(userId: string) {
-    await prisma.notification.updateMany({
-      where: { userId, isRead: false },
-      data: { isRead: true, readAt: new Date() },
-    })
+    await this.repo.markAllRead(userId)
     return { ok: true }
   }
+
   async unreadCount(userId: string) {
-    const count = await prisma.notification.count({ where: { userId, isRead: false } })
+    const count = await this.repo.count({ userId, isRead: false })
     return { count }
   }
 }

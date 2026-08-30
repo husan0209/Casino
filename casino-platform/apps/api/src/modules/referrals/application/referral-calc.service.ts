@@ -1,17 +1,24 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import Decimal from 'decimal.js'
 
-import { prisma } from '@casino/database'
 import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 import { WalletFacade } from '../../wallet/application/wallet.facade'
+import {
+  REFERRAL_REPOSITORY,
+  type CurrencySumRow,
+  type IReferralRepository,
+} from '../domain/referral.repository'
 
 @Injectable()
 export class ReferralCalcService {
   private logger = new Logger(ReferralCalcService.name)
 
-  constructor(private readonly walletFacade: WalletFacade) {}
+  constructor(
+    private readonly walletFacade: WalletFacade,
+    @Inject(REFERRAL_REPOSITORY) private readonly repo: IReferralRepository,
+  ) {}
 
   // TODO(referrals): split runDaily into accrual + payout steps (<60 lines)
   // eslint-disable-next-line max-lines-per-function
@@ -23,10 +30,7 @@ export class ReferralCalcService {
     dayEnd.setUTCHours(23, 59, 59, 999)
     const rewardRate = new Decimal(process.env['REFERRAL_REWARD_RATE'] || '0.05')
     // get all users with referrer
-    const referredUsers = await prisma.user.findMany({
-      where: { referredBy: { not: null } },
-      select: { id: true, referredBy: true },
-    })
+    const referredUsers = await this.repo.findReferredUsers()
     let processed = 0
     let credited = 0
     for (const ru of referredUsers) {
@@ -52,51 +56,39 @@ export class ReferralCalcService {
     dayEnd: Date,
     rewardRate: Decimal,
   ): Promise<{ processed: number; credited: number }> {
-    const bets = await prisma.gameTransaction.groupBy({
-      by: ['currency'],
-      where: { userId: referredId, type: 'bet', createdAt: { gte: dayStart, lte: dayEnd } },
-      _sum: { amount: true },
-    })
-    const wins = await prisma.gameTransaction.groupBy({
-      by: ['currency'],
-      where: { userId: referredId, type: 'win', createdAt: { gte: dayStart, lte: dayEnd } },
-      _sum: { amount: true },
-    })
+    const bets = await this.repo.sumTransactions(referredId, 'bet', dayStart, dayEnd)
+    const wins = await this.repo.sumTransactions(referredId, 'win', dayStart, dayEnd)
     const currencies = new Set<string>([
-      ...bets.map((b: { currency: string }) => b.currency),
-      ...wins.map((w: { currency: string }) => w.currency),
+      ...bets.map((b: CurrencySumRow) => b.currency),
+      ...wins.map((w: CurrencySumRow) => w.currency),
     ])
 
     let processed = 0
     let credited = 0
     for (const cur of currencies) {
-      const betSum = bets.find((b: { currency: string }) => b.currency === cur)?._sum.amount ?? '0'
-      const winSum = wins.find((w: { currency: string }) => w.currency === cur)?._sum.amount ?? '0'
+      const betSum = bets.find((b: CurrencySumRow) => b.currency === cur)?.amount ?? '0'
+      const winSum = wins.find((w: CurrencySumRow) => w.currency === cur)?.amount ?? '0'
       const ggr = new Decimal(betSum).minus(winSum)
       const isPositiveGgr = ggr.gt(0)
       const status = isPositiveGgr ? 'pending' : 'zero'
       const rewardAmount = isPositiveGgr ? ggr.times(rewardRate).toFixed(8) : '0'
 
-      const exists = await prisma.referralReward.findFirst({
-        where: { referrerId, referredId, periodStart: dayStart, currency: cur },
-      })
+      const exists = await this.repo.findReward(referrerId, referredId, dayStart, cur)
       if (exists) {
         continue
       }
 
-      const rr = await prisma.referralReward.create({
-        data: {
-          referrerId,
-          referredId,
-          type: 'ggr_share',
-          periodStart: dayStart,
-          periodEnd: dayEnd,
-          ggrAmount: isPositiveGgr ? ggr.toFixed(8) : '0',
-          rewardRate: rewardRate.toFixed(4),
-          rewardAmount,
-          currency: cur,
-          status: status as any,
-        },
+      const rr = await this.repo.createReward({
+        referrerId,
+        referredId,
+        type: 'ggr_share',
+        periodStart: dayStart,
+        periodEnd: dayEnd,
+        ggrAmount: isPositiveGgr ? ggr.toFixed(8) : '0',
+        rewardRate: rewardRate.toFixed(4),
+        rewardAmount,
+        currency: cur,
+        status,
       })
       processed++
 
@@ -113,10 +105,7 @@ export class ReferralCalcService {
           description: `Referral reward for ${referredId} (${dayStart.toISOString().slice(0, 10)})`,
           metadata: { referralRewardId: rr.id, referredId },
         })
-        await prisma.referralReward.update({
-          where: { id: rr.id },
-          data: { status: 'credited', creditedAt: new Date() },
-        })
+        await this.repo.updateReward(rr.id, { status: 'credited', creditedAt: new Date() })
         credited++
       } catch (err: any) {
         this.logger.error(

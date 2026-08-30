@@ -1,13 +1,72 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import type { Prisma } from '@prisma/client'
+
+import { GAME_CATALOG_REPOSITORY, type IGameCatalogRepository } from '../../domain/repositories/casino.repository'
+
+interface CatalogQuery {
+  page?: string
+  per_page?: string
+  category?: string
+  type?: string
+  provider?: string
+  is_featured?: string
+  is_new?: string
+  is_popular?: string
+  search?: string
+  sort?: string
+}
 
 @Injectable()
 export class ListGamesUseCase {
-  async execute(q: any) {
-    const page = parseInt(q.page) || 1,
-      perPage = Math.min(parseInt(q.per_page) || 24, 100)
-    const where: any = { isEnabled: true, provider: { isEnabled: true } }
+  constructor(
+    @Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository,
+  ) {}
+
+  async execute(q: CatalogQuery) {
+    const page = parseInt(q.page ?? '') || 1
+    const perPage = Math.min(parseInt(q.per_page ?? '') || 24, 100)
+    const where = this.buildWhere(q)
+    const [items, total] = await Promise.all([
+      this.catalog.findMany({
+        where,
+        skip: (page - 1) * perPage,
+        take: perPage,
+        orderBy: this.buildOrderBy(q.sort),
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          nameRu: true,
+          category: true,
+          type: true,
+          thumbnailUrl: true,
+          isFeatured: true,
+          isNew: true,
+          isPopular: true,
+          hasDemo: true,
+          rtp: true,
+          volatility: true,
+          provider: { select: { slug: true, name: true } },
+        },
+      }),
+      this.catalog.count(where),
+    ])
+    return {
+      items,
+      meta: {
+        page,
+        perPage,
+        total,
+        totalPages: Math.ceil(total / perPage),
+        hasNext: page * perPage < total,
+        hasPrev: page > 1,
+      },
+    }
+  }
+
+  private buildWhere(q: CatalogQuery): Prisma.GameWhereInput {
+    const where: Prisma.GameWhereInput = { isEnabled: true, provider: { isEnabled: true } }
     if (q.category) {
       where.category = q.category
     }
@@ -32,54 +91,21 @@ export class ListGamesUseCase {
         { nameRu: { contains: q.search, mode: 'insensitive' } },
       ]
     }
-    let orderBy: any = { sortOrder: 'asc' }
-    if (q.sort === 'popular') {
-      orderBy = { launchCount: 'desc' }
-    }
-    if (q.sort === 'new') {
-      orderBy = { createdAt: 'desc' }
-    }
-    if (q.sort === 'name_asc') {
-      orderBy = { name: 'asc' }
-    }
-    if (q.sort === 'name_desc') {
-      orderBy = { name: 'desc' }
-    }
-    const [items, total] = await Promise.all([
-      prisma.game.findMany({
-        where,
-        skip: (page - 1) * perPage,
-        take: perPage,
-        orderBy,
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-          nameRu: true,
-          category: true,
-          type: true,
-          thumbnailUrl: true,
-          isFeatured: true,
-          isNew: true,
-          isPopular: true,
-          hasDemo: true,
-          rtp: true,
-          volatility: true,
-          provider: { select: { slug: true, name: true } },
-        },
-      }),
-      prisma.game.count({ where }),
-    ])
-    return {
-      items,
-      meta: {
-        page,
-        perPage,
-        total,
-        totalPages: Math.ceil(total / perPage),
-        hasNext: page * perPage < total,
-        hasPrev: page > 1,
-      },
+    return where
+  }
+
+  private buildOrderBy(sort?: string): Prisma.GameOrderByWithRelationInput {
+    switch (sort) {
+      case 'popular':
+        return { launchCount: 'desc' }
+      case 'new':
+        return { createdAt: 'desc' }
+      case 'name_asc':
+        return { name: 'asc' }
+      case 'name_desc':
+        return { name: 'desc' }
+      default:
+        return { sortOrder: 'asc' }
     }
   }
 }

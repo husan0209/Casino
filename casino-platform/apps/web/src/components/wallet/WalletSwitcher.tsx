@@ -21,8 +21,8 @@ function displayLabel(currency: string): string {
 
 function mergeWallets(balances: WalletBalance[], enabled: string[]): WalletBalance[] {
   const map = new Map(balances.map((w) => [w.currency, w]))
-  return enabled.map((currency) =>
-    map.get(currency) ?? { currency, balance: '0', locked: '0', available: '0' },
+  return enabled.map(
+    (currency) => map.get(currency) ?? { currency, balance: '0', locked: '0', available: '0' },
   )
 }
 
@@ -38,12 +38,11 @@ export function WalletSwitcher() {
     }
   }, [walletSwitcher, load, fetchWallets])
 
-  if (!walletSwitcher) return null
+  if (!walletSwitcher) {
+    return null
+  }
 
-  const enabled = [
-    ...(config?.enabledFiat ?? ['RUB']),
-    ...(config?.enabledCrypto ?? []),
-  ]
+  const enabled = [...(config?.enabledFiat ?? ['RUB']), ...(config?.enabledCrypto ?? [])]
   const list = sortWallets(mergeWallets(wallets, enabled), activeCurrency)
 
   const pick = async (currency: string) => {
@@ -57,7 +56,9 @@ export function WalletSwitcher() {
       <div className="sheet-panel">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Кошелёк</h2>
-          <button type="button" onClick={closeWalletSwitcher} className="text-muted">✕</button>
+          <button type="button" onClick={closeWalletSwitcher} className="text-muted">
+            ✕
+          </button>
         </div>
         <ul className="mt-4 space-y-1">
           {list.map((w) => {
@@ -70,7 +71,10 @@ export function WalletSwitcher() {
                   onClick={() => pick(w.currency)}
                   className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm transition hover:bg-white/5 ${empty ? 'text-muted' : ''}`}
                 >
-                  <span>{active ? '✓ ' : ''}{displayLabel(w.currency)}</span>
+                  <span>
+                    {active ? '✓ ' : ''}
+                    {displayLabel(w.currency)}
+                  </span>
                   <span className={empty ? 'text-muted/70' : 'font-medium'}>
                     {formatBalance(w.available, w.currency)}
                   </span>

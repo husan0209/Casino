@@ -1,32 +1,20 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import * as argon2 from 'argon2'
 
-import { prisma } from '@casino/database'
+import {
+  ADMIN_USER_REPOSITORY,
+  type CreateAdminUserInput,
+  type IAdminUserRepository,
+} from '../domain/admin.repository'
 
 @Injectable()
 export class AdminUsersService {
+  constructor(@Inject(ADMIN_USER_REPOSITORY) private readonly repo: IAdminUserRepository) {}
+
   list(page = 1, perPage = 20) {
-    return prisma
-      .$transaction([
-        prisma.adminUser.findMany({
-          skip: (page - 1) * perPage,
-          take: perPage,
-          orderBy: { createdAt: 'desc' },
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-            isActive: true,
-            lastLoginAt: true,
-            createdAt: true,
-          },
-        }),
-        prisma.adminUser.count(),
-      ])
-      .then(([items, total]) => ({ items, total, page, perPage }))
+    return this.repo.list(page, perPage)
   }
+
   async create(
     data: {
       email: string
@@ -43,21 +31,28 @@ export class AdminUsersService {
       timeCost: 3,
       parallelism: 4,
     })
-    return prisma.adminUser.create({
-      data: {
-        email: data.email.toLowerCase(),
-        passwordHash,
-        role: data.role,
-        ...(data.first_name !== undefined && { firstName: data.first_name }),
-        ...(data.last_name !== undefined && { lastName: data.last_name }),
-        ...(createdBy !== undefined && { createdBy }),
-      },
-    })
+    const createInput: CreateAdminUserInput = {
+      email: data.email,
+      passwordHash,
+      role: data.role,
+    }
+    if (data.first_name !== undefined) {
+      createInput.firstName = data.first_name
+    }
+    if (data.last_name !== undefined) {
+      createInput.lastName = data.last_name
+    }
+    if (createdBy !== undefined) {
+      createInput.createdBy = createdBy
+    }
+    return this.repo.create(createInput)
   }
+
   async block(id: string) {
-    return prisma.adminUser.update({ where: { id }, data: { isActive: false } })
+    return this.repo.setActive(id, false)
   }
+
   async unblock(id: string) {
-    return prisma.adminUser.update({ where: { id }, data: { isActive: true } })
+    return this.repo.setActive(id, true)
   }
 }

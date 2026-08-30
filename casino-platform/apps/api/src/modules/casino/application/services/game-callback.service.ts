@@ -1,34 +1,35 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
 import { money } from '@casino/shared-utils'
 
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
 import { type ParsedProviderCallback } from '../../domain/provider-adapter.interface'
+import {
+  GAME_PLAY_REPOSITORY,
+  type GameRow,
+  type GameSessionWithGame,
+  type GameSessionWithUser,
+  type GameTransactionRow,
+  type IGamePlayRepository,
+} from '../../domain/repositories/casino.repository'
 
 @Injectable()
 export class GameCallbackService {
-  constructor(private wallet: WalletFacade) {}
+  constructor(
+    private wallet: WalletFacade,
+    @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
+  ) {}
 
   async authenticate(sessionToken: string) {
-    const session = await prisma.gameSession.findUnique({
-      where: { sessionToken },
-      include: { user: true, game: true },
-    })
+    const session = await this.play.findSessionByTokenWithUser(sessionToken)
     if (!session || session.status !== 'active') {
       throw new Error('SESSION_INVALID')
     }
     if (session.user.status !== 'active') {
       throw new Error('PLAYER_BLOCKED')
     }
-    await prisma.gameSession.update({
-      where: { id: session.id },
-      data: { lastActivityAt: new Date() },
-    })
-    const wallet = await prisma.walletAccount.findUnique({
-      where: { userId_currency: { userId: session.userId, currency: session.currency } },
-    })
-    const balance = wallet?.balance.toString() ?? '0'
+    await this.play.touchSession(session.id)
+    const balance = await this.getWalletBalance(session.userId, session.currency)
     return {
       player_id: session.userId,
       currency: session.currency,
@@ -46,44 +47,12 @@ export class GameCallbackService {
     if (!cb.playerToken || !cb.transactionId || !cb.betAmount) {
       throw new Error('INVALID_BET_REQUEST')
     }
-    const session = await prisma.gameSession.findUnique({
-      where: { sessionToken: cb.playerToken },
-      include: { game: true },
-    })
-    if (!session || session.status !== 'active') {
-      throw new Error('SESSION_INVALID')
-    }
-    // idempotency
-    const dup = await prisma.gameTransaction.findUnique({
-      where: {
-        providerId_externalTransactionId: { providerId, externalTransactionId: cb.transactionId },
-      },
-    })
+    const session = await this.findActiveSession(cb.playerToken)
+    const dup = await this.play.findTransactionByExternal(providerId, cb.transactionId)
     if (dup) {
-      const w = await prisma.walletAccount.findUnique({
-        where: { userId_currency: { userId: session.userId, currency: session.currency } },
-      })
-      return { balance: w?.balance.toString() ?? '0', duplicate: true }
+      return { balance: await this.getWalletBalance(session.userId, session.currency), duplicate: true }
     }
-    // round
-    const roundExternalId = cb.roundId || cb.transactionId
-    let round = await prisma.gameRound.findUnique({
-      where: { providerId_externalRoundId: { providerId, externalRoundId: roundExternalId } },
-    })
-    if (!round) {
-      round = await prisma.gameRound.create({
-        data: {
-          sessionId: session.id,
-          userId: session.userId,
-          gameId: session.gameId,
-          providerId,
-          externalRoundId: roundExternalId,
-          currency: session.currency,
-          status: 'open',
-        },
-      })
-    }
-    // debit wallet
+    const round = await this.findOrCreateRound(providerId, cb, session, 'open')
     const creditRes = await this.wallet.debit({
       userId: session.userId,
       currency: session.currency as any,
@@ -98,34 +67,21 @@ export class GameCallbackService {
         external_transaction_id: cb.transactionId,
       },
     })
-    // game_transaction
-    await prisma.gameTransaction.create({
-      data: {
-        roundId: round.id,
-        sessionId: session.id,
-        userId: session.userId,
-        providerId,
-        type: 'bet',
-        externalTransactionId: cb.transactionId!,
-        amount: cb.betAmount,
-        currency: session.currency,
-        balanceAfter: creditRes.balanceAfter,
-        ledgerEntryId: creditRes.ledgerEntryId,
-        metadata: cb.rawRequest ?? {},
-      },
+    await this.play.createTransaction({
+      roundId: round.id,
+      sessionId: session.id,
+      userId: session.userId,
+      providerId,
+      type: 'bet',
+      externalTransactionId: cb.transactionId!,
+      amount: cb.betAmount,
+      currency: session.currency,
+      balanceAfter: creditRes.balanceAfter,
+      ledgerEntryId: creditRes.ledgerEntryId,
+      metadata: cb.rawRequest ?? {},
     })
-    await prisma.gameRound.update({
-      where: { id: round.id },
-      data: { totalBet: { increment: cb.betAmount } },
-    })
-    await prisma.gameSession.update({
-      where: { id: session.id },
-      data: {
-        totalBet: { increment: cb.betAmount },
-        roundsPlayed: { increment: 1 },
-        lastActivityAt: new Date(),
-      },
-    })
+    await this.play.updateRound(round.id, { totalBet: { increment: cb.betAmount } })
+    await this.play.addSessionBet(session.id, cb.betAmount)
     return { balance: creditRes.balanceAfter, duplicate: false }
   }
 
@@ -133,87 +89,45 @@ export class GameCallbackService {
     if (!cb.playerToken || !cb.transactionId) {
       throw new Error('INVALID_WIN_REQUEST')
     }
-    const session = await prisma.gameSession.findUnique({
-      where: { sessionToken: cb.playerToken },
-      include: { game: true },
-    })
+    const session = await this.play.findSessionByTokenWithGame(cb.playerToken)
     if (!session) {
       throw new Error('SESSION_INVALID')
     }
-    const dup = await prisma.gameTransaction.findUnique({
-      where: {
-        providerId_externalTransactionId: { providerId, externalTransactionId: cb.transactionId },
-      },
-    })
+    const dup = await this.play.findTransactionByExternal(providerId, cb.transactionId)
     if (dup) {
-      const w = await prisma.walletAccount.findUnique({
-        where: { userId_currency: { userId: session.userId, currency: session.currency } },
-      })
-      return { balance: w?.balance.toString() ?? '0', duplicate: true }
+      return { balance: await this.getWalletBalance(session.userId, session.currency), duplicate: true }
     }
     const winAmount = cb.winAmount || '0'
-    const roundExternalId = cb.roundId || cb.transactionId
-    let round = await prisma.gameRound.findUnique({
-      where: { providerId_externalRoundId: { providerId, externalRoundId: roundExternalId } },
-    })
-    if (!round) {
-      round = await prisma.gameRound.create({
-        data: {
-          sessionId: session.id,
-          userId: session.userId,
-          gameId: session.gameId,
-          providerId,
-          externalRoundId: roundExternalId,
-          currency: session.currency,
-          status: 'closed',
-          closedAt: new Date(),
-        },
-      })
-    }
+    const round = await this.findOrCreateRound(providerId, cb, session, 'closed')
     let balanceAfter = '0'
     let ledgerEntryId: string | null = null
     if (money.isPositive(winAmount)) {
-      const res = await this.wallet.credit({
-        userId: session.userId,
-        currency: session.currency as any,
-        amount: winAmount,
-        type: 'WIN',
-        idempotencyKey: `win_${providerId}_${cb.transactionId}`,
-        description: `Выигрыш в ${session.game.name}`,
-        metadata: { provider_id: providerId },
-      })
+      const res = await this.creditWin(session, providerId, cb, winAmount)
       balanceAfter = res.balanceAfter
       ledgerEntryId = res.ledgerEntryId
     } else {
-      const w = await prisma.walletAccount.findUnique({
-        where: { userId_currency: { userId: session.userId, currency: session.currency } },
-      })
-      balanceAfter = w?.balance.toString() ?? '0'
+      balanceAfter = await this.getWalletBalance(session.userId, session.currency)
     }
-    await prisma.gameTransaction.create({
-      data: {
-        roundId: round.id,
-        sessionId: session.id,
-        userId: session.userId,
-        providerId,
-        type: 'win',
-        externalTransactionId: cb.transactionId!,
-        amount: winAmount,
-        currency: session.currency,
-        balanceAfter,
-        ledgerEntryId,
-        metadata: cb.rawRequest ?? {},
-      },
+    await this.play.createTransaction({
+      roundId: round.id,
+      sessionId: session.id,
+      userId: session.userId,
+      providerId,
+      type: 'win',
+      externalTransactionId: cb.transactionId!,
+      amount: winAmount,
+      currency: session.currency,
+      balanceAfter,
+      ledgerEntryId,
+      metadata: cb.rawRequest ?? {},
     })
     if (money.isPositive(winAmount)) {
-      await prisma.gameRound.update({
-        where: { id: round.id },
-        data: { totalWin: { increment: winAmount }, status: 'closed', closedAt: new Date() },
+      await this.play.updateRound(round.id, {
+        totalWin: { increment: winAmount },
+        status: 'closed',
+        closedAt: new Date(),
       })
-      await prisma.gameSession.update({
-        where: { id: session.id },
-        data: { totalWin: { increment: winAmount }, lastActivityAt: new Date() },
-      })
+      await this.play.addSessionWin(session.id, winAmount)
     }
     return { balance: balanceAfter, duplicate: false }
   }
@@ -222,38 +136,21 @@ export class GameCallbackService {
     if (!cb.playerToken || !cb.rollbackTransactionId) {
       throw new Error('INVALID_ROLLBACK_REQUEST')
     }
-    const session = await prisma.gameSession.findUnique({ where: { sessionToken: cb.playerToken } })
+    const session = await this.play.findSessionByToken(cb.playerToken)
     if (!session) {
       throw new Error('SESSION_INVALID')
     }
-    const originalTx = await prisma.gameTransaction.findUnique({
-      where: {
-        providerId_externalTransactionId: {
-          providerId,
-          externalTransactionId: cb.rollbackTransactionId,
-        },
-      },
-    })
+    const originalTx = await this.play.findTransactionByExternal(
+      providerId,
+      cb.rollbackTransactionId,
+    )
     if (!originalTx) {
       // phantom rollback – return current balance
-      const w = await prisma.walletAccount.findUnique({
-        where: { userId_currency: { userId: session.userId, currency: session.currency } },
-      })
-      return { balance: w?.balance.toString() ?? '0', phantom: true }
+      return { balance: await this.getWalletBalance(session.userId, session.currency), phantom: true }
     }
-    // check already rolled back
-    const already = await prisma.gameTransaction.findFirst({
-      where: {
-        roundId: originalTx.roundId,
-        type: 'rollback',
-        metadata: { path: ['rollback_of'], equals: originalTx.id },
-      },
-    })
+    const already = await this.play.findRollbackOf(originalTx.roundId, originalTx.id)
     if (already) {
-      const w = await prisma.walletAccount.findUnique({
-        where: { userId_currency: { userId: session.userId, currency: session.currency } },
-      })
-      return { balance: w?.balance.toString() ?? '0', duplicate: true }
+      return { balance: await this.getWalletBalance(session.userId, session.currency), duplicate: true }
     }
     const rollbackAmount = originalTx.amount.toString()
     const res = await this.wallet.credit({
@@ -265,25 +162,77 @@ export class GameCallbackService {
       description: 'Отмена ставки',
       metadata: { rollback_of: originalTx.id },
     })
-    await prisma.gameTransaction.create({
-      data: {
-        roundId: originalTx.roundId,
-        sessionId: session.id,
-        userId: session.userId,
-        providerId,
-        type: 'rollback',
-        externalTransactionId: cb.transactionId || `rb_${originalTx.externalTransactionId}`,
-        amount: rollbackAmount,
-        currency: session.currency,
-        balanceAfter: res.balanceAfter,
-        ledgerEntryId: res.ledgerEntryId,
-        metadata: { ...(cb.rawRequest ?? {}), rollback_of: originalTx.id },
-      },
+    await this.play.createTransaction({
+      roundId: originalTx.roundId,
+      sessionId: session.id,
+      userId: session.userId,
+      providerId,
+      type: 'rollback',
+      externalTransactionId: cb.transactionId || `rb_${originalTx.externalTransactionId}`,
+      amount: rollbackAmount,
+      currency: session.currency,
+      balanceAfter: res.balanceAfter,
+      ledgerEntryId: res.ledgerEntryId,
+      metadata: { ...(cb.rawRequest ?? {}), rollback_of: originalTx.id },
     })
-    await prisma.gameRound.update({
-      where: { id: originalTx.roundId },
-      data: { totalBet: { decrement: rollbackAmount }, status: 'rolled_back' },
+    await this.play.updateRound(originalTx.roundId, {
+      totalBet: { decrement: rollbackAmount },
+      status: 'rolled_back',
     })
     return { balance: res.balanceAfter }
+  }
+
+  /** Активная сессия с игрой — общий вход bet/win. */
+  private async findActiveSession(token: string): Promise<GameSessionWithGame> {
+    const session = await this.play.findSessionByTokenWithGame(token)
+    if (!session || session.status !== 'active') {
+      throw new Error('SESSION_INVALID')
+    }
+    return session
+  }
+
+  private async findOrCreateRound(
+    providerId: string,
+    cb: ParsedProviderCallback,
+    session: GameSessionWithGame,
+    initialStatus: 'open' | 'closed',
+  ): Promise<GameRow> {
+    const roundExternalId = cb.roundId || cb.transactionId!
+    const existing = await this.play.findRoundByExternal(providerId, roundExternalId)
+    if (existing) {
+      return existing
+    }
+    return this.play.createRound({
+      sessionId: session.id,
+      userId: session.userId,
+      gameId: session.gameId,
+      providerId,
+      externalRoundId: roundExternalId,
+      currency: session.currency,
+      status: initialStatus,
+      ...(initialStatus === 'closed' ? { closedAt: new Date() } : {}),
+    })
+  }
+
+  private async creditWin(
+    session: GameSessionWithGame,
+    providerId: string,
+    cb: ParsedProviderCallback,
+    winAmount: string,
+  ) {
+    return this.wallet.credit({
+      userId: session.userId,
+      currency: session.currency as any,
+      amount: winAmount,
+      type: 'WIN',
+      idempotencyKey: `win_${providerId}_${cb.transactionId}`,
+      description: `Выигрыш в ${session.game.name}`,
+      metadata: { provider_id: providerId },
+    })
+  }
+
+  private async getWalletBalance(userId: string, currency: string): Promise<string> {
+    const bal = await this.wallet.getBalance(userId, currency as any)
+    return bal.balance
   }
 }

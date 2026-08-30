@@ -4,7 +4,11 @@ import { persist } from 'zustand/middleware'
 
 import { apiPost } from '@/lib/api'
 
-export interface WebUser { id: string; email: string | null; role: string }
+export interface WebUser {
+  id: string
+  email: string | null
+  role: string
+}
 
 interface AuthState {
   token: string | null
@@ -26,7 +30,9 @@ export const useAuth = create<AuthState>()(
       user: null,
       login: async (email, password) => {
         const res = await apiPost<any>('/auth/login', { email, password })
-        if (!res?.accessToken) throw new Error(res?.error?.message || 'Ошибка входа')
+        if (!res?.accessToken) {
+          throw new Error(res?.error?.message || 'Ошибка входа')
+        }
         set({ token: res.accessToken, user: res.user })
       },
       setSession: (token, user) => set({ token, user }),
@@ -34,7 +40,11 @@ export const useAuth = create<AuthState>()(
       setAuth: (user, token) => set({ token, user }),
       /** регистрация нового пользователя (письмо-подтверждение уходит с API) */
       register: async (email, password, referralCode) => {
-        const res = await apiPost<any>('/auth/register', { email, password, referral_code: referralCode })
+        const res = await apiPost<any>('/auth/register', {
+          email,
+          password,
+          referral_code: referralCode,
+        })
         if (res?.accessToken) {
           set({ token: res.accessToken, user: res.user })
           return

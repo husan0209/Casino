@@ -9,7 +9,9 @@ export const api = axios.create({ baseURL: API_URL })
 
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
   return config
 })
 
@@ -18,7 +20,9 @@ api.interceptors.response.use(
   (err: AxiosError) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
       useAuthStore.getState().logout()
-      if (!window.location.pathname.endsWith('/')) window.location.href = '/'
+      if (!window.location.pathname.endsWith('/')) {
+        window.location.href = '/'
+      }
     }
     return Promise.reject(err)
   },
@@ -31,7 +35,10 @@ export async function apiGet<T>(url: string, params?: Record<string, unknown>): 
 }
 
 /** GET c полным конвертом (когда нужна meta пагинации) */
-export async function apiGetFull<T = any>(url: string, params?: Record<string, unknown>): Promise<{ data: T; meta?: any }> {
+export async function apiGetFull<T = any>(
+  url: string,
+  params?: Record<string, unknown>,
+): Promise<{ data: T; meta?: any }> {
   const res = await api.get(url, { params })
   return { data: res.data?.data as T, meta: res.data?.meta }
 }
@@ -48,5 +55,10 @@ export async function apiPatch<T = any>(url: string, body?: unknown): Promise<T>
 
 export function errText(e: unknown): string {
   const ax = e as AxiosError<any>
-  return ax.response?.data?.error?.message ?? ax.response?.data?.message ?? (e as Error).message ?? 'Ошибка'
+  return (
+    ax.response?.data?.error?.message ??
+    ax.response?.data?.message ??
+    (e as Error).message ??
+    'Ошибка'
+  )
 }

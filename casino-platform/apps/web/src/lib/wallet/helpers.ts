@@ -4,12 +4,20 @@ import { money } from '@casino/shared-utils'
 
 export function sortWallets(wallets: WalletBalance[], activeCurrency: string): WalletBalance[] {
   return [...wallets].sort((a, b) => {
-    if (a.currency === activeCurrency) return -1
-    if (b.currency === activeCurrency) return 1
+    if (a.currency === activeCurrency) {
+      return -1
+    }
+    if (b.currency === activeCurrency) {
+      return 1
+    }
     const aPos = money.isPositive(a.available)
     const bPos = money.isPositive(b.available)
-    if (aPos && !bPos) return -1
-    if (!aPos && bPos) return 1
+    if (aPos && !bPos) {
+      return -1
+    }
+    if (!aPos && bPos) {
+      return 1
+    }
     return a.currency.localeCompare(b.currency)
   })
 }
