@@ -90,6 +90,19 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     } catch {
       json = { raw: text }
     }
+    // Глобальный ResponseFormatInterceptor оборачивает ответы контроллеров в
+    // { success, data } — разворачиваем. NB: provider-callback использует @Res()
+    // и идёт мимо интерсептора (у него success/balance на верхнем уровне — не трогаем).
+    if (
+      json &&
+      typeof json === 'object' &&
+      'success' in json &&
+      'data' in json &&
+      json['data'] !== null &&
+      typeof json['data'] === 'object'
+    ) {
+      json = json['data'] as Record<string, unknown>
+    }
     return { status: res.status, json }
   }
 
@@ -248,6 +261,7 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
         method: 'card',
         currency: 'RUB',
         amount: '1000',
+        idempotencyKey: `e2e-dep-${depositPrId}`,
       },
     })
     const raw = JSON.stringify({ order_id: depositPrId, amount: '1000', status: 'success' })
