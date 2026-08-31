@@ -45,6 +45,8 @@ import { PaymentRequestRepository } from '../payments/infrastructure/repositorie
     DashboardService,
     PaymentRequestRepository,
   ],
-  exports: [AuditLogService, AdminAuthGuard],
+  // AdminAuthService экспортируем вместе с AdminAuthGuard: guard инжектит его,
+  // и без экспорта импортирующие модули (KycModule) падали на DI (E2E, PR #15)
+  exports: [AuditLogService, AdminAuthGuard, AdminAuthService],
 })
 export class AdminModule {}
