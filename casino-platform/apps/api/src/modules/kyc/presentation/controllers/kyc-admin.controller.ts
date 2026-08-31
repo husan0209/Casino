@@ -2,13 +2,14 @@ import { Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes, Inject 
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
-import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
-import { RolesGuard, Roles } from '../../../auth/presentation/guards/roles.guard'
+// NB: reviewed_by -> FK на AdminUser (см. схему) — пишем AdminUser.id,
+// а не user.id: AuthGuard+RolesGuard здесь давали FK-violation на КАЖДОМ
+// одобрении (найдено E2E, PR #15). Паттерн — как в admin-finance.controller.
+import { AdminAuthGuard } from '../../../admin/presentation/admin-auth.guard'
 import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
 import { KycDecisionReasonSchema } from '../dto/kyc.dto'
 
-@UseGuards(AuthGuard, RolesGuard)
-@Roles('admin', 'superadmin')
+@UseGuards(AdminAuthGuard)
 @Controller('admin/kyc')
 export class KycAdminController {
   constructor(@Inject(KYC_REPOSITORY) private repo: IKycRepository) {}

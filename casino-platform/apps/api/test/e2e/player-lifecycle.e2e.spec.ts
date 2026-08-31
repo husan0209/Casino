@@ -25,8 +25,6 @@ const BASE = process.env['E2E_BASE_URL'] ?? 'http://127.0.0.1:3001'
 
 const PLAYER_EMAIL = `e2e-player-${randomUUID().slice(0, 8)}@casino.test`
 const PLAYER_PASSWORD = 'e2e-PlayerPass1'
-const ADMIN_EMAIL = `e2e-admin-${randomUUID().slice(0, 8)}@casino.test`
-const ADMIN_PASSWORD = 'e2e-AdminPass1'
 const SUPERADMIN_EMAIL = 'e2e-superadmin@casino.test'
 const SUPERADMIN_PASSWORD = 'e2e-SuperPass1'
 const RUKASSA_SECRET = process.env['RUKASSA_SECRET_KEY'] ?? 'e2e-rukassa-hmac-secret'
@@ -35,7 +33,6 @@ const RUKASSA_SHOP_ID = process.env['RUKASSA_SHOP_ID'] ?? 'e2e-shop'
 dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () => {
   let playerToken = ''
   let playerUserId = ''
-  let adminUserId = ''
   let kycProfileId = ''
   let depositPrId = ''
   let withdrawalPrId = ''
@@ -126,11 +123,11 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
       }
       await new Promise((r) => setTimeout(r, 1000))
     }
-    // фикс-старт: provider demo + игра + суперадмин
+    // фикс-старт: demo-provider (slug фабрики адаптеров) + игра + суперадмин
     const provider = await prisma.gameProvider.upsert({
-      where: { slug: 'demo' },
+      where: { slug: 'demo-provider' },
       update: {},
-      create: { slug: 'demo', name: 'Demo Provider', type: 'slots' },
+      create: { slug: 'demo-provider', name: 'Demo Provider', type: 'slots' },
     })
     providerId = provider.id
     const game = await prisma.game.upsert({
@@ -218,27 +215,23 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     expect(profile?.status).toBe('pending')
     kycProfileId = profile!.id
 
-    // минимальный валидный PNG: сигнатура (сниффер проверяет магию)
+    // минимальный валидный PNG: сигнатура (сниффер проверяет магию).
+    // document_type -> KycFileType (front/back/selfie/proof_of_address) —
+    // так же шлёт и веб-фронт (apps/web/src/app/kyc/page.tsx)
     const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
     const upload = await api('POST', '/kyc/documents', {
       token: playerToken,
-      multipart: { fields: { document_type: 'passport' }, file: { name: 'file', bytes: png } },
+      multipart: { fields: { document_type: 'front' }, file: { name: 'file', bytes: png } },
     })
     expect(upload.status).toBe(201)
     expect(upload.json?.['ok']).toBe(true)
   })
 
-  it('4. KYC approve админ-юзером (role=admin через RolesGuard)', async () => {
-    const reg = await api('POST', '/auth/register', {
-      body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+  it('4. KYC approve суперадмином (admin-JWT; reviewedBy -> AdminUser FK)', async () => {
+    const login = await api('POST', '/admin/auth/login', {
+      body: { email: SUPERADMIN_EMAIL, password: SUPERADMIN_PASSWORD },
     })
-    expect(reg.status).toBe(201)
-    adminUserId = (reg.json?.['user'] as { id: string }).id
-    userIds.push(adminUserId)
-    await prisma.user.update({ where: { id: adminUserId }, data: { role: 'admin' } })
-    const login = await api('POST', '/auth/login', {
-      body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
-    })
+    expect(login.status).toBe(201)
     const approve = await api('POST', `/admin/kyc/${kycProfileId}/approve`, {
       token: login.json?.['accessToken'] as string,
     })
@@ -300,7 +293,7 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     const token = new URL(launchUrl).searchParams.get('token') as string
     expect(token).toBeTruthy()
 
-    const bet = await api('POST', '/provider-callback/demo/bet', {
+    const bet = await api('POST', '/provider-callback/demo-provider/bet', {
       body: {
         action: 'bet',
         player_token: token,
@@ -315,7 +308,7 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     expect(bet.json?.['success']).toBe(true)
     expect(bet.json?.['balance']).toBe('900')
 
-    const win = await api('POST', '/provider-callback/demo/win', {
+    const win = await api('POST', '/provider-callback/demo-provider/win', {
       body: {
         action: 'win',
         player_token: token,
