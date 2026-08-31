@@ -2,7 +2,12 @@ import { Module } from '@nestjs/common'
 
 import { AuthModule } from '../auth/auth.module'
 import { WalletFacade } from './application/wallet.facade'
-import { WALLET_REPOSITORY, WALLET_LEDGER } from './domain/repositories/wallet.repository'
+import {
+  WALLET_REPOSITORY,
+  WALLET_LEDGER,
+  WALLET_TRANSACTION_RUNNER,
+} from './domain/repositories/wallet.repository'
+import { PrismaWalletTransactionRunner } from './infrastructure/ledger/wallet-transaction-runner.prisma'
 import {
   PrismaWalletRepository,
   PrismaWalletLedger,
@@ -16,6 +21,7 @@ import { WalletController } from './presentation/controllers/wallet.controller'
     WalletFacade,
     { provide: WALLET_REPOSITORY, useClass: PrismaWalletRepository },
     { provide: WALLET_LEDGER, useClass: PrismaWalletLedger },
+    { provide: WALLET_TRANSACTION_RUNNER, useClass: PrismaWalletTransactionRunner },
   ],
   exports: [WalletFacade],
 })

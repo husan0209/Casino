@@ -88,17 +88,33 @@ export interface IGamePlayRepository {
     data: Prisma.GameSessionUncheckedCreateInput,
   ): Promise<{ id: string; sessionToken: string }>
   touchSession(id: string): Promise<void>
-  addSessionBet(id: string, amount: string): Promise<void>
-  addSessionWin(id: string, amount: string): Promise<void>
-  findRoundByExternal(providerId: string, externalRoundId: string): Promise<GameRow | null>
-  createRound(data: Prisma.GameRoundUncheckedCreateInput): Promise<GameRow>
-  updateRound(id: string, data: Prisma.GameRoundUncheckedUpdateInput): Promise<void>
+  addSessionBet(id: string, amount: string, tx?: Prisma.TransactionClient): Promise<void>
+  addSessionWin(id: string, amount: string, tx?: Prisma.TransactionClient): Promise<void>
+  findRoundByExternal(
+    providerId: string,
+    externalRoundId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<GameRow | null>
+  createRound(data: Prisma.GameRoundUncheckedCreateInput, tx?: Prisma.TransactionClient): Promise<GameRow>
+  updateRound(
+    id: string,
+    data: Prisma.GameRoundUncheckedUpdateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void>
   findTransactionByExternal(
     providerId: string,
     externalTransactionId: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<GameTransactionRow | null>
-  findRollbackOf(roundId: string, rollbackOfId: string): Promise<GameTransactionRow | null>
-  createTransaction(data: Prisma.GameTransactionUncheckedCreateInput): Promise<GameTransactionRow>
+  findRollbackOf(
+    roundId: string,
+    rollbackOfId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<GameTransactionRow | null>
+  createTransaction(
+    data: Prisma.GameTransactionUncheckedCreateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<GameTransactionRow>
 }
 
 export const GAME_PLAY_REPOSITORY = Symbol('GAME_PLAY_REPOSITORY')

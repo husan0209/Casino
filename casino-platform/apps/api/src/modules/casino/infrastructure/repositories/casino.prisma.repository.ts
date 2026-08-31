@@ -139,8 +139,13 @@ export class PrismaGamePlayRepository implements IGamePlayRepository {
     await prisma.gameSession.update({ where: { id }, data: { lastActivityAt: new Date() } })
   }
 
-  async addSessionBet(id: string, amount: string): Promise<void> {
-    await prisma.gameSession.update({
+  async addSessionBet(
+    id: string,
+    amount: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const client = tx ?? prisma
+    await client.gameSession.update({
       where: { id },
       data: {
         totalBet: { increment: amount },
@@ -150,38 +155,59 @@ export class PrismaGamePlayRepository implements IGamePlayRepository {
     })
   }
 
-  async addSessionWin(id: string, amount: string): Promise<void> {
-    await prisma.gameSession.update({
+  async addSessionWin(
+    id: string,
+    amount: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const client = tx ?? prisma
+    await client.gameSession.update({
       where: { id },
       data: { totalWin: { increment: amount }, lastActivityAt: new Date() },
     })
   }
 
-  findRoundByExternal(providerId: string, externalRoundId: string): Promise<GameRow | null> {
-    return prisma.gameRound.findUnique({
+  findRoundByExternal(
+    providerId: string,
+    externalRoundId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<GameRow | null> {
+    return (tx ?? prisma).gameRound.findUnique({
       where: { providerId_externalRoundId: { providerId, externalRoundId } },
     })
   }
 
-  createRound(data: Prisma.GameRoundUncheckedCreateInput): Promise<GameRow> {
-    return prisma.gameRound.create({ data })
+  createRound(
+    data: Prisma.GameRoundUncheckedCreateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<GameRow> {
+    return (tx ?? prisma).gameRound.create({ data })
   }
 
-  async updateRound(id: string, data: Prisma.GameRoundUncheckedUpdateInput): Promise<void> {
-    await prisma.gameRound.update({ where: { id }, data })
+  async updateRound(
+    id: string,
+    data: Prisma.GameRoundUncheckedUpdateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    await (tx ?? prisma).gameRound.update({ where: { id }, data })
   }
 
   findTransactionByExternal(
     providerId: string,
     externalTransactionId: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<GameTransactionRow | null> {
-    return prisma.gameTransaction.findUnique({
+    return (tx ?? prisma).gameTransaction.findUnique({
       where: { providerId_externalTransactionId: { providerId, externalTransactionId } },
     })
   }
 
-  findRollbackOf(roundId: string, rollbackOfId: string): Promise<GameTransactionRow | null> {
-    return prisma.gameTransaction.findFirst({
+  findRollbackOf(
+    roundId: string,
+    rollbackOfId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<GameTransactionRow | null> {
+    return (tx ?? prisma).gameTransaction.findFirst({
       where: {
         roundId,
         type: 'rollback',
@@ -190,7 +216,10 @@ export class PrismaGamePlayRepository implements IGamePlayRepository {
     })
   }
 
-  createTransaction(data: Prisma.GameTransactionUncheckedCreateInput): Promise<GameTransactionRow> {
-    return prisma.gameTransaction.create({ data })
+  createTransaction(
+    data: Prisma.GameTransactionUncheckedCreateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<GameTransactionRow> {
+    return (tx ?? prisma).gameTransaction.create({ data })
   }
 }

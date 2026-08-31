@@ -6,17 +6,30 @@ import { money } from '@casino/shared-utils'
 import {
   IWalletLedger,
   IWalletRepository,
+  IWalletTransactionRunner,
   WALLET_LEDGER,
   WALLET_REPOSITORY,
+  WALLET_TRANSACTION_RUNNER,
   type CreditInput,
 } from '../domain/repositories/wallet.repository'
+
+import type { Prisma } from '@prisma/client'
 
 @Injectable()
 export class WalletFacade {
   constructor(
     @Inject(WALLET_LEDGER) private ledger: IWalletLedger,
     @Inject(WALLET_REPOSITORY) private repo: IWalletRepository,
+    @Inject(WALLET_TRANSACTION_RUNNER) private txRunner: IWalletTransactionRunner,
   ) {}
+  /**
+   * P0 #3: атомарный денежный сценарий. Колбэк получает Prisma tx — передавайте
+   * его в credit/debit (CreditInput.tx) и в репозитории игровых транзакций,
+   * чтобы ledger-запись и gameTransaction коммитились одним $transaction.
+   */
+  runInTransaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    return this.txRunner.runInTransaction(fn)
+  }
   credit(input: CreditInput) {
     return this.ledger.credit(input)
   }

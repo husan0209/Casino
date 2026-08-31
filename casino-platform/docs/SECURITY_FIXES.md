@@ -18,7 +18,7 @@
 |---|----------|------|--------|
 | 1 | `rollback()` перезачесляет `win` (всегда `credit` без учёта `originalTx.type`) | `apps/api/src/modules/casino/application/services/game-callback.service.ts` | ✅ Исправлено: bet → credit, win → debit, rollback → ошибка |
 | 2 | `confirmWithdrawal` может увести `locked`/`balance` в минус (нет guard, в отличие от `unlock`) | `apps/api/src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma.ts` | ✅ Исправлено: guard `balance >= amount` + `locked >= amount` |
-| 3 | bet/win/rollback не атомарны (wallet-операция и запись `gameTransaction` вне единой транзакции) | `game-callback.service.ts` + `wallet.ledger.prisma.ts` | ⬜ Нужен рефакторинг: ввести транзакционный контекст (tx) в `IWalletLedger`/`IGamePlayRepository`, чтобы bet/win/rollback проводились одним `$transaction`. Делать вместе с тестами (см. P2). |
+| 3 | ~~bet/win/rollback не атомарны (wallet-операция и запись `gameTransaction` вне единой транзакции)~~ | `game-callback.service.ts` + `wallet.ledger.prisma.ts` | ✅ Исправлено 2026-08-30: `WalletFacade.runInTransaction` (Serializable, раннер в wallet infrastructure) + `CreditInput.tx` и `tx?` в методах `IGamePlayRepository`; ledger при переданном tx НЕ открывает свой `$transaction` (Prisma запрещает вложенные); дубликат-чек дублируется внутри tx (гонка одновременных bet/rollback); 11 тестов `money-flow.spec.ts` фиксируют атомарность структурно (один tx на все операции) |
 | 4 | NOWPayments IPN подпись считается по raw body; по спецификации NOWPayments подписывается JSON с отсортированными ключами | `apps/api/src/modules/payments/infrastructure/clients/nowpayments.client.ts` | ⬜ Сверить с актуальной спецификацией IPN перед боевыми ключами; при расхождении заменить raw-body на канонический sorted-JSON HMAC-SHA512 |
 
 ## P1 — безопасность auth и данных
@@ -39,7 +39,7 @@
 | # | Проблема | Файл | Статус |
 |---|----------|------|--------|
 | 13 | `totalBet/totalWin` инкрементируется строкой (`increment: cb.betAmount`) | `game-callback.service.ts` | ⬜ Проверить после `prisma generate` (Prisma `Decimal` increment принимает number/Decimal). Если строка не проходит — перевести через `Decimal` |
-| 14 | Тестов почти нет (2 spec-файла), деньги не покрыты | `apps/api` | ⬜ Минимум: money-flow + идемпотентность + rollback-типы (GAP-24) |
+| 14 | ~~Тестов почти нет; деньги не покрыты~~ | `apps/api` | 🔶 Частично закрыто 2026-08-30 (GAP-24): `money-flow.spec.ts` (11) — idempotency, типы rollback (bet→credit, win→debit), атомарность (tx), fanthom/duplicate; `account-lockout.spec.ts` (5); `logger-redact.spec.ts` (3). Осталось: E2E + NOWPayments IPN + confirmWithdrawal через БД |
 | 15 | Pino/redact вместо Nest Logger (пароли/токены в логах) | все `*.service.ts`/`*.use-case.ts` | ✅ Исправлено 2026-08-30 (GAP-23): nestjs-pino + redact (password/token/authorization/cookie на 3 уровнях + req.body.*); фильтр не логирует err целиком; тест logger-redact.spec.ts |
 | 16 | `toMoney(n: any)` + 34 `as any` + глубокие относительные импорты | `wallet.ledger.prisma.ts` и др. | ⬜ GAP-22/26 |
 | 17 | Nginx `api_auth:10r/m` не совпадает с требованием 10/15 мин | `infra/nginx/nginx.conf` | ⬜ Согласовать с GAP-19 и `SECURITY_BASELINE §2.3` |
@@ -49,7 +49,7 @@
 
 ## Порядок работ
 
-1. Закрыть **P0 #3/#4** (атомарность + NOWPayments IPN) — это деньги.
+1. Закрыть **P0 #4** (NOWPayments IPN — сверить со спецификацией перед боевыми ключами) — последний денежный пункт. **#3 закрыт 2026-08-30.**
 2. Закрыть **P1 #8–#11** (throttler, helmet, lockout, токен/CSP).
 3. **Runtime-приёмка** на Linux-FS: `pnpm install && pnpm db:generate && pnpm db:migrate && pnpm dev`,
    прогон `register → login → deposit → launch → bet/win/rollback → admin`.
