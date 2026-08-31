@@ -1,11 +1,40 @@
 'use client'
-import axios, { type AxiosError } from 'axios'
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
 import { useAuthStore } from '@/stores/auth'
 
 export const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001/api/v1'
 
-export const api = axios.create({ baseURL: API_URL })
+/** P1 #11: withCredentials — httpOnly refresh-cookie уходит на /auth/refresh. */
+export const api = axios.create({ baseURL: API_URL, withCredentials: true })
+
+let refreshPromise: Promise<boolean> | null = null
+
+/**
+ * P1 #11: silent refresh — один общий запрос (single-flight), чтобы параллельные
+ * 401 не устроили шторм /auth/refresh. Новый access-token кладётся в память
+ * стора (refresh-cookie ротируется сервером). Возвращает успех.
+ */
+function trySilentRefresh(): Promise<boolean> {
+  if (!refreshPromise) {
+    refreshPromise = axios
+      // отдельный запрос без interceptor'ов — иначе зациклится на собственном 401
+      .post(`${API_URL}/auth/refresh`, null, { withCredentials: true })
+      .then((r) => {
+        const token: string | undefined = r.data?.data?.accessToken ?? r.data?.accessToken
+        if (!token) {
+          return false
+        }
+        useAuthStore.setState({ token })
+        return true
+      })
+      .catch(() => false)
+      .finally(() => {
+        refreshPromise = null
+      })
+  }
+  return refreshPromise
+}
 
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token
@@ -17,9 +46,23 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (res) => res,
-  (err: AxiosError) => {
-    if (err.response?.status === 401 && typeof window !== 'undefined') {
-      useAuthStore.getState().logout()
+  async (err: AxiosError) => {
+    const status = err.response?.status
+    const url = err.config?.url ?? ''
+    // retry-запросы и вызовы /auth/* не ретраим (иначе цикл)
+    const config = err.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined
+    const isAuthCall = url.includes('/auth/')
+    if (status === 401 && config && !config._retry && !isAuthCall && typeof window !== 'undefined') {
+      config._retry = true
+      const ok = await trySilentRefresh()
+      if (ok) {
+        // повтор исходного запроса: request-interceptor подставит свежий токен
+        return api.request(config)
+      }
+    }
+    if (status === 401 && typeof window !== 'undefined') {
+      // refresh не удался/не проводился — чистим память (cookie чистит сервер на logout)
+      useAuthStore.setState({ token: null, user: null })
     }
     return Promise.reject(err)
   },
