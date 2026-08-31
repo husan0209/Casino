@@ -1,4 +1,4 @@
-import { extForMime, sniffDocumentMime } from '../src/modules/kyc/application/services/file-sniffer'
+import { extForMime, sniffDocumentMime } from '../src/common/files/file-sniffer'
 
 /** Реалистичные стартовые байты форматов. */
 const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64)])
