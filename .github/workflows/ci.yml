@@ -119,12 +119,19 @@ jobs:
       # shared-types (TS6305 на свежем дереве), tsconfig.build.json api резолвит @casino/* на dist
       - name: Build workspace packages
         run: pnpm --filter @casino/shared-types --filter @casino/shared-utils --filter @casino/shared-config --filter @casino/database build
+      # Интеграционные тесты wallet ledger (GAP-24 остаток): схема → тестовую БД.
+      # db push вместо migrate deploy: миграции в repo — только manual/, схема живёт в schema.prisma
+      - name: Prisma db push (test schema)
+        run: pnpm --filter @casino/database exec prisma db push --skip-generate
       - name: Lint
         run: pnpm lint
       - name: Typecheck
         run: pnpm typecheck
       - name: Unit tests
         run: pnpm test
+        env:
+          # включает ledger.integration.spec.ts (без флага — скипаются локально)
+          LEDGER_INTEGRATION: '1'
       - name: Build
         run: pnpm build
 
