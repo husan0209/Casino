@@ -132,10 +132,12 @@ jobs:
         env:
           # включает ledger.integration.spec.ts (без флага — скипаются локально)
           LEDGER_INTEGRATION: '1'
+      - name: Build
+        run: pnpm build
       - name: E2E player lifecycle (GAP-05)
         env:
           # поднимает СОБРАННЫЙ сервер (dist/main.js) против тестовой БД + Redis;
-          # NestFactory внутри vitest-воркера крашит процесс — потому сервер в фоне
+          # NestFactory внутри vitest-воркера крашит процесс - потому сервер в фоне
           E2E_API: '1'
           JWT_ACCESS_SECRET: e2e-access-secret-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           JWT_REFRESH_SECRET: e2e-refresh-secret-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
@@ -150,8 +152,6 @@ jobs:
           pnpm --filter @casino/api exec vitest run test/e2e; CODE=$?
           kill $SERVER_PID
           exit $CODE
-      - name: Build
-        run: pnpm build
 
   docker-build:
     runs-on: ubuntu-latest
