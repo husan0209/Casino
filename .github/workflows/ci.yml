@@ -145,6 +145,9 @@ jobs:
           RUKASSA_SHOP_ID: e2e-shop
           RUKASSA_API_BASE: http://localhost:9
           APP_PORT: '3001'
+          APP_URL: http://localhost:3000
+          ADMIN_URL: http://localhost:3002
+          DOMAIN: localhost
         run: |
           node apps/api/dist/main.js &
           SERVER_PID=$!
