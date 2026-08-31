@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { mkdirSync, writeFileSync } from 'fs'
 import { extname } from 'path'
 
 import {
@@ -15,11 +16,12 @@ import {
   Inject,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
-import { diskStorage } from 'multer'
+import { memoryStorage } from 'multer'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
+import { extForMime, sniffDocumentMime } from '../../application/services/file-sniffer'
 import { GetKycStatusUseCase } from '../../application/use-cases/get-kyc-status.use-case'
 import { SubmitKycUseCase } from '../../application/use-cases/submit-kyc.use-case'
 import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
@@ -29,29 +31,13 @@ import {
 } from '../dto/kyc.dto'
 
 // SECURITY_BASELINE.md §7.1 — KYC documents whitelist.
-// MIME type and extension MUST both be in the allowed lists.
-// Filename is always randomUUID + allowed extension; original name is discarded.
-const ALLOWED_MIME = new Set<string>(['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+// P1 #12: MIME-фильтр Multer'а — только первая линия; клиентский Content-Type
+// подделывается тривиально. Финальное решение — magic bytes (file-sniffer):
+// файл пишется на диск ТОЛЬКО после проверки сигнатуры, расширение задаётся
+// sniffed-типом (filename = randomUUID + ext), имя всегда безопасно.
 const ALLOWED_EXT = new Set<string>(['.jpg', '.jpeg', '.png', '.webp', '.pdf'])
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
-
-function pickExtension(mimetype: string, originalName: string): string {
-  // Trust MIME first, fall back to original extension only if MIME matches.
-  if (mimetype === 'image/jpeg') {
-    return '.jpg'
-  }
-  if (mimetype === 'image/png') {
-    return '.png'
-  }
-  if (mimetype === 'image/webp') {
-    return '.webp'
-  }
-  if (mimetype === 'application/pdf') {
-    return '.pdf'
-  }
-  const ext = extname(originalName).toLowerCase()
-  return ALLOWED_EXT.has(ext) ? ext : ''
-}
+const UPLOAD_DIR = './uploads/kyc'
 
 @UseGuards(AuthGuard)
 @Controller('kyc')
@@ -85,23 +71,13 @@ export class KycController {
   @Post('documents')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/kyc',
-        filename: (_, f, cb) => {
-          const ext = pickExtension(f.mimetype, f.originalname)
-          if (!ext) {
-            return cb(new BadRequestException('Unsupported file type'), '')
-          }
-          cb(null, randomUUID() + ext)
-        },
-      }),
+      // P1 #12: память, не диск — решение «писать/не писать» принимает контроллер
+      // ПОСЛЕ magic-byte проверки; недоверенный контент на диск не попадает.
+      storage: memoryStorage(),
       limits: { fileSize: MAX_FILE_SIZE, files: 1 },
+      // грубый пре-фильтр: отсеивает заведомо чужие типы до сниффера
       fileFilter: (_, f, cb) => {
-        if (!ALLOWED_MIME.has(f.mimetype)) {
-          return cb(new BadRequestException(`Unsupported MIME type: ${f.mimetype}`), false)
-        }
         const ext = extname(f.originalname).toLowerCase()
-        // Allow upload even if extension is empty (e.g. mobile camera) — pickExtension will normalize.
         if (ext && !ALLOWED_EXT.has(ext)) {
           return cb(new BadRequestException(`Unsupported file extension: ${ext}`), false)
         }
@@ -118,7 +94,19 @@ export class KycController {
     if (!profile) {
       throw new Error('KYC_NOT_SUBMITTED')
     }
-    const url = `/uploads/kyc/${file.filename}`
+    if (!file || !file.buffer || file.buffer.length === 0) {
+      throw new BadRequestException('File is required')
+    }
+    // P1 #12: реальный тип — только по magic bytes, не по клиентскому Content-Type
+    const sniffed = sniffDocumentMime(file.buffer)
+    if (!sniffed) {
+      throw new BadRequestException('File content does not match an allowed document type')
+    }
+    // Пишем на диск только проверенный контент; имя генерируем сами.
+    mkdirSync(UPLOAD_DIR, { recursive: true })
+    const filename = randomUUID() + extForMime(sniffed)
+    writeFileSync(`${UPLOAD_DIR}/${filename}`, file.buffer, { mode: 0o600 })
+    const url = `/uploads/kyc/${filename}`
     // Sanitize originalName: strip any path components and limit length to prevent log/db bloat.
     const safeOriginal = file.originalname.replace(/[\\/]/g, '_').slice(0, 200)
     await this.repo.addDocument(profile.id, {
@@ -126,7 +114,7 @@ export class KycController {
       fileUrl: url,
       fileName: safeOriginal,
       fileSize: file.size,
-      mimeType: file.mimetype,
+      mimeType: sniffed,
     })
     return { ok: true, file_url: url }
   }
