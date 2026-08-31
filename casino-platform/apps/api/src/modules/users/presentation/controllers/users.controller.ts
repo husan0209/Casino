@@ -1,7 +1,8 @@
 import { randomUUID } from 'crypto'
-import { extname } from 'path'
+import { mkdirSync, writeFileSync } from 'fs'
 
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -15,9 +16,10 @@ import {
   UsePipes,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
-import { diskStorage } from 'multer'
+import { memoryStorage } from 'multer'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
+import { extForMime, sniffDocumentMime } from '../../../../common/files/file-sniffer'
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { GetMeUseCase } from '../../application/use-cases/get-me.use-case'
@@ -93,23 +95,28 @@ export class UsersController {
   @Post('me/avatar')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/avatars',
-        filename: (_, file, cb) => cb(null, randomUUID() + extname(file.originalname)),
-      }),
+      // P1 #12 follow-up: память + magic bytes, как в KYC; расширение
+      // от sniffed-типа (раньше — extname(originalname) из запроса!)
+      storage: memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 },
-      fileFilter: (_, file, cb) => {
-        const ok = /jpe?g|png|webp/.test(file.mimetype)
-        cb(null, ok)
-      },
     }),
   )
   async avatar(@CurrentUser() user: any, @UploadedFile() file: Express.Multer.File) {
     // avatar url saving – simplified, reuse profile repo directly
     const { PrismaUserProfileRepository } =
       await import('../../infrastructure/repositories/user-profile.prisma')
+    if (!file || !file.buffer || file.buffer.length === 0) {
+      throw new BadRequestException('File is required')
+    }
+    const sniffed = sniffDocumentMime(file.buffer)
+    if (!sniffed || sniffed === 'application/pdf') {
+      throw new BadRequestException('Avatar must be a JPEG, PNG or WebP image')
+    }
+    mkdirSync('./uploads/avatars', { recursive: true })
+    const filename = randomUUID() + extForMime(sniffed)
+    writeFileSync(`./uploads/avatars/${filename}`, file.buffer, { mode: 0o600 })
     const repo = new PrismaUserProfileRepository()
-    const url = `/uploads/avatars/${file.filename}`
+    const url = `/uploads/avatars/${filename}`
     await repo.setAvatar(user.id, url)
     return { avatar_url: url }
   }

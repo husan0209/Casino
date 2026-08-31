@@ -10,4 +10,5 @@ declare module 'multer' {
     filename?: (req: any, file: any, cb: MulterCallback<string>) => void
   }
   function diskStorage(options: StorageEngineOptions): unknown
+  function memoryStorage(): unknown
 }
