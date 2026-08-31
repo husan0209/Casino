@@ -173,18 +173,22 @@ export class NOWPaymentsClient {
   }
 
   /**
-   * IPN signature verification.
+   * IPN signature verification — dual-check (P0 #4, SECURITY_FIXES #4).
    *
-   * IMPORTANT: HMAC must be computed against the RAW request body bytes
-   * (captured by express.json({ verify }) in main.ts), NOT against a
-   * re-serialised JSON object. Re-serialised JSON differs from the
-   * original in key order, whitespace, and number formatting, which
-   * would reject legitimate webhooks.
+   * NOWPayments подписывает IPN HMAC-SHA512 по КАНОНИЧЕСКОМУ JSON —
+   * официальный сниппет из их док (Python):
+   *   sorted payload keys (верхний уровень) → json.dumps(..., separators=(',',':'))
+   *   → hmac-sha512(ipn_secret) → hex → заголовок x-nowpayments-sig.
+   * Раньше мы проверяли HMAC по raw body — для реальных NOWPayments IPN
+   * он НИКОГДА не совпадает (в подписи не raw-байты): депозиты не зачислялись.
    *
-   * The `body` argument is kept for logging/fallback only — never use it
-   * for the HMAC computation.
+   * Алгоритм проверки:
+   *   1. канонический (спека): parse → sort keys → compact JSON →
+   *      не-ASCII экранируется \uXXXX по правилам ensure_ascii Python;
+   *   2. raw-body HMAC (обратная совместимость, стоит 1 hash);
+   * принимается ЛЮБОЙ из двух (секрет один и тот же — ослабления нет).
    *
-   * Fail-closed: production without NOWPAYMENTS_IPN_SECRET — exception.
+   * Fail-closed: production без NOWPAYMENTS_IPN_SECRET — exception.
    */
   verifyIPN(rawBody: string, signature: string): boolean {
     const secret = this.config.get<string>('NOWPAYMENTS_IPN_SECRET')
@@ -195,21 +199,167 @@ export class NOWPaymentsClient {
       this.logger.error('NOWPAYMENTS_IPN_SECRET not set — rejecting IPN (fail-closed dev)')
       return false
     }
-    if (!signature) {
+    if (!signature || !rawBody) {
       return false
     }
-    if (!rawBody) {
-      return false
-    }
-
-    const expected = createHmac('sha512', secret).update(rawBody, 'utf8').digest('hex')
-
+    // 1. Канонический вариант по спеке NOWPayments (Python-сниппет)
     try {
-      const a = Buffer.from(signature.toLowerCase())
-      const b = Buffer.from(expected)
-      return a.length === b.length && timingSafeEqual(a, b)
+      const canonical = canonicalizeForNOWPayments(rawBody)
+      const expected = createHmac('sha512', secret).update(canonical, 'utf8').digest('hex')
+      if (safeEqualHex(signature, expected)) {
+        return true
+      }
+      // 1b. PHP-флейвор: json_encode по умолчанию экранирует «/»
+      const phpFlavor = canonical.replace(/\//g, '\\/')
+      const expectedPhp = createHmac('sha512', secret).update(phpFlavor, 'utf8').digest('hex')
+      if (safeEqualHex(signature, expectedPhp)) {
+        return true
+      }
     } catch {
-      return false
+      // невалидный JSON или ошибка сериализации — идём в raw-проверку
+    }
+    // 2. Raw-body HMAC (обратная совместимость)
+    const expectedRaw = createHmac('sha512', secret).update(rawBody, 'utf8').digest('hex')
+    return safeEqualHex(signature, expectedRaw)
+  }
+}
+
+/**
+ * Константное сравнение hex-подписи, регистронезависимое (заголовок
+ * может прийти в верхнем регистре).
+ */
+function safeEqualHex(received: string, expected: string): boolean {
+  try {
+    const a = Buffer.from(received.toLowerCase())
+    const b = Buffer.from(expected)
+    return a.length === b.length && timingSafeEqual(a, b)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Канонический JSON по официальному сниппету NOWPayments (Python):
+ *  - ключи верхнего уровня сортируются (sorted(data.items()));
+ *  - разделители компактные (separators=(',', ':'));
+ *  - ensure_ascii=True (дефолт Python): каждый не-ASCII символ → \uXXXX
+ *    в нижнем регистре по UTF-16 кодам (астералы — суррогатными парами);
+ *  - числа сохраняют ИСХОДНУЮ запись из тела (Python repr(10.0)='10.0',
+ *    а JSON.parse+JSON.stringify дал бы '10' — и HMAC не сошёлся бы).
+ * Управляющие символы JSON.stringify экранирует так же, как Python
+ * (\b\f\n\r\t коротко, остальные <0x20 через \uXXXX); «/» НЕ экранируется
+ * — совпадает с Python (в отличие от дефолтного PHP json_encode — такой
+ * вариант проверяется отдельно в verifyIPN).
+ *
+ * Вход — СЫРОЙ текст тела (не распарсенный объект), чтобы сохранить токены чисел.
+ */
+export function canonicalizeForNOWPayments(rawBody: string): string {
+  // числа → строковые маркеры (вне строк), чтобы JSON.parse не схлопнул 10.0 в 10
+  const marked = markNumberTokens(rawBody)
+  const parsed: unknown = JSON.parse(marked.text)
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    // спека NOWPayments шлёт только плоские объекты; прочее — как есть
+    return asciiEscape(JSON.stringify(parsed))
+  }
+  // type-confusion guard: если в теле есть СТРОКИ, неотличимые от наших
+  // маркеров (вставили N, а нашли N+k) — значит часть «маркеров» пришла от
+  // отправителя. Каноническую ветку пропускаем (verifyIPN проверит raw-HMAC).
+  if (countMarkers(parsed) !== marked.inserted) {
+    throw new Error('marker collision')
+  }
+  const obj = parsed as Record<string, unknown>
+  const sorted: Record<string, unknown> = {}
+  for (const key of Object.keys(obj).sort()) {
+    sorted[key] = obj[key]
+  }
+  const s = JSON.stringify(sorted)
+  // все маркеры наши (подтверждено подсчётом) → восстанавливаем исходные токены
+  return asciiEscape(s.replace(/"\\u0000NUM:([^"\\]*)\\u0000"/g, '$1'))
+}
+
+const NUMBER_TOKEN = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/
+
+/** Полное совпадение строки-маркера (с реальными NUL) с валидным числом внутри. */
+// NUL в маркере намеренный: реальный NOWPayments в строках NUL не шлёт,
+// а guard по подсчёту маркеров ловит подделку (type-confusion). Литерал/строка
+// с \u0000 ловит no-control-regex — собираем паттерн из кусков.
+const NUL = String.fromCharCode(0)
+const MARKER_VALUE = new RegExp(
+  '^' + NUL + 'NUM:(-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)' + NUL + '$',
+)
+
+/** Глубокий подсчёт строк-маркеров в распарсенном объекте. */
+function countMarkers(v: unknown): number {
+  if (typeof v === 'string') {
+    return MARKER_VALUE.test(v) ? 1 : 0
+  }
+  if (Array.isArray(v)) {
+    return v.reduce((n: number, x) => n + countMarkers(x), 0)
+  }
+  if (v !== null && typeof v === 'object') {
+    return Object.values(v).reduce((n: number, x) => n + countMarkers(x), 0)
+  }
+  return 0
+}
+
+/**
+ * Обходит СЫРОЙ JSON-текст: вне строк оборачивает числовые токены в
+ * строковые маркеры "\u0000NUM:<token>\u0000". Внутри строк (даты,
+ * адреса) ничего не трогает — там числа легитимны как текст.
+ * Возвращает текст и число вставленных маркеров (для type-confusion guard).
+ */
+function markNumberTokens(raw: string): { text: string; inserted: number } {
+  let out = ''
+  let inStr = false
+  let i = 0
+  let inserted = 0
+  while (i < raw.length) {
+    const ch = raw[i]
+    if (inStr) {
+      if (ch === '\\') {
+        out += ch + (raw[i + 1] ?? '')
+        i += 2
+        continue
+      }
+      if (ch === '"') {
+        inStr = false
+      }
+      out += ch
+      i += 1
+      continue
+    }
+    if (ch === '"') {
+      inStr = true
+      out += ch
+      i += 1
+      continue
+    }
+    const m = NUMBER_TOKEN.exec(raw.slice(i))
+    if (m) {
+      out += '"\\u0000NUM:' + m[0] + '\\u0000"'
+      inserted += 1
+      i += m[0].length
+      continue
+    }
+    out += ch
+    i += 1
+  }
+  return { text: out, inserted }
+}
+
+/** ensure_ascii-экранирование поверх JSON.stringify. */
+function asciiEscape(s: string): string {
+  let out = ''
+  for (const ch of s) {
+    const code = ch.codePointAt(0)
+    if (code !== undefined && code < 0x80) {
+      out += ch
+    } else {
+      // астеральные символы: экранируем обе UTF-16 суррогатные единицы
+      for (const unit of ch) {
+        out += '\\u' + unit.charCodeAt(0).toString(16).padStart(4, '0')
+      }
     }
   }
+  return out
 }
