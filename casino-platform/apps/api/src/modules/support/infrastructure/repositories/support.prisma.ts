@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import { prisma, type SupportTicketCategory, type SupportTicketPriority, type SupportTicketStatus } from '@casino/database'
 
 import {
   type ISupportRepository,
@@ -19,7 +19,7 @@ export class PrismaSupportRepository implements ISupportRepository {
   async createTicket(userId: string, subject: string, category: TicketCategory, message: string) {
     const ticket = await prisma.$transaction(async (tx: { [k: string]: any }) => {
       const t = await tx.supportTicket.create({
-        data: { userId, subject, category: category as any, status: 'open', priority: 'normal' },
+        data: { userId, subject, category: category as SupportTicketCategory, status: 'open', priority: 'normal' },
       })
       await tx.supportMessage.create({
         data: {
@@ -150,10 +150,10 @@ export class PrismaSupportRepository implements ISupportRepository {
   async setPriority(ticketId: string, priority: TicketPriority) {
     await prisma.supportTicket.update({
       where: { id: ticketId },
-      data: { priority: priority as any },
+      data: { priority: priority as SupportTicketPriority },
     })
   }
   async setStatus(ticketId: string, status: TicketStatus) {
-    await prisma.supportTicket.update({ where: { id: ticketId }, data: { status: status as any } })
+    await prisma.supportTicket.update({ where: { id: ticketId }, data: { status: status as SupportTicketStatus } })
   }
 }

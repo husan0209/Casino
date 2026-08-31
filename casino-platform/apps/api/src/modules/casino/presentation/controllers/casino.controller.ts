@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import { prisma, type GameCategory } from '@casino/database'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
@@ -69,7 +69,7 @@ export class CasinoController {
       categoryList.map(async (category) => ({
         ...category,
         game_count: await prisma.game.count({
-          where: { category: category.slug as any, isEnabled: true },
+          where: { category: category.slug as GameCategory, isEnabled: true },
         }),
       })),
     )

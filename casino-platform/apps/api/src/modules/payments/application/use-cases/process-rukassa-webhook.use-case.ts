@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 
+import type { Currency } from '@casino/shared-types'
+
 import { UsersFacade } from '../../../users/facade/users.facade'
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
 import { classifyPaymentStatus } from '../../domain/payment-status'
@@ -55,7 +57,7 @@ export class ProcessRukassaWebhookUseCase {
         const currency = pr.currency || 'RUB'
         await this.wallet.credit({
           userId: pr.userId,
-          currency: currency as any,
+          currency: currency as Currency,
           amount: pr.amount.toString(),
           type: 'DEPOSIT',
           idempotencyKey: 'deposit_' + pr.id,

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import { prisma, type PaymentProvider } from '@casino/database'
 
 @Injectable()
 export class PaymentRequestRepository {
@@ -11,7 +11,7 @@ export class PaymentRequestRepository {
     return prisma.paymentRequest.findUnique({ where: { id } })
   }
   findByExternalId(externalId: string, provider: string) {
-    return prisma.paymentRequest.findFirst({ where: { externalId, provider: provider as any } })
+    return prisma.paymentRequest.findFirst({ where: { externalId, provider: provider as PaymentProvider } })
   }
   updateStatus(id: string, status: any, extra: any = {}) {
     return prisma.paymentRequest.update({

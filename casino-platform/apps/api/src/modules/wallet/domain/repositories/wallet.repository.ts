@@ -1,6 +1,6 @@
 import type { Currency, MoneyAmount } from '@casino/shared-types'
 
-import type { Prisma } from '@prisma/client'
+import type { LedgerEntryType, Prisma } from '@prisma/client'
 
 export interface WalletAccount {
   userId: string
@@ -13,10 +13,12 @@ export interface CreditInput {
   userId: string
   currency: Currency
   amount: MoneyAmount
-  type: string
+  /** Тип проводки — enum БД; литералы вызывающих проверяются компилятором. */
+  type: LedgerEntryType
   idempotencyKey: string
   description?: string
-  metadata?: any
+  /** Prisma InputJsonValue: Record<string, unknown> не проходит компилятор без приведения. */
+  metadata?: Prisma.InputJsonValue
   /**
    * P0 #3: внешний Prisma-клиент транзакции. Если задан — ledger НЕ открывает
    * свой внутренний $transaction (Prisma запрещает вложенные), а проводит
