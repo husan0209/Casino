@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 
+import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
@@ -64,7 +65,7 @@ export class GameCallbackService {
       const round = await this.findOrCreateRound(providerId, cb, session, 'open', tx)
       const creditRes = await this.wallet.debit({
         userId: session.userId,
-        currency: session.currency as any,
+        currency: session.currency as Currency,
         amount: betAmount,
         type: 'BET',
         idempotencyKey: `bet_${providerId}_${externalId}`,
@@ -198,7 +199,7 @@ export class GameCallbackService {
       const res = isBet
         ? await this.wallet.credit({
             userId: session.userId,
-            currency: session.currency as any,
+            currency: session.currency as Currency,
             amount: rollbackAmount,
             type: 'ROLLBACK',
             idempotencyKey: `rollback_${providerId}_${cb.transactionId || originalTx.id}`,
@@ -208,7 +209,7 @@ export class GameCallbackService {
           })
         : await this.wallet.debit({
             userId: session.userId,
-            currency: session.currency as any,
+            currency: session.currency as Currency,
             amount: rollbackAmount,
             type: 'ROLLBACK',
             idempotencyKey: `rollback_${providerId}_${cb.transactionId || originalTx.id}`,
@@ -289,7 +290,7 @@ export class GameCallbackService {
   ) {
     return this.wallet.credit({
       userId: session.userId,
-      currency: session.currency as any,
+      currency: session.currency as Currency,
       amount: winAmount,
       type: 'WIN',
       idempotencyKey: `win_${providerId}_${cb.transactionId}`,
@@ -300,7 +301,7 @@ export class GameCallbackService {
   }
 
   private async getWalletBalance(userId: string, currency: string): Promise<string> {
-    const bal = await this.wallet.getBalance(userId, currency as any)
+    const bal = await this.wallet.getBalance(userId, currency as Currency)
     return bal.balance
   }
 }

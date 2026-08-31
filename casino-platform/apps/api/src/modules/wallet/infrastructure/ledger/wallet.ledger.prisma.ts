@@ -1,6 +1,8 @@
+import { randomUUID } from 'crypto'
+
 import { Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import { prisma, type Prisma } from '@casino/database'
 import { ZERO, type Currency, type MoneyAmount } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
@@ -23,8 +25,9 @@ import {
  * ledger is added, only this file needs to change.
  */
 
-function toMoney(n: any): MoneyAmount {
-  return n.toString()
+/** Prisma возвращает Decimal — все денежные значения идут через toString(). */
+function toMoney(v: Prisma.Decimal | number | bigint | string): MoneyAmount {
+  return v.toString()
 }
 
 @Injectable()
@@ -46,14 +49,13 @@ export class PrismaWalletRepository implements IWalletRepository {
   }
   async listBalances(userId: string): Promise<WalletAccount[]> {
     const rows = await prisma.walletAccount.findMany({ where: { userId } })
-    return rows.map(
-      (w: { userId: string; currency: string; balance: any; locked: any; version: bigint }) => ({
+    return rows.map((w) => ({
         userId: w.userId,
         currency: w.currency as Currency,
         balance: toMoney(w.balance),
         locked: toMoney(w.locked),
         version: w.version,
-      }),
+      })
     )
   }
 }
@@ -63,7 +65,7 @@ export class PrismaWalletLedger implements IWalletLedger {
   private async runCreditDebit(input: CreditInput, sign: 1 | -1): Promise<CreditResult> {
     // idempotency check (читаем на том же клиенте, что и мутация —
     // внутри внешней транзакции это условие гонки внутри tx и корректно)
-    const client = (input.tx ?? prisma) as { [k: string]: any }
+    const client: Prisma.TransactionClient = input.tx ?? prisma
     const existing = await client.ledgerEntry.findUnique({
       where: { idempotencyKey: input.idempotencyKey },
     })
@@ -79,12 +81,12 @@ export class PrismaWalletLedger implements IWalletLedger {
     // (Prisma запрещает вложенные) — мутация идёт на переданном клиенте;
     // атомарность и Serializable обеспечивает запустивший транзакцию.
     if (input.tx) {
-      return this.applyCreditDebit(input.tx as { [k: string]: any }, input, sign)
+      return this.applyCreditDebit(input.tx, input, sign)
     }
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         return await prisma.$transaction(
-          async (tx: { [k: string]: any }) => this.applyCreditDebit(tx, input, sign),
+          async (tx) => this.applyCreditDebit(tx, input, sign),
           { isolationLevel: 'Serializable' },
         )
       } catch (e) {
@@ -100,7 +102,7 @@ export class PrismaWalletLedger implements IWalletLedger {
 
   /** Тело мутации без обёртки $transaction — общий для tx-режима и solo-режима. */
   private async applyCreditDebit(
-    tx: { [k: string]: any },
+    tx: Prisma.TransactionClient,
     input: CreditInput,
     sign: 1 | -1,
   ): Promise<CreditResult> {
@@ -140,12 +142,12 @@ export class PrismaWalletLedger implements IWalletLedger {
           transactionId: randomUUID(),
           walletAccountId: wallet.id,
           userId: input.userId,
-          type: input.type as any,
+          type: input.type,
           amount: sign === 1 ? input.amount : '-' + input.amount,
           balanceBefore,
           balanceAfter,
           idempotencyKey: input.idempotencyKey,
-          description: input.description,
+          description: input.description ?? null,
           metadata: input.metadata ?? {},
         },
       })
@@ -178,7 +180,7 @@ export class PrismaWalletLedger implements IWalletLedger {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         return await prisma.$transaction(
-          async (tx: { [k: string]: any }) => {
+          async (tx) => {
             const wallet = await tx.walletAccount.findUnique({
               where: { userId_currency: { userId, currency } },
             })
@@ -255,7 +257,7 @@ export class PrismaWalletLedger implements IWalletLedger {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         return await prisma.$transaction(
-          async (tx: { [k: string]: any }) => {
+          async (tx) => {
             const wallet = await tx.walletAccount.findUnique({
               where: { userId_currency: { userId, currency } },
             })
@@ -333,7 +335,7 @@ export class PrismaWalletLedger implements IWalletLedger {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
         return await prisma.$transaction(
-          async (tx: { [k: string]: any }) => {
+          async (tx) => {
             const wallet = await tx.walletAccount.findUnique({
               where: { userId_currency: { userId, currency } },
             })
@@ -384,12 +386,4 @@ export class PrismaWalletLedger implements IWalletLedger {
     }
     throw new OptimisticLockError()
   }
-}
-
-function randomUUID(): string {
-  if (globalThis.crypto.randomUUID) {
-    return globalThis.crypto.randomUUID()
-  }
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  return require('crypto').randomUUID() as string
 }

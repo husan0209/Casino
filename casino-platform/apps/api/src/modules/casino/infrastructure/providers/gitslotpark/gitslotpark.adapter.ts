@@ -12,6 +12,11 @@ import {
 
 const has = (v: unknown): boolean => v !== null && v !== undefined
 
+/** Элемент каталога агрегатора — внешний API без контракта, читаем по индексу. */
+type ProviderGameRow = Record<string, unknown>
+/** Конверт списка игр: массив, {games: []} или {data: []} — зависит от версии API. */
+type GameListEnvelope = ProviderGameRow[] | { games?: ProviderGameRow[]; data?: ProviderGameRow[] }
+
 /**
  * GitSlotPark Seamless Wallet API v2 — агрегатор Pragmatic Play / PG Soft /
  * Amatic / Amusnet (EGT).
@@ -90,16 +95,17 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
     if (!res.ok) {
       throw new Error(`gamelist HTTP ${res.status}`)
     }
-    const d = (await res.json()) as any
-    const list: any[] = Array.isArray(d) ? d : (d.games ?? d.data ?? [])
+    // Внешний API без контракта — ответ читается через unknown-индексацию с фолбэками
+    const d = (await res.json()) as GameListEnvelope
+    const list: ProviderGameRow[] = Array.isArray(d) ? d : (d.games ?? d.data ?? [])
     return list.map((g) => ({
-      externalGameId: String(g.gameid ?? g.id ?? g.game_id),
-      name: String(g.name ?? g.gameName ?? ''),
-      type: g.type === 'live' ? 'live_roulette' : 'slot',
-      category: g.type === 'live' ? 'live_casino' : 'slots',
-      thumbnailUrl: g.image ?? g.thumbnail ?? undefined,
-      hasDemo: Boolean(g.demo ?? g.freespin ?? false),
-      rtp: g.rtp ? Number(g.rtp) : undefined,
+      externalGameId: String(g['gameid'] ?? g['id'] ?? g['game_id']),
+      name: String(g['name'] ?? g['gameName'] ?? ''),
+      type: g['type'] === 'live' ? 'live_roulette' : 'slot',
+      category: g['type'] === 'live' ? 'live_casino' : 'slots',
+      thumbnailUrl: (g['image'] ?? g['thumbnail'] ?? undefined) as string | undefined,
+      hasDemo: Boolean(g['demo'] ?? g['freespin'] ?? false),
+      rtp: g['rtp'] ? Number(g['rtp']) : undefined,
       metadata: g,
     }))
   }

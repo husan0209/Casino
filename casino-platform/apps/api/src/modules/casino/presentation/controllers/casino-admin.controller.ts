@@ -2,7 +2,7 @@ import { createHash } from 'crypto'
 
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import { prisma, type GameCategory, type GameType, type Prisma } from '@casino/database'
 
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
@@ -50,14 +50,14 @@ export class CasinoAdminController {
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/(^-|-$)/g, '') || 'game'
       const slug = `${slugBase}-${createHash('md5').update(`${provider.slug}:${g.externalGameId}`).digest('hex').slice(0, 6)}`
-      const data: any = {
+      const data = {
         name: g.name || g.externalGameId,
-        type: (g.type as any) ?? 'slot',
-        category: (g.category as any) ?? 'slots',
+        type: (g.type as GameType) ?? 'slot',
+        category: (g.category as GameCategory) ?? 'slots',
         thumbnailUrl: g.thumbnailUrl ?? null,
         hasDemo: g.hasDemo ?? false,
         rtp: g.rtp != null ? String(g.rtp) : null, // eslint-disable-line eqeqeq -- null|undefined guard on provider payload
-        metadata: (g.metadata ?? {}) as any,
+        metadata: (g.metadata ?? {}) as Prisma.InputJsonValue,
       }
       const existing = await prisma.game.findUnique({
         where: { providerId_externalGameId: { providerId: id, externalGameId: g.externalGameId } },

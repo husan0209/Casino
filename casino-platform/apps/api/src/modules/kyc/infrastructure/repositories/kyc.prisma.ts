@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import { prisma, type KycDocumentType, type KycStatus } from '@casino/database'
 
 import { type IKycRepository, type KycSubmitInput } from '../../domain/repositories/kyc.repository'
 
@@ -26,7 +26,7 @@ export class PrismaKycRepository implements IKycRepository {
         lastName: input.lastName,
         dateOfBirth: input.dateOfBirth,
         country: input.country,
-        documentType: input.documentType as any,
+        documentType: input.documentType as KycDocumentType,
         documentNumber: input.documentNumber,
         documentExpiry: input.documentExpiry ?? null,
         status: 'pending',
@@ -39,7 +39,7 @@ export class PrismaKycRepository implements IKycRepository {
         lastName: input.lastName,
         dateOfBirth: input.dateOfBirth,
         country: input.country,
-        documentType: input.documentType as any,
+        documentType: input.documentType as KycDocumentType,
         documentNumber: input.documentNumber,
         documentExpiry: input.documentExpiry ?? null,
         status: 'pending',
@@ -75,7 +75,7 @@ export class PrismaKycRepository implements IKycRepository {
     }
   }
   async listAdmin(status?: string, page = 1, perPage = 20) {
-    const where = status ? { status: status as any } : {}
+    const where = status ? { status: status as KycStatus } : {}
     const [items, total] = await Promise.all([
       prisma.kycProfile.findMany({
         where,
@@ -97,7 +97,7 @@ export class PrismaKycRepository implements IKycRepository {
     await prisma.kycProfile.update({
       where: { id },
       data: {
-        status: status as any,
+        status: status as KycStatus,
         rejectionReason: reason ?? null,
         reviewedBy: reviewedBy ?? null,
         approvedAt: status === 'approved' ? new Date() : null,

@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
 
 import { prisma } from '@casino/database'
+import { type Currency } from '@casino/shared-types'
 import { AppError } from '@casino/shared-utils'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
@@ -146,7 +147,7 @@ export class AdminFinanceController {
     }
     await this.wallet.confirmWithdrawal(
       wd.userId,
-      wd.currency as any,
+      wd.currency as Currency,
       wd.amount.toString(),
       `wd_confirm_${wd.id}`,
     )
@@ -170,7 +171,7 @@ export class AdminFinanceController {
     }
     await this.wallet.unlock(
       wd.userId,
-      wd.currency as any,
+      wd.currency as Currency,
       wd.amount.toString(),
       `wd_unlock_${wd.id}_${randomUUID()}`,
     )
@@ -279,7 +280,7 @@ export class AdminFinanceController {
     }
     const res = await this.wallet.credit({
       userId,
-      currency: b.currency as any,
+      currency: b.currency as Currency,
       amount: b.amount,
       type: 'ADMIN_CREDIT',
       idempotencyKey: `adm_credit_${admin.id}_${Date.now()}`,
@@ -312,7 +313,7 @@ export class AdminFinanceController {
     }
     const res = await this.wallet.debit({
       userId,
-      currency: b.currency as any,
+      currency: b.currency as Currency,
       amount: b.amount,
       type: 'ADMIN_DEBIT',
       idempotencyKey: `adm_debit_${admin.id}_${Date.now()}`,

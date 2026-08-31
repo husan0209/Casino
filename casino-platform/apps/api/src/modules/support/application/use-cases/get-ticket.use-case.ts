@@ -16,7 +16,7 @@ export class GetTicketUseCase {
     if (!ticket) {
       throw new TicketNotFoundError()
     }
-    if (!isAdmin && (ticket as any).userId !== userId) {
+    if (!isAdmin && ticket.userId !== userId) {
       throw new ForbiddenTicketError()
     }
     const messages = await this.repo.listMessages(ticketId, isAdmin)

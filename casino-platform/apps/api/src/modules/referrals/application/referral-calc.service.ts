@@ -100,7 +100,7 @@ export class ReferralCalcService {
           userId: referrerId,
           currency: cur as Currency,
           amount: rewardAmount,
-          type: 'referral_reward',
+          type: 'REFERRAL_REWARD', // enum LedgerEntryType (было 'referral_reward' — не из enum)
           idempotencyKey: `ref_reward_${rr.id}`,
           description: `Referral reward for ${referredId} (${dayStart.toISOString().slice(0, 10)})`,
           metadata: { referralRewardId: rr.id, referredId },

@@ -2,6 +2,8 @@ import { randomUUID } from 'crypto'
 
 import { Injectable, ForbiddenException } from '@nestjs/common'
 
+import type { Currency } from '@casino/shared-types'
+
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 
@@ -21,7 +23,7 @@ export class CancelWithdrawalUseCase {
     }
     await this.wallet.unlock(
       userId,
-      pr.currency as any,
+      pr.currency as Currency,
       pr.amount.toString(),
       `wd_unlock_${randomUUID()}`,
     )

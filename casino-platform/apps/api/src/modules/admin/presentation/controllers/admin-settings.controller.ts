@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import { prisma, type SystemSettingType } from '@casino/database'
 
 import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
@@ -67,7 +67,7 @@ export class AdminSettingsController {
     await prisma.systemSetting.upsert({
       where: { key: templateKey },
       update: { value: templateValue, updatedBy: admin.id },
-      create: { key: templateKey, value: templateValue, type: 'json' as any, updatedBy: admin.id },
+      create: { key: templateKey, value: templateValue, type: 'json' as SystemSettingType, updatedBy: admin.id },
     })
     await this.audit.log({
       actorType: 'admin',

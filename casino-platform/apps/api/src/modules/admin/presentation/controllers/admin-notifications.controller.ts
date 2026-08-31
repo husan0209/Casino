@@ -31,7 +31,8 @@ export class AdminNotificationsController {
       userId,
       title: body.title,
       message: body.message,
-      type: (body.type as any) || 'system',
+      // Notification.type — VarChar(64), не enum — каст не нужен
+      type: body.type || 'system',
       channel: 'internal' as const,
       isRead: false,
     }))

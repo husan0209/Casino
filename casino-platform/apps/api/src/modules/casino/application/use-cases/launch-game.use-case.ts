@@ -3,6 +3,8 @@ import { randomBytes } from 'crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import Decimal from 'decimal.js'
 
+import type { Currency } from '@casino/shared-types'
+
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
 import { InsufficientFundsError } from '../../../wallet/domain/errors'
 import {
@@ -82,8 +84,9 @@ export class LaunchGameUseCase {
   /** Реальная или провайдерская валютная сетка; демо и гости не проверяются. */
   private assertCurrencySupported(game: GameWithProvider, input: LaunchGameInput): void {
     const supported = (game.supportedCurrencies as string[] | null) ?? []
-    const providerSupported = (game.provider.config as any)?.supported_currencies as
-      string[] | undefined
+    // Json-поле провайдера — контракт демо-провайдера; форма фиксируется типом, не any
+    const providerConfig = game.provider.config as { supported_currencies?: string[] } | null
+    const providerSupported = providerConfig?.supported_currencies
     const allowed = supported.length ? supported : (providerSupported ?? [input.currency])
     if (allowed.length && !allowed.includes(input.currency)) {
       throw new CurrencyNotSupportedError(input.currency)
@@ -91,7 +94,7 @@ export class LaunchGameUseCase {
   }
 
   private async ensureSufficientFunds(userId: string, currency: string): Promise<void> {
-    const bal = await this.wallet.getBalance(userId, currency as any)
+    const bal = await this.wallet.getBalance(userId, currency as Currency)
     if (new Decimal(bal.available).lte(0)) {
       throw new InsufficientFundsError('0.01', bal.available)
     }

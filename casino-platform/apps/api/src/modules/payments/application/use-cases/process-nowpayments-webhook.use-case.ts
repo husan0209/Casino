@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 
+import type { Currency } from '@casino/shared-types'
+
 import { UsersFacade } from '../../../users/facade/users.facade'
 import { WalletFacade } from '../../../wallet/application/wallet.facade'
 import { NOWPaymentsClient } from '../../infrastructure/clients/nowpayments.client'
@@ -45,7 +47,7 @@ export class ProcessNOWPaymentsWebhookUseCase {
         const actuallyPaid = body.actually_paid || body.pay_amount || pr.amount.toString()
         await this.wallet.credit({
           userId: pr.userId,
-          currency: pr.currency as any,
+          currency: pr.currency as Currency,
           amount: String(actuallyPaid),
           type: 'DEPOSIT',
           idempotencyKey: 'deposit_' + pr.id,

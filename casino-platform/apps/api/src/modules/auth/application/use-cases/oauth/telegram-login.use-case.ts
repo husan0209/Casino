@@ -67,7 +67,7 @@ export class TelegramLoginUseCase {
       provider: 'telegram',
       providerUserId: String(input.id),
       displayName,
-      referralCode: (input as any).referralCode,
+      referralCode: input.referralCode,
       ip: meta?.ip,
       userAgent: meta?.userAgent,
     })

@@ -29,7 +29,8 @@ function daysBetween(since: Date): number {
   return Math.round((startOfUtcDay().getTime() - since.getTime()) / DAY_MS) + 1
 }
 
-const s2 = (v: unknown): string => new Decimal((v as any)?.toString?.() ?? '0').toFixed(2)
+type DecimalLike = { toString?: () => string } | null | undefined
+const s2 = (v: unknown): string => new Decimal((v as DecimalLike)?.toString?.() ?? '0').toFixed(2)
 
 function dayLabels(since: Date, totalDays: number): string[] {
   const labels: string[] = []
