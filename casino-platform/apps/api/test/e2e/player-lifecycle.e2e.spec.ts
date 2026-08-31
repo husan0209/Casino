@@ -1,16 +1,17 @@
 /**
  * E2E player lifecycle (GAP-05, Engineering Excellence Plan §2.1).
  *
- * Реальный NestJS-сервер (AppModule целиком, express + json-rawBody capture)
- * на эфемерном порту, реальный Postgres (DATABASE_URL из окружения CI).
- * Клиентский слой — обычный fetch, без новых зависимостей.
+ * Против РЕАЛЬНОГО запущенного сервера: CI собирает api (`pnpm build`) и
+ * стартует `node dist/main.js` в фоне (prod-путь целиком: helmet, pino,
+ * rawBody-capture), тестовый Postgres/Redis — сервисы job'а.
+ * Спек — только HTTP-клиент (голый fetch), без подъёма Nest в воркере:
+ * NestFactory внутри vitest-форка крашит процесс (native crash, см. CI).
  *
- * Сценарий ТЗ: register → login → KYC (submit + upload + approve) →
- * депозит через вебхук Rukassa с валидным HMAC → баланс →
- * launch игры → provider-callback Bet/Win → заявка на вывод (lock) →
- * одобрение админом (confirmWithdrawal).
+ * Сценарий: register → login → KYC (submit+upload+approve) → депозит через
+ * вебхук Rukassa с валидным HMAC → баланс → launch → provider-callback
+ * Bet/Win → вывод (lock) → одобрение админом (confirmWithdrawal).
  *
- * Запуск: E2E_API=1 (в CI отдельный шаг; локально скипается).
+ * Запуск: E2E_API=1 (CI-шаг после unit; локально скипается).
  * ВАЖНО: describe-колбэк не async, весь код — в beforeAll/it.
  */
 import { randomUUID, createHmac } from 'crypto'
@@ -20,36 +21,20 @@ import { prisma } from '@casino/database'
 const E2E = process.env['E2E_API'] === '1'
 const dE2E = E2E ? describe : describe.skip
 
-// ── env до загрузки AppModule (ConfigModule.forRoot валидирует при import) ──
-process.env['NODE_ENV'] = 'test'
-process.env['JWT_ACCESS_SECRET'] =
-  'e2e-access-secret-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
-process.env['JWT_REFRESH_SECRET'] =
-  'e2e-refresh-secret-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
-process.env['APP_URL'] = 'http://localhost:3000'
-process.env['ADMIN_URL'] = 'http://localhost:3002'
-process.env['DOMAIN'] = 'localhost'
-process.env['CORS_ORIGINS'] = 'http://localhost:3000'
-process.env['REDIS_URL'] = process.env['REDIS_URL'] || 'redis://localhost:6379/1'
-process.env['RUKASSA_SHOP_ID'] = 'e2e-shop'
-process.env['RUKASSA_SECRET_KEY'] = 'e2e-rukassa-hmac-secret'
-process.env['RUKASSA_API_BASE'] = 'http://localhost:9' // web-вызовы не будут совершены
-process.env['NOWPAYMENTS_IPN_SECRET'] = 'e2e-nowpayments-ipn-secret'
+const BASE = process.env['E2E_BASE_URL'] ?? 'http://127.0.0.1:3001'
 
-const PLAYER_EMAIL = 'e2e-player@casino.test'
+const PLAYER_EMAIL = `e2e-player-${randomUUID().slice(0, 8)}@casino.test`
 const PLAYER_PASSWORD = 'e2e-PlayerPass1'
-const ADMIN_EMAIL = 'e2e-admin@casino.test'
+const ADMIN_EMAIL = `e2e-admin-${randomUUID().slice(0, 8)}@casino.test`
 const ADMIN_PASSWORD = 'e2e-AdminPass1'
 const SUPERADMIN_EMAIL = 'e2e-superadmin@casino.test'
 const SUPERADMIN_PASSWORD = 'e2e-SuperPass1'
+const RUKASSA_SECRET = process.env['RUKASSA_SECRET_KEY'] ?? 'e2e-rukassa-hmac-secret'
+const RUKASSA_SHOP_ID = process.env['RUKASSA_SHOP_ID'] ?? 'e2e-shop'
 
 dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () => {
-  let baseUrl = ''
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Nest app без импорта типов на верхнем уровне
-  let app: any
   let playerToken = ''
   let playerUserId = ''
-  let adminUserToken = ''
   let adminUserId = ''
   let kycProfileId = ''
   let depositPrId = ''
@@ -97,7 +82,7 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
       headers['content-type'] = 'application/json'
       body = JSON.stringify(opts.body)
     }
-    const res = await fetch(`${baseUrl}/api/v1${path}`, { method, headers, body })
+    const res = await fetch(`${BASE}/api/v1${path}`, { method, headers, body })
     const text = await res.text()
     let json: Record<string, unknown> | null = null
     try {
@@ -108,19 +93,27 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     return { status: res.status, json }
   }
 
+  /** Формула rukassa.client.ts: HMAC-SHA256(`${shopId}:${orderId}:${amount}`) по RAW-байтам. */
   function rukassaSign(raw: string): string {
-    // формула rukassa.client.ts: HMAC-SHA256(`${shopId}:${orderId}:${amount}`)
     const parsed = JSON.parse(raw) as { order_id: string; amount: string }
-    const payload = `${process.env['RUKASSA_SHOP_ID']}:${parsed.order_id}:${parsed.amount}`
-    return createHmac('sha256', process.env['RUKASSA_SECRET_KEY']!).update(payload).digest('hex')
+    const payload = `${RUKASSA_SHOP_ID}:${parsed.order_id}:${parsed.amount}`
+    return createHmac('sha256', RUKASSA_SECRET).update(payload).digest('hex')
   }
 
   beforeAll(async () => {
-    const { NestFactory } = await import('@nestjs/core')
-    const { AppModule } = await import('../../src/app.module')
-    const { json, urlencoded } = await import('express')
-
-    // фикс-старт: provider demo + игра + админы
+    // ready-проба: сервер уже должен быть поднят CI-шагом (или оператором локально)
+    for (let i = 0; i < 30; i++) {
+      try {
+        const res = await fetch(`${BASE}/api/v1/health/ready`)
+        if (res.ok) {
+          break
+        }
+      } catch {
+        // ещё не поднялся
+      }
+      await new Promise((r) => setTimeout(r, 1000))
+    }
+    // фикс-старт: provider demo + игра + суперадмин
     const provider = await prisma.gameProvider.upsert({
       where: { slug: 'demo' },
       update: {},
@@ -141,37 +134,17 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
       },
     })
     gameId = game.id
-
-    const { hash } = await import('argon2')
-    const superadmin = await prisma.adminUser.upsert({
+    const argon2 = await import('argon2')
+    await prisma.adminUser.upsert({
       where: { email: SUPERADMIN_EMAIL },
-      update: { passwordHash: await hash(SUPERADMIN_PASSWORD, { type: 2 }) },
+      update: { passwordHash: await argon2.hash(SUPERADMIN_PASSWORD, { type: 2 }) },
       create: {
         email: SUPERADMIN_EMAIL,
-        passwordHash: await hash(SUPERADMIN_PASSWORD, { type: 2 }),
+        passwordHash: await argon2.hash(SUPERADMIN_PASSWORD, { type: 2 }),
         role: 'superadmin',
         isActive: true,
       },
     })
-    expect(superadmin.role).toBe('superadmin')
-
-    app = await NestFactory.create(AppModule, {
-      bodyParser: false, // свои парсеры с rawBody capture, как в main.ts
-      logger: false,
-    })
-    app.use(
-      json({
-        limit: '1mb',
-        verify: (req: unknown, _r: unknown, buf: Buffer) => {
-          const r = req as { rawBody?: string }
-          r.rawBody = buf.toString('utf8')
-        },
-      }),
-    )
-    app.use(urlencoded({ extended: true, limit: '1mb' }))
-    app.setGlobalPrefix('api/v1')
-    await app.listen(0)
-    baseUrl = `http://127.0.0.1:${(app.getHttpServer().address() as { port: number }).port}`
   })
 
   afterAll(async () => {
@@ -192,9 +165,7 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     if (providerId) {
       await prisma.gameProvider.deleteMany({ where: { id: providerId } })
     }
-    if (app) {
-      await app.close()
-    }
+    await prisma.$disconnect()
   })
 
   it('1. регистрация игрока возвращает accessToken и referralCode', async () => {
@@ -234,11 +205,8 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     expect(profile?.status).toBe('pending')
     kycProfileId = profile!.id
 
-    // минимальный валидный PNG: подпись + IHDR (сниффер проверяет магию)
-    const png = Buffer.concat([
-      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), // PNG signature
-      Buffer.alloc(16), // IHDR length+type placeholder — сниффер смотрит только магию
-    ])
+    // минимальный валидный PNG: сигнатура (сниффер проверяет магию)
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
     const upload = await api('POST', '/kyc/documents', {
       token: playerToken,
       multipart: { fields: { document_type: 'passport' }, file: { name: 'file', bytes: png } },
@@ -258,9 +226,8 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     const login = await api('POST', '/auth/login', {
       body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
     })
-    adminUserToken = login.json?.['accessToken'] as string
     const approve = await api('POST', `/admin/kyc/${kycProfileId}/approve`, {
-      token: adminUserToken,
+      token: login.json?.['accessToken'] as string,
     })
     expect(approve.status).toBe(201)
     const profile = await prisma.kycProfile.findUnique({ where: { id: kycProfileId } })
@@ -284,7 +251,9 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
       },
     })
     const raw = JSON.stringify({ order_id: depositPrId, amount: '1000', status: 'success' })
-    const res = await api('POST', '/payments/webhooks/rukassa', { raw: { text: raw, sign: rukassaSign(raw) } })
+    const res = await api('POST', '/payments/webhooks/rukassa', {
+      raw: { text: raw, sign: rukassaSign(raw) },
+    })
     expect(res.status).toBe(200)
     const bal = await api('GET', '/wallet/balances', { token: playerToken })
     const rub = (bal.json as Array<{ currency: string; balance: string; locked: string }>)?.find(
@@ -368,9 +337,8 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     })
     expect(login.status).toBe(201)
     expect(login.json?.['accessToken']).toBeTruthy()
-    adminApiToken = login.json?.['accessToken'] as string
     const approve = await api('POST', `/admin/withdrawals/${withdrawalPrId}/approve`, {
-      token: adminApiToken,
+      token: login.json?.['accessToken'] as string,
     })
     expect(approve.status).toBe(201)
     const bal = await api('GET', '/wallet/balances', { token: playerToken })
@@ -382,7 +350,7 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     // проводки игрока: DEPOSIT 1000 + BET -100 + WIN 250 + WITHDRAWAL_CONFIRM -500
     const ledger = await prisma.ledgerEntry.findMany({
       where: { userId: playerUserId },
-      select: { type: true, amount: true },
+      select: { type: true },
     })
     const types = ledger.map((l) => l.type).sort()
     expect(types).toEqual(['BET', 'DEPOSIT', 'WIN', 'WITHDRAWAL_CONFIRM'])
