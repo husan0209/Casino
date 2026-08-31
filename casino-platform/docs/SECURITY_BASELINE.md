@@ -161,6 +161,9 @@ async refresh(input: RefreshInput) {
 ```nginx
 limit_req_zone $binary_remote_addr zone=api_general:10m rate=60r/m;
 limit_req_zone $binary_remote_addr zone=auth:10m rate=10r/m;
+limit_req_status 429;
+# NB: «10 неудачных login за 15 мин» (§2.3) — per-account lockout на app-уровне,
+# НЕ nginx-зона: nginx троттлит per-IP, lockout — по аккаунту. Слои дополняют друг друга.
 limit_req_zone $binary_remote_addr zone=webhooks:10m rate=100r/m;
 
 # Auth endpoints
