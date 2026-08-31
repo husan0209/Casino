@@ -55,11 +55,20 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Lint commits
         run: |
-          if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-            FROM="${{ github.event.before }}"
-          elif [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+          FROM=""
+          # для PR — база PR: после force-push event.before указывает на
+          # перезаписанный SHA, которого нет в fetch → Invalid revision range
+          if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
             FROM="${{ github.event.pull_request.base.sha }}"
-          else
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            FROM="${{ github.event.before }}"
+          fi
+          # FROM может быть dangling — проверяем ревизию, иначе фолбэк на origin/main
+          if [ -n "$FROM" ] && ! git rev-parse -q --verify "${FROM}^{commit}" >/dev/null 2>&1; then
+            echo "FROM ${FROM} not found in history (force-push?) — falling back to origin/main"
+            FROM=origin/main
+          fi
+          if [ -z "$FROM" ]; then
             echo "No commit range detected — skipping"
             exit 0
           fi
