@@ -354,12 +354,19 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     )
     expect(rub?.balance).toBe('650')
     expect(rub?.locked).toBe('0')
-    // проводки игрока: DEPOSIT 1000 + BET -100 + WIN 250 + WITHDRAWAL_CONFIRM -500
+    // проводки игрока: DEPOSIT 1000 + BET -100 + WIN 250 +
+    // WITHDRAWAL_LOCK 500 (блокировка) + WITHDRAWAL_CONFIRM -500 (выплата)
     const ledger = await prisma.ledgerEntry.findMany({
       where: { userId: playerUserId },
       select: { type: true },
     })
     const types = ledger.map((l) => l.type).sort()
-    expect(types).toEqual(['BET', 'DEPOSIT', 'WIN', 'WITHDRAWAL_CONFIRM'])
+    expect(types).toEqual([
+      'BET',
+      'DEPOSIT',
+      'WIN',
+      'WITHDRAWAL_CONFIRM',
+      'WITHDRAWAL_LOCK',
+    ])
   })
 })
