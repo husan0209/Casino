@@ -144,6 +144,8 @@ jobs:
           RUKASSA_SECRET_KEY: e2e-rukassa-hmac-secret
           RUKASSA_SHOP_ID: e2e-shop
           RUKASSA_API_BASE: http://localhost:9
+          # demo-провайдер для launch/Callbacks (envSchema: enum 'true'/'false')
+          DEMO_PROVIDER_ENABLED: 'true'
           APP_PORT: '3001'
           APP_URL: http://localhost:3000
           ADMIN_URL: http://localhost:3002
