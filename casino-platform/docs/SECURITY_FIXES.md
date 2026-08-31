@@ -38,12 +38,12 @@
 
 | # | Проблема | Файл | Статус |
 |---|----------|------|--------|
-| 13 | `totalBet/totalWin` инкрементируется строкой (`increment: cb.betAmount`) | `game-callback.service.ts` | ⬜ Проверить после `prisma generate` (Prisma `Decimal` increment принимает number/Decimal). Если строка не проходит — перевести через `Decimal` |
+| 13 | ~~`totalBet/totalWin` инкрементируется строкой (`increment: cb.betAmount`)~~ | `game-callback.service.ts` | ✅ Проверено 2026-08-30 интеграционным тестом на реальном Postgres (`game-round.integration.spec.ts`): `increment: '10.50'` + `'0.25'` → `10.75` — Prisma принимает строку для Decimal-инкремента без потери точности; код менять не нужно. Фиксирует также запись GameTransaction с Decimal-строками |
 | 14 | ~~Тестов почти нет; деньги не покрыты~~ | `apps/api` | 🔶 В основном закрыто 2026-08-30 (GAP-24): `money-flow.spec.ts` (11); `ledger.integration.spec.ts` (6, реальный Postgres в CI через `prisma db push` + `LEDGER_INTEGRATION=1`): idempotency, InsufficientFunds, **откат tx при сбое** и bet/win-сценарий в одной транзакии — проверено на настоящем Serializable-Postgres; `account-lockout.spec.ts` (5); `logger-redact.spec.ts` (3); `nowpayments-ipn.spec.ts` (13); `kyc-file-sniffer.spec.ts` (8). Осталось: E2E (GAP-05) |
 | 15 | Pino/redact вместо Nest Logger (пароли/токены в логах) | все `*.service.ts`/`*.use-case.ts` | ✅ Исправлено 2026-08-30 (GAP-23): nestjs-pino + redact (password/token/authorization/cookie на 3 уровнях + req.body.*); фильтр не логирует err целиком; тест logger-redact.spec.ts |
 | 16 | `toMoney(n: any)` + 34 `as any` + глубокие относительные импорты | `wallet.ledger.prisma.ts` и др. | ⬜ GAP-22/26 |
 | 17 | Nginx `api_auth:10r/m` не совпадает с требованием 10/15 мин | `infra/nginx/nginx.conf` | ⬜ Согласовать с GAP-19 и `SECURITY_BASELINE §2.3` |
-| 18 | Drift env-дока: `REDIS_PASSWORD`/`DB_*` не в `env.validation.ts` | `ENVIRONMENT_VARIABLES.md` ↔ `env.validation.ts` | ⬜ GAP-29 |
+| 18 | ~~Drift env-дока: `REDIS_PASSWORD`/`DB_*` не в `env.validation.ts`~~ | `ENVIRONMENT_VARIABLES.md` ↔ `env.validation.ts` | ✅ Исправлено 2026-08-30 (GAP-29 закрыт): все 39 ключей §22 добавлены в Zod-схему (числовые — coerce, URL — url(), логи — enum); все optional — код читает process.env с дефолтами, поведение не меняется; docs-guard D3 больше не предупреждает |
 
 ---
 

@@ -61,7 +61,7 @@
 | GAP-26 | C4 | Относительные импорты `../../../../` → path aliases (18 мест) | `apps/api/src/modules/**` | P3 |
 | GAP-27 | NEW | ~~argon2 без явных параметров~~ | `password-hasher.service.ts:7` | ✅ P1 закрыт 2026-08-30: `PasswordHasher.hash` → `argon2.hash(plain, {type: argon2id, memoryCost: 65536, timeCost: 3, parallelism: 4})` (совпадает с SECURITY_BASELINE §2.1 и admin-хэшером `admin-users.service.ts:28`) |
 | GAP-28 | H4 | Идемпотентность депозита: `deposit_${pr.id}` — добавить защиту и по `external_id` (defense-in-depth, P3) | `process-rukassa-webhook.use-case.ts:48` | P3 |
-| GAP-29 | NEW (docs-guard D3) | env.validation.ts валидирует не все ключи `.env.example` (конкретный список — в выводе docs-guard D3) — дополнить Zod-схему | `packages/shared-config/src/env.validation.ts` | P3 |
+| GAP-29 | NEW (docs-guard D3) | ~~env.validation.ts валидирует не все ключи `.env.example`~~ | `packages/shared-config/src/env.validation.ts` | ✅ Закрыт 2026-08-30: все 39 ключей §22 в Zod-схеме (coerce/url/enum, все optional — поведение кода не меняется); D3 молчит |
 | GAP-30 | NEW (PR-0) | 14 методов 61–88 строк (prettier-инфляция после `--fix`): `game-callback.service` bet/win/rollback, `dashboard.service` metrics/events, `wallet.ledger.prisma` runCreditDebit/lock/unlock/confirmWithdrawal, `list-games.use-case` execute, webhook execute ×2, `provider-callback.controller` handle — разбить на приватные методы, вернуть лимит 60. Делать вместе с тестами (GAP-21/24) | перечисленные файлы | P3 |
 
 ## 🟡 MEDIUM — частично сделано
