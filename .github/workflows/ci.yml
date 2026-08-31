@@ -132,6 +132,15 @@ jobs:
         env:
           # включает ledger.integration.spec.ts (без флага — скипаются локально)
           LEDGER_INTEGRATION: '1'
+      - name: E2E player lifecycle (GAP-05)
+        run: pnpm --filter @casino/api exec vitest run test/e2e
+        env:
+          # поднимает реальный AppModule на эфемерном порту против тестовой БД
+          E2E_API: '1'
+          JWT_ACCESS_SECRET: e2e-access-secret-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          JWT_REFRESH_SECRET: e2e-refresh-secret-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          RUKASSA_SECRET_KEY: e2e-rukassa-hmac-secret
+          RUKASSA_SHOP_ID: e2e-shop
       - name: Build
         run: pnpm build
 
