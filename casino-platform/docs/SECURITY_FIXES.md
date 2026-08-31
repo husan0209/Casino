@@ -19,7 +19,7 @@
 | 1 | `rollback()` перезачесляет `win` (всегда `credit` без учёта `originalTx.type`) | `apps/api/src/modules/casino/application/services/game-callback.service.ts` | ✅ Исправлено: bet → credit, win → debit, rollback → ошибка |
 | 2 | `confirmWithdrawal` может увести `locked`/`balance` в минус (нет guard, в отличие от `unlock`) | `apps/api/src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma.ts` | ✅ Исправлено: guard `balance >= amount` + `locked >= amount` |
 | 3 | ~~bet/win/rollback не атомарны (wallet-операция и запись `gameTransaction` вне единой транзакции)~~ | `game-callback.service.ts` + `wallet.ledger.prisma.ts` | ✅ Исправлено 2026-08-30: `WalletFacade.runInTransaction` (Serializable, раннер в wallet infrastructure) + `CreditInput.tx` и `tx?` в методах `IGamePlayRepository`; ledger при переданном tx НЕ открывает свой `$transaction` (Prisma запрещает вложенные); дубликат-чек дублируется внутри tx (гонка одновременных bet/rollback); 11 тестов `money-flow.spec.ts` фиксируют атомарность структурно (один tx на все операции) |
-| 4 | NOWPayments IPN подпись считается по raw body; по спецификации NOWPayments подписывается JSON с отсортированными ключами | `apps/api/src/modules/payments/infrastructure/clients/nowpayments.client.ts` | ⬜ Сверить с актуальной спецификацией IPN перед боевыми ключами; при расхождении заменить raw-body на канонический sorted-JSON HMAC-SHA512 |
+| 4 | ~~NOWPayments IPN подпись считается по raw body; по спецификации NOWPayments подписывается JSON с отсортированными ключами~~ | `apps/api/src/modules/payments/infrastructure/clients/nowpayments.client.ts` | ✅ Исправлено 2026-08-30: dual-check — (1) канонический sorted-JSON по официальному Python-сниппету (sorted keys + compact separators + ensure_ascii \uXXXX + исходные числовые токены через маркеры, чтобы repr(10.0) не схлопывался в 10), (2) PHP-флейвор (экранированный «/»), (3) raw-body HMAC (обратная совместимость). Type-confusion guard: подсчёт вставленных/найденных маркеров; при коллизии канон-ветка пропускается. 13 тестов с эталонным Python-зеркалом (`nowpayments-ipn.spec.ts`). Перед боевыми ключами: прогнать на sandbox |
 
 ## P1 — безопасность auth и данных
 
@@ -49,7 +49,7 @@
 
 ## Порядок работ
 
-1. Закрыть **P0 #4** (NOWPayments IPN — сверить со спецификацией перед боевыми ключами) — последний денежный пункт. **#3 закрыт 2026-08-30.**
+1. ~~Закрыть **P0 #3/#4**~~ — оба закрыты 2026-08-30 (атомарность bet/win/rollback + NOWPayments IPN dual-check). Перед боевыми ключами: sandbox-прогон NOWPayments.
 2. Закрыть **P1 #8–#11** (throttler, helmet, lockout, токен/CSP).
 3. **Runtime-приёмка** на Linux-FS: `pnpm install && pnpm db:generate && pnpm db:migrate && pnpm dev`,
    прогон `register → login → deposit → launch → bet/win/rollback → admin`.

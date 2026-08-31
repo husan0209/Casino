@@ -114,7 +114,7 @@
 ## Остаток работ (ревизия 2026-08-28)
 
 1. ~~**GAP-19/20/27** — Throttler + Helmet + argon2-параметры~~ ✅ закрыто 2026-08-30 (`security/gap-19-20-27`).
-2. **GAP-18 ✅ / GAP-21 ✅ / GAP-23 ✅** — lockout, Zod и Pino redact закрыты 2026-08-30. **P0 #3 (атомарность денег) закрыт 2026-08-30** — `WalletFacade.runInTransaction` + money-тесты. Осталось: P0 #4 (NOWPayments IPN — сверить со спецификацией), E2E (GAP-05).
+2. **GAP-18 ✅ / GAP-21 ✅ / GAP-23 ✅** — lockout, Zod и Pino redact закрыты 2026-08-30. **P0 #3 (атомарность денег) и P0 #4 (NOWPayments IPN — канонический sorted-JSON HMAC) закрыты 2026-08-30**. Осталось: E2E (GAP-05), sandbox-прогон NOWPayments перед боевыми ключами.
 3. **GAP-08/09 runtime** — сверка sign-порядков с менеджером GitSlotPark + runtime-тест с ключами.
 4. **GAP-03/04** — Google/Telegram OAuth: код готов, нужны ключи + runtime-проверка.
 5. **Runtime-приёмка** на Linux-FS: `pnpm install && pnpm db:generate && pnpm db:migrate && pnpm dev`; прогон register→login→deposit→launch→admin.

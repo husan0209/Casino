@@ -7,14 +7,13 @@ import { ProcessRukassaWebhookUseCase } from '../../application/use-cases/proces
 /**
  * Webhook controller.
  *
- * HMAC signature MUST be verified against the raw bytes of the HTTP body
- * (`req.rawBody`), not against the re-serialised JSON object. Re-serialised
- * JSON differs from the original in key order, whitespace, and number
- * formatting — which can both reject legitimate webhooks and (in some
- * implementations) let an attacker forge signatures.
+ * NOWPayments (P0 #4): подпись IPN — HMAC-SHA512 по каноническому JSON
+ * (sorted keys + compact + ensure_ascii + исходные числовые токены), fallback —
+ * raw-body HMAC (совместимость). Raw-байты берутся из req.rawBody, который
+ * каптурится express.json({ verify }) в main.ts.
  *
- * The rawBody is captured by express.json({ verify }) in main.ts and exposed
- * as req.rawBody (string). It is the ONLY reliable input for HMAC.
+ * Rukassa: HMAC по raw bytes тела (`req.rawBody`) — то же самое, re-serialised
+ * JSON отличается порядком ключей и whitespace.
  */
 // GAP-21 exemption: тело — payload платёжного провайдера (NOWPayments/…), формат
 // не контролируется нами и проверяется HMAC-подписью в use-case. Жёсткая Zod-схема
