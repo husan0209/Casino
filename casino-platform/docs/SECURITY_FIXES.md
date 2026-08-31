@@ -39,7 +39,7 @@
 | # | Проблема | Файл | Статус |
 |---|----------|------|--------|
 | 13 | `totalBet/totalWin` инкрементируется строкой (`increment: cb.betAmount`) | `game-callback.service.ts` | ⬜ Проверить после `prisma generate` (Prisma `Decimal` increment принимает number/Decimal). Если строка не проходит — перевести через `Decimal` |
-| 14 | ~~Тестов почти нет; деньги не покрыты~~ | `apps/api` | 🔶 Частично закрыто 2026-08-30 (GAP-24): `money-flow.spec.ts` (11) — idempotency, типы rollback (bet→credit, win→debit), атомарность (tx), fanthom/duplicate; `account-lockout.spec.ts` (5); `logger-redact.spec.ts` (3). Осталось: E2E + NOWPayments IPN + confirmWithdrawal через БД |
+| 14 | ~~Тестов почти нет; деньги не покрыты~~ | `apps/api` | 🔶 В основном закрыто 2026-08-30 (GAP-24): `money-flow.spec.ts` (11); `ledger.integration.spec.ts` (6, реальный Postgres в CI через `prisma db push` + `LEDGER_INTEGRATION=1`): idempotency, InsufficientFunds, **откат tx при сбое** и bet/win-сценарий в одной транзакии — проверено на настоящем Serializable-Postgres; `account-lockout.spec.ts` (5); `logger-redact.spec.ts` (3); `nowpayments-ipn.spec.ts` (13); `kyc-file-sniffer.spec.ts` (8). Осталось: E2E (GAP-05) |
 | 15 | Pino/redact вместо Nest Logger (пароли/токены в логах) | все `*.service.ts`/`*.use-case.ts` | ✅ Исправлено 2026-08-30 (GAP-23): nestjs-pino + redact (password/token/authorization/cookie на 3 уровнях + req.body.*); фильтр не логирует err целиком; тест logger-redact.spec.ts |
 | 16 | `toMoney(n: any)` + 34 `as any` + глубокие относительные импорты | `wallet.ledger.prisma.ts` и др. | ⬜ GAP-22/26 |
 | 17 | Nginx `api_auth:10r/m` не совпадает с требованием 10/15 мин | `infra/nginx/nginx.conf` | ⬜ Согласовать с GAP-19 и `SECURITY_BASELINE §2.3` |
