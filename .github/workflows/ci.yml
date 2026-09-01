@@ -192,6 +192,9 @@ jobs:
     steps:
       - name: Проверка VPS-секретов
         id: vps-secrets
+        # deploy-джоба без checkout; глобальный defaults.run.working-directory
+        # (casino-platform) здесь не существует — переопределяем на корень раннера
+        working-directory: .
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
