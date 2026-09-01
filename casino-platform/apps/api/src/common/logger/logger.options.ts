@@ -1,5 +1,3 @@
-import { type IncomingMessage } from 'http'
-
 import { type Options } from 'pino-http'
 
 import { resolveRequestId } from '../middleware/request-id.middleware'
@@ -80,10 +78,19 @@ export const LOG_REDACT_PATHS = [
   'req.body.secret',
 ] as const
 
-type LogReq = IncomingMessage & {
+/**
+ * Форма req для сериализатора. ВАЖНО: не наследуется от IncomingMessage — там
+ * socket обязателен, и no-unnecessary-condition сочтёт `?.` лишним и уберёт его.
+ * В рантайме pino-http звал сериализатор с объектом без socket (CI PR #18:
+ * TypeError 'reading remoteAddress' на каждом запросе), поэтому защита обязательна.
+ */
+type LogReq = {
   id?: string
-  body?: unknown
+  method?: string
+  url?: string
   socket?: { remoteAddress?: string }
+  headers?: Record<string, unknown>
+  body?: unknown
 }
 
 export function buildPinoHttpOptions(): Options {
@@ -107,7 +114,7 @@ export function buildPinoHttpOptions(): Options {
           id: r.id,
           method: r.method,
           url: r.url,
-          remoteAddress: r.socket.remoteAddress,
+          remoteAddress: r.socket?.remoteAddress,
           headers: r.headers,
           body: r.body,
         }
