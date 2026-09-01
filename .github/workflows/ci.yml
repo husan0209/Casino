@@ -73,7 +73,14 @@ jobs:
             exit 0
           fi
           echo "Committing range: ${FROM}..HEAD"
-          pnpm exec commitlint --from "${FROM}" --to HEAD
+          # Squash-мержи: заголовок/боди редактируются в UI при мерже и не проходили
+          # commitlint на PR-ветке. На push в main проверяем только свежий squash-коммит
+          # (переписать историю нельзя — ruleset), иначе краснеет ВЕСЬ диапазон за день.
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            pnpm exec commitlint --from "HEAD~1" --to HEAD
+          else
+            pnpm exec commitlint --from "${FROM}" --to HEAD
+          fi
 
   lint-typecheck-test:
     runs-on: ubuntu-latest
@@ -169,7 +176,10 @@ jobs:
       - name: Build API (test)
         uses: docker/build-push-action@v5
         with:
-          context: .
+          # Контекст = casino-platform (Dockerfile копирует package.json/packages/apps/api
+          # от workspace-корня; в корне РЕПО их нет — раньше падало «/apps/api: not found»
+          # на каждом push в main).
+          context: ./casino-platform
           file: ./casino-platform/infra/docker/api.prod.Dockerfile
           push: false
           tags: casino-api:test
