@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common'
 
 import { AuthModule } from '../auth/auth.module'
+import { ConfirmWithdrawalUseCase } from './application/use-cases/confirm-withdrawal.use-case'
+import { LockFundsUseCase } from './application/use-cases/lock-funds.use-case'
+import { UnlockFundsUseCase } from './application/use-cases/unlock-funds.use-case'
 import { WalletFacade } from './application/wallet.facade'
 import {
   WALLET_REPOSITORY,
@@ -19,6 +22,9 @@ import { WalletController } from './presentation/controllers/wallet.controller'
   controllers: [WalletController],
   providers: [
     WalletFacade,
+    LockFundsUseCase,
+    UnlockFundsUseCase,
+    ConfirmWithdrawalUseCase,
     { provide: WALLET_REPOSITORY, useClass: PrismaWalletRepository },
     { provide: WALLET_LEDGER, useClass: PrismaWalletLedger },
     { provide: WALLET_TRANSACTION_RUNNER, useClass: PrismaWalletTransactionRunner },
