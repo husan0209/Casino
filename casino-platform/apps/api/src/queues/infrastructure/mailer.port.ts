@@ -10,4 +10,3 @@ export interface MailerPort {
   send(msg: MailMessage): Promise<void>
 }
 
-export const MAILER_PORT = Symbol('MAILER_PORT')

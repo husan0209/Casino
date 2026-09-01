@@ -134,6 +134,29 @@ jobs:
           LEDGER_INTEGRATION: '1'
       - name: Build
         run: pnpm build
+      - name: E2E player lifecycle (GAP-05)
+        env:
+          # поднимает СОБРАННЫЙ сервер (dist/main.js) против тестовой БД + Redis;
+          # NestFactory внутри vitest-воркера крашит процесс - потому сервер в фоне
+          E2E_API: '1'
+          JWT_ACCESS_SECRET: e2e-access-secret-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          JWT_REFRESH_SECRET: e2e-refresh-secret-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          RUKASSA_SECRET_KEY: e2e-rukassa-hmac-secret
+          RUKASSA_SHOP_ID: e2e-shop
+          RUKASSA_API_BASE: http://localhost:9
+          # demo-провайдер для launch/Callbacks (envSchema: enum 'true'/'false')
+          DEMO_PROVIDER_ENABLED: 'true'
+          APP_PORT: '3001'
+          APP_URL: http://localhost:3000
+          ADMIN_URL: http://localhost:3002
+          DOMAIN: localhost
+        run: |
+          node apps/api/dist/main.js &
+          SERVER_PID=$!
+          npx --yes wait-on http://127.0.0.1:3001/api/v1/health/ready -t 30000 || { kill $SERVER_PID; exit 1; }
+          pnpm --filter @casino/api exec vitest run test/e2e; CODE=$?
+          kill $SERVER_PID
+          exit $CODE
 
   docker-build:
     runs-on: ubuntu-latest

@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 
+// AdminAuthGuard (admin-JWT, reviewedBy -> AdminUser FK) экспортируется из AdminModule
+import { AdminModule } from '../admin/admin.module'
 import { AuthModule } from '../auth/auth.module'
 import { GeoModule } from '../geo/geo.module'
 import { GetKycStatusUseCase } from './application/use-cases/get-kyc-status.use-case'
@@ -12,7 +14,7 @@ import { KycAdminController } from './presentation/controllers/kyc-admin.control
 import { KycController } from './presentation/controllers/kyc.controller'
 
 @Module({
-  imports: [AuthModule, ConfigModule, GeoModule],
+  imports: [AdminModule, AuthModule, ConfigModule, GeoModule],
   controllers: [KycController, KycAdminController],
   providers: [
     { provide: KYC_REPOSITORY, useClass: PrismaKycRepository },

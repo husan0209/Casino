@@ -76,9 +76,11 @@
 
 ## 🔄 Этап 2. End-to-End (E2E) Тестирование
 
-### 2.1. Главный сквозной сценарий (`test/e2e/player-lifecycle.e2e-spec.ts`)
+### 2.1. Главный сквозной сценарий (`test/e2e/player-lifecycle.e2e.spec.ts`)
 
-Тест должен поднимать тестовое NestJS-приложение с тестовой БД PostgreSQL и Redis и выполнять полный жизненный цикл:
+**✅ Реализовано 2026-08-31 (PR #15, 9/9 зелёные в CI):** сервер поднимается как собранный `node dist/main.js` (prod-путь: helmet, pino, rawBody) против тестовых Postgres/Redis; спек — чистый HTTP-клиент (NestFactory внутри vitest-форка крашит процесс). Отличия от исходной схемы: KYC-approve и выплату одобряет суперадмин через admin-JWT (`/admin/auth/login` — `reviewed_by`/audit ссылаются на AdminUser); launch slug — `demo-provider` (фабрика адаптеров, `DEMO_PROVIDER_ENABLED=true`); callback-маршруты `/provider-callback/demo-provider/{bet,win}`. Побочный результат — найдены и закрыты прод-баги: дубликат `MAILER_PORT`, незарегистрированный `OAuthUserProvisioningService`, пустой `HealthModule`, `ZodValidationPipe` валидировал все параметры хендлера, KYC-approve писал user.id в FK AdminUser, `AdminAuthService` не экспортировался.
+
+Тест выполняет полный жизненный цикл:
 
 ```
 [1. Регистрация игрока]
