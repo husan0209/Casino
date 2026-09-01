@@ -264,6 +264,9 @@ importers:
       '@casino/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@types/node':
+        specifier: ^20.14.0
+        version: 20.19.43
       prisma:
         specifier: ^5.18.0
         version: 5.22.0
@@ -285,6 +288,9 @@ importers:
       '@casino/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@types/node':
+        specifier: ^20.14.0
+        version: 20.19.43
       typescript:
         specifier: ^5.5.4
         version: 5.9.3
