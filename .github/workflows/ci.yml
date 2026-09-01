@@ -190,7 +190,21 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     steps:
+      - name: Проверка VPS-секретов
+        id: vps-secrets
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ] || [ -z "$VPS_SSH_KEY" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Deploy пропущен: не настроены секреты VPS_HOST / VPS_USER / VPS_SSH_KEY (Settings → Secrets and variables → Actions)"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Deploy via SSH
+        if: steps.vps-secrets.outputs.skip != 'true'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
