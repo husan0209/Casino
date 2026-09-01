@@ -103,7 +103,10 @@ export class ProcessRukassaWebhookUseCase {
         currency: currency as Currency,
         amount: pr.amount.toString(),
         type: 'DEPOSIT',
-        idempotencyKey: 'deposit_' + pr.id,
+        // GAP-28 (defense-in-depth): ключ от external_id провайдера, а не только от
+        // нашей платёжки — повторный коллбэк по тому же внешнему платежу не зачислит дважды,
+        // даже если смэпился на другую платёжку.
+        idempotencyKey: 'deposit_rukassa_' + externalId,
         description: 'Пополнение через Rukassa',
         metadata: { provider: 'rukassa', external_id: externalId },
       })
