@@ -32,7 +32,9 @@ last_updated: 2026-08-28
 
 Все эти правила были `warn` в предыдущей версии `.eslintrc.js`, что означало: lint warning ≠ CI fail. Теперь они **`error`** → CI красный, merge заблокирован.
 
-> ⚠️ **Честно на 2026-08-28:** `max-params` и `complexity` в `.eslintrc.js` всё ещё `warn` (max-params с порогом 4, а не 3) — расхождение с этой таблицей зафиксировано как **GAP-25**. Остальные строки таблицы соответствуют коду.
+> ✅ **2026-09-01: GAP-25 закрыт** — `max-params` и `complexity` доведены до обещанных
+> error-порогов (3/10), весь `apps/api/src` чищен под них (45 + 13 нарушений разобраны).
+> Исключения — framework-imposed сигнатуры Nest, см. §2.1.1. Остальные строки таблицы соответствуют коду.
 
 | Правило | Было | Стало | Ловит в коде |
 |---------|------|-------|--------------|
@@ -40,10 +42,38 @@ last_updated: 2026-08-28
 | `@typescript-eslint/no-explicit-any` | warn | **error** | `any` тип (AUDIT §C5, в коде: `toMoney(n: any)`) |
 | `import/no-cycle` | warn | **error** | Циклы в модулях (скрытые баги зависимостей) |
 | `react-hooks/exhaustive-deps` | warn | **error** | Stale closures (в React-коде) |
-| `max-params` (3) | warn (3) | ⚠️ **warn (4)** — перенос в error: GAP-25 | Функции с >3 параметрами |
+| `max-params` (3) | warn (4) | **error (3)** — GAP-25 закрыт 2026-09-01 | Функции с >3 параметрами |
 | `max-depth` (3) | warn | **error** | Вложенность >3 |
-| `complexity` (10) | warn | ⚠️ **warn (10)** — перенос в error: GAP-25 | Cyclomatic complexity >10 |
+| `complexity` (10) | warn | **error (10)** — GAP-25 закрыт 2026-09-01 | Cyclomatic complexity >10 |
 | `max-lines-per-function` (90, временно — GAP-30) | warn | **error** | Методы >90 строк; лимит был 60, перекалиброван под prettier-нормализацию (printWidth 100 растягивает строки). Вернуть к 60 после разбора 14 методов |
+
+### 2.1.1. Разрешённые исключения `max-params` (GAP-25)
+
+Порог 3 — про **наш** API-дизайн (функция, принимающая 4+ позиционных аргумента, читается
+плохо → нужен input-объект). Сигнатуры, которые навязывает фреймворк, рефакторить нельзя —
+они вынесены явно и **только** так:
+
+| Где | Механизм | Почему |
+|-----|----------|--------|
+| `**/*.controller.ts`, `**/src/main.ts` | `overrides` → `max-params: off` | Числа параметров задаются декораторами `@Param/@Body/@Headers/@Res` и express-подписью `verify(req, res, buf, encoding)` — это контракт фреймворка, а не дизайн |
+| DI-конструкторы сервисов/use-cases (10 мест) | inline `// eslint-disable-next-line max-params -- Nest DI: …` | Состав конструктора = граф зависимостей Nest; «объект-зависимость» ради порога означал бы ручной проброс каждого сервиса |
+
+Всё остальное (>3 параметров) переведено на input-объекты вместе с вызовами: `wallet`
+`lock/unlock/confirmWithdrawal` → `WithdrawalOpArgs`, `kyc.setStatus`, `support`
+`createTicket/listUserTickets/addMessage`, `referrals` `sumTransactions/findReward/processUserRewards`,
+`casino` `findRoundsWithGame/findOrCreateRound/creditWin`, `notifications.list`,
+`payment-request.listUser`, `favorites.history`, webhook-`execute` → `Process*WebhookInput`.
+
+`complexity` исключений не имеет: 13 нарушений разобраны на приватные методы/таблицы
+(`sniffDocumentMime` → `isJpeg/isPng/isWebp/isPdf`, `GlobalExceptionFilter` →
+`payloadMessage/payloadCode/payloadDetails`, вебхуки → `resolvePaymentRequest/applyOutcome/applyPaymentStatus`,
+GitSlotPark → `CALLBACK_MESSAGE_BUILDERS/firstPresent/mapProviderGame`,
+`syncGames` → `upsertGameRow/gameSlug`, provider-callback → `dispatch`).
+
+> `packages/*` и `apps/web`/`apps/admin` под `pnpm -r lint` не попадают по-разному:
+> у `packages/*` lint-скрипта нет (гейт — `apps/api`: `eslint src --ext .ts`), у фронтенда
+> `next lint` + собственные overrides (`complexity: off` для `app/**`, `components/**`) —
+> на 2026-09-01 обе точки дают 0 errors.
 
 ### 2.2. Что добавлено
 
@@ -190,6 +220,7 @@ Tier 1 + Tier 2 ловят **синтаксические** и **структу�
 | 2026-08-28 | Ссылки на аудит → `docs/archive/audit-2026-08-25.md`; честный статус max-params/complexity (GAP-25) | AI agent (фаза 1: единый статус) |
 | 2026-08-28 | Tier 2.5: `docs-guard.yml` (D1–D6) + PR-шаблон с docs-чеклистом | AI agent (фаза 3: автопроверка) |
 | 2026-08-28 | PR-0: typecheck-конфиг починен (rootDir/tsconfig.build.json, пакеты → dist), тесты переписаны на vitest (18/18), lint 0 ошибок, `max-lines-per-function` 60→90 (GAP-30) | AI agent (PR-0: ликвидация долга CI) |
+| 2026-09-01 | GAP-25 закрыт: `max-params` error(3) + `complexity` error(10), разобраны 45 + 13 нарушений, §2.1.1 (исключения Nest); GAP-26 закрыт: 72 глубоких относительных импорта → `@/`+`@modules/`, билд через `tsc-alias` | AI agent (GAP-25/26) |
 
 ---
 
