@@ -3,12 +3,14 @@ import { randomUUID } from 'crypto'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+
+import { GeoFacade } from '@modules/geo/facade/geo.facade'
+import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
+import { UsersFacade } from '@modules/users/facade/users.facade'
+
 import type { DisplayCurrency } from '@casino/shared-config'
 import { money } from '@casino/shared-utils'
 
-import { GeoFacade } from '../../../geo/facade/geo.facade'
-import { KycCheckService } from '../../../kyc/application/use-cases/kyc-check.service'
-import { UsersFacade } from '../../../users/facade/users.facade'
 import { AmountTooLargeError, AmountTooSmallError, PaymentProviderError } from '../../domain/errors'
 import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
@@ -21,6 +23,7 @@ export interface CreateFiatDepositInput {
 
 @Injectable()
 export class CreateFiatDepositUseCase {
+  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     private repo: PaymentRequestRepository,
     private rukassa: RukassaClient,

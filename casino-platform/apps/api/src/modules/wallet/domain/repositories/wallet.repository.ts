@@ -48,26 +48,18 @@ export interface IWalletTransactionRunner {
   runInTransaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T>
 }
 export const WALLET_TRANSACTION_RUNNER = Symbol('WALLET_TRANSACTION_RUNNER')
+/** Общие аргументы операций блокировки/выплаты (GAP-25: ≤3 позиционных параметров). */
+export interface WithdrawalOpArgs {
+  userId: string
+  currency: Currency
+  amount: MoneyAmount
+  idempotencyKey: string
+}
 export interface IWalletLedger {
   credit(input: CreditInput): Promise<CreditResult>
   debit(input: CreditInput): Promise<CreditResult>
-  lock(
-    userId: string,
-    currency: Currency,
-    amount: MoneyAmount,
-    idempotencyKey: string,
-  ): Promise<CreditResult>
-  unlock(
-    userId: string,
-    currency: Currency,
-    amount: MoneyAmount,
-    idempotencyKey: string,
-  ): Promise<CreditResult>
-  confirmWithdrawal(
-    userId: string,
-    currency: Currency,
-    amount: MoneyAmount,
-    idempotencyKey: string,
-  ): Promise<CreditResult>
+  lock(args: WithdrawalOpArgs): Promise<CreditResult>
+  unlock(args: WithdrawalOpArgs): Promise<CreditResult>
+  confirmWithdrawal(args: WithdrawalOpArgs): Promise<CreditResult>
 }
 export const WALLET_LEDGER = Symbol('WALLET_LEDGER')

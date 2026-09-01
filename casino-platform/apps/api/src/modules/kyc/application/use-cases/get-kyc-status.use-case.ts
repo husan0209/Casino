@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import { GeoFacade } from '@modules/geo/facade/geo.facade'
+
 import type { DisplayCurrency } from '@casino/shared-config'
 import { money } from '@casino/shared-utils'
 
-import { GeoFacade } from '../../../geo/facade/geo.facade'
 import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
 
 @Injectable()

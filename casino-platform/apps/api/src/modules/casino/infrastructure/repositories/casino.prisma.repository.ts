@@ -85,12 +85,13 @@ export class PrismaGameFavoritesRepository implements IGameFavoritesRepository {
     })
   }
 
-  findRoundsWithGame(
-    userId: string,
-    gameId: string | undefined,
-    skip: number,
-    take: number,
-  ): Promise<RoundHistoryRow[]> {
+  findRoundsWithGame(args: {
+    userId: string
+    gameId: string | undefined
+    skip: number
+    take: number
+  }): Promise<RoundHistoryRow[]> {
+    const { userId, gameId, skip, take } = args
     return prisma.gameRound.findMany({
       where: { userId, ...(gameId ? { gameId } : {}) },
       skip,

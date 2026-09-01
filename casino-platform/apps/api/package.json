@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "nest build",
+    "build": "nest build && tsc-alias -p tsconfig.build.json",
     "dev": "nest start --watch",
     "start": "node dist/main",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -38,6 +38,7 @@
     "cookie-parser": "^1.4.6"
   },
   "devDependencies": {
+    "tsc-alias": "^1.8.10",
     "@casino/tsconfig": "workspace:*",
     "@nestjs/cli": "^10.4.5",
     "@types/node": "^20.14.9",

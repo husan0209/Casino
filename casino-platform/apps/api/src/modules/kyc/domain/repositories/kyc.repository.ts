@@ -35,12 +35,12 @@ export interface IKycRepository {
     page?: number,
     perPage?: number,
   ): Promise<{ items: any[]; total: number }>
-  setStatus(
-    id: string,
-    status: 'approved' | 'rejected' | 'requires_resubmission',
-    reason?: string,
-    reviewedBy?: string,
-  ): Promise<void>
+  setStatus(args: {
+    id: string
+    status: 'approved' | 'rejected' | 'requires_resubmission'
+    reason?: string
+    reviewedBy?: string
+  }): Promise<void>
   getTotalDepositedRub(userId: string): Promise<string>
 }
 export const KYC_REPOSITORY = Symbol('KYC_REPOSITORY')

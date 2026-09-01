@@ -122,7 +122,7 @@ async getUserByIdAsync(): Promise<...>   ❌ (async уже означает Prom
 
 ## 3. Imports
 
-### 3.1. Path aliases
+### 3.1. Path aliases (GAP-26 — закрыто 2026-09-01)
 
 ```typescript
 // вместо
@@ -132,20 +132,46 @@ import { UserRepository } from '../../../domain/repositories/user.repository'
 import { UserRepository } from '@modules/users/domain/repositories/user.repository'
 ```
 
-Конфигурация `tsconfig.json`:
+| Алиас | Куда | Когда использовать |
+|-------|------|--------------------|
+| `@modules/<mod>/…` | `src/modules/<mod>/…` | Кросс-модульный импорт (чужой модуль: facade, guard, домен) |
+| `@/<seg>/…` | `src/<seg>/…` | Общий код вне модулей: `@/common/pipes/…`, `@/types/…` |
+
+Конфигурация `apps/api/tsconfig.json` (в `tsconfig.build.json` — то же, но `@casino/*` → `dist`):
 
 ```json
 {
+  "baseUrl": "./",
   "paths": {
-    "@/*": ["src/*"],
-    "@modules/*": ["src/modules/*"],
-    "@packages/*": ["../../packages/*"],
+    "@/*": ["./src/*"],
+    "@modules/*": ["./src/modules/*"],
     "@casino/shared-types": ["../../packages/shared-types/src"],
     "@casino/shared-utils": ["../../packages/shared-utils/src"],
+    "@casino/shared-config": ["../../packages/shared-config/src"],
     "@casino/database": ["../../packages/database/src"]
   }
 }
 ```
+
+> `baseUrl` объявлен **в самом `apps/api/tsconfig.json`**, а не унаследован из
+> `@casino/tsconfig/nest.json`: `paths` резолвятся относительно файла с `baseUrl`, поэтому
+> унаследованный `./src/*` указывал бы в packages/tsconfig/src (каталога нет) — и весь
+> `pnpm typecheck` валил алиасные импорты.
+
+**Правило конвертации (применено к 72 импортам в `apps/api/src`):** внутримодульные ссылки
+остаются относительными (`../domain/…`, `../entities/…` — ближний контекст читается быстрее),
+а импорт, которому нужно **3 и более `../`**, переводится на алиас. Путь перестаёт зависеть от
+глубины каталога и не ломается при переезде файла.
+
+**Рантайм-резолвер не нужен:** `build` = `nest build && tsc-alias -p tsconfig.build.json` —
+`tsc-alias` переписывает алиасы в `dist` обратно в относительные пути, поэтому
+`node dist/main.js` (prod/Docker, см. `infra/docker/api.prod.Dockerfile`) работает без
+`tsconfig-paths` и без env-переменных. В `dist` не должно остаться `require("@/…")` —
+проверяется E2E-прогоном в CI (`pnpm build` → `node apps/api/dist/main.js`).
+
+> Vitest алиасы из tsconfig не подхватывает — они продублированы в `apps/api/vitest.config.ts`
+> (`resolve.alias`). Без них спеки с кросс-модульными импортами падают с «Cannot find module
+> '@modules/…'».
 
 ### 3.2. Порядок импортов
 
@@ -164,8 +190,6 @@ import { money } from '@casino/shared-utils'
 import { UserRepository } from '../repositories/user.repository'
 import { UserEntity } from '../entities/user.entity'
 ```
-
----
 
 ## 4. File Organization
 

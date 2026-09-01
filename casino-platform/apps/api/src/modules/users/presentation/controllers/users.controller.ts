@@ -18,10 +18,12 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 
-import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { extForMime, sniffDocumentMime } from '../../../../common/files/file-sniffer'
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
-import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
+import { extForMime, sniffDocumentMime } from '@/common/files/file-sniffer'
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
+import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+
 import { GetMeUseCase } from '../../application/use-cases/get-me.use-case'
 import { ListSessionsUseCase } from '../../application/use-cases/list-sessions.use-case'
 import { RevokeSessionUseCase } from '../../application/use-cases/revoke-session.use-case'
@@ -105,7 +107,7 @@ export class UsersController {
     // avatar url saving – simplified, reuse profile repo directly
     const { PrismaUserProfileRepository } =
       await import('../../infrastructure/repositories/user-profile.prisma')
-    if (!file || !file.buffer || file.buffer.length === 0) {
+    if (!file.buffer || file.buffer.length === 0) {
       throw new BadRequestException('File is required')
     }
     const sniffed = sniffDocumentMime(file.buffer)

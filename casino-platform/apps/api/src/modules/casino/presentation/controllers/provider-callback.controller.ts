@@ -5,7 +5,15 @@ import { Response } from 'express'
 import { prisma } from '@casino/database'
 
 import { GameCallbackService } from '../../application/services/game-callback.service'
+import { type ParsedProviderCallback } from '../../domain/provider-adapter.interface'
 import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
+
+/** Доменные ошибки -> коды результата GitSlotPark. */
+const CALLBACK_ERROR_CODES: Record<string, string> = {
+  INSUFFICIENT_FUNDS: 'INSUFFICIENT_FUNDS',
+  SESSION_INVALID: 'SESSION_EXPIRED',
+  PLAYER_BLOCKED: 'PLAYER_BLOCKED',
+}
 
 // GAP-21 exemption: тело — callback игрового провайдера (формат провайдера,
 // подписан токеном/HMAC, который сверяется в use-case). Zod-схема здесь неуместна.
@@ -54,44 +62,49 @@ export class ProviderCallbackController {
           .status(200)
           .json(adapter.formatErrorResponse('PROVIDER_NOT_FOUND', 'Unknown provider'))
       }
-      let result: any
-      try {
-        switch (parsed.action) {
-          case 'authenticate': {
-            const a = await this.cb.authenticate(parsed.playerToken!)
-            return res.json({ player_id: a.player_id, balance: a.balance, currency: a.currency })
-          }
-          case 'balance': {
-            const b = await this.cb.balance(parsed.playerToken!)
-            return res.json(b)
-          }
-          case 'bet': {
-            result = await this.cb.bet(parsed, provider.id)
-            return res.json(adapter.formatSuccessResponse(result.balance, parsed.transactionId))
-          }
-          case 'win': {
-            result = await this.cb.win(parsed, provider.id)
-            return res.json(adapter.formatSuccessResponse(result.balance, parsed.transactionId))
-          }
-          case 'rollback': {
-            result = await this.cb.rollback(parsed, provider.id)
-            return res.json(adapter.formatSuccessResponse(result.balance))
-          }
-          default:
-            return res.json(adapter.formatErrorResponse('UNKNOWN_ACTION', 'Unknown action'))
-        }
-      } catch (e: any) {
-        const msg = e?.message || 'INTERNAL_ERROR'
-        const map: Record<string, string> = {
-          INSUFFICIENT_FUNDS: 'INSUFFICIENT_FUNDS',
-          SESSION_INVALID: 'SESSION_EXPIRED',
-          PLAYER_BLOCKED: 'PLAYER_BLOCKED',
-        }
-        const code = map[msg] || 'INTERNAL_ERROR'
-        return res.json(adapter.formatErrorResponse(code, msg))
-      }
+      return await this.dispatch(adapter, parsed, provider.id, res)
     } catch (e: any) {
       return res.status(200).json({ success: false, error: e.message })
+    }
+  }
+
+  /**
+   * Роутинг callback-операции провайдеру. Ответ всегда HTTP 200 — код результата
+   * в теле (спека GitSlotPark), иначе провайдер зациклит ретраи.
+   */
+  private async dispatch(
+    adapter: ReturnType<ProviderAdapterFactory['getAdapter']>,
+    parsed: ParsedProviderCallback,
+    providerId: string,
+    res: Response,
+  ) {
+    try {
+      switch (parsed.action) {
+        case 'authenticate': {
+          const a = await this.cb.authenticate(parsed.playerToken!)
+          return res.json({ player_id: a.player_id, balance: a.balance, currency: a.currency })
+        }
+        case 'balance':
+          return res.json(await this.cb.balance(parsed.playerToken!))
+        case 'bet': {
+          const r = await this.cb.bet(parsed, providerId)
+          return res.json(adapter.formatSuccessResponse(r.balance, parsed.transactionId))
+        }
+        case 'win': {
+          const r = await this.cb.win(parsed, providerId)
+          return res.json(adapter.formatSuccessResponse(r.balance, parsed.transactionId))
+        }
+        case 'rollback': {
+          const r = await this.cb.rollback(parsed, providerId)
+          return res.json(adapter.formatSuccessResponse(r.balance))
+        }
+        default:
+          return res.json(adapter.formatErrorResponse('UNKNOWN_ACTION', 'Unknown action'))
+      }
+    } catch (e: any) {
+      const msg = e?.message || 'INTERNAL_ERROR'
+      const code = CALLBACK_ERROR_CODES[msg] ?? 'INTERNAL_ERROR'
+      return res.json(adapter.formatErrorResponse(code, msg))
     }
   }
 }

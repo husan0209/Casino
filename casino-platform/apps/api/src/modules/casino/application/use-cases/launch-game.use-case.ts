@@ -3,10 +3,12 @@ import { randomBytes } from 'crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import Decimal from 'decimal.js'
 
+
+import { WalletFacade } from '@modules/wallet/application/wallet.facade'
+import { InsufficientFundsError } from '@modules/wallet/domain/errors'
+
 import type { Currency } from '@casino/shared-types'
 
-import { WalletFacade } from '../../../wallet/application/wallet.facade'
-import { InsufficientFundsError } from '../../../wallet/domain/errors'
 import {
   CurrencyNotSupportedError,
   GameDisabledError,
@@ -40,6 +42,7 @@ interface ActiveGameSession {
 
 @Injectable()
 export class LaunchGameUseCase {
+  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     private adapters: ProviderAdapterFactory,
     private wallet: WalletFacade,

@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
 
-import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
-import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
+import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+
 import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
 import { CreateTicketUseCase } from '../../application/use-cases/create-ticket.use-case'
 import { GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
@@ -41,12 +43,12 @@ export class SupportController {
   ) {
     const page = parseInt(queryParams.page || '1', 10) || 1
     const perPage = parseInt(queryParams.per_page || '20', 10) || 20
-    const result = await this.listTicketsUseCase.execute(
-      currentUser.id,
-      queryParams.status,
+    const result = await this.listTicketsUseCase.execute({
+      userId: currentUser.id,
+      status: queryParams.status,
       page,
       perPage,
-    )
+    })
     return {
       data: result.items,
       meta: { total: result.total },

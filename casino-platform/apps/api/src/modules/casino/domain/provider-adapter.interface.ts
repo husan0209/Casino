@@ -22,20 +22,20 @@ export interface ParsedProviderCallback {
   rawRequest: any
   currency?: string | undefined
 }
+/** Строка игрового каталога провайдера (нормализованная). */
+export interface ProviderGameRow {
+  externalGameId: string
+  name: string
+  type?: string | undefined
+  category?: string | undefined
+  thumbnailUrl?: string | undefined
+  hasDemo: boolean
+  rtp?: number | undefined
+  metadata?: any
+}
 export interface GameProviderAdapter {
   getLaunchUrl(params: LaunchParams): Promise<{ url: string }>
-  fetchGameList(): Promise<
-    Array<{
-      externalGameId: string
-      name: string
-      type?: string | undefined
-      category?: string | undefined
-      thumbnailUrl?: string | undefined
-      hasDemo: boolean
-      rtp?: number | undefined
-      metadata?: any
-    }>
-  >
+  fetchGameList(): Promise<ProviderGameRow[]>
   verifyCallback(headers: any, body: any): boolean
   parseCallback(headers: any, body: any): ParsedProviderCallback
   formatSuccessResponse(balance: string, transactionId?: string): any

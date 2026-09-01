@@ -48,6 +48,7 @@ module.exports = {
         groups: ['builtin', 'external', 'internal', ['parent', 'sibling', 'index'], 'type'],
         pathGroups: [
           { pattern: '@/**', group: 'internal', position: 'after' },
+          { pattern: '@modules/**', group: 'internal', position: 'after' },
           { pattern: '@casino/**', group: 'internal', position: 'after' },
         ],
         pathGroupsExcludedImportTypes: ['builtin'],
@@ -63,11 +64,13 @@ module.exports = {
 
     // ─── Function discipline ──────────────────────────────────────
     // CRITICAL: was 'warn'. Long/complex methods hide business logic.
-    'max-params': ['warn', 4],
+    // GAP-25 закрыт: обещанные в QUALITY_GATES §2.1 error-пороги (3/10).
+    // Nest-специфика исключена (см. overrides ниже): controller-хендлеры
+    // (параметры навязаны декораторами роутинга) и DI-конструкторы
+    // (граф зависимостей) — inline-disable с обоснованием.
+    'max-params': ['error', 3],
     'max-depth': ['error', 3],
-    // TODO(security-hardening): promote back to 'error' after extracting
-    // guard-clauses in wallet/casino flows + adding unit tests (follow-up PR)
-    'complexity': ['warn', 10],
+    'complexity': ['error', 10],
     // Лимит перекалиброван 60→90 под prettier-нормализацию (printWidth 100 растягивает строки).
     // Вернуть к 60 после разбора 14 методов — GAP-30 (вместе с тестами GAP-21/24).
     'max-lines-per-function': ['error', { max: 90, skipBlankLines: true, skipComments: true }],
@@ -98,6 +101,14 @@ module.exports = {
     ],
   },
   overrides: [
+    {
+      // Nest-хендлеры: сигнатуру задаёт фреймворк (декораторы @Param/@Body/@Req/@Res,
+      // express verify(req,res,buf,encoding)) — это не наш API-дизайн (GAP-25).
+      files: ['**/*.controller.ts', '**/src/main.ts'],
+      rules: {
+        'max-params': 'off',
+      },
+    },
     {
       // Relaxed rules for tests (docs/CONVENTIONS.md §11: tests assert behavior, not size)
       files: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e-spec.ts'],

@@ -16,7 +16,13 @@ export class PrismaSupportRepository implements ISupportRepository {
       where: { userId, status: { in: ['open', 'in_progress', 'waiting_user'] } },
     })
   }
-  async createTicket(userId: string, subject: string, category: TicketCategory, message: string) {
+  async createTicket(args: {
+    userId: string
+    subject: string
+    category: TicketCategory
+    message: string
+  }) {
+    const { userId, subject, category, message } = args
     const ticket = await prisma.$transaction(async (tx: { [k: string]: any }) => {
       const t = await tx.supportTicket.create({
         data: { userId, subject, category: category as SupportTicketCategory, status: 'open', priority: 'normal' },
@@ -35,7 +41,8 @@ export class PrismaSupportRepository implements ISupportRepository {
     })
     return { id: ticket.id }
   }
-  async listUserTickets(userId: string, status?: TicketStatus, page = 1, perPage = 20) {
+  async listUserTickets(args: { userId: string; status?: TicketStatus; page: number; perPage: number }) {
+    const { userId, status, page, perPage } = args
     const where: any = { userId }
     if (status) {
       where.status = status
@@ -64,14 +71,17 @@ export class PrismaSupportRepository implements ISupportRepository {
   async getTicketForUser(ticketId: string, userId: string) {
     return prisma.supportTicket.findFirst({ where: { id: ticketId, userId } })
   }
-  async addMessage(
-    ticketId: string,
-    senderType: 'user' | 'admin',
-    senderId: string,
-    message: string,
-    isInternal = false,
-    attachments: any[] = [],
-  ) {
+  async addMessage(args: {
+    ticketId: string
+    senderType: 'user' | 'admin'
+    senderId: string
+    message: string
+    isInternal?: boolean
+    attachments?: any[]
+  }) {
+    const { ticketId, senderType, senderId, message } = args
+    const isInternal = args.isInternal ?? false
+    const attachments = args.attachments ?? []
     const m = await prisma.supportMessage.create({
       data: { ticketId, senderType, senderId, message, attachments, isInternal },
     })

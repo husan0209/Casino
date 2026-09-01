@@ -28,6 +28,7 @@ export class LoginUseCase {
     lockDurationMs: Number(process.env['LOCKOUT_DURATION_MS'] ?? 30 * 60_000),
   }
 
+  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,

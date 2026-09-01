@@ -1,11 +1,13 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes, Inject } from '@nestjs/common'
 
-import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
 // NB: reviewed_by -> FK на AdminUser (см. схему) — пишем AdminUser.id,
 // а не user.id: AuthGuard+RolesGuard здесь давали FK-violation на КАЖДОМ
 // одобрении (найдено E2E, PR #15). Паттерн — как в admin-finance.controller.
-import { AdminAuthGuard } from '../../../admin/presentation/admin-auth.guard'
+import { AdminAuthGuard } from '@modules/admin/presentation/admin-auth.guard'
+
 import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
 import { KycDecisionReasonSchema } from '../dto/kyc.dto'
 
@@ -31,19 +33,19 @@ export class KycAdminController {
   }
   @Post(':id/approve')
   async approve(@Param('id') id: string, @CurrentUser() u: any) {
-    await this.repo.setStatus(id, 'approved', undefined, u.id)
+    await this.repo.setStatus({ id, status: 'approved', reviewedBy: u.id })
     return { ok: true }
   }
   @Post(':id/reject')
   @UsePipes(new ZodValidationPipe(KycDecisionReasonSchema))
   async reject(@Param('id') id: string, @Body() b: { reason: string }, @CurrentUser() u: any) {
-    await this.repo.setStatus(id, 'rejected', b.reason, u.id)
+    await this.repo.setStatus({ id, status: 'rejected', reason: b.reason, reviewedBy: u.id })
     return { ok: true }
   }
   @Post(':id/request-resubmission')
   @UsePipes(new ZodValidationPipe(KycDecisionReasonSchema))
   async resubmit(@Param('id') id: string, @Body() b: { reason: string }, @CurrentUser() u: any) {
-    await this.repo.setStatus(id, 'requires_resubmission', b.reason, u.id)
+    await this.repo.setStatus({ id, status: 'requires_resubmission', reason: b.reason, reviewedBy: u.id })
     return { ok: true }
   }
 }

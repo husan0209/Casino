@@ -37,7 +37,13 @@ export class ReferralCalcService {
       if (!ru.referredBy) {
         continue
       }
-      const res = await this.processUserRewards(ru.id, ru.referredBy!, dayStart, dayEnd, rewardRate)
+      const res = await this.processUserRewards({
+        referredId: ru.id,
+        referrerId: ru.referredBy!,
+        dayStart,
+        dayEnd,
+        rewardRate,
+      })
       processed += res.processed
       credited += res.credited
     }
@@ -48,16 +54,16 @@ export class ReferralCalcService {
   }
 
   /** GGR-share за сутки по всем валютам игрока: создаёт referralReward и кредитует награду рефереру. */
-  // eslint-disable-next-line max-lines-per-function -- single cohesive unit: group bets/wins per currency, accrue, credit
-  private async processUserRewards(
-    referredId: string,
-    referrerId: string,
-    dayStart: Date,
-    dayEnd: Date,
-    rewardRate: Decimal,
-  ): Promise<{ processed: number; credited: number }> {
-    const bets = await this.repo.sumTransactions(referredId, 'bet', dayStart, dayEnd)
-    const wins = await this.repo.sumTransactions(referredId, 'win', dayStart, dayEnd)
+  private async processUserRewards(args: {
+    referredId: string
+    referrerId: string
+    dayStart: Date
+    dayEnd: Date
+    rewardRate: Decimal
+  }): Promise<{ processed: number; credited: number }> {
+    const { referredId, referrerId, dayStart, dayEnd, rewardRate } = args
+    const bets = await this.repo.sumTransactions({ userId: referredId, type: 'bet', from: dayStart, to: dayEnd })
+    const wins = await this.repo.sumTransactions({ userId: referredId, type: 'win', from: dayStart, to: dayEnd })
     const currencies = new Set<string>([
       ...bets.map((b: CurrencySumRow) => b.currency),
       ...wins.map((w: CurrencySumRow) => w.currency),
@@ -66,53 +72,82 @@ export class ReferralCalcService {
     let processed = 0
     let credited = 0
     for (const cur of currencies) {
-      const betSum = bets.find((b: CurrencySumRow) => b.currency === cur)?.amount ?? '0'
-      const winSum = wins.find((w: CurrencySumRow) => w.currency === cur)?.amount ?? '0'
-      const ggr = new Decimal(betSum).minus(winSum)
-      const isPositiveGgr = ggr.gt(0)
-      const status = isPositiveGgr ? 'pending' : 'zero'
-      const rewardAmount = isPositiveGgr ? ggr.times(rewardRate).toFixed(8) : '0'
-
-      const exists = await this.repo.findReward(referrerId, referredId, dayStart, cur)
-      if (exists) {
-        continue
-      }
-
-      const rr = await this.repo.createReward({
-        referrerId,
+      const res = await this.processCurrencyReward({
         referredId,
-        type: 'ggr_share',
-        periodStart: dayStart,
-        periodEnd: dayEnd,
-        ggrAmount: isPositiveGgr ? ggr.toFixed(8) : '0',
-        rewardRate: rewardRate.toFixed(4),
-        rewardAmount,
-        currency: cur,
-        status,
+        referrerId,
+        dayStart,
+        dayEnd,
+        rewardRate,
+        cur,
+        betSum: bets.find((b: CurrencySumRow) => b.currency === cur)?.amount ?? '0',
+        winSum: wins.find((w: CurrencySumRow) => w.currency === cur)?.amount ?? '0',
       })
-      processed++
-
-      if (!isPositiveGgr || !money.isPositive(rewardAmount)) {
-        continue
-      }
-      try {
-        await this.walletFacade.credit({
-          userId: referrerId,
-          currency: cur as Currency,
-          amount: rewardAmount,
-          type: 'REFERRAL_REWARD', // enum LedgerEntryType (было 'referral_reward' — не из enum)
-          idempotencyKey: `ref_reward_${rr.id}`,
-          description: `Referral reward for ${referredId} (${dayStart.toISOString().slice(0, 10)})`,
-          metadata: { referralRewardId: rr.id, referredId },
-        })
-        await this.repo.updateReward(rr.id, { status: 'credited', creditedAt: new Date() })
-        credited++
-      } catch (err: any) {
-        this.logger.error(
-          `Failed to credit referral reward ${rr.id} for user ${referrerId}: ${err?.message || err}`,
-        )
-      }
+      processed += res.processed
+      credited += res.credited
     }
     return { processed, credited }
+  }
+
+  /** Одна валюта: расчёт GGR, дедупликация, создание награды и кредитование. */
+  private async processCurrencyReward(args: {
+    referredId: string
+    referrerId: string
+    dayStart: Date
+    dayEnd: Date
+    rewardRate: Decimal
+    cur: string
+    betSum: string
+    winSum: string
+  }): Promise<{ processed: number; credited: number }> {
+    const { referredId, referrerId, dayStart, dayEnd, rewardRate, cur, betSum, winSum } = args
+    const ggr = new Decimal(betSum).minus(winSum)
+    const isPositiveGgr = ggr.gt(0)
+    const status = isPositiveGgr ? 'pending' : 'zero'
+    const rewardAmount = isPositiveGgr ? ggr.times(rewardRate).toFixed(8) : '0'
+
+    const exists = await this.repo.findReward({
+      referrerId,
+      referredId,
+      periodStart: dayStart,
+      currency: cur,
+    })
+    if (exists) {
+      return { processed: 0, credited: 0 }
+    }
+
+    const rr = await this.repo.createReward({
+      referrerId,
+      referredId,
+      type: 'ggr_share',
+      periodStart: dayStart,
+      periodEnd: dayEnd,
+      ggrAmount: isPositiveGgr ? ggr.toFixed(8) : '0',
+      rewardRate: rewardRate.toFixed(4),
+      rewardAmount,
+      currency: cur,
+      status,
+    })
+
+    if (!isPositiveGgr || !money.isPositive(rewardAmount)) {
+      return { processed: 1, credited: 0 }
+    }
+    try {
+      await this.walletFacade.credit({
+        userId: referrerId,
+        currency: cur as Currency,
+        amount: rewardAmount,
+        type: 'REFERRAL_REWARD', // enum LedgerEntryType (было 'referral_reward' — не из enum)
+        idempotencyKey: `ref_reward_${rr.id}`,
+        description: `Referral reward for ${referredId} (${dayStart.toISOString().slice(0, 10)})`,
+        metadata: { referralRewardId: rr.id, referredId },
+      })
+      await this.repo.updateReward(rr.id, { status: 'credited', creditedAt: new Date() })
+      return { processed: 1, credited: 1 }
+    } catch (err: any) {
+      this.logger.error(
+        `Failed to credit referral reward ${rr.id} for user ${referrerId}: ${err?.message || err}`,
+      )
+      return { processed: 1, credited: 0 }
+    }
   }
 }

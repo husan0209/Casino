@@ -17,27 +17,27 @@ export interface TicketRow {
 }
 export interface ISupportRepository {
   countOpenByUser(userId: string): Promise<number>
-  createTicket(
-    userId: string,
-    subject: string,
-    category: TicketCategory,
-    message: string,
-  ): Promise<{ id: string }>
-  listUserTickets(
-    userId: string,
-    status?: TicketStatus,
-    page?: number,
-    perPage?: number,
-  ): Promise<{ items: any[]; total: number }>
+  createTicket(args: {
+    userId: string
+    subject: string
+    category: TicketCategory
+    message: string
+  }): Promise<{ id: string }>
+  listUserTickets(args: {
+    userId: string
+    status?: TicketStatus
+    page: number
+    perPage: number
+  }): Promise<{ items: any[]; total: number }>
   getTicketForUser(ticketId: string, userId: string): Promise<TicketRow | null>
-  addMessage(
-    ticketId: string,
-    senderType: 'user' | 'admin',
-    senderId: string,
-    message: string,
-    isInternal?: boolean,
-    attachments?: any[],
-  ): Promise<any>
+  addMessage(args: {
+    ticketId: string
+    senderType: 'user' | 'admin'
+    senderId: string
+    message: string
+    isInternal?: boolean
+    attachments?: any[]
+  }): Promise<any>
   listMessages(ticketId: string, includeInternal: boolean): Promise<any[]>
   closeTicket(ticketId: string, closedBy: 'user' | 'admin'): Promise<void>
   // admin

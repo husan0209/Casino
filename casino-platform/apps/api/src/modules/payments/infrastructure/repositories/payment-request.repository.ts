@@ -19,7 +19,13 @@ export class PaymentRequestRepository {
       data: { status, updatedAt: new Date(), ...extra },
     })
   }
-  listUser(userId: string, type?: 'deposit' | 'withdrawal', page = 1, perPage = 20) {
+  listUser(args: {
+    userId: string
+    type?: 'deposit' | 'withdrawal'
+    page: number
+    perPage: number
+  }) {
+    const { userId, type, page, perPage } = args
     const where: any = { userId }
     if (type) {
       where.type = type

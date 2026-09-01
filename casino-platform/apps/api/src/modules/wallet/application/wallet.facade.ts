@@ -1,12 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import type { Currency, MoneyAmount } from '@casino/shared-types'
+import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 
-import { ConfirmWithdrawalUseCase } from './use-cases/confirm-withdrawal.use-case'
-import { LockFundsUseCase } from './use-cases/lock-funds.use-case'
-import { UnlockFundsUseCase } from './use-cases/unlock-funds.use-case'
+import { ConfirmWithdrawalUseCase, type ConfirmWithdrawalInput } from './use-cases/confirm-withdrawal.use-case'
+import { LockFundsUseCase, type LockFundsInput } from './use-cases/lock-funds.use-case'
+import { UnlockFundsUseCase, type UnlockFundsInput } from './use-cases/unlock-funds.use-case'
 import {
   IWalletLedger,
   IWalletRepository,
@@ -27,6 +27,7 @@ import type { Prisma } from '@prisma/client'
  */
 @Injectable()
 export class WalletFacade {
+  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(WALLET_LEDGER) private ledger: IWalletLedger,
     @Inject(WALLET_REPOSITORY) private repo: IWalletRepository,
@@ -49,24 +50,14 @@ export class WalletFacade {
   debit(input: CreditInput) {
     return this.ledger.debit(input)
   }
-  lock(userId: string, currency: Currency, amount: MoneyAmount, key: string): Promise<CreditResult> {
-    return this.lockFunds.execute({ userId, currency, amount, idempotencyKey: key })
+  lock(args: LockFundsInput): Promise<CreditResult> {
+    return this.lockFunds.execute(args)
   }
-  unlock(
-    userId: string,
-    currency: Currency,
-    amount: MoneyAmount,
-    key: string,
-  ): Promise<CreditResult> {
-    return this.unlockFunds.execute({ userId, currency, amount, idempotencyKey: key })
+  unlock(args: UnlockFundsInput): Promise<CreditResult> {
+    return this.unlockFunds.execute(args)
   }
-  confirmWithdrawal(
-    userId: string,
-    currency: Currency,
-    amount: MoneyAmount,
-    key: string,
-  ): Promise<CreditResult> {
-    return this.confirmWithdrawalUc.execute({ userId, currency, amount, idempotencyKey: key })
+  confirmWithdrawal(args: ConfirmWithdrawalInput): Promise<CreditResult> {
+    return this.confirmWithdrawalUc.execute(args)
   }
   getBalances(userId: string) {
     return this.repo.listBalances(userId)

@@ -1,14 +1,17 @@
 {
   "extends": "@casino/tsconfig/nest.json",
   "compilerOptions": {
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@modules/*": ["./src/modules/*"],
+      "@casino/shared-types": ["../../packages/shared-types/src"],
+      "@casino/shared-utils": ["../../packages/shared-utils/src"],
+      "@casino/shared-config": ["../../packages/shared-config/src"],
+      "@casino/database": ["../../packages/database/src"]
+    }
   },
-  "include": [
-    "src"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "test"
-  ]
+  "include": ["src"],
+  "exclude": ["node_modules", "dist", "test"]
 }

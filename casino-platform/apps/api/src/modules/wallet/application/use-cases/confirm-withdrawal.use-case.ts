@@ -23,12 +23,7 @@ export interface ConfirmWithdrawalInput {
 @Injectable()
 export class ConfirmWithdrawalUseCase {
   constructor(@Inject(WALLET_LEDGER) private ledger: IWalletLedger) {}
-  execute(input: ConfirmWithdrawalInput): Promise<CreditResult> {
-    return this.ledger.confirmWithdrawal(
-      input.userId,
-      input.currency,
-      input.amount,
-      input.idempotencyKey,
-    )
+  execute(args: ConfirmWithdrawalInput): Promise<CreditResult> {
+    return this.ledger.confirmWithdrawal(args)
   }
 }

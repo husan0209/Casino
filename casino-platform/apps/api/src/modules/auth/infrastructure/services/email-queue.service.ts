@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
-import { EMAIL_QUEUE_PORT, EmailQueuePort } from '../../../../queues/queue.types'
+import { EMAIL_QUEUE_PORT, EmailQueuePort } from '@/queues/queue.types'
 
 /**
  * Продюсер писей аутентификации (verify-email / reset-password).

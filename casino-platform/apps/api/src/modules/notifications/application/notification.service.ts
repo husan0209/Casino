@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 
-import { EMAIL_QUEUE_PORT, EmailQueuePort } from '../../../queues/queue.types'
+import { EMAIL_QUEUE_PORT, EmailQueuePort } from '@/queues/queue.types'
+
 import {
   NOTIFICATION_REPOSITORY,
   type CreateNotificationInput,
@@ -61,7 +62,8 @@ export class NotificationService {
     return n
   }
 
-  async list(userId: string, page = 1, perPage = 20, isRead?: boolean) {
+  async list(args: { userId: string; page: number; perPage: number; isRead?: boolean }) {
+    const { userId, page, perPage, isRead } = args
     const where: { userId: string; isRead?: boolean } = { userId }
     if (isRead !== undefined) {
       where.isRead = isRead

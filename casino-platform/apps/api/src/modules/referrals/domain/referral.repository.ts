@@ -34,18 +34,18 @@ export interface IReferralRepository {
   /** Все пользователи, у которых заполнен referredBy. */
   findReferredUsers(): Promise<ReferredUserRow[]>
   /** Суммы bet/win-транзакций пользователя за период, сгруппированные по валютам. */
-  sumTransactions(
-    userId: string,
-    type: string,
-    from: Date,
-    to: Date,
-  ): Promise<CurrencySumRow[]>
-  findReward(
-    referrerId: string,
-    referredId: string,
-    periodStart: Date,
-    currency: string,
-  ): Promise<ReferralRewardRow | null>
+  sumTransactions(args: {
+    userId: string
+    type: string
+    from: Date
+    to: Date
+  }): Promise<CurrencySumRow[]>
+  findReward(args: {
+    referrerId: string
+    referredId: string
+    periodStart: Date
+    currency: string
+  }): Promise<ReferralRewardRow | null>
   createReward(data: CreateReferralRewardInput): Promise<ReferralRewardRow>
   updateReward(
     id: string,
