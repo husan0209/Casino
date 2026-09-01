@@ -1,0 +1,15 @@
+# Gitleaks: базовый конфиг — дефолтные правила + allowlist для документации.
+# Зачем: full-history скан (workflow_dispatch, новый кэш ветки) ловит
+# placeholder-примеры в доках (generic-api-key на UUID в curl-сниппетах),
+# из-за чего secrets-scan краснеет не на секретах, а на учебном тексте.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+[rules.allowlist]
+description = "Примеры запросов в документации (двухсотые UUID/placeholder-ключи)"
+paths = [
+  '''(casino-platform/)?docs/(API_CONVENTIONS|PROVIDER_INTEGRATION_STRATEGY)\.md$''',
+  '''^uploads/(API_CONVENTIONS|PROVIDER_INTEGRATION_STRATEGY)\.txt$''',
+]
