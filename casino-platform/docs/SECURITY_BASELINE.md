@@ -267,6 +267,8 @@ add_header Content-Security-Policy "
 
 `'unsafe-inline'` и `'unsafe-eval'` используются потому что провайдеры казино требуют iframe с inline-скриптами. Для более строгой CSP нужны nonce-based скрипты. После MVP — переход на nonce.
 
+> **✅ Реализовано 2026-08-31 (PR #15):** nonce-CSP через Next middleware (`apps/web/src/middleware.ts`) — nonce на каждый запрос + `'strict-dynamic'`; `unsafe-eval` только в dev (HMR); nginx-строка CSP для веб-хоста удалена (двойной CSP ломает strict-dynamic), для `/api` CSP отдаёт helmet. Схема выше — историческая (до nonce); актуальная политика — в middleware.
+
 ### 6.3. Helmet (NestJS)
 
 ```typescript
