@@ -1,6 +1,7 @@
 # Implementation Gaps — честный аудит ТЗ vs код
 
 > Дата аудита: 2026-08-23, ревизия 2026-08-24. Цель: зафиксировать расхождения между ТЗ (`docs/tz-part-*.md`) и фактическим кодом.
+> Последняя ревизия: **2026-09-01 — аудит готовности к запуску, добавлены GAP-31…GAP-38** (два P0-блокера: миграции, реферальные выплаты).
 > Этот файл — точка правды по статусу. Не отмечать пункт «готов», пока не работает end-to-end.
 
 ## 🔴 CRITICAL — блокеры (API не собирается)
@@ -41,7 +42,7 @@
 | GAP-10 | ~~Frontend админки — заглушки~~ | ✅ Исправлено 2026-08-23: реальный UI на 13 страницах (`apps/admin/src`): логин c JWT (zustand persist), guard-layout, дашборд на живых metrics/charts/events + Recharts, users (block/unblock), transactions, payments, withdrawals (single+batch approve/reject), KYC (approve/reject/resubmit), games/providers (toggle/sync), support (диалог+внутр.заметки+приоритет+close), referrals (stats), audit, admins (superadmin CRUD), settings. `tsc -p apps/admin` = 0 |
 | GAP-11 | ~~Нет API метрик дашборда~~ | ✅ Исправлено 2026-08-23: `admin/application/dashboard.service.ts` + `AdminDashboardController` (`/admin/dashboard/metrics\|charts\|events`), raw SQL по date_trunc, деньги string. Runtime — нужна БД (prisma generate) |
 | GAP-12 | ~~Нет batch approve/reject~~ | ✅ Исправлено 2026-08-23: `POST /admin/withdrawals/batch-approve\|batch-reject`, независимая обработка каждой заявки + audit-log сводки; single-эндпоинты рефакторнуты на общие helpers + `WithdrawalInvalidStatusError`(AppError) |
-| GAP-13 | Referral rewards помечаются `credited` без реального зачисления через WalletFacade (деньги не движутся) | `referrals/application/referral-calc.service.ts:56-60` | UC-REF-03 шаг 5 |
+| GAP-13 | ~~Referral rewards помечаются `credited` без реального зачисления через WalletFacade~~ | `referrals/application/referral-calc.service.ts:56-60` | UC-REF-03 шаг 5 — ⚠️ **частично**: само зачисление реальное (`walletFacade.credit`, тип `REFERRAL_REWARD`, ключ `ref_reward_<id>`), **но метод `runDaily` никто не вызывает** → деньги всё равно не движутся. Перенесено в **GAP-32** (аудит 2026-09-01) |
 
 ## 🛡 АУДИТ 2026-08-25 → открытые пункты (ревизия 2026-08-28)
 
@@ -64,6 +65,32 @@
 | GAP-29 | NEW (docs-guard D3) | ~~env.validation.ts валидирует не все ключи `.env.example`~~ | `packages/shared-config/src/env.validation.ts` | ✅ Закрыт 2026-08-30: все 39 ключей §22 в Zod-схеме (coerce/url/enum, все optional — поведение кода не меняется); D3 молчит |
 | GAP-30 | NEW (PR-0) | 14 методов 61–88 строк (prettier-инфляция после `--fix`): `game-callback.service` bet/win/rollback, `dashboard.service` metrics/events, `wallet.ledger.prisma` runCreditDebit/lock/unlock/confirmWithdrawal, `list-games.use-case` execute, webhook execute ×2, `provider-callback.controller` handle — разбить на приватные методы, вернуть лимит 60. Делать вместе с тестами (GAP-21/24) | перечисленные файлы | P3 |
 
+## 🔎 АУДИТ ГОТОВНОСТИ К ЗАПУСКУ — 2026-09-01 (GAP-31…GAP-38)
+
+> Повод: после закрытия P0/P1/P2-трекера и зеленого CI задан вопрос «проект готов?».
+> Аудит сравнивал **фактический код** с ТЗ ч.3 §13, ч.7 §10/§12 и `docs/QA_CHECKLIST.md`.
+> Найдено 8 расхождений, из них 2 — блокеры запуска.
+>
+> **Формат обязателен для исполнителя (в т.ч. другого AI-агента):** пункт закрывается
+> только при выполнении «Критерия приёмки» целиком. Отметка «готово» без критерия —
+> причина, по которой GAP-13 полгода числился закрытым при неработающем начислении.
+> Правило INDEX.md §6.3: закрыл код → обнови этот файл в том же PR.
+
+| # | Что не работает | Где | Приоритет | Критерий приёмки |
+|---|-----------------|-----|-----------|------------------|
+| GAP-31 | **Нет Prisma-миграций.** В `packages/database/prisma/migrations/` только `manual/` c 3 ad-hoc SQL-файлами; каталогов `<timestamp>_<name>/migration.sql` и `migration_lock.toml` нет. При этом деплой выполняет `prisma migrate deploy` (`infra/scripts/deploy.sh`, шаг ssh-деплоя в `.github/workflows/ci.yml`) — на чистой БД он **не создаст ни одной из 27 таблиц** и упадёт/сделает вид, что применять нечего. CI обходит проблему через `prisma db push`, поэтому баг не виден | `packages/database/prisma/`, `infra/scripts/deploy.sh` | **P0 — блокер деплоя** | 1) сгенерирована baseline-миграция, покрывающая все 27 моделей `schema.prisma` **и** три `manual/*.sql` (last_payment_method, self_excluded_until, account_lockout); 2) на **пустой** БД `prisma migrate deploy` создаёт схему, `prisma migrate status` → «Database schema is up to date»; 3) `prisma migrate diff --from-schema-datasource --to-schema-datamodel` даёт пустой diff (schema.prisma ≡ миграции); 4) `manual/` либо удалён, либо в нём README «применены в baseline, не запускать»; 5) в CI шаг `db push` заменён на `migrate deploy` (иначе дрейф вернётся) |
+| GAP-32 | **Реферальные начисления не происходят никогда.** `ReferralCalcService.runDaily` реализован полностью и честно (реальный `walletFacade.credit`, тип `REFERRAL_REWARD`, ключ `ref_reward_<id>`), но **у него нет ни одного вызывающего**: ни cron, ни admin-эндпоинта, ни воркера — `grep runDaily` находит только определение. `admin/referrals` отдаёт только статистику. Т.е. GGR-share 5% из ТЗ не выплачивается | `apps/api/src/modules/referrals/application/referral-calc.service.ts`, `apps/api/src/modules/referrals/presentation/referrals-admin.controller.ts` | **P0 — деньги не движутся** | 1) появился триггер: cron-job (см. GAP-33) **и** ручной `POST /admin/referrals/run-daily` для superadmin с audit-log; 2) интеграционный тест на реальной БД: игрок с GGR>0 → после запуска в `ledger_entries` есть проводка `REFERRAL_REWARD` с суммой `ggr × rate` и `referral_rewards.status='credited'`; 3) повторный запуск за тот же день **не** создаёт второй проводки (проверяется существующей защитой `findReward` + уникальным `idempotencyKey`); 4) день без GGR → статус `zero`, проводок нет |
+| GAP-33 | **Ни одного scheduled job.** ТЗ ч.3 §13 требует три: истечение pending-депозитов старше 2ч (крипто — по `expires_at`), обновление курсов каждые 5 мин, напоминание админу о выводах в pending >24ч. BullMQ подключён, но очередь одна — `email`, без `repeat`; `@nestjs/schedule` в зависимостях отсутствует. Следствие: pending-депозиты живут вечно, вывод может «зависнуть» незамеченным | `apps/api/src/queues/queue.types.ts`, `apps/api/src/queues/application/email.worker.ts` | P1 | 1) три повторяющиеся job'ы зарегистрированы (BullMQ `repeat` или `@nestjs/schedule`), интервалы из env, а не хардкод; 2) юнит-тест на каждую: депозит `pending` + `createdAt` 3ч назад → `expired`; депозит 1ч назад → не тронут; 3) напоминание о выводе создаёт запись в `notifications` для админа и не дублируется при повторном тике; 4) job'ы идемпотентны и логируют сводку (обработано/пропущено); 5) документировано в `docs/ENVIRONMENT_VARIABLES.md` + `.env.example` (D3-парити) |
+| GAP-34 | **Курсы валют захардкожены.** Модель `ExchangeRate` в схеме есть, но в коде к ней **ни одного обращения**: конвертация RUB↔крипто идёт по константам `DISPLAY_RUB_RATES`. От этих чисел зависят KYC-лимит 5000₽ (`limit_remaining`) и админ-отчётность → при движении курса USDT/BTC лимит и GGR считаются неверно | `packages/shared-config/src/geo.config.ts`, `apps/api/src/modules/geo/domain/geo-config.policy.ts` | P1 | 1) сервис курсов пишет в `exchange_rates` (source, fetched_at) и кеширует в Redis TTL 5 мин; 2) конвертация читает БД/кеш, `DISPLAY_RUB_RATES` остаются только **fallback** при пустой таблице; 3) тест: подменённый курс в БД меняет `limit_remaining` в ответе KYC-API; 4) устаревший курс (fetched_at > 1ч) логирует warning и не роняет запрос; 5) деньги — только `string`/Decimal (CONVENTIONS §5) |
+| GAP-35 | **Health-эндпоинты фиктивные.** `/health/ready` возвращает `{ready:true}` **без проверки** Postgres/Redis, `/health/details` из ТЗ ч.7 §10.1 нет вовсе. Docker healthcheck (`docker-compose.prod.yml`) бьёт в `/health` → контейнер отмечается healthy при мёртвой БД, а E2E-`wait-on` даёт ложный зелёный | `apps/api/src/modules/health/presentation/health.controller.ts`, `docker-compose.prod.yml` | P1 | 1) `/health/ready` делает `SELECT 1` к БД и `PING` к Redis, при недоступности → **503** (fail-closed); 2) добавлен `/health/details` с `services{database,redis,email_queue}`, счётчиками очереди и uptime, закрыт от публичного доступа (internal/admin); 3) healthcheck в compose переведён на `/health/ready`; 4) тест: с выключенным Redis `ready` → 503, `live` → 200 (liveness не зависит от внешних сервисов) |
+| GAP-36 | KYC-лимит не виден игроку: API отдаёт `limit_remaining` в запрошенной валюте (`get-kyc-status.use-case.ts`), но во фронте нет ни одного использования — на странице KYC нет остатка лимита. Хвост GAP-17 | `apps/web/src/app/kyc/page.tsx` | P2 | 1) страница KYC и депозитный флоу показывают остаток лимита в активной валюте; 2) при исчерпании лимита CTA ведёт на верификацию, а не на ошибку 422 после отправки формы; 3) значение берётся из API (не пересчитывается на клиенте) |
+| GAP-37 | Дрейф деплой-документации: `docs/DEPLOY.md` §CI/CD ссылается на `.github/workflows/deploy.yml`, которого нет (деплой — job в `.github/workflows/ci.yml`); ТЗ ч.7 §12.3 требует скрипт resource-check.sh в `infra/scripts/`, его нет (есть health-check.sh, backup, rollback). Плюс не описано, что деплой пропускается без VPS-секретов (#23/#24) | `docs/DEPLOY.md`, `infra/scripts/` | P3 | 1) DEPLOY.md описывает фактический пайплайн (единый ci.yml, deploy-job после 4 зелёных чеков, skip без секретов); 2) либо добавлен resource-check.sh, либо в ТЗ-хвостах помечено «не входит в MVP» — без висящей ссылки; 3) docs-guard D1/D2 зелёные |
+| GAP-38 | **На чистом проде некому войти в админку.** Первый superadmin создаётся только `packages/database/src/seed.ts` (`pnpm db:seed`), но ни `infra/scripts/deploy.sh`, ни deploy-job его не вызывают и в `docs/DEPLOY.md` шага нет. Дефолтный пароль в сиде — `dev_superadmin_password_123` | `packages/database/src/seed.ts`, `infra/scripts/deploy.sh`, `docs/DEPLOY.md` | P2 | 1) в DEPLOY.md есть шаг первичной инициализации с обязательными `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD`; 2) сид **отказывается** создавать админа с дефолтным паролем при `NODE_ENV=production` (fail-closed); 3) повторный запуск идемпотентен (уже есть); 4) в `.env.example` + ENVIRONMENT_VARIABLES §22 обе переменные описаны (D3-парити) |
+
+### Что НЕ является гэпом (проверено 2026-09-01)
+
+Чтобы исполнитель не переделывал готовое: 12 модулей API и 4-слойка на месте; 18 страниц web + 14 админки без заглушек (`grep TODO` по фронту — пусто); 27 моделей в `schema.prisma`; деньги — Decimal/string + идемпотентность + Serializable-retry; безопасность — helmet, throttler, argon2id, Zod на всех клиентских `@Body`, pino-redact, HMAC на вебхуках; тесты — 62 unit + 9 E2E; CI — 4 обязательных чека + 2 guard'а зелёные, docker-образ собирается.
+
 ## 🟡 MEDIUM — частично сделано
 
 | # | Что | Статус |
@@ -71,7 +98,7 @@
 | GAP-14 | `GET /admin/kyc/:id` возвращал `{todo:true}` | ✅ Исправлено 2026-08-22: возвращает профиль+документы+`totalDepositedRub` (`kyc-admin.controller.ts`) |
 | GAP-15 | ~~NotificationService игнорировал настройки и канал email~~ | ✅ Закрыто в рамках GAP-02: enqueue в очередь `email` с проверкой `user_settings.notificationsEmail`; sentAt проставляет воркер |
 | GAP-16 | README врал про `[x]` во всех частях | ✅ Исправлено: честные проценты + ссылка сюда |
-| GAP-17 | KYC upload UI есть, но лимит 5000₽ проверяется только на бэке при депозите — сверить с kyc-check.service | ⚠️ Нужен `limit_remaining` в активной валюте для UI (tz-part-2 §4, tz-part-5 §13) |
+| GAP-17 | KYC upload UI есть, но лимит 5000₽ проверяется только на бэке при депозите — сверить с kyc-check.service | ⚠️ API `limit_remaining` готов (`get-kyc-status.use-case.ts`), во фронте не используется → выделено в **GAP-36** (аудит 2026-09-01) |
 
 ## 📋 TZ SYNC — расхождения после обновления Part 5 (2026-08-23)
 
@@ -120,3 +147,13 @@
 5. **Runtime-приёмка** на Linux-FS: `pnpm install && pnpm db:generate && pnpm db:migrate && pnpm dev`; прогон register→login→deposit→launch→admin.
 6. Решение по email-верификации (см. заметку о TZ-10 выше).
 7. ~~После MVP: GAP-22/24/25/26~~ **2026-09-01: закрыты все четыре** — GAP-22 (4-слойка wallet), GAP-24 (тесты + E2E), GAP-25 (ESLint error-пороги 3/10), GAP-26 (алиасы через `tsc-alias`). ~~Из P2/P3-трекера остаётся только GAP-28~~ **GAP-28 закрыт 2026-09-01 (идемпотентность депозита по external_id)**; остался GAP-30 (возврат `max-lines-per-function` к 60); плюс email-воркер отдельным процессом и rich HTML-шаблоны.
+8. **Аудит готовности 2026-09-01 → GAP-31…GAP-38** (раздел выше). Порядок работ:
+   **сначала P0** — GAP-31 (миграции: без них деплой на чистую БД невозможен) и GAP-32
+   (реферальные выплаты не происходят); **затем P1** — GAP-33 (cron-jobs), GAP-34 (курсы
+   из БД), GAP-35 (честный readiness); **потом P2/P3** — GAP-36, GAP-38, GAP-37, GAP-30.
+   GAP-32 зависит от GAP-33 (cron), GAP-34 частично зависит от GAP-33 (job обновления курсов).
+9. **CI-инфраструктура приведена в порядок 2026-09-01** (PR #20/#21/#23/#24): docker-build
+   получил правильный контекст (`casino-platform`, а не корень репо) и `@types/node`/`.npmrc`
+   в образе; commitlint на push в main проверяет только свежий squash-коммит; `.gitleaks.toml`
+   с allowlist для placeholder-примеров в доках; deploy-job пропускается (notice), пока нет
+   `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY`. Main зелёный целиком, включая docker-build.
