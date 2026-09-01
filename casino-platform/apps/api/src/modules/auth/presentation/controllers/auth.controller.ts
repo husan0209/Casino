@@ -5,8 +5,9 @@ import { Request, Response } from 'express'
 import {
   setRefreshTokenCookie,
   clearRefreshTokenCookie,
-} from '../../../../common/cookies/refresh-token-cookie'
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
+} from '@/common/cookies/refresh-token-cookie'
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
 import { ForgotPasswordUseCase } from '../../application/use-cases/forgot-password.use-case'
 import { LoginUseCase } from '../../application/use-cases/login.use-case'
 import { LogoutUseCase } from '../../application/use-cases/logout.use-case'

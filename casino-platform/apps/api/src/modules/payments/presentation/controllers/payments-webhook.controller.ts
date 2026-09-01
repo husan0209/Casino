@@ -35,7 +35,12 @@ export class PaymentsWebhookController {
     @Body() body: unknown,
     @Req() req: { rawBody?: string; ip?: string },
   ) {
-    return this.rukassa.execute(headers, body, req.rawBody ?? '', req.ip ?? '')
+    return this.rukassa.execute({
+      rawHeaders: headers,
+      body,
+      rawBody: req.rawBody ?? '',
+      ip: req.ip ?? '',
+    })
   }
 
   @Post('nowpayments')
@@ -45,6 +50,11 @@ export class PaymentsWebhookController {
     @Body() body: unknown,
     @Req() req: { rawBody?: string; ip?: string },
   ) {
-    return this.np.execute(headers, body, req.rawBody ?? '', req.ip ?? '')
+    return this.np.execute({
+      rawHeaders: headers,
+      body,
+      rawBody: req.rawBody ?? '',
+      ip: req.ip ?? '',
+    })
   }
 }

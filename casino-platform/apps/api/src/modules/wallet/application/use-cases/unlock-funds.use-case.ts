@@ -23,7 +23,7 @@ export interface UnlockFundsInput {
 @Injectable()
 export class UnlockFundsUseCase {
   constructor(@Inject(WALLET_LEDGER) private ledger: IWalletLedger) {}
-  execute(input: UnlockFundsInput): Promise<CreditResult> {
-    return this.ledger.unlock(input.userId, input.currency, input.amount, input.idempotencyKey)
+  execute(args: UnlockFundsInput): Promise<CreditResult> {
+    return this.ledger.unlock(args)
   }
 }

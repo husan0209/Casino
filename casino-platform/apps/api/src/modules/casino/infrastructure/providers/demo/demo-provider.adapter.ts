@@ -5,7 +5,7 @@ import {
   type GameProviderAdapter,
   type LaunchParams,
   type ParsedProviderCallback,
-} from '../../../domain/provider-adapter.interface'
+} from '@modules/casino/domain/provider-adapter.interface'
 
 @Injectable()
 export class DemoProviderAdapter implements GameProviderAdapter {

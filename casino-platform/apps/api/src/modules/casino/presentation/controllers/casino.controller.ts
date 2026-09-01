@@ -1,10 +1,13 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
 
+
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
+import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+
 import { prisma, type GameCategory } from '@casino/database'
 
-import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
-import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
 import { FavoritesUseCase } from '../../application/use-cases/favorites.use-case'
 import { LaunchGameUseCase } from '../../application/use-cases/launch-game.use-case'
 import { ListGamesUseCase } from '../../application/use-cases/list-games.use-case'
@@ -166,12 +169,12 @@ export class CasinoController {
   ) {
     const page = parseInt(queryParams.page || '1', 10) || 1
     const perPage = parseInt(queryParams.per_page || '20', 10) || 20
-    const result = await this.favoritesUseCase.history(
-      currentUser.id,
+    const result = await this.favoritesUseCase.history({
+      userId: currentUser.id,
       page,
       perPage,
-      queryParams.game_id,
-    )
+      ...(queryParams.game_id ? { gameId: queryParams.game_id } : {}),
+    })
     return {
       data: result.data,
       meta: {

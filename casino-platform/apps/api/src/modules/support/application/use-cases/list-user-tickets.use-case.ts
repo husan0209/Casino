@@ -8,7 +8,7 @@ import {
 @Injectable()
 export class ListUserTicketsUseCase {
   constructor(@Inject(SUPPORT_REPOSITORY) private repo: ISupportRepository) {}
-  execute(userId: string, status?: any, page = 1, perPage = 20) {
-    return this.repo.listUserTickets(userId, status, page, perPage)
+  execute(args: { userId: string; status?: any; page: number; perPage: number }) {
+    return this.repo.listUserTickets({ userId: args.userId, status: args.status, page: args.page, perPage: args.perPage })
   }
 }

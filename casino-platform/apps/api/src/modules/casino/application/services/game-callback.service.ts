@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
 
+import { WalletFacade } from '@modules/wallet/application/wallet.facade'
+
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-import { WalletFacade } from '../../../wallet/application/wallet.facade'
 import { type ParsedProviderCallback } from '../../domain/provider-adapter.interface'
 import {
   GAME_PLAY_REPOSITORY,
@@ -62,7 +63,7 @@ export class GameCallbackService {
       if (dupInTx) {
         return { balance: await this.getWalletBalance(session.userId, session.currency), duplicate: true }
       }
-      const round = await this.findOrCreateRound(providerId, cb, session, 'open', tx)
+      const round = await this.findOrCreateRound({ providerId, cb, session, initialStatus: 'open', tx })
       const creditRes = await this.wallet.debit({
         userId: session.userId,
         currency: session.currency as Currency,
@@ -119,11 +120,11 @@ export class GameCallbackService {
       if (dupInTx) {
         return { balance: await this.getWalletBalance(session.userId, session.currency), duplicate: true }
       }
-      const round = await this.findOrCreateRound(providerId, cb, session, 'closed', tx)
+      const round = await this.findOrCreateRound({ providerId, cb, session, initialStatus: 'closed', tx })
       let balanceAfter = '0'
       let ledgerEntryId: string | null = null
       if (money.isPositive(winAmount)) {
-        const res = await this.creditWin(session, providerId, cb, winAmount, tx)
+        const res = await this.creditWin({ session, providerId, cb, winAmount, tx })
         balanceAfter = res.balanceAfter
         ledgerEntryId = res.ledgerEntryId
       } else {
@@ -254,13 +255,14 @@ export class GameCallbackService {
     return session
   }
 
-  private async findOrCreateRound(
-    providerId: string,
-    cb: ParsedProviderCallback,
-    session: GameSessionWithGame,
-    initialStatus: 'open' | 'closed',
-    tx?: Parameters<Parameters<WalletFacade['runInTransaction']>[0]>[0],
-  ): Promise<GameRow> {
+  private async findOrCreateRound(args: {
+    providerId: string
+    cb: ParsedProviderCallback
+    session: GameSessionWithGame
+    initialStatus: 'open' | 'closed'
+    tx?: Parameters<Parameters<WalletFacade['runInTransaction']>[0]>[0]
+  }): Promise<GameRow> {
+    const { providerId, cb, session, initialStatus, tx } = args
     const roundExternalId = cb.roundId || cb.transactionId!
     const existing = await this.play.findRoundByExternal(providerId, roundExternalId, tx)
     if (existing) {
@@ -281,13 +283,14 @@ export class GameCallbackService {
     )
   }
 
-  private async creditWin(
-    session: GameSessionWithGame,
-    providerId: string,
-    cb: ParsedProviderCallback,
-    winAmount: string,
-    tx?: Parameters<Parameters<WalletFacade['runInTransaction']>[0]>[0],
-  ) {
+  private async creditWin(args: {
+    session: GameSessionWithGame
+    providerId: string
+    cb: ParsedProviderCallback
+    winAmount: string
+    tx?: Parameters<Parameters<WalletFacade['runInTransaction']>[0]>[0]
+  }) {
+    const { session, providerId, cb, winAmount, tx } = args
     return this.wallet.credit({
       userId: session.userId,
       currency: session.currency as Currency,

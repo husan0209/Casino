@@ -13,6 +13,7 @@ import {
   type CreditInput,
   type CreditResult,
   type WalletAccount,
+  type WithdrawalOpArgs,
 } from '../../domain/repositories/wallet.repository'
 
 /**
@@ -168,12 +169,8 @@ export class PrismaWalletLedger implements IWalletLedger {
     return this.runCreditDebit(input, -1)
   }
 
-  async lock(
-    userId: string,
-    currency: Currency,
-    amount: MoneyAmount,
-    idempotencyKey: string,
-  ): Promise<CreditResult> {
+  async lock(args: WithdrawalOpArgs): Promise<CreditResult> {
+    const { userId, currency, amount, idempotencyKey } = args
     const existing = await prisma.ledgerEntry.findUnique({ where: { idempotencyKey } })
     if (existing) {
       return {
@@ -245,12 +242,8 @@ export class PrismaWalletLedger implements IWalletLedger {
     throw new OptimisticLockError()
   }
 
-  async unlock(
-    userId: string,
-    currency: Currency,
-    amount: MoneyAmount,
-    idempotencyKey: string,
-  ): Promise<CreditResult> {
+  async unlock(args: WithdrawalOpArgs): Promise<CreditResult> {
+    const { userId, currency, amount, idempotencyKey } = args
     const existing = await prisma.ledgerEntry.findUnique({ where: { idempotencyKey } })
     if (existing) {
       return {
@@ -322,12 +315,8 @@ export class PrismaWalletLedger implements IWalletLedger {
     throw new OptimisticLockError()
   }
 
-  async confirmWithdrawal(
-    userId: string,
-    currency: Currency,
-    amount: MoneyAmount,
-    idempotencyKey: string,
-  ): Promise<CreditResult> {
+  async confirmWithdrawal(args: WithdrawalOpArgs): Promise<CreditResult> {
+    const { userId, currency, amount, idempotencyKey } = args
     // debit + unlock atomically
     const existing = await prisma.ledgerEntry.findUnique({ where: { idempotencyKey } })
     if (existing) {

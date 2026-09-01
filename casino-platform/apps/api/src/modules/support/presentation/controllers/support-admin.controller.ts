@@ -1,9 +1,11 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes, Inject } from '@nestjs/common'
 
-import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
-import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
-import { RolesGuard, Roles } from '../../../auth/presentation/guards/roles.guard'
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
+import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+import { RolesGuard, Roles } from '@modules/auth/presentation/guards/roles.guard'
+
 import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
 import { GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
 import { SendMessageUseCase } from '../../application/use-cases/send-message.use-case'

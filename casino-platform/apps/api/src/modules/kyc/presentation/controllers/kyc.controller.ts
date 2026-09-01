@@ -18,10 +18,12 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 
-import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { extForMime, sniffDocumentMime } from '../../../../common/files/file-sniffer'
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
-import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
+import { extForMime, sniffDocumentMime } from '@/common/files/file-sniffer'
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
+import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+
 import { GetKycStatusUseCase } from '../../application/use-cases/get-kyc-status.use-case'
 import { SubmitKycUseCase } from '../../application/use-cases/submit-kyc.use-case'
 import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
@@ -94,7 +96,7 @@ export class KycController {
     if (!profile) {
       throw new Error('KYC_NOT_SUBMITTED')
     }
-    if (!file || !file.buffer || file.buffer.length === 0) {
+    if (!file.buffer || file.buffer.length === 0) {
       throw new BadRequestException('File is required')
     }
     // P1 #12: реальный тип — только по magic bytes, не по клиентскому Content-Type

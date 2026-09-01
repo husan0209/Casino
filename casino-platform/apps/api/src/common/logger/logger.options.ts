@@ -107,7 +107,7 @@ export function buildPinoHttpOptions(): Options {
           id: r.id,
           method: r.method,
           url: r.url,
-          remoteAddress: r.socket?.remoteAddress,
+          remoteAddress: r.socket.remoteAddress,
           headers: r.headers,
           body: r.body,
         }

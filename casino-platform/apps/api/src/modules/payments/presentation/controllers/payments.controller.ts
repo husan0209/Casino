@@ -10,9 +10,11 @@ import {
   UsePipes,
 } from '@nestjs/common'
 
-import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
-import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
+import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+
 import { CancelWithdrawalUseCase } from '../../application/use-cases/cancel-withdrawal.use-case'
 import { CreateCryptoDepositUseCase } from '../../application/use-cases/create-crypto-deposit.use-case'
 import { CreateFiatDepositUseCase } from '../../application/use-cases/create-fiat-deposit.use-case'
@@ -91,12 +93,12 @@ export class PaymentsController {
   @Get('withdrawals')
   async listWd(@CurrentUser() u: any, @Query() q: any) {
     const page = parseInt(q.page) || 1
-    const [items, total] = await this.repo.listUser(
-      u.id,
-      'withdrawal',
+    const [items, total] = await this.repo.listUser({
+      userId: u.id,
+      type: 'withdrawal',
       page,
-      parseInt(q.per_page) || 20,
-    )
+      perPage: parseInt(q.per_page) || 20,
+    })
     return { items, meta: { page, total } }
   }
   @Post('withdrawal/:id/cancel')

@@ -3,13 +3,15 @@ import { randomUUID } from 'crypto'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
-import { KycCheckService } from '../../../kyc/application/use-cases/kyc-check.service'
+import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
+
 import { PaymentProviderError } from '../../domain/errors'
 import { NOWPaymentsClient } from '../../infrastructure/clients/nowpayments.client'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 
 @Injectable()
 export class CreateCryptoDepositUseCase {
+  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     private repo: PaymentRequestRepository,
     private np: NOWPaymentsClient,

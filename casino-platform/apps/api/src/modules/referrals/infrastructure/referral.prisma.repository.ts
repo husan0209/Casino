@@ -19,12 +19,13 @@ export class PrismaReferralRepository implements IReferralRepository {
     })
   }
 
-  async sumTransactions(
-    userId: string,
-    type: string,
-    from: Date,
-    to: Date,
-  ): Promise<CurrencySumRow[]> {
+  async sumTransactions(args: {
+    userId: string
+    type: string
+    from: Date
+    to: Date
+  }): Promise<CurrencySumRow[]> {
+    const { userId, type, from, to } = args
     const rows = await prisma.gameTransaction.groupBy({
       by: ['currency'],
       where: { userId, type: type as never, createdAt: { gte: from, lte: to } },
@@ -33,12 +34,13 @@ export class PrismaReferralRepository implements IReferralRepository {
     return rows.map((r) => ({ currency: r.currency, amount: r._sum.amount?.toString() ?? '0' }))
   }
 
-  findReward(
-    referrerId: string,
-    referredId: string,
-    periodStart: Date,
-    currency: string,
-  ): Promise<ReferralRewardRow | null> {
+  findReward(args: {
+    referrerId: string
+    referredId: string
+    periodStart: Date
+    currency: string
+  }): Promise<ReferralRewardRow | null> {
+    const { referrerId, referredId, periodStart, currency } = args
     return prisma.referralReward.findFirst({
       where: { referrerId, referredId, periodStart, currency: currency as never },
     })

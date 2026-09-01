@@ -2,13 +2,31 @@ import { createHash } from 'crypto'
 
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
 
+
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
+import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+import { RolesGuard, Roles } from '@modules/auth/presentation/guards/roles.guard'
+
 import { prisma, type GameCategory, type GameType, type Prisma } from '@casino/database'
 
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
-import { AuthGuard } from '../../../auth/presentation/guards/auth.guard'
-import { RolesGuard, Roles } from '../../../auth/presentation/guards/roles.guard'
+import { type ProviderGameRow } from '../../domain/provider-adapter.interface'
 import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 import { UpdateGameSchema } from '../dto/admin-game.dto'
+
+/** Стабильный slug игры: читаемая база + хэш пары (provider, externalId). */
+function gameSlug(providerSlug: string, externalGameId: string, name?: string): string {
+  const slugBase =
+    String(name || externalGameId)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '') || 'game'
+  const hash = createHash('md5')
+    .update(`${providerSlug}:${externalGameId}`)
+    .digest('hex')
+    .slice(0, 6)
+  return `${slugBase}-${hash}`
+}
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
@@ -44,38 +62,9 @@ export class CasinoAdminController {
     let added = 0
     let updated = 0
     for (const g of list) {
-      const slugBase =
-        String(g.name || g.externalGameId)
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)/g, '') || 'game'
-      const slug = `${slugBase}-${createHash('md5').update(`${provider.slug}:${g.externalGameId}`).digest('hex').slice(0, 6)}`
-      const data = {
-        name: g.name || g.externalGameId,
-        type: (g.type as GameType) ?? 'slot',
-        category: (g.category as GameCategory) ?? 'slots',
-        thumbnailUrl: g.thumbnailUrl ?? null,
-        hasDemo: g.hasDemo ?? false,
-        rtp: g.rtp != null ? String(g.rtp) : null, // eslint-disable-line eqeqeq -- null|undefined guard on provider payload
-        metadata: (g.metadata ?? {}) as Prisma.InputJsonValue,
-      }
-      const existing = await prisma.game.findUnique({
-        where: { providerId_externalGameId: { providerId: id, externalGameId: g.externalGameId } },
-      })
-      if (existing) {
-        await prisma.game.update({ where: { id: existing.id }, data })
+      if (await this.upsertGameRow(id, provider.slug, g)) {
         updated++
       } else {
-        // UC-GAME-19 правило: новые игры добавляются ВЫКЛЮЧЕННЫМИ
-        await prisma.game.create({
-          data: {
-            ...data,
-            providerId: id,
-            externalGameId: g.externalGameId,
-            slug,
-            isEnabled: false,
-          },
-        })
         added++
       }
     }
@@ -88,6 +77,44 @@ export class CasinoAdminController {
       total,
       note: 'Новые игры добавлены выключенными — включите нужные в разделе «Игры»',
     }
+  }
+
+  /**
+   * Одна строка каталога: update существующей игры либо create новой.
+   * @returns true если игра уже была (обновили), false — добавили.
+   */
+  private async upsertGameRow(
+    providerId: string,
+    providerSlug: string,
+    g: ProviderGameRow,
+  ): Promise<boolean> {
+    const data = {
+      name: g.name || g.externalGameId,
+      type: (g.type as GameType) ?? 'slot',
+      category: (g.category as GameCategory) ?? 'slots',
+      thumbnailUrl: g.thumbnailUrl ?? null,
+      hasDemo: g.hasDemo ?? false,
+      rtp: g.rtp != null ? String(g.rtp) : null, // eslint-disable-line eqeqeq -- null|undefined guard on provider payload
+      metadata: (g.metadata ?? {}) as Prisma.InputJsonValue,
+    }
+    const existing = await prisma.game.findUnique({
+      where: { providerId_externalGameId: { providerId, externalGameId: g.externalGameId } },
+    })
+    if (existing) {
+      await prisma.game.update({ where: { id: existing.id }, data })
+      return true
+    }
+    // UC-GAME-19 правило: новые игры добавляются ВЫКЛЮЧЕННЫМИ
+    await prisma.game.create({
+      data: {
+        ...data,
+        providerId,
+        externalGameId: g.externalGameId,
+        slug: gameSlug(providerSlug, g.externalGameId, g.name),
+        isEnabled: false,
+      },
+    })
+    return false
   }
 
   // games

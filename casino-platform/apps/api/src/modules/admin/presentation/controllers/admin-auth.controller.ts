@@ -1,8 +1,9 @@
 import { Body, Controller, Post, UsePipes } from '@nestjs/common'
 
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
 import { prisma } from '@casino/database'
 
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthService } from '../../infrastructure/admin-jwt.service'
 import { AdminLoginSchema } from '../dto/admin-auth.dto'

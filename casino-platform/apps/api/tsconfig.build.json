@@ -2,6 +2,11 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": "src",
+    // Инкрементальную сборку выключаем: nest-cli ставит deleteOutDir: true, и при
+    // живом tsconfig.build.tsbuildinfo tsc считает, что эмитить нечего, — dist
+    // остаётся пустым без ошибки (проверено локально: 12:52 build → пустой dist).
+    // Для билда это не потеря: он и так полный (workspace + Docker layer cache).
+    "incremental": false,
     "baseUrl": "./",
     "paths": {
       "@/*": ["./src/*"],

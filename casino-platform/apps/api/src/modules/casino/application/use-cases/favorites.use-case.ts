@@ -45,9 +45,10 @@ export class FavoritesUseCase {
     return sessions.map((s) => s.game)
   }
 
-  async history(userId: string, page = 1, perPage = 20, gameId?: string) {
+  async history(args: { userId: string; page: number; perPage: number; gameId?: string }) {
+    const { userId, page, perPage, gameId } = args
     const [rounds, total] = await Promise.all([
-      this.favorites.findRoundsWithGame(userId, gameId, (page - 1) * perPage, perPage),
+      this.favorites.findRoundsWithGame({ userId, gameId, skip: (page - 1) * perPage, take: perPage }),
       this.favorites.countRounds(userId, gameId),
     ])
     const data = rounds.map((r) => ({

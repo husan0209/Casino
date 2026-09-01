@@ -14,6 +14,6 @@ export class CreateTicketUseCase {
     if (open >= 5) {
       throw new TooManyOpenTicketsError()
     }
-    return this.repo.createTicket(userId, input.subject, input.category, input.message)
+    return this.repo.createTicket({ userId, subject: input.subject, category: input.category, message: input.message })
   }
 }

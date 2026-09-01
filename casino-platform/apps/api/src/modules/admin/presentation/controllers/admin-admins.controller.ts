@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
 
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
 import { AdminUsersService } from '../../application/admin-users.service'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'

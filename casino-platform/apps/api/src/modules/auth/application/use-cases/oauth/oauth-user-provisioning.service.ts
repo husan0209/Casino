@@ -6,13 +6,13 @@ import {
   IAuthProviderRepository,
   AUTH_PROVIDER_REPOSITORY,
   type AuthProviderKind,
-} from '../../../domain/repositories/auth-provider.repository'
+} from '@modules/auth/domain/repositories/auth-provider.repository'
 import {
   ISessionRepository,
   SESSION_REPOSITORY,
-} from '../../../domain/repositories/session.repository'
-import { IUserRepository, USER_REPOSITORY } from '../../../domain/repositories/user.repository'
-import { JwtTokenService } from '../../../infrastructure/services/jwt.service'
+} from '@modules/auth/domain/repositories/session.repository'
+import { IUserRepository, USER_REPOSITORY } from '@modules/auth/domain/repositories/user.repository'
+import { JwtTokenService } from '@modules/auth/infrastructure/services/jwt.service'
 
 export interface ProviderSignInInput {
   provider: AuthProviderKind
@@ -34,6 +34,7 @@ export interface ProviderSignInInput {
  */
 @Injectable()
 export class OAuthUserProvisioningService {
+  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(AUTH_PROVIDER_REPOSITORY) private authProviders: IAuthProviderRepository,
@@ -64,26 +65,9 @@ export class OAuthUserProvisioningService {
     if (!user && input.email) {
       user = await this.users.findByEmail(input.email.toLowerCase().trim())
     }
-
     if (!user) {
-      const referralCode = await this.generateReferralCode()
-      let referredBy: string | null = null
-      if (input.referralCode) {
-        const referrer = await this.users.findByReferralCode(
-          input.referralCode.toUpperCase().trim(),
-        )
-        if (referrer) {
-          referredBy = referrer.id
-        }
-      }
-      user = await this.users.create({
-        email: input.email ? input.email.toLowerCase().trim() : null,
-        passwordHash: null,
-        referralCode,
-        referredBy,
-      })
+      user = await this.provisionUser(input)
     }
-
     if (!link) {
       link = await this.authProviders.create({
         userId: user.id,
@@ -111,5 +95,23 @@ export class OAuthUserProvisioningService {
       user: { id: user.id, email: user.email, role: user.role },
       wasLinked,
     }
+  }
+
+  /** Создание игрока при первом входе через провайдера (без пароля, с реферальным кодом). */
+  private async provisionUser(input: ProviderSignInInput) {
+    const referralCode = await this.generateReferralCode()
+    let referredBy: string | null = null
+    if (input.referralCode) {
+      const referrer = await this.users.findByReferralCode(input.referralCode.toUpperCase().trim())
+      if (referrer) {
+        referredBy = referrer.id
+      }
+    }
+    return this.users.create({
+      email: input.email ? input.email.toLowerCase().trim() : null,
+      passwordHash: null,
+      referralCode,
+      referredBy,
+    })
   }
 }

@@ -2,9 +2,10 @@ import { randomUUID } from 'crypto'
 
 import { Injectable, ForbiddenException } from '@nestjs/common'
 
+import { WalletFacade } from '@modules/wallet/application/wallet.facade'
+
 import type { Currency } from '@casino/shared-types'
 
-import { WalletFacade } from '../../../wallet/application/wallet.facade'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 
 @Injectable()
@@ -21,12 +22,12 @@ export class CancelWithdrawalUseCase {
     if (pr.status !== 'pending') {
       throw new ForbiddenException('Cannot cancel')
     }
-    await this.wallet.unlock(
+    await this.wallet.unlock({
       userId,
-      pr.currency as Currency,
-      pr.amount.toString(),
-      `wd_unlock_${randomUUID()}`,
-    )
+      currency: pr.currency as Currency,
+      amount: pr.amount.toString(),
+      idempotencyKey: `wd_unlock_${randomUUID()}`,
+    })
     await this.repo.updateStatus(id, 'cancelled')
     return { ok: true }
   }

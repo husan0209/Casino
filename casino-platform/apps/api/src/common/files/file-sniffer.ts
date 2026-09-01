@@ -11,11 +11,12 @@
  */
 export type AllowedDocumentMime = 'image/jpeg' | 'image/png' | 'image/webp' | 'application/pdf'
 
-export function sniffDocumentMime(buf: Buffer): AllowedDocumentMime | null {
-  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
-    return 'image/jpeg'
-  }
-  if (
+/** Отдельные сигнатурные проверки — каждая простой линейный тест (GAP-25 complexity). */
+function isJpeg(buf: Buffer): boolean {
+  return buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff
+}
+function isPng(buf: Buffer): boolean {
+  return (
     buf.length >= 8 &&
     buf[0] === 0x89 &&
     buf[1] === 0x50 &&
@@ -25,17 +26,30 @@ export function sniffDocumentMime(buf: Buffer): AllowedDocumentMime | null {
     buf[5] === 0x0a &&
     buf[6] === 0x1a &&
     buf[7] === 0x0a
-  ) {
-    return 'image/png'
-  }
-  if (
+  )
+}
+function isWebp(buf: Buffer): boolean {
+  return (
     buf.length >= 12 &&
     buf.toString('latin1', 0, 4) === 'RIFF' &&
     buf.toString('latin1', 8, 12) === 'WEBP'
-  ) {
+  )
+}
+function isPdf(buf: Buffer): boolean {
+  return buf.length >= 5 && buf.toString('latin1', 0, 5) === '%PDF-'
+}
+
+export function sniffDocumentMime(buf: Buffer): AllowedDocumentMime | null {
+  if (isJpeg(buf)) {
+    return 'image/jpeg'
+  }
+  if (isPng(buf)) {
+    return 'image/png'
+  }
+  if (isWebp(buf)) {
     return 'image/webp'
   }
-  if (buf.length >= 5 && buf.toString('latin1', 0, 5) === '%PDF-') {
+  if (isPdf(buf)) {
     return 'application/pdf'
   }
   return null

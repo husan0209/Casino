@@ -67,12 +67,12 @@ export interface IGameFavoritesRepository {
   countFavorites(userId: string): Promise<number>
   /** Последние уникальные игры игрока (distinct по gameId, только реальные сессии). */
   findRecentSessions(userId: string, take: number): Promise<RecentSessionRow[]>
-  findRoundsWithGame(
-    userId: string,
-    gameId: string | undefined,
-    skip: number,
-    take: number,
-  ): Promise<RoundHistoryRow[]>
+  findRoundsWithGame(args: {
+    userId: string
+    gameId: string | undefined
+    skip: number
+    take: number
+  }): Promise<RoundHistoryRow[]>
   countRounds(userId: string, gameId?: string): Promise<number>
 }
 

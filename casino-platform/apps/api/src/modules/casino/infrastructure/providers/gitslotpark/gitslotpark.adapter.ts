@@ -3,19 +3,20 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
-import { PaymentProviderNotConfiguredError } from '../../../../payments/infrastructure/clients/rukassa.client'
 import {
   type GameProviderAdapter,
   type LaunchParams,
   type ParsedProviderCallback,
-} from '../../../domain/provider-adapter.interface'
+  type ProviderGameRow,
+} from '@modules/casino/domain/provider-adapter.interface'
+import { PaymentProviderNotConfiguredError } from '@modules/payments/infrastructure/clients/rukassa.client'
 
 const has = (v: unknown): boolean => v !== null && v !== undefined
 
 /** Элемент каталога агрегатора — внешний API без контракта, читаем по индексу. */
-type ProviderGameRow = Record<string, unknown>
+type RawGameRow = Record<string, unknown>
 /** Конверт списка игр: массив, {games: []} или {data: []} — зависит от версии API. */
-type GameListEnvelope = ProviderGameRow[] | { games?: ProviderGameRow[]; data?: ProviderGameRow[] }
+type GameListEnvelope = RawGameRow[] | { games?: RawGameRow[]; data?: RawGameRow[] }
 
 /**
  * GitSlotPark Seamless Wallet API v2 — агрегатор Pragmatic Play / PG Soft /
@@ -31,6 +32,65 @@ type GameListEnvelope = ProviderGameRow[] | { games?: ProviderGameRow[]; data?: 
  * Каталог: GET {API}/gamelist
  */
 const AMT = (v: any) => Number(v ?? 0).toFixed(2)
+
+/** Первое поле с фактическим значением (undefined/пусто пропускаются). */
+function firstPresent(body: any, ...keys: string[]): string | undefined {
+  for (const k of keys) {
+    if (has(body[k])) {
+      return String(body[k])
+    }
+  }
+  return undefined
+}
+
+/** Постоянное сравнение подписи (timing-safe) — given от провайдера, expected наш HMAC. */
+function signatureMatches(givenRaw: string, expected: string): boolean {
+  const given = givenRaw.toUpperCase()
+  const a = Buffer.from(given, 'hex')
+  const b = Buffer.from(expected, 'hex')
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
+/** Первое непустое поле из перечня (внешний контракт без схемы). */
+function pick(g: RawGameRow, ...keys: string[]): unknown {
+  for (const k of keys) {
+    const v = g[k]
+    if (v !== null && v !== undefined) {
+      return v
+    }
+  }
+  return undefined
+}
+
+/** Нормализация строки каталога агрегатора (внешний контракт без схемы). */
+function mapProviderGame(g: RawGameRow): ProviderGameRow {
+  const isLive = g['type'] === 'live'
+  const rtp = pick(g, 'rtp')
+  return {
+    externalGameId: String(pick(g, 'gameid', 'id', 'game_id')),
+    name: String(pick(g, 'name', 'gameName') ?? ''),
+    type: isLive ? 'live_roulette' : 'slot',
+    category: isLive ? 'live_casino' : 'slots',
+    thumbnailUrl: pick(g, 'image', 'thumbnail') as string | undefined,
+    hasDemo: Boolean(pick(g, 'demo', 'freespin')),
+    rtp: rtp ? Number(rtp) : undefined,
+    metadata: g,
+  }
+}
+
+/**
+ * Порядок конкатенации полей подписи по операциям (Withdraw/Deposit/BetWin).
+ * ⚠️ Сверить с менеджером GitSlotPark при выдаче боевых ключей.
+ */
+const CALLBACK_MESSAGE_BUILDERS: Record<string, (body: any) => string> = {
+  getbalance: (b) => `${b.agentID}${b.userID}`,
+  withdraw: (b) => `${b.agentID}${b.userID}${AMT(b.amount)}${b.transactionID}${b.roundID}`,
+  deposit: (b) =>
+    `${b.agentID}${b.userID}${AMT(b.amount)}${b.refTransactionID ?? ''}${b.transactionID ?? ''}${b.roundID ?? ''}`,
+  betwin: (b) =>
+    `${b.agentID}${b.userID}${AMT(b.betAmount)}${AMT(b.winAmount)}${b.transactionID}${b.roundID}`,
+  rollbacktransaction: (b) => `${b.agentID}${b.userID}${b.refTransactionID}`,
+}
 
 @Injectable()
 export class GitslotparkProviderAdapter implements GameProviderAdapter {
@@ -97,17 +157,8 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
     }
     // Внешний API без контракта — ответ читается через unknown-индексацию с фолбэками
     const d = (await res.json()) as GameListEnvelope
-    const list: ProviderGameRow[] = Array.isArray(d) ? d : (d.games ?? d.data ?? [])
-    return list.map((g) => ({
-      externalGameId: String(g['gameid'] ?? g['id'] ?? g['game_id']),
-      name: String(g['name'] ?? g['gameName'] ?? ''),
-      type: g['type'] === 'live' ? 'live_roulette' : 'slot',
-      category: g['type'] === 'live' ? 'live_casino' : 'slots',
-      thumbnailUrl: (g['image'] ?? g['thumbnail'] ?? undefined) as string | undefined,
-      hasDemo: Boolean(g['demo'] ?? g['freespin'] ?? false),
-      rtp: g['rtp'] ? Number(g['rtp']) : undefined,
-      metadata: g,
-    }))
+    const list: RawGameRow[] = Array.isArray(d) ? d : (d.games ?? d.data ?? [])
+    return list.map(mapProviderGame)
   }
 
   /**
@@ -118,32 +169,13 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
   verifyCallback(headers: Record<string, string>, body: any): boolean {
     try {
       this.creds()
-      const op = headers['x-gsp-op'] || ''
-      let msg: string
-      switch (op.toLowerCase()) {
-        case 'getbalance':
-          msg = `${body.agentID}${body.userID}`
-          break
-        case 'withdraw':
-          msg = `${body.agentID}${body.userID}${AMT(body.amount)}${body.transactionID}${body.roundID}`
-          break
-        case 'deposit':
-          msg = `${body.agentID}${body.userID}${AMT(body.amount)}${body.refTransactionID ?? ''}${body.transactionID ?? ''}${body.roundID ?? ''}`
-          break
-        case 'betwin':
-          msg = `${body.agentID}${body.userID}${AMT(body.betAmount)}${AMT(body.winAmount)}${body.transactionID}${body.roundID}`
-          break
-        case 'rollbacktransaction':
-          msg = `${body.agentID}${body.userID}${body.refTransactionID}`
-          break
-        default:
-          return false
+      const op = String(headers['x-gsp-op'] || '').toLowerCase()
+      const build = CALLBACK_MESSAGE_BUILDERS[op]
+      if (!build) {
+        return false
       }
-      const expected = this.sign([msg])
-      const given = String(body.sign ?? '').toUpperCase()
-      const a = Buffer.from(given, 'hex')
-      const b = Buffer.from(expected, 'hex')
-      return a.length === b.length && timingSafeEqual(a, b)
+      const expected = this.sign([build(body)])
+      return signatureMatches(String(body.sign ?? ''), expected)
     } catch (e: any) {
       this.logger.warn(`verifyCallback failed: ${e?.message}`)
       return false
@@ -164,20 +196,12 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
       // Seamless-модель: игрок идентифицируется по userID, не по session-token
       playerToken: has(body.userID) ? `uid:${body.userID}` : undefined,
       playerId: has(body.userID) ? String(body.userID) : undefined,
-      betAmount: has(body.amount)
-        ? String(body.amount)
-        : has(body.betAmount)
-          ? String(body.betAmount)
-          : undefined,
-      winAmount: has(body.winAmount)
-        ? String(body.winAmount)
-        : has(body.amount)
-          ? String(body.amount)
-          : undefined,
-      roundId: has(body.roundID) ? String(body.roundID) : undefined,
-      transactionId: has(body.transactionID) ? String(body.transactionID) : undefined,
-      rollbackTransactionId: has(body.refTransactionID) ? String(body.refTransactionID) : undefined,
-      gameId: has(body.gameID) ? String(body.gameID) : undefined,
+      betAmount: firstPresent(body, 'amount', 'betAmount'),
+      winAmount: firstPresent(body, 'winAmount', 'amount'),
+      roundId: firstPresent(body, 'roundID'),
+      transactionId: firstPresent(body, 'transactionID'),
+      rollbackTransactionId: firstPresent(body, 'refTransactionID'),
+      gameId: firstPresent(body, 'gameID'),
       rawRequest: body,
     }
   }

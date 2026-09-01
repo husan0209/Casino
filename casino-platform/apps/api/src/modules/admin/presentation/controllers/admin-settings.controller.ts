@@ -1,9 +1,11 @@
 import { Body, Controller, Get, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
 
+
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
 import { prisma, type SystemSettingType } from '@casino/database'
 
-import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { EmailTemplateSchema, UpsertSettingSchema } from '../dto/admin-settings.dto'

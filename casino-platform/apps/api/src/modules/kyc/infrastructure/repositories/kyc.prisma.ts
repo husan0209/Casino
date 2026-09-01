@@ -88,12 +88,13 @@ export class PrismaKycRepository implements IKycRepository {
     ])
     return { items, total }
   }
-  async setStatus(
-    id: string,
-    status: 'approved' | 'rejected' | 'requires_resubmission',
-    reason?: string,
-    reviewedBy?: string,
-  ) {
+  async setStatus(args: {
+    id: string
+    status: 'approved' | 'rejected' | 'requires_resubmission'
+    reason?: string
+    reviewedBy?: string
+  }) {
+    const { id, status, reason, reviewedBy } = args
     await prisma.kycProfile.update({
       where: { id },
       data: {

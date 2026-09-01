@@ -2,14 +2,17 @@ import { randomUUID } from 'crypto'
 
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
 
+
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
+import { PaymentRequestRepository } from '@modules/payments/infrastructure/repositories/payment-request.repository'
+import { WalletFacade } from '@modules/wallet/application/wallet.facade'
+
 import { prisma } from '@casino/database'
 import { type Currency } from '@casino/shared-types'
 import { AppError } from '@casino/shared-utils'
 
-import { CurrentUser } from '../../../../common/decorators/current-user.decorator'
-import { ZodValidationPipe } from '../../../../common/pipes/zod-validation.pipe'
-import { PaymentRequestRepository } from '../../../payments/infrastructure/repositories/payment-request.repository'
-import { WalletFacade } from '../../../wallet/application/wallet.facade'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import {
@@ -145,12 +148,12 @@ export class AdminFinanceController {
     if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') {
       throw new WithdrawalInvalidStatusError()
     }
-    await this.wallet.confirmWithdrawal(
-      wd.userId,
-      wd.currency as Currency,
-      wd.amount.toString(),
-      `wd_confirm_${wd.id}`,
-    )
+    await this.wallet.confirmWithdrawal({
+      userId: wd.userId,
+      currency: wd.currency as Currency,
+      amount: wd.amount.toString(),
+      idempotencyKey: `wd_confirm_${wd.id}`,
+    })
     await this.payments.updateStatus(id, 'completed', { completedAt: new Date() })
     await this.audit.log({
       actorType: 'admin',
@@ -169,12 +172,12 @@ export class AdminFinanceController {
     if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') {
       throw new WithdrawalInvalidStatusError()
     }
-    await this.wallet.unlock(
-      wd.userId,
-      wd.currency as Currency,
-      wd.amount.toString(),
-      `wd_unlock_${wd.id}_${randomUUID()}`,
-    )
+    await this.wallet.unlock({
+      userId: wd.userId,
+      currency: wd.currency as Currency,
+      amount: wd.amount.toString(),
+      idempotencyKey: `wd_unlock_${wd.id}_${randomUUID()}`,
+    })
     await this.payments.updateStatus(id, 'cancelled', { errorMessage: reason })
     await this.audit.log({
       actorType: 'admin',

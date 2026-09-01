@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 
-import { UsersFacade } from '../../../users/facade/users.facade'
+import { UsersFacade } from '@modules/users/facade/users.facade'
+
 import { resolveGeoConfig } from '../../domain/geo-config.policy'
 
 export interface ResolveGeoInput {

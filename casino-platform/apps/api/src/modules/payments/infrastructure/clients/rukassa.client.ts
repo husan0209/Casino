@@ -35,6 +35,17 @@ const TIMEOUT_MS = 30_000 // TZ part 3 §5.3
  * Если у конкретного мерчанта эндпоинты отличаются — правится через RUKASSA_API_BASE,
  * код не меняется. Dev без ключей работает на лог-стабе (флоу проверяем без PSP).
  */
+/** Rukassa отдаёт разные имена полей в зависимости от версии API. */
+function pickPaymentFields(data: Record<string, any>): {
+  paymentId: string
+  paymentUrl: string
+} {
+  return {
+    paymentId: String(data.payment_id ?? data.id ?? data.order_id ?? ''),
+    paymentUrl: String(data.payment_url ?? data.url ?? data.location ?? ''),
+  }
+}
+
 @Injectable()
 export class RukassaClient {
   private readonly logger = new Logger(RukassaClient.name)
@@ -87,8 +98,7 @@ export class RukassaClient {
         throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
       }
       const data = (await res.json()) as Record<string, any>
-      const paymentId = String(data.payment_id ?? data.id ?? data.order_id ?? '')
-      const paymentUrl = String(data.payment_url ?? data.url ?? data.location ?? '')
+      const { paymentId, paymentUrl } = pickPaymentFields(data)
       if (!paymentId || !paymentUrl) {
         throw new Error(`unexpected response shape: ${JSON.stringify(data).slice(0, 200)}`)
       }

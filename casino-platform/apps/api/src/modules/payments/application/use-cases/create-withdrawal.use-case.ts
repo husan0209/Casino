@@ -3,10 +3,12 @@ import { randomUUID } from 'crypto'
 import { Injectable } from '@nestjs/common'
 import { Decimal } from 'decimal.js'
 
+
+import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
+import { WalletFacade } from '@modules/wallet/application/wallet.facade'
+
 import type { Currency } from '@casino/shared-types'
 
-import { KycCheckService } from '../../../kyc/application/use-cases/kyc-check.service'
-import { WalletFacade } from '../../../wallet/application/wallet.facade'
 import { AmountTooSmallError, AmountTooLargeError } from '../../domain/errors'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 
@@ -35,7 +37,12 @@ export class CreateWithdrawalUseCase {
       throw new AmountTooSmallError('0')
     }
     // lock funds
-    await this.wallet.lock(userId, input.currency as Currency, input.amount, `wd_lock_${randomUUID()}`)
+    await this.wallet.lock({
+      userId,
+      currency: input.currency as Currency,
+      amount: input.amount,
+      idempotencyKey: `wd_lock_${randomUUID()}`,
+    })
     const pr = await this.repo.create({
       userId,
       type: 'withdrawal',

@@ -16,6 +16,15 @@ const MAP: Record<string, string> = {
 
 const TIMEOUT_MS = 30_000
 
+/** Ответ /payment: имена поля могут отличаться по версиям API. */
+function parseCreateResponse(json: unknown): { paymentId: string; payAddress: string } {
+  const d = (json ?? {}) as Record<string, any>
+  return {
+    paymentId: String(d.payment_id ?? ''),
+    payAddress: String(d.pay_address ?? ''),
+  }
+}
+
 /**
  * NOWPayments HTTP client — TZ part 3 §6 (UC-PAY-03/04).
  *
@@ -35,6 +44,25 @@ export class NOWPaymentsClient {
 
   private isProd(): boolean {
     return this.config.get<string>('NODE_ENV') === 'production'
+  }
+
+  /** DEV/STAGE без ключа: детерминированный платёж, чтобы флоу был проходим end-to-end. */
+  private devStubPayment(params: {
+    priceAmount: string
+    priceCurrency: string
+    payCurrency: string
+    orderId: string
+  }) {
+    this.logger.log(
+      `NOWPayments DEV-STUB create ${params.priceAmount} ${params.priceCurrency}->${params.payCurrency} order=${params.orderId}`,
+    )
+    return {
+      paymentId: `np_${params.orderId}`,
+      payAddress: 'TX' + params.orderId.replace(/-/g, '').slice(0, 30),
+      payAmount: params.priceAmount,
+      payCurrency: this.mapCurrency(params.payCurrency),
+      expirationEstimateDate: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    }
   }
 
   private assertApiKey(): string {
@@ -61,17 +89,7 @@ export class NOWPaymentsClient {
     ipnCallbackUrl: string
   }) {
     if (!this.isProd() && !this.config.get<string>('NOWPAYMENTS_API_KEY')) {
-      this.logger.log(
-        `NOWPayments DEV-STUB create ${params.priceAmount} ${params.priceCurrency}->${params.payCurrency} order=${params.orderId}`,
-      )
-      const payAmount = params.priceAmount
-      return {
-        paymentId: `np_${params.orderId}`,
-        payAddress: 'TX' + params.orderId.replace(/-/g, '').slice(0, 30),
-        payAmount,
-        payCurrency: this.mapCurrency(params.payCurrency),
-        expirationEstimateDate: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-      }
+      return this.devStubPayment(params)
     }
     const apiKey = this.assertApiKey()
     try {
@@ -91,10 +109,9 @@ export class NOWPaymentsClient {
         throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
       }
       const d = (await res.json()) as Record<string, any>
-      const paymentId = String(d.payment_id ?? '')
-      const payAddress = String(d.pay_address ?? '')
+      const { paymentId, payAddress } = parseCreateResponse(d)
       if (!paymentId || !payAddress) {
-        throw new Error(`unexpected shape: ${JSON.stringify(d).slice(0, 200)}`)
+        throw new Error(`unexpected shape: ${JSON.stringify({ paymentId, payAddress }).slice(0, 200)}`)
       }
       this.logger.log(`NOWPayments payment created: ${paymentId}`)
       return {
