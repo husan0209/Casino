@@ -16,13 +16,11 @@ import {
 } from '../../domain/repositories/wallet.repository'
 
 /**
- * NOTE on architecture (AUDIT_REPORT.md §A1):
- * The 4-layer rule says ledger operations should live in application/use-cases/.
- * We keep them here as an internal Prisma-backed implementation of IWalletLedger
- * (a domain interface) and expose them only through WalletFacade. This is a
- * pragmatic compromise: the IWalletLedger boundary is enforced, but the actual
- * use-case class wrappers would be redundant boilerplate. When a non-Prisma
- * ledger is added, only this file needs to change.
+ * Architecture (AUDIT_REPORT.md §A1, GAP-22): семантика операций — в
+ * application/use-cases (LockFundsUseCase, UnlockFundsUseCase,
+ * ConfirmWithdrawalUseCase, WalletFacade — точка входа для других модулей);
+ * здесь — только Prisma-реализация атомарных мутаций и retry/idempotency
+ * за доменным интерфейсом IWalletLedger. Non-Prisma ledger меняет только этот файл.
  */
 
 /** Prisma возвращает Decimal — все денежные значения идут через toString(). */
@@ -100,59 +98,67 @@ export class PrismaWalletLedger implements IWalletLedger {
     throw new OptimisticLockError()
   }
 
+  /** Гет-ор-крейт кошелька — общий для credit/debit; разбивка runCreditDebit (GAP-22). */
+  private async getOrCreateWallet(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    currency: Currency,
+  ) {
+    const wallet = await tx.walletAccount.findUnique({
+      where: { userId_currency: { userId, currency } },
+    })
+    if (wallet) {
+      return wallet
+    }
+    return tx.walletAccount.create({
+      data: {
+        userId,
+        currency,
+        balance: ZERO[currency],
+        locked: ZERO[currency],
+        version: 0n,
+      },
+    })
+  }
+
   /** Тело мутации без обёртки $transaction — общий для tx-режима и solo-режима. */
   private async applyCreditDebit(
     tx: Prisma.TransactionClient,
     input: CreditInput,
     sign: 1 | -1,
   ): Promise<CreditResult> {
-    {
-      let wallet = await tx.walletAccount.findUnique({
-        where: { userId_currency: { userId: input.userId, currency: input.currency } },
-      })
-      if (!wallet) {
-        wallet = await tx.walletAccount.create({
-          data: {
-            userId: input.userId,
-            currency: input.currency,
-            balance: ZERO[input.currency],
-            locked: ZERO[input.currency],
-            version: 0n,
-          },
-        })
-      }
-      const balanceBefore = toMoney(wallet.balance)
-      const available = money.subtract(balanceBefore, toMoney(wallet.locked))
-      if (sign === -1 && !money.isGreaterOrEqual(available, input.amount)) {
-        throw new InsufficientFundsError(input.amount, available)
-      }
-      const balanceAfter =
-        sign === 1
-          ? money.add(balanceBefore, input.amount)
-          : money.subtract(balanceBefore, input.amount)
-      const updated = await tx.walletAccount.updateMany({
-        where: { userId: input.userId, currency: input.currency, version: wallet.version },
-        data: { balance: balanceAfter, version: { increment: 1 } },
-      })
-      if (updated.count === 0) {
-        throw new OptimisticLockError()
-      }
-      const ledger = await tx.ledgerEntry.create({
-        data: {
-          transactionId: randomUUID(),
-          walletAccountId: wallet.id,
-          userId: input.userId,
-          type: input.type,
-          amount: sign === 1 ? input.amount : '-' + input.amount,
-          balanceBefore,
-          balanceAfter,
-          idempotencyKey: input.idempotencyKey,
-          description: input.description ?? null,
-          metadata: input.metadata ?? {},
-        },
-      })
-      return { balanceBefore, balanceAfter, ledgerEntryId: ledger.id, duplicate: false }
+    const wallet = await this.getOrCreateWallet(tx, input.userId, input.currency)
+    const balanceBefore = toMoney(wallet.balance)
+    const available = money.subtract(balanceBefore, toMoney(wallet.locked))
+    if (sign === -1 && !money.isGreaterOrEqual(available, input.amount)) {
+      throw new InsufficientFundsError(input.amount, available)
     }
+    const balanceAfter =
+      sign === 1
+        ? money.add(balanceBefore, input.amount)
+        : money.subtract(balanceBefore, input.amount)
+    const updated = await tx.walletAccount.updateMany({
+      where: { userId: input.userId, currency: input.currency, version: wallet.version },
+      data: { balance: balanceAfter, version: { increment: 1 } },
+    })
+    if (updated.count === 0) {
+      throw new OptimisticLockError()
+    }
+    const ledger = await tx.ledgerEntry.create({
+      data: {
+        transactionId: randomUUID(),
+        walletAccountId: wallet.id,
+        userId: input.userId,
+        type: input.type,
+        amount: sign === 1 ? input.amount : '-' + input.amount,
+        balanceBefore,
+        balanceAfter,
+        idempotencyKey: input.idempotencyKey,
+        description: input.description ?? null,
+        metadata: input.metadata ?? {},
+      },
+    })
+    return { balanceBefore, balanceAfter, ledgerEntryId: ledger.id, duplicate: false }
   }
 
   credit(input: CreditInput): Promise<CreditResult> {
