@@ -92,7 +92,9 @@ export class ProcessNOWPaymentsWebhookUseCase {
       currency: pr.currency as Currency,
       amount: String(actuallyPaid),
       type: 'DEPOSIT',
-      idempotencyKey: 'deposit_' + pr.id,
+      // GAP-28 (defense-in-depth): ключ от external_id провайдера — повторная доставка
+      // IPN по тому же payment_id не зачислит дважды.
+      idempotencyKey: 'deposit_nowpayments_' + String(body.payment_id),
       description: 'Крипто-пополнение через NOWPayments',
       metadata: {
         provider: 'nowpayments',
