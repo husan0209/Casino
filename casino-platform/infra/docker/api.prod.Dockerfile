@@ -1,6 +1,10 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
+# .npmrc (node-linker=hoisted) обязателен: без него pnpm изолирует @types/node
+# в apps/api/node_modules, и билд shared-config/database падает без node-типов
+# (TS2503 'NodeJS' / TS2580 'process') — локально и в CI hoisting это скрывал.
+COPY .npmrc ./
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages ./packages
 COPY apps/api ./apps/api
