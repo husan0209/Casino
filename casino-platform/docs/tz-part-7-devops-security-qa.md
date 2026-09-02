@@ -1113,8 +1113,12 @@ echo "✅ Rollback completed to $PREVIOUS_COMMIT"
 
 ### 9.1. GitHub Actions
 
+> **Примечание (ревизия 2026-09-02, GAP-37):** деплой выполняется job'ой «Deploy to VPS
+> (only after green CI)» в едином `.github/workflows/ci.yml` — отдельный `deploy.yml`
+> ниже — исходный эскиз ТЗ, в репо не создаётся. Фактический пайплайн — `docs/DEPLOY.md`.
+
 ```yaml
-# .github/workflows/deploy.yml
+# .github/workflows/deploy.yml (эскиз ТЗ — в репо не существует)
 
 name: Deploy to Production
 

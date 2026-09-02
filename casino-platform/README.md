@@ -29,9 +29,10 @@ Seed admin: superadmin@casino.example.com / dev_superadmin_password_123
 > Снапшот аудита с ревизией каждого пункта — `docs/archive/audit-2026-08-25.md`.
 >
 > ⚠️ **К запуску не готово.** Аудит 2026-09-01 выявил 8 расхождений (GAP-31…GAP-38);
-> закрыты: GAP-31 (Prisma-миграции), GAP-32/33 (реферальные выплаты + scheduled jobs) и
-> GAP-34/35 (курсы из БД + честный readiness, 2026-09-02). Ключевой остаток:
-> runtime-проверки с боевыми ключами и GAP-36/37/38 (seed админа, админ-модули, empty-state).
+> закрыты: GAP-31 (миграции), GAP-32/33 (реферальные выплаты + scheduled jobs),
+> GAP-34/35 (курсы из БД + честный readiness), GAP-37/38 (деплой-доки + resource-check,
+> seed fail-closed) — все 2026-09-02. Ключевой остаток: GAP-36 (KYC-лимит во фронте)
+> и runtime-проверки с боевыми ключами.
 > Инженерные гейты при этом зелёные: 4 обязательных чека CI + 2 guard'а, docker-образ собирается,
 > 62 unit + 9 E2E проходят.
 - [x] Часть 1 Foundation – ~85% – monorepo, Prisma schema (19 таблиц), shared packages, Docker, Nginx — готово
@@ -40,7 +41,7 @@ Seed admin: superadmin@casino.example.com / dev_superadmin_password_123
 - [~] Часть 4 Casino Providers – ~60% – Seamless Wallet API + DemoProvider + GitSlotPark-адаптер (GAP-08 закрыт 2026-08-24: агрегатор Pragmatic Play/PG Soft/Amatic/Amusnet, sync каталога — GAP-09); до продакшена — сверка sign-порядков и runtime-тест с ключами
 - [~] Часть 5 Frontend Web – ~75% – витрина/ЛК/кошелёк/KYC/история + geo/wallet stores, DepositSheet/LaunchCurrencySheet, play-страница; полный 90-сек флоу частично (TZ-07/09)
 - [~] Часть 6 Admin/Support/Referrals – ~70% – Backend API полный (users/finance/support/referrals/notifications+queue/dashboard metrics·charts·events/batch withdrawals). Admin frontend реализован (13 страниц: JWT-логин, живой дашборд с графиками, withdrawals batch, KYC/support/games/audit/admins/settings). GGR-share выплачивается: cron `referral-daily` + ручной `POST /admin/referrals/run-daily` (GAP-32 закрыт 2026-09-02). Осталось: runtime-проверка с ключами (OAuth, GitSlotPark) на Linux-FS
-- [~] Часть 7 DevOps – ~60% – docker-compose.prod, nginx, GitHub Actions CI – скелет есть, VPS init/backup – скрипты есть. **Открыто (2026-09-01):** нет шага seed админа в деплое (GAP-38). Закрыто 2026-09-02: Prisma-миграции (GAP-31), честный readiness с проверкой БД/Redis + healthcheck на /health/ready (GAP-35)
+- [~] Часть 7 DevOps – ~85% – docker-compose.prod, nginx, GitHub Actions CI: 4 чека + deploy-job (после зелёного CI, skip без VPS-секретов), migrate deploy на деплое (GAP-31), честный readiness + healthcheck на /health/ready (GAP-35), первичная инициализация админа задокументирована + seed fail-closed в production (GAP-38), resource-check.sh (GAP-37). Осталось: runtime-деплой на VPS с секретами
 
 > Подробнее см. `docs/IMPLEMENTATION_GAPS.md` (открытые GAP-08..17, GAP-30..38) и раздел Money safety ниже.
 
