@@ -127,9 +127,20 @@ jobs:
       - name: Build workspace packages
         run: pnpm --filter @casino/shared-types --filter @casino/shared-utils --filter @casino/shared-config --filter @casino/database build
       # Интеграционные тесты wallet ledger (GAP-24 остаток): схема → тестовую БД.
-      # db push вместо migrate deploy: миграции в repo — только manual/, схема живёт в schema.prisma
-      - name: Prisma db push (test schema)
-        run: pnpm --filter @casino/database exec prisma db push --skip-generate
+      # GAP-31: применяем МИГРАЦИИ (как в проде), а не db push — так CI ловит дрейф
+      # schema.prisma ↔ migrations/ (упадёт, если модель изменили без новой миграции)
+      - name: Prisma migrate deploy (test schema)
+        run: pnpm --filter @casino/database exec prisma migrate deploy
+      # Дрейф-детектор: --exit-code (0 = миграции ≡ schema.prisma, 2 = есть diff).
+      # Не парсим stdout: при отсутствии diff Prisma печатает строку "No difference
+      # detected." — непустой вывод был ложным срабатыванием (GAP-31, поймано CI)
+      - name: Verify no schema drift
+        run: |
+          pnpm --filter @casino/database exec prisma migrate diff \
+            --from-schema-datasource prisma/schema.prisma \
+            --to-schema-datamodel prisma/schema.prisma \
+            --exit-code
+          echo "✅ No drift: migrations ≡ schema.prisma"
       - name: Lint
         run: pnpm lint
       - name: Typecheck
