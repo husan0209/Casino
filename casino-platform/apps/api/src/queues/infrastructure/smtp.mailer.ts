@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import type { Transporter } from 'nodemailer'
 
 import { AppError } from '@casino/shared-utils'
 
 import { type MailMessage, type MailerPort } from './mailer.port'
+
+import type { Transporter } from 'nodemailer'
 
 export class EmailNotConfiguredError extends AppError {
   readonly code = 'EMAIL_NOT_CONFIGURED'

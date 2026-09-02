@@ -5,6 +5,7 @@ import { EmailWorker } from './application/email.worker'
 import { BullMqEmailQueue, DevLogEmailQueue } from './infrastructure/email.queue'
 import { mailerFactory } from './infrastructure/smtp.mailer'
 import { EMAIL_QUEUE_PORT, MAILER_PORT } from './queue.types'
+
 import type Redis from 'ioredis'
 
 /**
