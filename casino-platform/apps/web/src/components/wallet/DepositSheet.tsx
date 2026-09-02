@@ -1,11 +1,15 @@
 'use client'
+import { useQuery } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
 import { saveDepositContext } from '@/components/wallet/DepositReturnHandler'
 import { errText } from '@/lib/api'
+import { getKycStatus } from '@/lib/api/kyc.api'
 import { createFiatDeposit } from '@/lib/api/wallet.api'
 import { formatAmount } from '@/lib/format/currency'
+import { useAuth } from '@/stores/auth'
 import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
@@ -14,6 +18,8 @@ export function DepositSheet() {
   const { depositSheet, closeDeposit, depositCurrency, pendingGameSlug } = useUIStore()
   const { config, load } = useGeoStore()
   const { activeCurrency, setActiveCurrency } = useWalletStore()
+  const { user } = useAuth()
+  const router = useRouter()
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState('')
   const [loading, setLoading] = useState(false)
@@ -39,10 +45,6 @@ export function DepositSheet() {
     }
   }, [config, depositSheet])
 
-  if (!depositSheet) {
-    return null
-  }
-
   const presets = config?.depositPresets ?? ['1000', '2000', '5000', '10000']
   const fiatMethods = config?.paymentMethods ?? []
   const cryptoMethods = config?.cryptoMethods ?? []
@@ -50,6 +52,22 @@ export function DepositSheet() {
     mode === 'crypto' && cryptoMethods[0]
       ? (cryptoMethods.find((m) => m.id === method)?.currency ?? 'USDT_TRC20')
       : currency
+
+  // GAP-36: остаток лимита — из API (в валюте шита), без пересчёта на клиенте.
+  // useQuery — до раннего return (правила хуков)
+  const { data: kyc } = useQuery({
+    queryKey: ['kyc-status', payCurrency],
+    queryFn: () => getKycStatus(payCurrency),
+    enabled: Boolean(depositSheet) && Boolean(user),
+  })
+
+  if (!depositSheet) {
+    return null
+  }
+
+  const kycNotApproved = Boolean(kyc) && kyc!.status !== 'approved'
+  const limitRemaining = kyc?.limit_remaining
+  const limitExhausted = kycNotApproved && limitRemaining !== undefined && Number(limitRemaining) <= 0
 
   const currencyLabel = formatAmount(0, payCurrency).replace(/^0\s?/, '').trim() || payCurrency
 
@@ -168,9 +186,33 @@ export function DepositSheet() {
           )}
         </div>
 
-        <button type="button" className="btn-money mt-5 w-full" disabled={loading} onClick={pay}>
-          {loading ? 'Переход к оплате…' : 'Пополнить'}
+        <button
+          type="button"
+          className="btn-money mt-5 w-full"
+          disabled={loading}
+          onClick={() => {
+            // GAP-36: при исчерпании лимита CTA ведёт на верификацию,
+            // а не на ошибку 422 после отправки формы
+            if (limitExhausted) {
+              closeDeposit()
+              router.push('/kyc')
+              return
+            }
+            void pay()
+          }}
+        >
+          {loading
+            ? 'Переход к оплате…'
+            : limitExhausted
+              ? 'Лимит исчерпан — пройти верификацию'
+              : 'Пополнить'}
         </button>
+
+        {kycNotApproved && limitRemaining !== undefined && !limitExhausted && (
+          <p className="mt-2 text-center text-xs text-muted">
+            Остаток лимита: {formatAmount(limitRemaining, kyc!.limit_currency, true)}
+          </p>
+        )}
 
         {pendingGameSlug && (
           <p className="mt-2 text-center text-xs text-muted">После оплаты — вернётесь в игру</p>
