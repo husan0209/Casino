@@ -131,17 +131,15 @@ jobs:
       # schema.prisma ↔ migrations/ (упадёт, если модель изменили без новой миграции)
       - name: Prisma migrate deploy (test schema)
         run: pnpm --filter @casino/database exec prisma migrate deploy
-      # Дрейф-детектор: пустой вывод = миграции ≡ schema.prisma (GAP-31, критерий 3)
+      # Дрейф-детектор: --exit-code (0 = миграции ≡ schema.prisma, 2 = есть diff).
+      # Не парсим stdout: при отсутствии diff Prisma печатает строку "No difference
+      # detected." — непустой вывод был ложным срабатыванием (GAP-31, поймано CI)
       - name: Verify no schema drift
         run: |
-          DIFF=$(pnpm --filter @casino/database exec prisma migrate diff \
+          pnpm --filter @casino/database exec prisma migrate diff \
             --from-schema-datasource prisma/schema.prisma \
-            --to-schema-datamodel prisma/schema.prisma)
-          if [ -n "$DIFF" ]; then
-            echo "❌ Schema drift detected — миграции не соответствуют schema.prisma:";
-            echo "$DIFF";
-            exit 1;
-          fi
+            --to-schema-datamodel prisma/schema.prisma \
+            --exit-code
           echo "✅ No drift: migrations ≡ schema.prisma"
       - name: Lint
         run: pnpm lint
