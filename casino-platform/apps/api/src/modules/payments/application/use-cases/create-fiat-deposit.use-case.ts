@@ -2,9 +2,8 @@ import { randomUUID } from 'crypto'
 
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+
 import { errorMessage } from '@/common/utils/error-message'
-
-
 import { GeoFacade } from '@modules/geo/facade/geo.facade'
 import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
 import { UsersFacade } from '@modules/users/facade/users.facade'

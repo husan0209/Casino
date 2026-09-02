@@ -1,8 +1,8 @@
 import { Body, Controller, Headers, Param, Post, Res, HttpCode } from '@nestjs/common'
 import { SkipThrottle } from '@nestjs/throttler'
-import { errorMessage } from '@/common/utils/error-message'
 import { Response } from 'express'
 
+import { errorMessage } from '@/common/utils/error-message'
 import { prisma } from '@casino/database'
 
 import { GameCallbackService } from '../../application/services/game-callback.service'

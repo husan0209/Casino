@@ -1,7 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 
 import { errorMessage } from '@/common/utils/error-message'
-
 import { DISPLAY_RUB_RATES } from '@casino/shared-config'
 
 import {
