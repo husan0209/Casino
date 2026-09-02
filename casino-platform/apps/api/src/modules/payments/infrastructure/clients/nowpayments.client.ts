@@ -21,6 +21,7 @@ const TIMEOUT_MS = 30_000
 
 /** Ответ /payment: имена поля могут отличаться по версиям API. */
 function parseCreateResponse(json: unknown): { paymentId: string; payAddress: string } {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- external PSP payload (NOWPayments), defensive parsing
   const d = (json ?? {}) as Record<string, any>
   return {
     paymentId: String(d.payment_id ?? ''),
@@ -111,6 +112,7 @@ export class NOWPaymentsClient {
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- external PSP payload (NOWPayments /payment), defensive parsing
       const d = (await res.json()) as Record<string, any>
       const { paymentId, payAddress } = parseCreateResponse(d)
       if (!paymentId || !payAddress) {
@@ -143,6 +145,7 @@ export class NOWPaymentsClient {
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`)
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- external PSP payload (NOWPayments /payment/{id}), defensive parsing
     const d = (await res.json()) as Record<string, any>
     return {
       paymentStatus: String(d.payment_status ?? 'unknown'),
@@ -183,6 +186,7 @@ export class NOWPaymentsClient {
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`)
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- external PSP payload (NOWPayments /estimate), defensive parsing
       const d = (await res.json()) as Record<string, any>
       const v = Number(d.estimated_amount)
       if (!Number.isFinite(v) || v <= 0) {

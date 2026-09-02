@@ -69,6 +69,7 @@ export class ProcessNOWPaymentsWebhookUseCase {
   private async applyPaymentStatus(
     pr: { id: string; userId: string; status: string; currency: string; amount: { toString(): string } },
     paymentStatus: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- NOWPayments IPN payload, body поля читаются через String()/|| fallback
     body: Record<string, any>,
   ): Promise<void> {
     if (['finished', 'confirmed'].includes(paymentStatus)) {
@@ -84,6 +85,7 @@ export class ProcessNOWPaymentsWebhookUseCase {
 
   private async creditCryptoDeposit(
     pr: { id: string; userId: string; currency: string; amount: { toString(): string } },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- NOWPayments IPN payload, body поля читаются через String()/|| fallback
     body: Record<string, any>,
   ): Promise<void> {
     const actuallyPaid = body.actually_paid || body.pay_amount || pr.amount.toString()
