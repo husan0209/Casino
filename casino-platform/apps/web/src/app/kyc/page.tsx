@@ -3,14 +3,16 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
-import { apiGet, apiPost } from '@/lib/api'
+import { apiPost } from '@/lib/api'
+import { getKycStatus } from '@/lib/api/kyc.api'
+import { formatAmount } from '@/lib/format/currency'
 import { useAuth } from '@/stores/auth'
 
 export default function KycPage() {
   const { user } = useAuth()
   const { data, refetch } = useQuery({
     queryKey: ['kyc-status'],
-    queryFn: () => apiGet<any>('/kyc/status'),
+    queryFn: () => getKycStatus(),
     enabled: Boolean(user),
   })
   const [form, setForm] = useState<any>({
@@ -66,13 +68,38 @@ export default function KycPage() {
     return <div className="container-1 py-8">Войдите в аккаунт</div>
   }
   const status = data?.status || 'not_started'
+  const remaining = data?.limit_remaining
+  const remainingExhausted = remaining !== undefined && Number(remaining) <= 0
 
   return (
     <div className="container-1 py-8 max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">KYC Верификация</h1>
-      <div className="text-sm text-muted mb-6">
-        Лимит без KYC: 5000 ₽ суммарных пополнений. Вывод всегда требует KYC.
-      </div>
+      {status === 'approved' ? (
+        <div className="text-sm text-muted mb-6">
+          Лимит снят: пополнения и выводы доступны без ограничений.
+        </div>
+      ) : (
+        <div className="text-sm text-muted mb-6">
+          {/* GAP-36: значения — из API, не пересчёт на клиенте */}
+          Остаток лимита без KYC:{' '}
+          <b className={remainingExhausted ? 'text-red-400' : 'text-white'}>
+            {data ? formatAmount(data.limit_remaining, data.limit_currency, true) : '…'}
+          </b>{' '}
+          из {data?.deposit_limit_rub ? `${data.deposit_limit_rub} ₽` : '5000 ₽'} суммарных
+          пополнений. Вывод всегда требует KYC.
+        </div>
+      )}
+      {remainingExhausted && status !== 'approved' && (
+        <div className="card mb-6 border-red-500/40">
+          <div className="text-red-400 font-semibold">Лимит пополнений исчерпан</div>
+          <div className="text-sm text-muted mt-1">
+            Дальнейшие пополнения — после верификации личности.
+          </div>
+          <a href="#kyc-form" className="btn mt-3 inline-block">
+            Пройти верификацию
+          </a>
+        </div>
+      )}
       <div className="card mb-6">
         Статус:{' '}
         <b
@@ -91,7 +118,7 @@ export default function KycPage() {
         {data?.rejection_reason && (
           <div className="text-red-400 text-sm mt-2">Причина: {data.rejection_reason}</div>
         )}
-        {data?.documents?.length > 0 && (
+        {data?.documents && data.documents.length > 0 && (
           <div className="text-xs text-muted mt-2">
             Загружено документов: {data.documents.join(', ')}
           </div>
@@ -101,7 +128,7 @@ export default function KycPage() {
       {(status === 'not_started' ||
         status === 'requires_resubmission' ||
         status === 'rejected') && (
-        <form onSubmit={submit} className="card space-y-3 mb-6">
+        <form id="kyc-form" onSubmit={submit} className="card space-y-3 mb-6">
           <div className="font-semibold">Персональные данные</div>
           <div className="grid md:grid-cols-2 gap-3">
             <input
