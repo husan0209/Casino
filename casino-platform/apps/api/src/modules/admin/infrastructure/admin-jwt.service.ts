@@ -58,7 +58,8 @@ export class AdminAuthService {
   }
   verify(token: string) {
     const payload = hs256Verify(this.config.get<string>('JWT_ACCESS_SECRET')!, token)
-    if (payload.exp * 1000 < Date.now()) {
+    const exp = typeof payload['exp'] === 'number' ? payload['exp'] : 0
+    if (exp * 1000 < Date.now()) {
       throw new Error('TOKEN_EXPIRED')
     }
     return payload

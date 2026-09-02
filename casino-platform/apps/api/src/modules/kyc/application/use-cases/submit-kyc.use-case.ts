@@ -9,6 +9,8 @@ interface KycSubmitInput {
   date_of_birth: string
   country: string
   document_type: string
+  document_number: string
+  document_expiry?: string
 }
 
 @Injectable()
@@ -21,7 +23,7 @@ export class SubmitKycUseCase {
       lastName: input.last_name,
       dateOfBirth: new Date(input.date_of_birth),
       country: input.country,
-      documentType: input.document_type,
+      documentType: input.document_type as 'passport' | 'id_card' | 'drivers_license',
       documentNumber: input.document_number,
       documentExpiry: input.document_expiry ? new Date(input.document_expiry) : null,
     })

@@ -4,7 +4,7 @@ import { prisma, type Prisma, type PaymentProvider , type PaymentStatus } from '
 
 @Injectable()
 export class PaymentRequestRepository {
-  create(data: Prisma.PaymentRequestCreateInput) {
+  create(data: Prisma.PaymentRequestUncheckedCreateInput) {
     return prisma.paymentRequest.create({ data })
   }
   findById(id: string) {
@@ -13,10 +13,28 @@ export class PaymentRequestRepository {
   findByExternalId(externalId: string, provider: string) {
     return prisma.paymentRequest.findFirst({ where: { externalId, provider: provider as PaymentProvider } })
   }
-  updateStatus(id: string, status: PaymentStatus, extra: { completedAt?: Date; externalStatus?: string; errorMessage?: string } = {}) {
+  updateStatus(
+    id: string,
+    status: PaymentStatus,
+    extra: {
+      completedAt?: Date
+      externalStatus?: string
+      errorMessage?: string
+      externalId?: string
+    } = {},
+  ) {
+    // exactOptionalPropertyTypes: Prisma не принимает явный undefined —
+    // включаем в data только заданные поля (undefined -> отсутствие -> NULL)
     return prisma.paymentRequest.update({
       where: { id },
-      data: { status, updatedAt: new Date(), ...extra },
+      data: {
+        status,
+        updatedAt: new Date(),
+        ...(extra.completedAt !== undefined && { completedAt: extra.completedAt }),
+        ...(extra.externalStatus !== undefined && { externalStatus: extra.externalStatus }),
+        ...(extra.errorMessage !== undefined && { errorMessage: extra.errorMessage }),
+        ...(extra.externalId !== undefined && { externalId: extra.externalId }),
+      },
     })
   }
   listUser(args: {

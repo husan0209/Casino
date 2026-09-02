@@ -139,7 +139,7 @@ export class CasinoController {
     @CurrentUser() currentUser: { id: string },
     @Query() queryParams: { page?: string; per_page?: string },
   ) {
-    const page = parseInt(queryParams.page || '1', 10) || 1
+    const page = parseInt(queryParams.page ?? '1', 10) || 1
     const perPage = parseInt(queryParams.per_page || '24', 10) || 24
     const result = await this.favoritesUseCase.list(currentUser.id, page, perPage)
     return {
@@ -168,7 +168,7 @@ export class CasinoController {
     @CurrentUser() currentUser: { id: string },
     @Query() queryParams: { page?: string; per_page?: string; game_id?: string },
   ) {
-    const page = parseInt(queryParams.page || '1', 10) || 1
+    const page = parseInt(queryParams.page ?? '1', 10) || 1
     const perPage = parseInt(queryParams.per_page || '20', 10) || 20
     const result = await this.favoritesUseCase.history({
       userId: currentUser.id,

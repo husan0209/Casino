@@ -172,13 +172,14 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
   verifyCallback(headers: Record<string, string>, body: unknown): boolean {
     try {
       this.creds()
+      const payload = (body ?? {}) as Record<string, unknown>
       const op = String(headers['x-gsp-op'] || '').toLowerCase()
       const build = CALLBACK_MESSAGE_BUILDERS[op]
       if (!build) {
         return false
       }
-      const expected = this.sign([build(body)])
-      return signatureMatches(String(body.sign ?? ''), expected)
+      const expected = this.sign([build(payload)])
+      return signatureMatches(String(payload.sign ?? ''), expected)
     } catch (e) {
       this.logger.warn(`verifyCallback failed: ${errorMessage(e)}`)
       return false

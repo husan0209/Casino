@@ -8,7 +8,7 @@ import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { CreateAdminSchema } from '../dto/admin-admins.dto'
 
-function isSuper(req: { user?: AdminActor }) {
+function isSuper(req: Request) {
   return req.user?.role === 'superadmin'
 }
 @UseGuards(AdminAuthGuard)

@@ -9,11 +9,11 @@ import { AdminAuthGuard } from '../admin-auth.guard'
 export class AdminAuditController {
   @Get()
   async list(@Query() q: Record<string, string | undefined>) {
-    const page = parseInt(q.page) || 1,
-      perPage = Math.min(parseInt(q.per_page) || 50, 200)
+    const page = parseInt(q.page ?? '') || 1,
+      perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
     const where: Prisma.AuditLogWhereInput = {}
     if (q.actor_type) {
-      where.actorType = q.actor_type
+      where.actorType = q.actor_type as Prisma.EnumActorTypeFilter['equals']
     }
     if (q.actor_id) {
       where.actorId = q.actor_id

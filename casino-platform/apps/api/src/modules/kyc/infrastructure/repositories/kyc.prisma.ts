@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma, type KycDocumentType, type KycStatus } from '@casino/database'
+import { prisma, type KycDocumentType, type KycStatus , type KycFileType } from '@casino/database'
 
 import { type IKycRepository, type KycSubmitInput } from '../../domain/repositories/kyc.repository'
 
@@ -60,7 +60,7 @@ export class PrismaKycRepository implements IKycRepository {
     return prisma.kycDocument.create({
       data: {
         kycProfileId,
-        documentType: doc.documentType,
+        documentType: doc.documentType as KycFileType,
         fileUrl: doc.fileUrl,
         fileName: doc.fileName ?? null,
         fileSize: doc.fileSize ?? null,

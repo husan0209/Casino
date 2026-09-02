@@ -37,15 +37,15 @@ export class WalletController {
     @CurrentUser() currentUser: { id: string },
     @Query() queryParams: { page?: string; per_page?: string; currency?: string; type?: string },
   ) {
-    const page = parseInt(queryParams.page || '1', 10) || 1
-    const perPage = Math.min(parseInt(queryParams.per_page || '20', 10) || 20, 100)
+    const page = parseInt(queryParams.page ?? '1', 10) || 1
+    const perPage = Math.min(parseInt(queryParams.per_page ?? '20', 10) || 20, 100)
 
     const where: Prisma.LedgerEntryWhereInput = { userId: currentUser.id }
     if (queryParams.currency) {
       where.walletAccount = { currency: queryParams.currency }
     }
     if (queryParams.type) {
-      where.type = queryParams.type
+      where.type = queryParams.type as Prisma.EnumLedgerEntryTypeFilter['equals']
     }
 
     const [items, total] = await Promise.all([

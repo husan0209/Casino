@@ -23,7 +23,7 @@ export class AdminUsersController {
 
     const where: Prisma.UserWhereInput = {}
     if (queryParams.status) {
-      where.status = queryParams.status
+      where.status = queryParams.status as Prisma.EnumUserStatusFilter['equals']
     }
     if (queryParams.search) {
       where.OR = [

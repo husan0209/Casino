@@ -51,16 +51,17 @@ export class DemoProviderAdapter implements GameProviderAdapter {
     return true
   }
   parseCallback(_h: Record<string, unknown>, body: Record<string, unknown>): ParsedProviderCallback {
+    const opt = (v: unknown): string | undefined => (v === undefined || v === null ? undefined : String(v))
     return {
-      action: body.action,
-      playerToken: body.player_token || body.session_token,
-      betAmount: body.amount ? String(body.amount) : undefined,
-      winAmount: body.amount ? String(body.amount) : undefined,
-      roundId: body.round_id,
-      transactionId: body.transaction_id,
-      rollbackTransactionId: body.rollback_transaction_id,
-      gameId: body.game_id,
-      currency: body.currency,
+      action: body.action as ParsedProviderCallback['action'],
+      playerToken: opt(body.player_token ?? body.session_token),
+      betAmount: body.amount !== undefined ? String(body.amount) : undefined,
+      winAmount: body.amount !== undefined ? String(body.amount) : undefined,
+      roundId: opt(body.round_id),
+      transactionId: opt(body.transaction_id),
+      rollbackTransactionId: opt(body.rollback_transaction_id),
+      gameId: opt(body.game_id),
+      currency: opt(body.currency),
       rawRequest: body,
     }
   }
