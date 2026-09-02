@@ -1,6 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import Decimal from 'decimal.js'
 
+import { errorMessage } from '@/common/utils/error-message'
+
 import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
@@ -143,9 +145,9 @@ export class ReferralCalcService {
       })
       await this.repo.updateReward(rr.id, { status: 'credited', creditedAt: new Date() })
       return { processed: 1, credited: 1 }
-    } catch (err: any) {
+    } catch (err) {
       this.logger.error(
-        `Failed to credit referral reward ${rr.id} for user ${referrerId}: ${err?.message || err}`,
+        `Failed to credit referral reward ${rr.id} for user ${referrerId}: ${errorMessage(err)}`,
       )
       return { processed: 1, credited: 0 }
     }

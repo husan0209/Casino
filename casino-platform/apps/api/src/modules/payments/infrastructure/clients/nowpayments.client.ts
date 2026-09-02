@@ -3,10 +3,11 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import { errorMessage } from '@/common/utils/error-message'
+
 import { DISPLAY_RUB_RATES } from '@casino/shared-config'
 
 import { PaymentProviderNotConfiguredError } from './rukassa.client'
-
 
 const MAP: Record<string, string> = {
   USDT_TRC20: 'usdttrc20',
@@ -128,8 +129,8 @@ export class NOWPaymentsClient {
           d.expiration_estimate_date ?? new Date(Date.now() + 3600_000).toISOString(),
         ),
       }
-    } catch (e: any) {
-      this.logger.error(`NOWPayments createPayment failed: ${e?.message}`)
+    } catch (e) {
+      this.logger.error(`NOWPayments createPayment failed: ${errorMessage(e)}`)
       throw e
     }
   }
@@ -193,8 +194,8 @@ export class NOWPaymentsClient {
         throw new Error(`bad estimate shape: ${JSON.stringify(d).slice(0, 120)}`)
       }
       return { estimatedAmount: String(v), source: 'nowpayments' }
-    } catch (e: any) {
-      this.logger.error(`NOWPayments estimate failed: ${e?.message}`)
+    } catch (e) {
+      this.logger.error(`NOWPayments estimate failed: ${errorMessage(e)}`)
       return null
     }
   }

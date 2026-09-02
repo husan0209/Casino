@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import { errorMessage } from '@/common/utils/error-message'
 
 import { GeoFacade } from '@modules/geo/facade/geo.facade'
 import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
@@ -86,9 +87,9 @@ export class CreateFiatDepositUseCase {
         paymentUrl: res.paymentUrl,
       })
       return { payment_request_id: pr.id, payment_url: res.paymentUrl, currency, method }
-    } catch (e: any) {
-      await this.repo.updateStatus(pr.id, 'failed', { errorMessage: e.message })
-      throw new PaymentProviderError('Rukassa error', { cause: e.message })
+    } catch (e) {
+      await this.repo.updateStatus(pr.id, 'failed', { errorMessage: errorMessage(e) })
+      throw new PaymentProviderError('Rukassa error', { cause: errorMessage(e) })
     }
   }
 }

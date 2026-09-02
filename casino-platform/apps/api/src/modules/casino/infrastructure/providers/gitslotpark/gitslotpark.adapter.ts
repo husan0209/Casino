@@ -3,6 +3,8 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import { errorMessage } from '@/common/utils/error-message'
+
 import {
   type GameProviderAdapter,
   type LaunchParams,
@@ -177,8 +179,8 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
       }
       const expected = this.sign([build(body)])
       return signatureMatches(String(body.sign ?? ''), expected)
-    } catch (e: any) {
-      this.logger.warn(`verifyCallback failed: ${e?.message}`)
+    } catch (e) {
+      this.logger.warn(`verifyCallback failed: ${errorMessage(e)}`)
       return false
     }
   }

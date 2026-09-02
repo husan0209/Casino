@@ -3,6 +3,8 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import { errorMessage } from '@/common/utils/error-message'
+
 import { AppError } from '@casino/shared-utils'
 
 export class PaymentProviderNotConfiguredError extends AppError {
@@ -106,9 +108,9 @@ export class RukassaClient {
       }
       this.logger.log(`Rukassa order created: ${paymentId}`)
       return { paymentId, paymentUrl }
-    } catch (e: any) {
+    } catch (e) {
       // TZ §5.4 UC-PAY-01 шаг 7: ошибка провайдера → PR остаётся/становится failed, наверх PAYMENT_PROVIDER_ERROR
-      this.logger.error(`Rukassa createPayment failed: ${e?.message}`)
+      this.logger.error(`Rukassa createPayment failed: ${errorMessage(e)}`)
       throw e
     }
   }

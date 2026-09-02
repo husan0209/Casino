@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common'
 
+import { errorMessage } from '@/common/utils/error-message'
 
 import { UsersFacade } from '@modules/users/facade/users.facade'
 import { WalletFacade } from '@modules/wallet/application/wallet.facade'
@@ -73,9 +74,9 @@ export class ProcessRukassaWebhookUseCase {
       await this.applyOutcome(pr, status, externalId)
       await this.repo.markCallbackProcessed(cb.id, 'ok')
       return { ok: true }
-    } catch (e: any) {
-      this.logger.error('Rukassa webhook err ' + e.message)
-      await this.repo.markCallbackProcessed(cb.id, 'error: ' + e.message)
+    } catch (e) {
+      this.logger.error('Rukassa webhook err ' + errorMessage(e))
+      await this.repo.markCallbackProcessed(cb.id, 'error: ' + errorMessage(e))
       return { ok: true } // always 200 to provider
     }
   }

@@ -1,5 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 
+import { errorMessage } from '@/common/utils/error-message'
+
 import {
   MAINTENANCE_EMAIL_PORT,
   PAYMENT_MAINTENANCE_REPO,
@@ -66,9 +68,9 @@ export class WithdrawalReminderJob {
         try {
           await this.emailQueue.enqueue({ to, subject, text })
           sent++
-        } catch (e: any) {
+        } catch (e) {
           // Письмо — side-effect: сбои фиксируем в сводке, не роняем задачу
-          this.logger.warn(`withdrawal-reminder: email to ${to} failed: ${e.message}`)
+          this.logger.warn(`withdrawal-reminder: email to ${to} failed: ${errorMessage(e)}`)
         }
       }
       await this.audit.recordReminder({ targetId: w.id, adminsNotified: sent, count: stale.length })

@@ -2,6 +2,8 @@ import { Body, Controller, Headers, Param, Post, Res, HttpCode } from '@nestjs/c
 import { SkipThrottle } from '@nestjs/throttler'
 import { Response } from 'express'
 
+import { errorMessage } from '@/common/utils/error-message'
+
 import { prisma } from '@casino/database'
 
 import { GameCallbackService } from '../../application/services/game-callback.service'
@@ -63,8 +65,8 @@ export class ProviderCallbackController {
           .json(adapter.formatErrorResponse('PROVIDER_NOT_FOUND', 'Unknown provider'))
       }
       return await this.dispatch(adapter, parsed, provider.id, res)
-    } catch (e: any) {
-      return res.status(200).json({ success: false, error: e.message })
+    } catch (e) {
+      return res.status(200).json({ success: false, error: errorMessage(e) })
     }
   }
 
@@ -101,8 +103,8 @@ export class ProviderCallbackController {
         default:
           return res.json(adapter.formatErrorResponse('UNKNOWN_ACTION', 'Unknown action'))
       }
-    } catch (e: any) {
-      const msg = e?.message || 'INTERNAL_ERROR'
+    } catch (e) {
+      const msg = errorMessage(e) || 'INTERNAL_ERROR'
       const code = CALLBACK_ERROR_CODES[msg] ?? 'INTERNAL_ERROR'
       return res.json(adapter.formatErrorResponse(code, msg))
     }
