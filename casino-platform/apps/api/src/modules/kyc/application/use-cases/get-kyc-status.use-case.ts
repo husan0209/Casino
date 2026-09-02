@@ -25,7 +25,7 @@ export class GetKycStatusUseCase {
       : money.subtract(limitRub, totalRub)
 
     const displayCurrency = (currency || 'RUB') as DisplayCurrency
-    const limitRemaining = this.geo.convertRubToDisplay(remainingRub, displayCurrency)
+    const limitRemaining = await this.geo.convertRubToDisplay(remainingRub, displayCurrency)
 
     return {
       ...status,

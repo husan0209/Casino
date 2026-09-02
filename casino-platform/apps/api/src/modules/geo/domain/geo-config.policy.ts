@@ -85,12 +85,17 @@ export function getCurrencyLimits(currency: DisplayCurrency) {
   return CURRENCY_LIMITS[currency] ?? CURRENCY_LIMITS.RUB
 }
 
-/** Display-only: RUB remaining → target currency (KYC UI) */
-export function convertRubToDisplayAmount(amountRub: string, currency: DisplayCurrency): string {
+/** Display-only: RUB remaining → target currency (KYC UI)
+ *  rateOverride — динамический курс из exchange_rates (GAP-34); без него — константы */
+export function convertRubToDisplayAmount(
+  amountRub: string,
+  currency: DisplayCurrency,
+  rateOverride?: string,
+): string {
   if (currency === 'RUB') {
     return amountRub
   }
-  const rate = DISPLAY_RUB_RATES[currency] || '1'
+  const rate = (rateOverride ?? DISPLAY_RUB_RATES[currency]) || '1'
   const converted = money.divide(amountRub, rate)
   const [intPart, fracPart = ''] = converted.split('.')
   if (currency === 'BTC') {
