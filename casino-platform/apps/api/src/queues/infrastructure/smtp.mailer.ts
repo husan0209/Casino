@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
-import type { Transporter } from 'nodemailer'
 import { ConfigService } from '@nestjs/config'
+import type * as nodemailerModule from 'nodemailer'
+import type { Transporter } from 'nodemailer'
 
 import { AppError } from '@casino/shared-utils'
 
@@ -26,7 +27,7 @@ export class SmtpMailer implements MailerPort {
     if (this.transport) {
       return this.transport
     }
-    let nodemailer: typeof import('nodemailer')
+    let nodemailer: typeof nodemailerModule
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       nodemailer = require('nodemailer')

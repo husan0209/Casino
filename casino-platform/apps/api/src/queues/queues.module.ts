@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common'
-import type Redis from 'ioredis'
 import { ConfigService } from '@nestjs/config'
 
 import { EmailWorker } from './application/email.worker'
 import { BullMqEmailQueue, DevLogEmailQueue } from './infrastructure/email.queue'
 import { mailerFactory } from './infrastructure/smtp.mailer'
 import { EMAIL_QUEUE_PORT, MAILER_PORT } from './queue.types'
+import type Redis from 'ioredis'
 
 /**
  * BullMQ-очереди (TZ part 6 §11, IMPLEMENTATION_GAPS GAP-02):
