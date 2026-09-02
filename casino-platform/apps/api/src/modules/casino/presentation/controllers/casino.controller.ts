@@ -97,7 +97,7 @@ export class CasinoController {
       returnUrl: dto.return_url || 'http://localhost:3000',
       isDemo: false,
       isMobile,
-      ip: req.ip,
+      ip: req.ip ?? '',
     })
   }
 
@@ -116,7 +116,7 @@ export class CasinoController {
       returnUrl: dto.return_url || 'http://localhost:3000',
       isDemo: true,
       isMobile,
-      ip: req.ip,
+      ip: req.ip ?? '',
     })
   }
 

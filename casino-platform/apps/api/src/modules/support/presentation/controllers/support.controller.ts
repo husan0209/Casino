@@ -5,6 +5,8 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 
+import { type TicketCategory, type TicketStatus } from '../../domain/repositories/support.repository'
+
 import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
 import { CreateTicketUseCase } from '../../application/use-cases/create-ticket.use-case'
 import { GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
@@ -31,7 +33,7 @@ export class SupportController {
   ) {
     return this.createTicketUseCase.execute(currentUser.id, {
       subject: dto.subject,
-      category: dto.category,
+      category: dto.category as TicketCategory,
       message: dto.message,
     })
   }
@@ -45,7 +47,9 @@ export class SupportController {
     const perPage = parseInt(queryParams.per_page || '20', 10) || 20
     const result = await this.listTicketsUseCase.execute({
       userId: currentUser.id,
-      status: queryParams.status,
+      ...(queryParams.status !== undefined
+        ? { status: queryParams.status as TicketStatus }
+        : {}),
       page,
       perPage,
     })

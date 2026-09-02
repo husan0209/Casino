@@ -51,7 +51,12 @@ export class PrismaSupportRepository implements ISupportRepository {
     )
     return { id: ticket.id }
   }
-  async listUserTickets(args: { userId: string; status?: TicketStatus; page: number; perPage: number }) {
+  async listUserTickets(args: {
+    userId: string
+    status?: TicketStatus | undefined
+    page: number
+    perPage: number
+  }) {
     const { userId, status, page, perPage } = args
     const where: Prisma.SupportTicketWhereInput = { userId }
     if (status) {
@@ -91,7 +96,7 @@ export class PrismaSupportRepository implements ISupportRepository {
   }) {
     const { ticketId, senderType, senderId, message } = args
     const isInternal = args.isInternal ?? false
-    const attachments = args.attachments ?? []
+    const attachments = (args.attachments ?? []) as unknown as Prisma.InputJsonValue[]
     const m = await prisma.supportMessage.create({
       data: { ticketId, senderType, senderId, message, attachments, isInternal },
     })

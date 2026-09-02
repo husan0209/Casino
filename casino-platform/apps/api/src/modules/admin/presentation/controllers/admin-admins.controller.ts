@@ -31,7 +31,7 @@ export class AdminAdminsController {
     }
     const admin = await this.svc.create(
       body as unknown as Parameters<typeof this.svc.create>[0],
-      req.user as AdminActor,
+      (req.user as AdminActor).id,
     )
     await this.audit.log({
       actorType: 'admin',

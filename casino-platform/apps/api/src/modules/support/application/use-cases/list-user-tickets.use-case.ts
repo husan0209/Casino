@@ -10,6 +10,11 @@ import {
 export class ListUserTicketsUseCase {
   constructor(@Inject(SUPPORT_REPOSITORY) private repo: ISupportRepository) {}
   execute(args: { userId: string; status?: TicketStatus; page: number; perPage: number }) {
-    return this.repo.listUserTickets({ userId: args.userId, status: args.status, page: args.page, perPage: args.perPage })
+    return this.repo.listUserTickets({
+      userId: args.userId,
+      ...(args.status !== undefined ? { status: args.status } : {}),
+      page: args.page,
+      perPage: args.perPage,
+    })
   }
 }

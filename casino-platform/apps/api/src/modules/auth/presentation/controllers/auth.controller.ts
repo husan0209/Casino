@@ -94,8 +94,9 @@ export class AuthController {
 
   @Post('logout')
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    if (req.user?.sessionId) {
-      await this.logoutUc.execute(req.user.sessionId)
+    const user = req.user
+    if (user && 'sessionId' in user && user.sessionId) {
+      await this.logoutUc.execute(user.sessionId)
     }
     clearRefreshTokenCookie(res)
     return { ok: true }
