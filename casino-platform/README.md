@@ -23,19 +23,25 @@ Admin http://localhost:3002
 
 Seed admin: superadmin@casino.example.com / dev_superadmin_password_123
 
-## TZ Progress (ревизия 2026-08-28)
+## TZ Progress (ревизия 2026-09-01)
 
 > Единственный источник правды по статусу — `docs/IMPLEMENTATION_GAPS.md` (GAP-трекер).
 > Снапшот аудита с ревизией каждого пункта — `docs/archive/audit-2026-08-25.md`.
+>
+> ⚠️ **К запуску не готово.** Аудит 2026-09-01 выявил 8 расхождений (GAP-31…GAP-38),
+> два из них — блокеры: **нет Prisma-миграций** (деплой на чистую БД не создаст схему)
+> и **реферальные выплаты не запускаются** (`runDaily` без вызывающего).
+> Инженерные гейты при этом зелёные: 4 обязательных чека CI + 2 guard'а, docker-образ собирается,
+> 62 unit + 9 E2E проходят.
 - [x] Часть 1 Foundation – ~85% – monorepo, Prisma schema (19 таблиц), shared packages, Docker, Nginx — готово
 - [~] Часть 2 Auth/Users/KYC/RBAC – ~85% – регистрация (сразу сессия, TZ-10)/логин/JWT refresh-rotation/KYC 5000₽ + limit_remaining; BullMQ email queue. Google OAuth (code-flow) и Telegram Login Widget реализованы – нужны ключи в env (GAP-03/04 закрыты)
-- [~] Часть 3 Wallet & Payments – ~80% – ledger/optimistic locking + Serializable/retry; Rukassa/NOWPayments — реальные HTTP-клиенты и HMAC-verify на raw body (GAP-06/07 закрыты 2026-08-24); runtime — нужны боевые ключи
+- [~] Часть 3 Wallet & Payments – ~80% – ledger/optimistic locking + Serializable/retry; Rukassa/NOWPayments — реальные HTTP-клиенты и HMAC-verify на raw body (GAP-06/07 закрыты 2026-08-24); runtime — нужны боевые ключи. **Открыто (2026-09-01):** нет scheduled jobs из ТЗ §13 — pending-депозиты не истекают, курсы не обновляются (GAP-33/34)
 - [~] Часть 4 Casino Providers – ~60% – Seamless Wallet API + DemoProvider + GitSlotPark-адаптер (GAP-08 закрыт 2026-08-24: агрегатор Pragmatic Play/PG Soft/Amatic/Amusnet, sync каталога — GAP-09); до продакшена — сверка sign-порядков и runtime-тест с ключами
 - [~] Часть 5 Frontend Web – ~75% – витрина/ЛК/кошелёк/KYC/история + geo/wallet stores, DepositSheet/LaunchCurrencySheet, play-страница; полный 90-сек флоу частично (TZ-07/09)
-- [~] Часть 6 Admin/Support/Referrals – ~50% – Backend API полный (users/finance/support/referrals/notifications+queue/dashboard metrics·charts·events/batch withdrawals). Admin frontend реализован (13 страниц: JWT-логин, живой дашборд с графиками, withdrawals batch, KYC/support/games/audit/admins/settings). Осталось: runtime-проверка с ключами (OAuth, GitSlotPark) на Linux-FS
-- [~] Часть 7 DevOps – ~60% – docker-compose.prod, nginx, GitHub Actions CI – скелет есть, VPS init/backup – скрипты есть
+- [~] Часть 6 Admin/Support/Referrals – ~50% – Backend API полный (users/finance/support/referrals/notifications+queue/dashboard metrics·charts·events/batch withdrawals). Admin frontend реализован (13 страниц: JWT-логин, живой дашборд с графиками, withdrawals batch, KYC/support/games/audit/admins/settings). Осталось: runtime-проверка с ключами (OAuth, GitSlotPark) на Linux-FS. **Открыто (2026-09-01):** GGR-share рефералы не выплачиваются — `runDaily` без триггера (GAP-32)
+- [~] Часть 7 DevOps – ~60% – docker-compose.prod, nginx, GitHub Actions CI – скелет есть, VPS init/backup – скрипты есть. **Открыто (2026-09-01):** нет Prisma-миграций (GAP-31), health/ready без проверки БД/Redis (GAP-35), нет шага seed админа в деплое (GAP-38)
 
-> Подробнее см. `docs/IMPLEMENTATION_GAPS.md` (открытые GAP-08..28) и раздел Money safety ниже.
+> Подробнее см. `docs/IMPLEMENTATION_GAPS.md` (открытые GAP-08..17, GAP-30..38) и раздел Money safety ниже.
 
 ## Money safety
 - DB: `DECIMAL(20,8)`
