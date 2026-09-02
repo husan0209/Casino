@@ -10,6 +10,13 @@ interface SmtpTransport {
   sendMail(options: Record<string, unknown>): Promise<unknown>
 }
 
+interface SmtpOptions {
+  host: string
+  port: number
+  secure: boolean
+  auth?: { user: string; pass: string }
+}
+
 export class EmailNotConfiguredError extends AppError {
   readonly code = 'EMAIL_NOT_CONFIGURED'
   readonly httpStatus = 500
@@ -30,7 +37,7 @@ export class SmtpMailer implements MailerPort {
     if (this.transport) {
       return this.transport
     }
-    let nodemailer: { createTransport: (opts: Record<string, unknown>) => SmtpTransport }
+    let nodemailer: { createTransport: (opts: SmtpOptions) => SmtpTransport }
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       nodemailer = require('nodemailer')
