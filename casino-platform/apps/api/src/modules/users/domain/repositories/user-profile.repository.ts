@@ -1,3 +1,5 @@
+import type { UserProfile, UserSettings } from '@casino/database'
+
 export interface UserProfileFull {
   user: {
     id: string

@@ -13,6 +13,8 @@ import {
   type TicketStatus,
   type TicketCategory,
   type TicketPriority,
+  type MessageRow,
+  type TicketListItem,
   type TicketAttachment,
   type TicketListItemFilters,
 } from '../../domain/repositories/support.repository'
@@ -56,7 +58,7 @@ export class PrismaSupportRepository implements ISupportRepository {
     status?: TicketStatus | undefined
     page: number
     perPage: number
-  }) {
+  }): Promise<{ items: TicketListItem[]; total: number }> {
     const { userId, status, page, perPage } = args
     const where: Prisma.SupportTicketWhereInput = { userId }
     if (status) {
@@ -109,7 +111,7 @@ export class PrismaSupportRepository implements ISupportRepository {
     })
     return m
   }
-  async listMessages(ticketId: string, includeInternal: boolean) {
+  async listMessages(ticketId: string, includeInternal: boolean): Promise<MessageRow[]> {
     return prisma.supportMessage.findMany({
       where: { ticketId, ...(includeInternal ? {} : { isInternal: false }) },
       orderBy: { createdAt: 'asc' },

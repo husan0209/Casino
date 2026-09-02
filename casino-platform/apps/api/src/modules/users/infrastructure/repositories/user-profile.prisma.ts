@@ -59,15 +59,24 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
       create: { userId, lastPaymentMethod: method, currencyPreference: currency },
     })
   }
-  async updateProfile(userId: string, data: Prisma.UserProfileUpdateInput) {
+  async updateProfile(
+    userId: string,
+    data: {
+      firstName?: string | undefined
+      lastName?: string | undefined
+      dateOfBirth?: Date | undefined
+      country?: string | undefined
+      city?: string | undefined
+    },
+  ) {
     await prisma.userProfile.upsert({
       where: { userId },
       update: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        dateOfBirth: data.dateOfBirth ?? undefined,
-        country: data.country,
-        city: data.city,
+        ...(data.firstName !== undefined && { firstName: data.firstName }),
+        ...(data.lastName !== undefined && { lastName: data.lastName }),
+        ...(data.dateOfBirth !== undefined && { dateOfBirth: data.dateOfBirth }),
+        ...(data.country !== undefined && { country: data.country }),
+        ...(data.city !== undefined && { city: data.city }),
       },
       create: {
         userId,
@@ -79,14 +88,22 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
       },
     })
   }
-  async updateSettings(userId: string, data: Prisma.UserSettingsUpdateInput) {
+  async updateSettings(
+    userId: string,
+    data: {
+      notificationsEmail?: boolean | undefined
+      notificationsPush?: boolean | undefined
+      language?: string | undefined
+      timezone?: string | undefined
+    },
+  ) {
     await prisma.userSettings.upsert({
       where: { userId },
       update: {
-        notificationsEmail: data.notificationsEmail,
-        notificationsPush: data.notificationsPush,
-        language: data.language,
-        timezone: data.timezone,
+        ...(data.notificationsEmail !== undefined && { notificationsEmail: data.notificationsEmail }),
+        ...(data.notificationsPush !== undefined && { notificationsPush: data.notificationsPush }),
+        ...(data.language !== undefined && { language: data.language }),
+        ...(data.timezone !== undefined && { timezone: data.timezone }),
       },
       create: {
         userId,
