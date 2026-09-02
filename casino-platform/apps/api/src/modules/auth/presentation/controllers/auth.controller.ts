@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post, Query, Req, Res, UsePipes } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
+import { type Request } from 'express'
 import { Request, Response } from 'express'
 
 import {
@@ -93,7 +94,7 @@ export class AuthController {
   }
 
   @Post('logout')
-  async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     if (req.user?.sessionId) {
       await this.logoutUc.execute(req.user.sessionId)
     }

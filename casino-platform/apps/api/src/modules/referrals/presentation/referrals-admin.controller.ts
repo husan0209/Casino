@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
-import { prisma } from '@casino/database'
+import { prisma, type Prisma } from '@casino/database'
 
 
 import { AuditLogService } from '../../admin/application/audit-log.service'
@@ -76,7 +76,7 @@ export class ReferralsAdminController {
         async (t: {
           referrerId: string
           _count: { referredId: number }
-          _sum: { rewardAmount: any }
+          _sum: { rewardAmount: unknown }
         }) => {
           const u = await prisma.user.findUnique({
             where: { id: t.referrerId },
@@ -98,10 +98,10 @@ export class ReferralsAdminController {
     }
   }
   @Get()
-  async list(@Query() q: any) {
+  async list(@Query() q: Record<string, string | undefined>) {
     const page = parseInt(q.page) || 1,
       perPage = parseInt(q.per_page) || 20
-    const where: any = {}
+    const where: Prisma.ReferralRewardWhereInput = {}
     if (q.referrer_id) {
       where.referrerId = q.referrer_id
     }

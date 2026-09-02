@@ -21,7 +21,7 @@ export class CreateWithdrawalUseCase {
   ) {}
   async execute(
     userId: string,
-    input: { amount: string; currency: string; method?: string; destination: any },
+    input: { amount: string; currency: string; method?: string; destination: string },
   ) {
     await this.kyc.assertCanWithdraw(userId)
     const amt = new Decimal(input.amount)

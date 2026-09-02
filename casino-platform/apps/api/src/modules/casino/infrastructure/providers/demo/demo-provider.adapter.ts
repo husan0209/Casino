@@ -50,7 +50,7 @@ export class DemoProviderAdapter implements GameProviderAdapter {
     }
     return true
   }
-  parseCallback(_h: any, body: any): ParsedProviderCallback {
+  parseCallback(_h: Record<string, unknown>, body: Record<string, unknown>): ParsedProviderCallback {
     return {
       action: body.action,
       playerToken: body.player_token || body.session_token,

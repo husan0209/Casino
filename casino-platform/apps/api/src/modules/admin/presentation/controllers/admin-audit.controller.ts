@@ -1,6 +1,6 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import { prisma, type Prisma } from '@casino/database'
 
 import { AdminAuthGuard } from '../admin-auth.guard'
 
@@ -8,10 +8,10 @@ import { AdminAuthGuard } from '../admin-auth.guard'
 @Controller('admin/audit-logs')
 export class AdminAuditController {
   @Get()
-  async list(@Query() q: any) {
+  async list(@Query() q: Record<string, string | undefined>) {
     const page = parseInt(q.page) || 1,
       perPage = Math.min(parseInt(q.per_page) || 50, 200)
-    const where: any = {}
+    const where: Prisma.AuditLogWhereInput = {}
     if (q.actor_type) {
       where.actorType = q.actor_type
     }

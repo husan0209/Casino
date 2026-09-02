@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
+import type { Transporter } from 'nodemailer'
 import { ConfigService } from '@nestjs/config'
 
 import { AppError } from '@casino/shared-utils'
@@ -16,16 +17,16 @@ export class EmailNotConfiguredError extends AppError {
 @Injectable()
 export class SmtpMailer implements MailerPort {
   private readonly logger = new Logger(SmtpMailer.name)
-  private transport: any | null = null
+  private transport: Transporter | null = null
 
   constructor(private config: ConfigService) {}
 
   /** nodemailer — optional peer: require ленивый, чтобы dev-среда без пакета собиралась. */
-  private transporter(): any {
+  private transporter(): Transporter {
     if (this.transport) {
       return this.transport
     }
-    let nodemailer: any
+    let nodemailer: typeof import('nodemailer')
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       nodemailer = require('nodemailer')

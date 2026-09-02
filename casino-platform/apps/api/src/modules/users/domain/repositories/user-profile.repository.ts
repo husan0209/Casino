@@ -7,8 +7,8 @@ export interface UserProfileFull {
     referralCode: string
     createdAt: Date
   }
-  profile: any | null
-  settings: any | null
+  profile: UserProfile | null
+  settings: UserSettings | null
   kycStatus: string
 }
 

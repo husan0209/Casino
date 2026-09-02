@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import { prisma, type Prisma } from '@casino/database'
 
 import { type IUserProfileRepository } from '../../domain/repositories/user-profile.repository'
 
@@ -59,7 +59,7 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
       create: { userId, lastPaymentMethod: method, currencyPreference: currency },
     })
   }
-  async updateProfile(userId: string, data: any) {
+  async updateProfile(userId: string, data: Prisma.UserProfileUpdateInput) {
     await prisma.userProfile.upsert({
       where: { userId },
       update: {
@@ -79,7 +79,7 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
       },
     })
   }
-  async updateSettings(userId: string, data: any) {
+  async updateSettings(userId: string, data: Prisma.UserSettingsUpdateInput) {
     await prisma.userSettings.upsert({
       where: { userId },
       update: {

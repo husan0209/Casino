@@ -12,7 +12,9 @@ import { SendMessageUseCase } from '../../application/use-cases/send-message.use
 import {
   ISupportRepository,
   SUPPORT_REPOSITORY,
+  type TicketCategory,
   type TicketPriority,
+  type TicketStatus,
 } from '../../domain/repositories/support.repository'
 import {
   AddAdminMessageSchema,
@@ -35,9 +37,9 @@ export class SupportAdminController {
   async list(
     @Query()
     queryParams: {
-      status?: any
-      priority?: any
-      category?: any
+      status?: TicketStatus
+      priority?: TicketPriority
+      category?: TicketCategory
       assigned_to?: string
       user_id?: string
       search?: string

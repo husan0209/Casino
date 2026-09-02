@@ -16,7 +16,7 @@ function hs256(secret: string, header: object, payload: object): string {
   return `${h}.${p}.${sig}`
 }
 
-function hs256Verify(secret: string, token: string): any {
+function hs256Verify(secret: string, token: string): Record<string, unknown> {
   const [h, p, sig] = token.split('.') as [string, string, string]
   const expected = createHmac('sha256', secret).update(`${h}.${p}`).digest()
   const given = Buffer.from(sig!, 'base64url')

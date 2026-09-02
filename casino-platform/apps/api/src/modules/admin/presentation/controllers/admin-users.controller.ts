@@ -1,8 +1,9 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
+import { type Request } from 'express'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
-import { prisma } from '@casino/database'
+import { prisma, type Prisma } from '@casino/database'
 
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
@@ -20,7 +21,7 @@ export class AdminUsersController {
     const page = parseInt(queryParams.page || '1', 10) || 1
     const perPage = Math.min(parseInt(queryParams.per_page || '20', 10) || 20, 100)
 
-    const where: any = {}
+    const where: Prisma.UserWhereInput = {}
     if (queryParams.status) {
       where.status = queryParams.status
     }
@@ -76,7 +77,7 @@ export class AdminUsersController {
 
   @Post(':id/block')
   @UsePipes(new ZodValidationPipe(BlockUserSchema))
-  async block(@Param('id') userId: string, @Body() dto: { reason?: string }, @Req() req: any) {
+  async block(@Param('id') userId: string, @Body() dto: { reason?: string }, @Req() req: Request) {
     await prisma.user.update({
       where: { id: userId },
       data: { status: 'blocked' },
@@ -99,7 +100,7 @@ export class AdminUsersController {
   }
 
   @Post(':id/unblock')
-  async unblock(@Param('id') userId: string, @Req() req: any) {
+  async unblock(@Param('id') userId: string, @Req() req: Request) {
     await prisma.user.update({
       where: { id: userId },
       data: { status: 'active' },

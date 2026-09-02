@@ -139,7 +139,7 @@ export class RukassaClient {
    * Подпись вебхука: HMAC-SHA256(secret, "shop_id:order_id:amount"), заголовок x-signature (или body.sign).
    * Fail-closed: в production без RUKASSA_SECRET_KEY — исключение (старт невозможен по env.validation).
    */
-  verifyCallback(headers: Record<string, string>, body: any): boolean {
+  verifyCallback(headers: Record<string, string>, body: unknown): boolean {
     const secret = this.config.get<string>('RUKASSA_SECRET_KEY')
     if (!secret) {
       if (this.isProd()) {

@@ -13,7 +13,7 @@ import { PaymentRequestRepository } from '../../infrastructure/repositories/paym
 /** IPN-запрос провайдера: заголовки, разобранный JSON, оригинальные байты тела и IP. */
 export interface ProcessNowPaymentsWebhookInput {
   rawHeaders: Record<string, string>
-  body: any
+  body: Record<string, unknown>
   rawBody: string
   ip: string
 }

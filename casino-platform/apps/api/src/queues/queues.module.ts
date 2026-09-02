@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import type Redis from 'ioredis'
 import { ConfigService } from '@nestjs/config'
 
 import { EmailWorker } from './application/email.worker'
@@ -22,7 +23,7 @@ import { EMAIL_QUEUE_PORT, MAILER_PORT } from './queue.types'
     },
     {
       provide: EMAIL_QUEUE_PORT,
-      useFactory: (config: ConfigService): any => {
+      useFactory: (config: ConfigService): Redis => {
         if (config.get<string>('REDIS_URL')) {
           return new BullMqEmailQueue(config)
         }

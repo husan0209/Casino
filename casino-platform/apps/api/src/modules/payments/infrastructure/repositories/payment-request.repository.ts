@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma, type PaymentProvider } from '@casino/database'
+import { prisma, type Prisma, type PaymentProvider , type PaymentStatus } from '@casino/database'
 
 @Injectable()
 export class PaymentRequestRepository {
-  create(data: any) {
+  create(data: Prisma.PaymentRequestCreateInput) {
     return prisma.paymentRequest.create({ data })
   }
   findById(id: string) {
@@ -13,7 +13,7 @@ export class PaymentRequestRepository {
   findByExternalId(externalId: string, provider: string) {
     return prisma.paymentRequest.findFirst({ where: { externalId, provider: provider as PaymentProvider } })
   }
-  updateStatus(id: string, status: any, extra: any = {}) {
+  updateStatus(id: string, status: PaymentStatus, extra: { completedAt?: Date; externalStatus?: string; errorMessage?: string } = {}) {
     return prisma.paymentRequest.update({
       where: { id },
       data: { status, updatedAt: new Date(), ...extra },
@@ -26,7 +26,7 @@ export class PaymentRequestRepository {
     perPage: number
   }) {
     const { userId, type, page, perPage } = args
-    const where: any = { userId }
+    const where: Prisma.PaymentRequestWhereInput = { userId }
     if (type) {
       where.type = type
     }
@@ -44,7 +44,7 @@ export class PaymentRequestRepository {
     provider: string
     externalId?: string
     paymentRequestId?: string
-    rawHeaders: any
+    rawHeaders: Record<string, string>
     rawBody: string
     ipAddress?: string
   }) {

@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
+import { type Request } from 'express'
 
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
@@ -22,7 +23,7 @@ export class CasinoController {
   ) {}
 
   @Get('games')
-  async games(@Query() queryParams: any) {
+  async games(@Query() queryParams: Record<string, string | undefined>) {
     const result = await this.listGamesUseCase.execute(queryParams)
     return {
       data: result.items,
@@ -50,7 +51,7 @@ export class CasinoController {
       orderBy: { sortOrder: 'asc' },
     })
     return rows.map(
-      (provider: { slug: string; name: string; logoUrl: any; gameCount: number; type: any }) => ({
+      (provider: { slug: string; name: string; logoUrl: string | null; gameCount: number; type: string }) => ({
         slug: provider.slug,
         name: provider.name,
         logo_url: provider.logoUrl,
@@ -85,7 +86,7 @@ export class CasinoController {
   async launch(
     @Param('slug') slug: string,
     @Body() dto: { currency?: string; return_url?: string },
-    @Req() req: any,
+    @Req() req: Request,
   ) {
     const isMobile = /mobile/i.test(req.headers['user-agent'] || '')
     return this.launchGameUseCase.execute({
@@ -104,7 +105,7 @@ export class CasinoController {
   async demo(
     @Param('slug') slug: string,
     @Body() dto: { currency?: string; return_url?: string },
-    @Req() req: any,
+    @Req() req: Request,
   ) {
     const isMobile = /mobile/i.test(req.headers['user-agent'] || '')
     return this.launchGameUseCase.execute({

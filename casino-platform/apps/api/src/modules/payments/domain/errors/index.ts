@@ -10,7 +10,7 @@ export class KycRequiredError extends AppError {
 export class PaymentProviderError extends AppError {
   readonly code = 'PAYMENT_PROVIDER_ERROR'
   readonly httpStatus = 502
-  constructor(m = 'Payment provider error', ctx?: any) {
+  constructor(m = 'Payment provider error', ctx?: Record<string, unknown>) {
     super(m, ctx)
   }
 }

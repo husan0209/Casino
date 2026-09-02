@@ -47,7 +47,16 @@ export class PrismaKycRepository implements IKycRepository {
       },
     })
   }
-  async addDocument(kycProfileId: string, doc: any) {
+  async addDocument(
+    kycProfileId: string,
+    doc: {
+      documentType: string
+      fileUrl: string
+      fileName?: string
+      fileSize?: number
+      mimeType?: string
+    },
+  ) {
     return prisma.kycDocument.create({
       data: {
         kycProfileId,

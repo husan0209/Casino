@@ -33,10 +33,10 @@ type GameListEnvelope = RawGameRow[] | { games?: RawGameRow[]; data?: RawGameRow
  * Запуск игры: POST {API}/userAuth {agentID,userID,lang,gameid,isaffiliate,lobbyUrl}
  * Каталог: GET {API}/gamelist
  */
-const AMT = (v: any) => Number(v ?? 0).toFixed(2)
+const AMT = (v: unknown) => Number(v ?? 0).toFixed(2)
 
 /** Первое поле с фактическим значением (undefined/пусто пропускаются). */
-function firstPresent(body: any, ...keys: string[]): string | undefined {
+function firstPresent(body: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const k of keys) {
     if (has(body[k])) {
       return String(body[k])
@@ -84,7 +84,7 @@ function mapProviderGame(g: RawGameRow): ProviderGameRow {
  * Порядок конкатенации полей подписи по операциям (Withdraw/Deposit/BetWin).
  * ⚠️ Сверить с менеджером GitSlotPark при выдаче боевых ключей.
  */
-const CALLBACK_MESSAGE_BUILDERS: Record<string, (body: any) => string> = {
+const CALLBACK_MESSAGE_BUILDERS: Record<string, (body: Record<string, unknown>) => string> = {
   getbalance: (b) => `${b.agentID}${b.userID}`,
   withdraw: (b) => `${b.agentID}${b.userID}${AMT(b.amount)}${b.transactionID}${b.roundID}`,
   deposit: (b) =>
@@ -169,7 +169,7 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
    * ⚠️ Порядки конкатенации Withdraw/Deposit/BetWin сверить с менеджером GitSlotPark
    * при выдаче боевых ключей (в доках приведён общий принцип + один пример).
    */
-  verifyCallback(headers: Record<string, string>, body: any): boolean {
+  verifyCallback(headers: Record<string, string>, body: unknown): boolean {
     try {
       this.creds()
       const op = String(headers['x-gsp-op'] || '').toLowerCase()
@@ -185,7 +185,7 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
     }
   }
 
-  parseCallback(_headers: Record<string, string>, body: any): ParsedProviderCallback {
+  parseCallback(_headers: Record<string, string>, body: Record<string, unknown>): ParsedProviderCallback {
     const op = String(_headers['x-gsp-op'] || '').toLowerCase()
     const map: Record<string, ParsedProviderCallback['action']> = {
       getbalance: 'balance',

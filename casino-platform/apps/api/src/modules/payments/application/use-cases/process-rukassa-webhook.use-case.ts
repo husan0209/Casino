@@ -12,19 +12,19 @@ import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 
 /** Rukassa отдаёт id платежа в разных полях в зависимости от сценария. */
-function pickExternalId(body: any): string {
+function pickExternalId(body: Record<string, unknown>): string {
   return String(body.order_id || body.merchant_order_id || body.payment_id || '')
 }
 
 /** Статус платежа: status (v1) либо state (старые интеграции). */
-function pickStatus(body: any): string {
+function pickStatus(body: Record<string, unknown>): string {
   return String(body.status || body.state || '')
 }
 
 /** IPN-запрос провайдера: заголовки, разобранный JSON, оригинальные байты тела и IP. */
 export interface ProcessRukassaWebhookInput {
   rawHeaders: Record<string, string>
-  body: any
+  body: Record<string, unknown>
   rawBody: string
   ip: string
 }
