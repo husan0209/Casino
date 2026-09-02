@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
-import type { Request } from 'express'
+import { Body, Controller, Get, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
+import { type Request } from 'express'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -34,7 +34,7 @@ export class AdminSettingsController {
       create: {
         key: body.key,
         value: body.value,
-        type: body.type || 'string',
+        type: (body.type || 'string') as SystemSettingType,
         updatedBy: admin.id,
       },
     })

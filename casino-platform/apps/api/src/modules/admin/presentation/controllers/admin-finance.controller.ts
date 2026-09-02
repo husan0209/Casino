@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
-import type { Request } from 'express'
+import { type Request } from 'express'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -92,7 +92,7 @@ export class AdminFinanceController {
       where.status = q.status as Prisma.EnumPaymentStatusFilter['equals']
     }
     if (q.provider) {
-      where.provider = q.provider
+      where.provider = q.provider as Prisma.EnumPaymentProviderFilter['equals']
     }
     const [items, total] = await Promise.all([
       prisma.paymentRequest.findMany({
@@ -261,6 +261,7 @@ export class AdminFinanceController {
       } catch (e) {
         failed.push({ id, error: e instanceof AppError ? e.code : e instanceof Error ? e.message : String(e) })
       }
+    }
     await this.audit.log({
       actorType: 'admin',
       actorId: admin.id,
