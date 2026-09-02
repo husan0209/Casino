@@ -1,6 +1,7 @@
+import { createHmac, timingSafeEqual } from 'crypto'
+
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { createHmac, timingSafeEqual } from 'crypto'
 
 import { errorMessage } from '@/common/utils/error-message'
 import {
@@ -10,9 +11,6 @@ import {
 } from '@modules/auth/domain/errors'
 
 import { OAuthUserProvisioningService } from './oauth-user-provisioning.service'
-
-
-
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'

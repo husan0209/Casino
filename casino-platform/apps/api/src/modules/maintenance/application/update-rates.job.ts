@@ -11,8 +11,6 @@ import {
   type RatesResult,
 } from '../domain/maintenance.ports'
 
-
-
 const HISTORY_TTL_MS = 7 * 86_400_000
 
 /**

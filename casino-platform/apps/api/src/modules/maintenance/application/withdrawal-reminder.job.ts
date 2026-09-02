@@ -11,8 +11,6 @@ import {
   type ReminderResult,
 } from '../domain/maintenance.ports'
 
-
-
 /** Напоминаем о выводах, висящих в pending дольше суток — ТЗ ч.3 §13. */
 const WITHDRAWAL_STALE_MS = 24 * 3_600_000
 /** Дедуп-окно: одна запись в audit_log на вывод (повторные тики не шлют письмо). */
