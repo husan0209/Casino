@@ -34,7 +34,7 @@ export interface MessageRow {
   senderId: string | null
   message: string
   isInternal: boolean
-  attachments: PrismaJson
+  attachments: unknown // Prisma JsonValue
   createdAt: Date
 }
 /** Prisma JsonValue-совместимый тип для JSON-полей. */
