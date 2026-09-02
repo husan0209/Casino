@@ -1,15 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common'
-
-/** Минимальная структурная типизация nodemailer (optional peer, типы недоступны). */
-interface SmtpTransport {
-  sendMail(options: Record<string, unknown>): Promise<unknown>
-}
 import { ConfigService } from '@nestjs/config'
 
 import { AppError } from '@casino/shared-utils'
 
 import { type MailMessage, type MailerPort } from './mailer.port'
 
+/** Минимальная структурная типизация nodemailer (optional peer, типы недоступны). */
+interface SmtpTransport {
+  sendMail(options: Record<string, unknown>): Promise<unknown>
+}
+
+import { ConfigService } from '@nestjs/config'
 
 export class EmailNotConfiguredError extends AppError {
   readonly code = 'EMAIL_NOT_CONFIGURED'
