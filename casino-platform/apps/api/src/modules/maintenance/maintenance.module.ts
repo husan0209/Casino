@@ -56,6 +56,7 @@ import { NOWPaymentsClient } from '../payments/infrastructure/clients/nowpayment
     { provide: EXCHANGE_RATE_WRITER, useClass: PrismaExchangeRateWriter },
     { provide: RATES_PROVIDER, useClass: NowPaymentsRatesProvider },
     { provide: MAINTENANCE_EMAIL_PORT, useExisting: EMAIL_QUEUE_PORT },
+    PaymentJobHandlers,
     {
       provide: MAINTENANCE_HANDLERS,
       // referral-daily добавлен к map из PaymentJobHandlers (3 payment-задачи)
