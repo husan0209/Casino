@@ -142,11 +142,7 @@ export class RukassaClient {
   verifyCallback(headers: Record<string, string>, rawBody: unknown): boolean {
     const secret = this.config.get<string>('RUKASSA_SECRET_KEY')
     if (!secret) {
-      if (this.isProd()) {
-        throw new PaymentProviderNotConfiguredError('Rukassa', 'RUKASSA_SECRET_KEY')
-      }
-      this.logger.error('RUKASSA_SECRET_KEY not set — rejecting callback (fail-closed dev)')
-      return false
+      return this.failWithoutSecret()
     }
     // Signature MUST come from the header only. Reading `body.sign` would
     // let an attacker bypass the signature check by simply including a
@@ -155,18 +151,31 @@ export class RukassaClient {
     if (!receivedSig) {
       return false
     }
-
-    const shopId = this.config.get('RUKASSA_SHOP_ID') || ''
-    const payload = (rawBody ?? {}) as Record<string, unknown>
-    const orderId = String(payload['order_id'] || payload['merchant_order_id'] || '')
-    const amount = String(payload['amount'] || '')
-    const payload = `${shopId}:${orderId}:${amount}`
-    const expected = createHmac('sha256', secret).update(payload).digest('hex')
+    const expected = this.expectedSignature(rawBody, secret)
 
     try {
       return timingSafeEqual(Buffer.from(receivedSig, 'hex'), Buffer.from(expected, 'hex'))
     } catch {
       return false
     }
+  }
+
+  /** Отбой без RUKASSA_SECRET_KEY: fail-closed и в dev (GAP-43: рантайм-приёмка). */
+  private failWithoutSecret(): boolean {
+    if (this.isProd()) {
+      throw new PaymentProviderNotConfiguredError('Rukassa', 'RUKASSA_SECRET_KEY')
+    }
+    this.logger.error('RUKASSA_SECRET_KEY not set — rejecting callback (fail-closed dev)')
+    return false
+  }
+
+  /** HMAC-SHA256 подпись для payload: shop_id:order_id:amount. */
+  private expectedSignature(rawBody: unknown, secret: string): string {
+    const shopId = this.config.get('RUKASSA_SHOP_ID') || ''
+    const body = (rawBody ?? {}) as Record<string, unknown>
+    const orderId = String(body['order_id'] || body['merchant_order_id'] || '')
+    const amount = String(body['amount'] || '')
+    const payload = `${shopId}:${orderId}:${amount}`
+    return createHmac('sha256', secret).update(payload).digest('hex')
   }
 }
