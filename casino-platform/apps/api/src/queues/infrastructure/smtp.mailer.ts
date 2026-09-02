@@ -30,7 +30,9 @@ export class SmtpMailer implements MailerPort {
   private readonly logger = new Logger(SmtpMailer.name)
   private transport: SmtpTransport | null = null
 
-  constructor(private config: ConfigService) {}
+  constructor(private config: ConfigService) {
+    // пусто: ConfigService через DI
+  }
 
   /** nodemailer — optional peer: require ленивый, чтобы dev-среда без пакета собиралась. */
   private transporter(): SmtpTransport {
