@@ -1,5 +1,13 @@
 import { Injectable } from '@nestjs/common'
 
+type ProfileUpdateFields = {
+  firstName?: string | undefined
+  lastName?: string | undefined
+  dateOfBirth?: Date | undefined
+  country?: string | undefined
+  city?: string | undefined
+}
+
 import { prisma, type Prisma } from '@casino/database'
 
 import { type IUserProfileRepository } from '../../domain/repositories/user-profile.repository'
@@ -68,25 +76,33 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
       country?: string | undefined
       city?: string | undefined
     },
-  ) {
+  ): Promise<void> {
     await prisma.userProfile.upsert({
       where: { userId },
-      update: {
-        ...(data.firstName !== undefined && { firstName: data.firstName }),
-        ...(data.lastName !== undefined && { lastName: data.lastName }),
-        ...(data.dateOfBirth !== undefined && { dateOfBirth: data.dateOfBirth }),
-        ...(data.country !== undefined && { country: data.country }),
-        ...(data.city !== undefined && { city: data.city }),
-      },
-      create: {
-        userId,
-        firstName: data.firstName ?? null,
-        lastName: data.lastName ?? null,
-        dateOfBirth: data.dateOfBirth ?? null,
-        country: data.country ?? null,
-        city: data.city ?? null,
-      },
+      // exactOptionalPropertyTypes: включаем только заданные поля
+      update: this.profileUpdateData(data),
+      create: { userId, ...this.profileCreateData(data) },
     })
+  }
+
+  private profileUpdateData(data: ProfileUpdateFields): Prisma.UserProfileUpdateInput {
+    return {
+      ...(data.firstName !== undefined && { firstName: data.firstName }),
+      ...(data.lastName !== undefined && { lastName: data.lastName }),
+      ...(data.dateOfBirth !== undefined && { dateOfBirth: data.dateOfBirth }),
+      ...(data.country !== undefined && { country: data.country }),
+      ...(data.city !== undefined && { city: data.city }),
+    }
+  }
+
+  private profileCreateData(data: ProfileUpdateFields): Prisma.UserProfileUncheckedCreateInput {
+    return {
+      firstName: data.firstName ?? null,
+      lastName: data.lastName ?? null,
+      dateOfBirth: data.dateOfBirth ?? null,
+      country: data.country ?? null,
+      city: data.city ?? null,
+    }
   }
   async updateSettings(
     userId: string,
