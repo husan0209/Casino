@@ -30,7 +30,7 @@ export interface TicketListItem {
 export interface MessageRow {
   id: string
   ticketId: string
-  senderType: 'user' | 'admin' | 'system' | (string & {})
+  senderType: string
   senderId: string | null
   message: string
   isInternal: boolean
@@ -38,7 +38,8 @@ export interface MessageRow {
   createdAt: Date
 }
 /** Prisma JsonValue-совместимый тип для JSON-полей. */
-export type PrismaJson = string | number | boolean | null | PrismaJson[] | { [key: string]: PrismaJson }
+export type PrismaJsonObject = { [key: string]: PrismaJson }
+export type PrismaJson = string | number | boolean | null | PrismaJson[] | PrismaJsonObject
 /** Вложение к сообщению тикета (ссылка на сохранённый файл). */
 export interface TicketAttachment {
   url: string
