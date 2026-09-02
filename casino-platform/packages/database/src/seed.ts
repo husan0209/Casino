@@ -1,8 +1,19 @@
 import { prisma } from './index'
 import * as argon2 from 'argon2'
+import { assertSeedAdminConfig } from './seed-guard'
+
 async function main(){
   const adminEmail = process.env['SEED_ADMIN_EMAIL'] || 'superadmin@casino.example.com'
   const adminPassword = process.env['SEED_ADMIN_PASSWORD'] || 'dev_superadmin_password_123'
+
+  // GAP-38 fail-closed: в production сид отказывается создавать админа
+  // с дефолтным паролем или без обязательных переменных
+  const guard = assertSeedAdminConfig(process.env)
+  if (!guard.ok) {
+    console.error(guard.message)
+    process.exit(1)
+  }
+
   let admin = await prisma.adminUser.findUnique({ where: { email: adminEmail }})
   if(!admin){
     const passwordHash = await argon2.hash(adminPassword, { type: argon2.argon2id, memoryCost: 65536, timeCost: 3, parallelism: 4 })
