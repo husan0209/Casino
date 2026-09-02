@@ -1,15 +1,23 @@
 import { randomUUID } from 'crypto'
 
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
-
+import { type Request } from 'express'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+import { type AdminActor } from '@/common/types/req-user'
 
 import { PaymentRequestRepository } from '@modules/payments/infrastructure/repositories/payment-request.repository'
 import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 
-import { prisma } from '@casino/database'
+import {
+  prisma,
+  type LedgerEntryType,
+  type PaymentProvider,
+  type PaymentStatus,
+  type PaymentType,
+  type Prisma,
+} from '@casino/database'
 import { type Currency } from '@casino/shared-types'
 import { AppError } from '@casino/shared-utils'
 
@@ -30,6 +38,13 @@ export class WithdrawalInvalidStatusError extends AppError {
   }
 }
 
+/** Пагинация, общая для списков админки (q.page/q.per_page + дефолты/кап). */
+function parsePagination(q: Record<string, string | undefined>): { page: number; perPage: number } {
+  const page = parseInt(q.page ?? '') || 1
+  const perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
+  return { page, perPage }
+}
+
 @UseGuards(AdminAuthGuard)
 @Controller('admin')
 export class AdminFinanceController {
@@ -41,15 +56,14 @@ export class AdminFinanceController {
 
   // UC-PAY-16 transactions
   @Get('transactions')
-  async transactions(@Query() q: any) {
-    const page = parseInt(q.page) || 1,
-      perPage = Math.min(parseInt(q.per_page) || 50, 200)
-    const where: any = {}
+  async transactions(@Query() q: Record<string, string | undefined>) {
+    const { page, perPage } = parsePagination(q)
+    const where: Prisma.LedgerEntryWhereInput = {}
     if (q.user_id) {
       where.userId = q.user_id
     }
     if (q.type) {
-      where.type = q.type
+      where.type = q.type as LedgerEntryType
     }
     if (q.currency) {
       where.walletAccount = { currency: q.currency }
@@ -72,21 +86,20 @@ export class AdminFinanceController {
 
   // UC-PAY-17 payment_requests
   @Get('payment-requests')
-  async paymentRequests(@Query() q: any) {
-    const page = parseInt(q.page) || 1,
-      perPage = Math.min(parseInt(q.per_page) || 50, 200)
-    const where: any = {}
+  async paymentRequests(@Query() q: Record<string, string | undefined>) {
+    const { page, perPage } = parsePagination(q)
+    const where: Prisma.PaymentRequestWhereInput = {}
     if (q.user_id) {
       where.userId = q.user_id
     }
     if (q.type) {
-      where.type = q.type
+      where.type = q.type as PaymentType
     }
     if (q.status) {
-      where.status = q.status
+      where.status = q.status as PaymentStatus
     }
     if (q.provider) {
-      where.provider = q.provider
+      where.provider = q.provider as PaymentProvider
     }
     const [items, total] = await Promise.all([
       prisma.paymentRequest.findMany({
@@ -116,12 +129,11 @@ export class AdminFinanceController {
 
   // UC-PAY-10 withdrawals list
   @Get('withdrawals')
-  async withdrawals(@Query() q: any) {
-    const page = parseInt(q.page) || 1,
-      perPage = Math.min(parseInt(q.per_page) || 50, 200)
-    const where: any = { type: 'withdrawal' }
+  async withdrawals(@Query() q: Record<string, string | undefined>) {
+    const { page, perPage } = parsePagination(q)
+    const where: Prisma.PaymentRequestWhereInput = { type: 'withdrawal' }
     if (q.status) {
-      where.status = q.status
+      where.status = q.status as PaymentStatus
     }
     if (q.user_id) {
       where.userId = q.user_id
@@ -143,7 +155,7 @@ export class AdminFinanceController {
   }
 
   /** Общая логика одобрения одной заявки (single + batch). */
-  private async approveOne(id: string, admin: any, req: any) {
+  private async approveOne(id: string, admin: AdminActor, req: Request) {
     const wd = await this.payments.findById(id)
     if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') {
       throw new WithdrawalInvalidStatusError()
@@ -167,7 +179,7 @@ export class AdminFinanceController {
   }
 
   /** Общая логика отклонения одной заявки (single + batch). */
-  private async rejectOne(id: string, reason: string | undefined, admin: any, req: any) {
+  private async rejectOne(id: string, reason: string | undefined, admin: AdminActor, req: Request) {
     const wd = await this.payments.findById(id)
     if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') {
       throw new WithdrawalInvalidStatusError()
@@ -192,7 +204,7 @@ export class AdminFinanceController {
 
   // UC-PAY-11 approve
   @Post('withdrawals/:id/approve')
-  async approve(@Param('id') id: string, @CurrentUser() admin: any, @Req() req: any) {
+  async approve(@Param('id') id: string, @CurrentUser() admin: AdminActor, @Req() req: Request) {
     await this.approveOne(id, admin, req)
     return { ok: true }
   }
@@ -203,8 +215,8 @@ export class AdminFinanceController {
   async reject(
     @Param('id') id: string,
     @Body() body: { reason: string },
-    @CurrentUser() admin: any,
-    @Req() req: any,
+    @CurrentUser() admin: AdminActor,
+    @Req() req: Request,
   ) {
     await this.rejectOne(id, body.reason, admin, req)
     return { ok: true }
@@ -213,15 +225,19 @@ export class AdminFinanceController {
   // UC-ADMIN-FIN-05 batch approve – каждая заявка обрабатывается независимо (TZ part 6 §6.3)
   @Post('withdrawals/batch-approve')
   @UsePipes(new ZodValidationPipe(BatchApproveSchema))
-  async batchApprove(@Body() body: { ids: string[] }, @CurrentUser() admin: any, @Req() req: any) {
+  async batchApprove(
+    @Body() body: { ids: string[] },
+    @CurrentUser() admin: AdminActor,
+    @Req() req: Request,
+  ) {
     const failed: Array<{ id: string; error: string }> = []
     let approved = 0
     for (const id of body.ids ?? []) {
       try {
         await this.approveOne(id, admin, req)
         approved++
-      } catch (e: any) {
-        failed.push({ id, error: e.code ?? e.message })
+      } catch (e) {
+        failed.push({ id, error: e instanceof AppError ? e.code : e instanceof Error ? e.message : String(e) })
       }
     }
     await this.audit.log({
@@ -240,8 +256,8 @@ export class AdminFinanceController {
   @UsePipes(new ZodValidationPipe(BatchRejectSchema))
   async batchReject(
     @Body() body: { ids: string[]; reason: string },
-    @CurrentUser() admin: any,
-    @Req() req: any,
+    @CurrentUser() admin: AdminActor,
+    @Req() req: Request,
   ) {
     const failed: Array<{ id: string; error: string }> = []
     let rejected = 0
@@ -249,8 +265,8 @@ export class AdminFinanceController {
       try {
         await this.rejectOne(id, body.reason, admin, req)
         rejected++
-      } catch (e: any) {
-        failed.push({ id, error: e.code ?? e.message })
+      } catch (e) {
+        failed.push({ id, error: e instanceof AppError ? e.code : e instanceof Error ? e.message : String(e) })
       }
     }
     await this.audit.log({
@@ -275,8 +291,8 @@ export class AdminFinanceController {
   async adminCredit(
     @Param('user_id') userId: string,
     @Body() b: { amount: string; currency: string; reason: string },
-    @CurrentUser() admin: any,
-    @Req() req: any,
+    @CurrentUser() admin: AdminActor,
+    @Req() req: Request,
   ) {
     if (admin.role !== 'superadmin') {
       throw new Error('FORBIDDEN')
@@ -308,8 +324,8 @@ export class AdminFinanceController {
   async adminDebit(
     @Param('user_id') userId: string,
     @Body() b: { amount: string; currency: string; reason: string },
-    @CurrentUser() admin: any,
-    @Req() req: any,
+    @CurrentUser() admin: AdminActor,
+    @Req() req: Request,
   ) {
     if (admin.role !== 'superadmin') {
       throw new Error('FORBIDDEN')

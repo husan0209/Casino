@@ -66,7 +66,21 @@ export class PrismaAdminUserRepository implements IAdminUserRepository {
 @Injectable()
 export class PrismaAuditLogRepository implements IAuditLogRepository {
   async log(input: AuditLogInput): Promise<void> {
-    await prisma.auditLog.create({ data: input })
+    // Явный маппинг вместо spread: AuditLogInput.ipAddress/userAgent могут быть undefined
+    // (express req.ip), а Prisma-тип при exactOptionalPropertyTypes не принимает явный
+    // undefined — опциональные поля включаем в data только когда они заданы.
+    await prisma.auditLog.create({
+      data: {
+        actorType: input.actorType,
+        actorId: input.actorId,
+        action: input.action,
+        ...(input.targetType !== undefined && { targetType: input.targetType }),
+        ...(input.targetId !== undefined && { targetId: input.targetId }),
+        ...(input.payload !== undefined && { payload: input.payload }),
+        ...(input.ipAddress !== undefined && { ipAddress: input.ipAddress }),
+        ...(input.userAgent !== undefined && { userAgent: input.userAgent }),
+      },
+    })
   }
 }
 

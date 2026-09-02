@@ -1,8 +1,9 @@
 import { Body, Controller, Get, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
-
+import { type Request } from 'express'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+import { type AdminActor } from '@/common/types/req-user'
 
 import { prisma, type SystemSettingType } from '@casino/database'
 
@@ -23,9 +24,9 @@ export class AdminSettingsController {
   @Post()
   @UsePipes(new ZodValidationPipe(UpsertSettingSchema))
   async updateSetting(
-    @Body() body: { key: string; value: string; type: any },
-    @CurrentUser() admin: any,
-    @Req() req: any,
+    @Body() body: { key: string; value: string; type: string },
+    @CurrentUser() admin: AdminActor,
+    @Req() req: Request,
   ) {
     const setting = await prisma.systemSetting.upsert({
       where: { key: body.key },
@@ -33,7 +34,7 @@ export class AdminSettingsController {
       create: {
         key: body.key,
         value: body.value,
-        type: body.type || 'string',
+        type: (body.type || 'string') as SystemSettingType,
         updatedBy: admin.id,
       },
     })
@@ -61,8 +62,8 @@ export class AdminSettingsController {
   @UsePipes(new ZodValidationPipe(EmailTemplateSchema))
   async updateEmailTemplate(
     @Body() body: { name: string; subject: string; htmlBody: string },
-    @CurrentUser() admin: any,
-    @Req() req: any,
+    @CurrentUser() admin: AdminActor,
+    @Req() req: Request,
   ) {
     const templateKey = `email_template_${body.name}`
     const templateValue = JSON.stringify({ subject: body.subject, htmlBody: body.htmlBody })
