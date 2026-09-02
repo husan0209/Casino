@@ -24,6 +24,7 @@ import {
 import { MaintenanceWorker } from './infrastructure/maintenance.worker'
 import { MaintenanceScheduler } from '../../queues/infrastructure/maintenance.scheduler'
 import { EMAIL_QUEUE_PORT } from '../../queues/queue.types'
+import { QueuesModule } from '../../queues/queues.module'
 import { NOWPaymentsClient } from '../payments/infrastructure/clients/nowpayments.client'
 
 /**
@@ -41,7 +42,7 @@ import { NOWPaymentsClient } from '../payments/infrastructure/clients/nowpayment
  * напрямую PrismaReminderAuditRepo (audit_logs).
  */
 @Module({
-  imports: [ReferralsModule],
+  imports: [ReferralsModule, QueuesModule],
   providers: [
     MaintenanceScheduler,
     MaintenanceWorker,
