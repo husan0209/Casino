@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common'
 
 import type { DisplayCurrency, LegalCountry } from '@casino/shared-config'
 
+import { ExchangeRatesService } from '../application/exchange-rates.service'
 import {
   GetGeoConfigUseCase,
   type ResolveGeoInput,
@@ -16,7 +17,10 @@ import {
 
 @Injectable()
 export class GeoFacade {
-  constructor(private getGeoConfig: GetGeoConfigUseCase) {}
+  constructor(
+    private getGeoConfig: GetGeoConfigUseCase,
+    private rates: ExchangeRatesService,
+  ) {}
 
   resolveConfig(input: ResolveGeoInput) {
     return this.getGeoConfig.execute(input)
@@ -30,8 +34,10 @@ export class GeoFacade {
     return getCurrencyLimits(currency)
   }
 
-  convertRubToDisplay(amountRub: string, currency: DisplayCurrency) {
-    return convertRubToDisplayAmount(amountRub, currency)
+  /** GAP-34: крипто-курс из БД/кеша (fallback — константы); фиат — политические константы */
+  async convertRubToDisplay(amountRub: string, currency: DisplayCurrency) {
+    const { rate } = await this.rates.getRubRate(currency)
+    return convertRubToDisplayAmount(amountRub, currency, rate)
   }
 
   toRubEquivalent(amount: string, currency: DisplayCurrency) {
