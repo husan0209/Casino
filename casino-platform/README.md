@@ -31,8 +31,8 @@ Seed admin: superadmin@casino.example.com / dev_superadmin_password_123
 > ⚠️ **К запуску не готово.** Аудит 2026-09-01 выявил 8 расхождений (GAP-31…GAP-38);
 > закрыты: GAP-31 (миграции), GAP-32/33 (реферальные выплаты + scheduled jobs),
 > GAP-34/35 (курсы из БД + честный readiness), GAP-36/37/38 (KYC-лимит во фронте,
-> деплой-доки + resource-check, seed fail-closed) — все 2026-09-02. Ключевой остаток:
-> runtime-проверки с боевыми ключами и GAP-30 (eslint 60).
+> деплой-доки + resource-check, seed fail-closed), GAP-30 (eslint 60) — все 2026-09-02.
+> Ключевой остаток: runtime-проверки с боевыми ключами (OAuth, провайдеры, NOWPayments, VPS).
 > Инженерные гейты при этом зелёные: 4 обязательных чека CI + 2 guard'а, docker-образ собирается,
 > 62 unit + 9 E2E проходят.
 - [x] Часть 1 Foundation – ~85% – monorepo, Prisma schema (19 таблиц), shared packages, Docker, Nginx — готово

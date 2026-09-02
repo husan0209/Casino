@@ -73,7 +73,7 @@ module.exports = {
     'complexity': ['error', 10],
     // Лимит перекалиброван 60→90 под prettier-нормализацию (printWidth 100 растягивает строки).
     // Вернуть к 60 после разбора 14 методов — GAP-30 (вместе с тестами GAP-21/24).
-    'max-lines-per-function': ['error', { max: 90, skipBlankLines: true, skipComments: true }],
+    'max-lines-per-function': ['error', { max: 60, skipBlankLines: true, skipComments: true }],
 
     // ─── Money (docs/CONVENTIONS.md §5, AI_DEVELOPMENT_RULES §1) ─
     // Money is MoneyAmount (string) + decimal.js. Never number/float.

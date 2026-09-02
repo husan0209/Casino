@@ -191,59 +191,65 @@ export class GameCallbackService {
     // win would pay the win amount a second time.
     const isBet = originalTx.type === 'bet'
     // P0 #3: атомарно — компенсирующая проводка + rollback-запись + раунд.
-    return this.wallet.runInTransaction(async (tx) => {
-      // гонка двух одновременных rollback — перепроверка внутри транзакции
-      const alreadyInTx = await this.play.findRollbackOf(originalTx.roundId, originalTx.id, tx)
-      if (alreadyInTx) {
-        return { balance: await this.getWalletBalance(session.userId, session.currency), duplicate: true }
-      }
-      const res = isBet
-        ? await this.wallet.credit({
-            userId: session.userId,
-            currency: session.currency as Currency,
-            amount: rollbackAmount,
-            type: 'ROLLBACK',
-            idempotencyKey: `rollback_${providerId}_${cb.transactionId || originalTx.id}`,
-            description: 'Отмена ставки',
-            metadata: { rollback_of: originalTx.id },
-            tx,
-          })
-        : await this.wallet.debit({
-            userId: session.userId,
-            currency: session.currency as Currency,
-            amount: rollbackAmount,
-            type: 'ROLLBACK',
-            idempotencyKey: `rollback_${providerId}_${cb.transactionId || originalTx.id}`,
-            description: 'Отмена выигрыша',
-            metadata: { rollback_of: originalTx.id },
-            tx,
-          })
-      await this.play.createTransaction(
-        {
-          roundId: originalTx.roundId,
-          sessionId: session.id,
-          userId: session.userId,
-          providerId,
-          type: 'rollback',
-          externalTransactionId: cb.transactionId || `rb_${originalTx.externalTransactionId}`,
-          amount: rollbackAmount,
-          currency: session.currency,
-          balanceAfter: res.balanceAfter,
-          ledgerEntryId: res.ledgerEntryId,
-          metadata: { ...(cb.rawRequest ?? {}), rollback_of: originalTx.id },
-        },
-        tx,
-      )
-      await this.play.updateRound(
-        originalTx.roundId,
-        {
-          totalBet: { decrement: rollbackAmount },
-          status: 'rolled_back',
-        },
-        tx,
-      )
-      return { balance: res.balanceAfter }
-    })
+    return this.wallet.runInTransaction((tx) =>
+      this.applyRollback({ cb, providerId, session, originalTx, rollbackAmount, isBet, tx }),
+    )
+  }
+
+  /** Компенсирующая проводка + rollback-запись + раунд внутри tx (вынос из rollback, GAP-30). */
+  private async applyRollback(args: {
+    cb: ParsedProviderCallback
+    providerId: string
+    session: { id: string; userId: string; currency: string }
+    originalTx: { id: string; roundId: string; externalTransactionId: string }
+    rollbackAmount: string
+    isBet: boolean
+    /* Тип tx выводим из фасада — прямой импорт prisma в application запрещён (G1) */
+    tx: Parameters<Parameters<WalletFacade['runInTransaction']>[0]>[0]
+  }) {
+    const { cb, providerId, session, originalTx, rollbackAmount, isBet, tx } = args
+    // гонка двух одновременных rollback — перепроверка внутри транзакции
+    const alreadyInTx = await this.play.findRollbackOf(originalTx.roundId, originalTx.id, tx)
+    if (alreadyInTx) {
+      return { balance: await this.getWalletBalance(session.userId, session.currency), duplicate: true }
+    }
+    const entry = {
+      userId: session.userId,
+      currency: session.currency as Currency,
+      amount: rollbackAmount,
+      type: 'ROLLBACK' as const,
+      idempotencyKey: `rollback_${providerId}_${cb.transactionId || originalTx.id}`,
+      metadata: { rollback_of: originalTx.id },
+      tx,
+    }
+    const res = isBet
+      ? await this.wallet.credit({ ...entry, description: 'Отмена ставки' })
+      : await this.wallet.debit({ ...entry, description: 'Отмена выигрыша' })
+    await this.play.createTransaction(
+      {
+        roundId: originalTx.roundId,
+        sessionId: session.id,
+        userId: session.userId,
+        providerId,
+        type: 'rollback',
+        externalTransactionId: cb.transactionId || `rb_${originalTx.externalTransactionId}`,
+        amount: rollbackAmount,
+        currency: session.currency,
+        balanceAfter: res.balanceAfter,
+        ledgerEntryId: res.ledgerEntryId,
+        metadata: { ...(cb.rawRequest ?? {}), rollback_of: originalTx.id },
+      },
+      tx,
+    )
+    await this.play.updateRound(
+      originalTx.roundId,
+      {
+        totalBet: { decrement: rollbackAmount },
+        status: 'rolled_back',
+      },
+      tx,
+    )
+    return { balance: res.balanceAfter }
   }
 
   /** Активная сессия с игрой — общий вход bet/win. */

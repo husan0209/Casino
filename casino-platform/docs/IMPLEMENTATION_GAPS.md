@@ -63,7 +63,7 @@
 | GAP-27 | NEW | ~~argon2 без явных параметров~~ | `password-hasher.service.ts:7` | ✅ P1 закрыт 2026-08-30: `PasswordHasher.hash` → `argon2.hash(plain, {type: argon2id, memoryCost: 65536, timeCost: 3, parallelism: 4})` (совпадает с SECURITY_BASELINE §2.1 и admin-хэшером `admin-users.service.ts:28`) |
 | GAP-28 | H4 | ~~Идемпотентность депозита: `deposit_${pr.id}` — добавить защиту и по `external_id`~~ | `process-rukassa-webhook.use-case.ts`, `process-nowpayments-webhook.use-case.ts` | ✅ P3 закрыт 2026-09-01: ключ проводки депозита — **`deposit_${provider}_${externalId}`** (был `deposit_${pr.id}`, который защищал только уникальность НАШЕЙ платёжки). Повторный коллбэк по тому же внешнему платежу, смэпившийся на другую платёжку (рассинхрон маппинга), больше не зачислит дважды — уникальный индекс `ledger.idempotencyKey` отсекает на уровне БД. Первый уровень защиты сохранён: `pr.status === 'completed'` → `duplicate` до wallet.credit. Регресс-тесты `test/deposit-idempotency.spec.ts` (4): NP/Rukassa — ключ от external_id, повторная доставка той же платёжки — без credit, отсутствие external_id — без зачисления |
 | GAP-29 | NEW (docs-guard D3) | ~~env.validation.ts валидирует не все ключи `.env.example`~~ | `packages/shared-config/src/env.validation.ts` | ✅ Закрыт 2026-08-30: все 39 ключей §22 в Zod-схеме (coerce/url/enum, все optional — поведение кода не меняется); D3 молчит |
-| GAP-30 | NEW (PR-0) | 14 методов 61–88 строк (prettier-инфляция после `--fix`): `game-callback.service` bet/win/rollback, `dashboard.service` metrics/events, `wallet.ledger.prisma` runCreditDebit/lock/unlock/confirmWithdrawal, `list-games.use-case` execute, webhook execute ×2, `provider-callback.controller` handle — разбить на приватные методы, вернуть лимит 60. Делать вместе с тестами (GAP-21/24) | перечисленные файлы | P3 |
+| ~~GAP-30~~ | NEW (PR-0) | 14 методов 61–88 строк (prettier-инфляция после `--fix`): `game-callback.service` bet/win/rollback, `dashboard.service` metrics/events, `wallet.ledger.prisma` runCreditDebit/lock/unlock/confirmWithdrawal, `list-games.use-case` execute, webhook execute ×2, `provider-callback.controller` handle — разбить на приватные методы, вернуть лимит 60. Делать вместе с тестами (GAP-21/24) | перечисленные файлы | P3 | — ✅ закрыт 2026-09-02: max-lines-per-function 90→60 (попутно max-params-фикс в applyRollback — entry-объект вместо 7 параметров); рефакторинг wallet.ledger.prisma.ts (общие existingDuplicate/withRetry/findWalletOrThrow/ledgerEntry, методы lock/unlock/confirmWithdrawal ≤60) и game-callback.service.ts (applyRollback вынесен из rollback). Все гейты зелёные
 
 ## 🔎 АУДИТ ГОТОВНОСТИ К ЗАПУСКУ — 2026-09-01 (GAP-31…GAP-38)
 
@@ -156,7 +156,8 @@
    **затем P2/P3** — ~~GAP-38~~ (закрыт 2026-09-02: seed-guard fail-closed + DEPLOY.md),
    ~~GAP-37~~ (закрыт 2026-09-02: DEPLOY.md фактический + resource-check.sh),
    ~~GAP-36~~ (закрыт 2026-09-02: KYC-лимит из API на странице KYC и в DepositSheet,
-   CTA на верификацию при исчерпании); остаток: GAP-30 (eslint 60).
+   CTA на верификацию при исчерпании), ~~GAP-30~~ (закрыт 2026-09-02: eslint
+   max-lines 60 + рефакторинг ledger/callback). **Все гэпы аудита 2026-09-01 закрыты.**
 9. **CI-инфраструктура приведена в порядок 2026-09-01** (PR #20/#21/#23/#24): docker-build
    получил правильный контекст (`casino-platform`, а не корень репо) и `@types/node`/`.npmrc`
    в образе; commitlint на push в main проверяет только свежий squash-коммит; `.gitleaks.toml`
