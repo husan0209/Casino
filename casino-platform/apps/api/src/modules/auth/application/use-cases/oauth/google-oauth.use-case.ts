@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { errorMessage } from '@/common/utils/error-message'
 
 import {
   OAuthNotConfiguredError,
@@ -130,8 +131,8 @@ export class GoogleOAuthUseCase {
         throw new Error('email not available/verified')
       }
       email = ui.email
-    } catch (e: any) {
-      throw new OAuthExchangeError(e?.message)
+    } catch (e) {
+      throw new OAuthExchangeError(errorMessage(e))
     }
 
     return this.provisioning.signIn({

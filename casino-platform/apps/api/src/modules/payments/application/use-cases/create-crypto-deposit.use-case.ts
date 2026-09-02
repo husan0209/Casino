@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto'
 
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { errorMessage } from '@/common/utils/error-message'
 
 import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
 
@@ -68,8 +69,8 @@ export class CreateCryptoDepositUseCase {
         pay_currency: npRes.payCurrency,
         expires_at: npRes.expirationEstimateDate,
       }
-    } catch (e: any) {
-      throw new PaymentProviderError('NOWPayments error', { cause: e.message })
+    } catch (e) {
+      throw new PaymentProviderError('NOWPayments error', { cause: errorMessage(e) })
     }
   }
 }

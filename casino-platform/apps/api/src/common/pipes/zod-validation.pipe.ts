@@ -1,4 +1,5 @@
 import { type ArgumentMetadata, type PipeTransform, BadRequestException } from '@nestjs/common'
+import { errorMessage } from '@/common/utils/error-message'
 import { type ZodSchema } from 'zod'
 
 export class ZodValidationPipe implements PipeTransform {
@@ -12,8 +13,8 @@ export class ZodValidationPipe implements PipeTransform {
     }
     try {
       return this.schema.parse(value)
-    } catch (e: any) {
-      throw new BadRequestException({ code: 'VALIDATION_ERROR', message: e.message })
+    } catch (e) {
+      throw new BadRequestException({ code: 'VALIDATION_ERROR', message: errorMessage(e) })
     }
   }
 }

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { errorMessage } from '@/common/utils/error-message'
 
 
 import { UsersFacade } from '@modules/users/facade/users.facade'
@@ -58,9 +59,9 @@ export class ProcessNOWPaymentsWebhookUseCase {
       await this.applyPaymentStatus(pr, paymentStatus, body)
       await this.repo.markCallbackProcessed(cb.id, 'ok')
       return { ok: true }
-    } catch (e: any) {
-      this.logger.error('NOWPayments IPN err ' + e.message)
-      await this.repo.markCallbackProcessed(cb.id, 'error: ' + e.message)
+    } catch (e) {
+      this.logger.error('NOWPayments IPN err ' + errorMessage(e))
+      await this.repo.markCallbackProcessed(cb.id, 'error: ' + errorMessage(e))
       return { ok: true }
     }
   }

@@ -1,5 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 
+import { errorMessage } from '@/common/utils/error-message'
+
 import { DISPLAY_RUB_RATES } from '@casino/shared-config'
 
 import {
@@ -59,8 +61,8 @@ export class UpdateRatesJob {
         })
         cached[currency] = rate.rate
         updated++
-      } catch (e: any) {
-        this.logger.error(`update-rates: ${currency} save failed: ${e.message}`)
+      } catch (e) {
+        this.logger.error(`update-rates: ${currency} save failed: ${errorMessage(e)}`)
         skipped++
       }
     }

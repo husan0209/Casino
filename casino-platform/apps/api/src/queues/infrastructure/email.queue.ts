@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Queue } from 'bullmq'
 import Redis from 'ioredis'
+import { errorMessage } from '@/common/utils/error-message'
 
 import { type EmailJobData, type EmailQueuePort, type EnqueueResult, QUEUES } from '../queue.types'
 
@@ -35,9 +36,9 @@ export class BullMqEmailQueue implements EmailQueuePort {
       await this.queue.add('send', job)
       this.logger.log(`Email enqueued: to=${job.to} subject="${job.subject}"`)
       return 'queued'
-    } catch (e: any) {
+    } catch (e) {
       // Письмо — side-effect: не блокируем бизнес-операцию, но фиксируем потерю
-      this.logger.error(`Email enqueue FAILED (письмо утеряно): ${e?.message}`)
+      this.logger.error(`Email enqueue FAILED (письмо утеряно): ${errorMessage(e)}`)
       return 'logged'
     }
   }
