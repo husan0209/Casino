@@ -32,7 +32,12 @@ Seed admin: superadmin@casino.example.com / dev_superadmin_password_123
 > закрыты: GAP-31 (миграции), GAP-32/33 (реферальные выплаты + scheduled jobs),
 > GAP-34/35 (курсы из БД + честный readiness), GAP-36/37/38 (KYC-лимит во фронте,
 > деплой-доки + resource-check, seed fail-closed), GAP-30 (eslint 60) — все 2026-09-02.
-> Ключевой остаток: runtime-проверки с боевыми ключами (OAuth, провайдеры, NOWPayments, VPS).
+>
+> **Аудит готовности #2 (2026-09-02): код MVP готов (~85%), приёмка — 0%.**
+> Заведены GAP-39…GAP-50. Блокеры запуска: **GAP-46** (runtime-приёмка внешнего
+> контура и первый деплой — нужны ключи и VPS), **GAP-40** (SMTP-пароль: мейлер
+> читает `SMTP_PASS`, дока предписывает `SMTP_PASSWORD` → в проде не уходят письма),
+> **GAP-49** (юридика/комплаенс — решение владельца). Подробно — `docs/IMPLEMENTATION_GAPS.md`.
 > Инженерные гейты при этом зелёные: 4 обязательных чека CI + 2 guard'а, docker-образ собирается,
 > 62 unit + 9 E2E проходят.
 - [x] Часть 1 Foundation – ~85% – monorepo, Prisma schema (19 таблиц), shared packages, Docker, Nginx — готово
