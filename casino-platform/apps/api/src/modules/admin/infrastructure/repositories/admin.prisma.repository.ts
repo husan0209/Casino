@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import { prisma, type Prisma } from '@casino/database'
 
 
 import {
@@ -76,7 +76,7 @@ export class PrismaAuditLogRepository implements IAuditLogRepository {
         action: input.action,
         ...(input.targetType !== undefined && { targetType: input.targetType }),
         ...(input.targetId !== undefined && { targetId: input.targetId }),
-        ...(input.payload !== undefined && { payload: input.payload }),
+        ...(input.payload !== undefined && { payload: input.payload as Prisma.InputJsonValue }),
         ...(input.ipAddress !== undefined && { ipAddress: input.ipAddress }),
         ...(input.userAgent !== undefined && { userAgent: input.userAgent }),
       },

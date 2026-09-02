@@ -4,7 +4,7 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 
-import { prisma, type Prisma } from '@casino/database'
+import { prisma, type LedgerEntryType, type Prisma } from '@casino/database'
 import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
@@ -45,7 +45,7 @@ export class WalletController {
       where.walletAccount = { currency: queryParams.currency }
     }
     if (queryParams.type) {
-      where.type = queryParams.type as Prisma.EnumLedgerEntryTypeFilter['equals']
+      where.type = queryParams.type as LedgerEntryType
     }
 
     const [items, total] = await Promise.all([

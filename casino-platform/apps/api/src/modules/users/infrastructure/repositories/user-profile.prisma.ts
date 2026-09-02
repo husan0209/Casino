@@ -81,7 +81,7 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
       where: { userId },
       // exactOptionalPropertyTypes: включаем только заданные поля
       update: this.profileUpdateData(data),
-      create: { userId, ...this.profileCreateData(data) },
+      create: this.profileCreateData(data, userId),
     })
   }
 
@@ -95,8 +95,9 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
     }
   }
 
-  private profileCreateData(data: ProfileUpdateFields): Prisma.UserProfileUncheckedCreateInput {
+  private profileCreateData(data: ProfileUpdateFields, userId: string): Prisma.UserProfileUncheckedCreateInput {
     return {
+      userId,
       firstName: data.firstName ?? null,
       lastName: data.lastName ?? null,
       dateOfBirth: data.dateOfBirth ?? null,

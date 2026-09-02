@@ -15,8 +15,15 @@ export interface TicketRow {
   createdAt: Date
   updatedAt: Date
 }
-/** Строка списка тикетов (Prisma select + счётчик сообщений). */
-export interface TicketListItem extends TicketRow {
+/** Строка списка тикетов (Prisma select — без user-полей) + счётчик сообщений. */
+export interface TicketListItem {
+  id: string
+  subject: string
+  category: TicketCategory
+  status: TicketStatus
+  priority: TicketPriority
+  createdAt: Date
+  updatedAt: Date
   _count: { messages: number }
 }
 /** Строка сообщения тикета (Prisma SupportMessage). */
@@ -27,9 +34,11 @@ export interface MessageRow {
   senderId: string | null
   message: string
   isInternal: boolean
-  attachments: unknown[]
+  attachments: PrismaJson
   createdAt: Date
 }
+/** Prisma JsonValue-совместимый тип для JSON-полей. */
+export type PrismaJson = string | number | boolean | null | PrismaJson[] | { [key: string]: PrismaJson }
 /** Вложение к сообщению тикета (ссылка на сохранённый файл). */
 export interface TicketAttachment {
   url: string
