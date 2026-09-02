@@ -10,8 +10,6 @@ interface SmtpTransport {
   sendMail(options: Record<string, unknown>): Promise<unknown>
 }
 
-import { ConfigService } from '@nestjs/config'
-
 export class EmailNotConfiguredError extends AppError {
   readonly code = 'EMAIL_NOT_CONFIGURED'
   readonly httpStatus = 500
