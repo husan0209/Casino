@@ -1,4 +1,14 @@
-export const QUEUES = { EMAIL: 'email' } as const
+export const QUEUES = { EMAIL: 'email', MAINTENANCE: 'maintenance' } as const
+
+/** Имена repeatable-job'ов maintenance-очереди (GAP-33, ТЗ ч.3 §13). */
+export const MAINTENANCE_JOBS = [
+  'expire-deposits',
+  'update-rates',
+  'withdrawal-reminder',
+  'referral-daily',
+] as const
+
+export type MaintenanceJobName = (typeof MAINTENANCE_JOBS)[number]
 
 export interface EmailJobData {
   to: string

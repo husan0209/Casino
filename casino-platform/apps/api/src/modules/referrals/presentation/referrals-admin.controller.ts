@@ -1,14 +1,61 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common'
+import { Body, Controller, Get, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
+import { z } from 'zod'
+
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
 import { prisma } from '@casino/database'
 
+
+import { AuditLogService } from '../../admin/application/audit-log.service'
 import { AuthGuard } from '../../auth/presentation/guards/auth.guard'
 import { RolesGuard, Roles } from '../../auth/presentation/guards/roles.guard'
+import { ReferralCalcService } from '../application/referral-calc.service'
+
+// GAP-21: ручной триггер начислений — date опционален (YYYY-MM-DD)
+export const RunDailySchema = z
+  .object({
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD')
+      .optional(),
+  })
+  .strict()
+export type RunDailyDto = z.infer<typeof RunDailySchema>
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
 @Controller('admin/referrals')
 export class ReferralsAdminController {
+  constructor(
+    private readonly referralCalc: ReferralCalcService,
+    private readonly audit: AuditLogService,
+  ) {}
+
+  /**
+   * GAP-32: ручной запуск реферальных начислений (GGR-share) — только superadmin.
+   * Идемпотентен: повторный запуск за тот же день не создаёт вторых проводок
+   * (дедуп findReward + idempotencyKey внутри runDaily). Cron-триггер — job
+   * `referral-daily` maintenance-очереди (GAP-33).
+   */
+  @Post('run-daily')
+  @Roles('superadmin')
+  @UsePipes(new ZodValidationPipe(RunDailySchema))
+  async runDaily(
+    @Body() dto: RunDailyDto,
+    @CurrentUser() admin: { id: string; email?: string },
+  ) {
+    const result = await this.referralCalc.runDaily(dto.date)
+    await this.audit.log({
+      actorType: 'user',
+      actorId: admin.id,
+      action: 'referrals.run_daily',
+      targetType: 'referral_reward',
+      payload: { date: result.date.toISOString().slice(0, 10), processed: result.processed, credited: result.credited },
+    })
+    return { ok: true, ...result, date: result.date.toISOString().slice(0, 10) }
+  }
+
   @Get('stats')
   async stats() {
     const totalReferrals = await prisma.user.count({ where: { referredBy: { not: null } } })

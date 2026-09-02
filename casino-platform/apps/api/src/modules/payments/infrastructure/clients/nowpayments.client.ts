@@ -3,7 +3,10 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import { DISPLAY_RUB_RATES } from '@casino/shared-config'
+
 import { PaymentProviderNotConfiguredError } from './rukassa.client'
+
 
 const MAP: Record<string, string> = {
   USDT_TRC20: 'usdttrc20',
@@ -145,6 +148,50 @@ export class NOWPaymentsClient {
       paymentStatus: String(d.payment_status ?? 'unknown'),
       actuallyPaid: String(d.actually_paid ?? '0'),
       outcomeAmount: String(d.outcome_amount ?? '0'),
+    }
+  }
+
+  /**
+   * GET /estimate — курс для maintenance-задачи update-rates (GAP-33/34).
+   * Возвращает null, если API недоступен/курс некорректен — вызывающий
+   * падает на fallback (константы DISPLAY_RUB_RATES), задача не роняется.
+   */
+  async estimate(params: {
+    amount: string
+    currencyFrom: string
+    currencyTo: string
+  }): Promise<{ estimatedAmount: string; source: string } | null> {
+    if (!this.isProd() && !this.config.get<string>('NOWPAYMENTS_API_KEY')) {
+      // Dev-stub: детерминированный «курс» из констант, чтобы задача была проходима без ключей
+      const stub = DISPLAY_RUB_RATES[params.currencyFrom as keyof typeof DISPLAY_RUB_RATES]
+      if (!stub) {
+        return null
+      }
+      return { estimatedAmount: stub, source: 'np-dev-stub' }
+    }
+    try {
+      const apiKey = this.assertApiKey()
+      const qs = new URLSearchParams({
+        amount: params.amount,
+        currency_from: this.mapCurrency(params.currencyFrom),
+        currency_to: this.mapCurrency(params.currencyTo),
+      })
+      const res = await fetch(`${this.base()}/estimate?${qs}`, {
+        headers: { 'x-api-key': apiKey },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      })
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
+      }
+      const d = (await res.json()) as Record<string, any>
+      const v = Number(d.estimated_amount)
+      if (!Number.isFinite(v) || v <= 0) {
+        throw new Error(`bad estimate shape: ${JSON.stringify(d).slice(0, 120)}`)
+      }
+      return { estimatedAmount: String(v), source: 'nowpayments' }
+    } catch (e: any) {
+      this.logger.error(`NOWPayments estimate failed: ${e?.message}`)
+      return null
     }
   }
 

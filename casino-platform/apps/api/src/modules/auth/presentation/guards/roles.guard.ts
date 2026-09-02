@@ -12,7 +12,13 @@ export const Roles = (...roles: string[]) => SetMetadata('roles', roles)
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
   canActivate(ctx: ExecutionContext): boolean {
-    const roles = this.reflector.get<string[]>('roles', ctx.getHandler())
+    // getAllAndOverride по [handler, class]: class-level @Roles применялся ранее
+    // только через get(handler) и ИГНОРИРОВАЛСЯ — любой авторизованный user
+    // проходил на admin-эндпоинты (найдено при GAP-32, фикс + test/roles-guard.spec.ts)
+    const roles = this.reflector.getAllAndOverride<string[]>('roles', [
+      ctx.getHandler(),
+      ctx.getClass(),
+    ])
     if (!roles) {
       return true
     }

@@ -81,6 +81,10 @@ export function validateEnv() {
 | `LOCKOUT_MAX_ATTEMPTS` | int | ❌ | `10` | Неудачных входов за окно до блокировки аккаунта (GAP-18) |
 | `LOCKOUT_WINDOW_MS` | int | ❌ | `900000` | Скользящее окно подсчёта неудач, мс (15 мин) |
 | `LOCKOUT_DURATION_MS` | int | ❌ | `1800000` | Длительность блокировки аккаунта, мс (30 мин) |
+| `JOB_EXPIRE_DEPOSITS_EVERY_MS` | int | ❌ | `300000` | Интервал задачи истечения pending-депозитов, мс (GAP-33) |
+| `JOB_UPDATE_RATES_EVERY_MS` | int | ❌ | `300000` | Интервал задачи обновления курсов, мс (GAP-33) |
+| `JOB_WITHDRAWAL_REMINDER_EVERY_MS` | int | ❌ | `3600000` | Интервал напоминания о зависших выводах, мс (GAP-33) |
+| `JOB_REFERRAL_DAILY_EVERY_MS` | int | ❌ | `86400000` | Интервал ежедневных реферальных начислений, мс (GAP-32/33) |
 | `DOMAIN` | string | ✅ | — | `casino.example.com` (без доменной зоны) |
 
 ---
@@ -338,6 +342,12 @@ THROTTLE_AUTH_LIMIT=10
 LOCKOUT_MAX_ATTEMPTS=10
 LOCKOUT_WINDOW_MS=900000
 LOCKOUT_DURATION_MS=1800000
+
+# ── Scheduled jobs (GAP-33) ───────────────────────────────
+JOB_EXPIRE_DEPOSITS_EVERY_MS=300000
+JOB_UPDATE_RATES_EVERY_MS=300000
+JOB_WITHDRAWAL_REMINDER_EVERY_MS=3600000
+JOB_REFERRAL_DAILY_EVERY_MS=86400000
 
 # ── Database ───────────────────────────────────────────────
 DATABASE_URL=postgresql://casino:casino_dev_password@localhost:5432/casino_dev

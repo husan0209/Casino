@@ -16,6 +16,7 @@ import { CasinoModule } from './modules/casino/casino.module'
 import { GeoModule } from './modules/geo/geo.module'
 import { HealthModule } from './modules/health/health.module'
 import { KycModule } from './modules/kyc/kyc.module'
+import { MaintenanceModule } from './modules/maintenance/maintenance.module'
 import { NotificationsModule } from './modules/notifications/notifications.module'
 import { PaymentsModule } from './modules/payments/payments.module'
 import { ReferralsModule } from './modules/referrals/referrals.module'
@@ -52,6 +53,7 @@ import { QueuesModule } from './queues/queues.module'
     SupportModule,
     ReferralsModule,
     NotificationsModule,
+    MaintenanceModule,
     QueuesModule,
   ],
   providers: [
