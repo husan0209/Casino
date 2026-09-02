@@ -1,6 +1,6 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common'
 
-import { prisma, type Prisma } from '@casino/database'
+import { prisma, type ActorType, type Prisma } from '@casino/database'
 
 import { AdminAuthGuard } from '../admin-auth.guard'
 
@@ -13,7 +13,7 @@ export class AdminAuditController {
       perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
     const where: Prisma.AuditLogWhereInput = {}
     if (q.actor_type) {
-      where.actorType = q.actor_type as Prisma.EnumActorTypeFilter['equals']
+      where.actorType = q.actor_type as ActorType
     }
     if (q.actor_id) {
       where.actorId = q.actor_id

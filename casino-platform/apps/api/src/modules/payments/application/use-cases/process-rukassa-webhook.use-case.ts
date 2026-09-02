@@ -45,7 +45,7 @@ export class ProcessRukassaWebhookUseCase {
     // re-verify or investigate a dispute, we have the original payload.
     const cb = await this.repo.saveCallback({
       provider: 'rukassa',
-      externalId: body?.order_id || body?.payment_id,
+      externalId: String(body['order_id'] ?? body['payment_id'] ?? ''),
       rawHeaders,
       rawBody,
       ipAddress: ip,

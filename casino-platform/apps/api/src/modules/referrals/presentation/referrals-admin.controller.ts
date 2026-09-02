@@ -99,8 +99,8 @@ export class ReferralsAdminController {
   }
   @Get()
   async list(@Query() q: Record<string, string | undefined>) {
-    const page = parseInt(q.page) || 1,
-      perPage = parseInt(q.per_page) || 20
+    const page = parseInt(q.page ?? '') || 1,
+      perPage = parseInt(q.per_page ?? '') || 20
     const where: Prisma.ReferralRewardWhereInput = {}
     if (q.referrer_id) {
       where.referrerId = q.referrer_id

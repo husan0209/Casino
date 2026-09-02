@@ -4,6 +4,7 @@ import { type Request } from 'express'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+import { type UserActor } from '@/common/types/req-user'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 
@@ -90,7 +91,7 @@ export class CasinoController {
   ) {
     const isMobile = /mobile/i.test(req.headers['user-agent'] || '')
     return this.launchGameUseCase.execute({
-      userId: req.user.id,
+      userId: (req.user as UserActor).id,
       gameSlug: slug,
       currency: dto.currency || 'RUB',
       returnUrl: dto.return_url || 'http://localhost:3000',

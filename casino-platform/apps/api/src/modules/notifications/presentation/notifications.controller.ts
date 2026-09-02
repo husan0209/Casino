@@ -13,7 +13,7 @@ export class NotificationsController {
   @Get()
   async list(@CurrentUser() u: UserActor, @Query() q: Record<string, string | undefined>) {
     const page = parseInt(q.page ?? '') || 1,
-      perPage = parseInt(q.per_page) || 20
+      perPage = parseInt(q.per_page ?? '') || 20
     const isRead = q.is_read === undefined ? undefined : q.is_read === 'true'
     const r = await this.svc.list({ userId: u.id, page, perPage, ...(isRead !== undefined ? { isRead } : {}) })
     return { data: r.items, meta: { page, perPage, total: r.total, unread: r.unreadCount } }

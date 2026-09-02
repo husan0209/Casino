@@ -2,8 +2,9 @@ import { Body, Controller, Get, Param, Post, Query, Req, UseGuards, UsePipes } f
 import { type Request } from 'express'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+import { type AdminActor } from '@/common/types/req-user'
 
-import { prisma, type Prisma } from '@casino/database'
+import { prisma, type Prisma, type UserStatus } from '@casino/database'
 
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
@@ -23,7 +24,7 @@ export class AdminUsersController {
 
     const where: Prisma.UserWhereInput = {}
     if (queryParams.status) {
-      where.status = queryParams.status as Prisma.EnumUserStatusFilter['equals']
+      where.status = queryParams.status as UserStatus
     }
     if (queryParams.search) {
       where.OR = [
@@ -88,7 +89,7 @@ export class AdminUsersController {
     })
     await this.auditLogService.log({
       actorType: 'admin',
-      actorId: req.user.id,
+      actorId: (req.user as AdminActor).id,
       action: 'admin.user.blocked',
       targetType: 'user',
       targetId: userId,
@@ -107,7 +108,7 @@ export class AdminUsersController {
     })
     await this.auditLogService.log({
       actorType: 'admin',
-      actorId: req.user.id,
+      actorId: (req.user as AdminActor).id,
       action: 'admin.user.unblocked',
       targetType: 'user',
       targetId: userId,

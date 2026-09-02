@@ -56,8 +56,8 @@ export class PrismaKycRepository implements IKycRepository {
       fileSize?: number
       mimeType?: string
     },
-  ) {
-    return prisma.kycDocument.create({
+  ): Promise<void> {
+    await prisma.kycDocument.create({
       data: {
         kycProfileId,
         documentType: doc.documentType as KycFileType,

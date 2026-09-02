@@ -17,10 +17,11 @@ export class PaymentRequestRepository {
     id: string,
     status: PaymentStatus,
     extra: {
-      completedAt?: Date
-      externalStatus?: string
-      errorMessage?: string
-      externalId?: string
+      completedAt?: Date | undefined
+      externalStatus?: string | undefined
+      errorMessage?: string | undefined
+      externalId?: string | undefined
+      paymentUrl?: string | undefined
     } = {},
   ) {
     // exactOptionalPropertyTypes: Prisma не принимает явный undefined —
@@ -34,6 +35,7 @@ export class PaymentRequestRepository {
         ...(extra.externalStatus !== undefined && { externalStatus: extra.externalStatus }),
         ...(extra.errorMessage !== undefined && { errorMessage: extra.errorMessage }),
         ...(extra.externalId !== undefined && { externalId: extra.externalId }),
+        ...(extra.paymentUrl !== undefined && { paymentUrl: extra.paymentUrl }),
       },
     })
   }

@@ -139,7 +139,7 @@ export class RukassaClient {
    * Подпись вебхука: HMAC-SHA256(secret, "shop_id:order_id:amount"), заголовок x-signature (или body.sign).
    * Fail-closed: в production без RUKASSA_SECRET_KEY — исключение (старт невозможен по env.validation).
    */
-  verifyCallback(headers: Record<string, string>, body: unknown): boolean {
+  verifyCallback(headers: Record<string, string>, rawBody: unknown): boolean {
     const secret = this.config.get<string>('RUKASSA_SECRET_KEY')
     if (!secret) {
       if (this.isProd()) {
@@ -157,8 +157,9 @@ export class RukassaClient {
     }
 
     const shopId = this.config.get('RUKASSA_SHOP_ID') || ''
-    const orderId = String(body?.order_id || body?.merchant_order_id || '')
-    const amount = String(body?.amount || '')
+    const payload = (rawBody ?? {}) as Record<string, unknown>
+    const orderId = String(payload['order_id'] || payload['merchant_order_id'] || '')
+    const amount = String(payload['amount'] || '')
     const payload = `${shopId}:${orderId}:${amount}`
     const expected = createHmac('sha256', secret).update(payload).digest('hex')
 
