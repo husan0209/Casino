@@ -51,6 +51,11 @@ export const envSchema = z.object({
   GITSLOTPARK_SECRET_KEY: z.string().optional(),
   GITSLOTPARK_API_BASE: z.string().url().optional(),
   NOWPAYMENTS_IPN_SECRET: z.string().optional(),
+  // GAP-33: scheduled jobs (BullMQ repeat) — интервалы в мс, не хардкод
+  JOB_EXPIRE_DEPOSITS_EVERY_MS: z.coerce.number().int().positive().optional(),
+  JOB_UPDATE_RATES_EVERY_MS: z.coerce.number().int().positive().optional(),
+  JOB_WITHDRAWAL_REMINDER_EVERY_MS: z.coerce.number().int().positive().optional(),
+  JOB_REFERRAL_DAILY_EVERY_MS: z.coerce.number().int().positive().optional(),
   DEMO_PROVIDER_ENABLED: z
     .enum(['true', 'false'])
     .default('false')
