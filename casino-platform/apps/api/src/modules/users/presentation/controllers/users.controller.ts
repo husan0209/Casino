@@ -21,6 +21,7 @@ import { memoryStorage } from 'multer'
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { extForMime, sniffDocumentMime } from '@/common/files/file-sniffer'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+import { type UserActor } from '@/common/types/req-user'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 
@@ -52,14 +53,14 @@ export class UsersController {
   ) {}
 
   @Get('me')
-  me(@CurrentUser() user: any) {
+  me(@CurrentUser() user: UserActor) {
     return this.getMe.execute(user.id)
   }
 
   @Patch('me/profile')
   @UsePipes(new ZodValidationPipe(UpdateProfileSchema))
   updateProfileCtl(
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserActor,
     @Body()
     body: {
       first_name?: string
@@ -75,7 +76,7 @@ export class UsersController {
   @Patch('me/settings')
   @UsePipes(new ZodValidationPipe(UpdateSettingsSchema))
   updateSettingsCtl(
-    @CurrentUser() user: any,
+    @CurrentUser() user: UserActor,
     @Body()
     body: {
       language?: string
@@ -90,7 +91,7 @@ export class UsersController {
 
   @Patch('me/currency')
   @UsePipes(new ZodValidationPipe(UpdateCurrencySchema))
-  setCurrency(@CurrentUser() user: any, @Body() body: { currency: string }) {
+  setCurrency(@CurrentUser() user: UserActor, @Body() body: { currency: string }) {
     return this.updateCurrency.execute(user.id, body.currency)
   }
 
@@ -103,7 +104,7 @@ export class UsersController {
       limits: { fileSize: 5 * 1024 * 1024 },
     }),
   )
-  async avatar(@CurrentUser() user: any, @UploadedFile() file: Express.Multer.File) {
+  async avatar(@CurrentUser() user: UserActor, @UploadedFile() file: Express.Multer.File) {
     // avatar url saving – simplified, reuse profile repo directly
     const { PrismaUserProfileRepository } =
       await import('../../infrastructure/repositories/user-profile.prisma')
@@ -129,7 +130,7 @@ export class UsersController {
    */
   @Post('me/self-exclude')
   @UsePipes(new ZodValidationPipe(SelfExcludeSchema))
-  selfExclude(@CurrentUser() user: any, @Body() body: { period_hours: number }) {
+  selfExclude(@CurrentUser() user: UserActor, @Body() body: { period_hours: number }) {
     const hours = typeof body.period_hours === 'number' ? body.period_hours : 24
     return this.selfExclusion.exclude(user.id, hours)
   }
@@ -138,17 +139,17 @@ export class UsersController {
    * UC-RG-02 — Lift self-exclusion (subject to 72h cooloff from when exclusion was set).
    */
   @Delete('me/self-exclude')
-  liftExclusion(@CurrentUser() user: any) {
+  liftExclusion(@CurrentUser() user: UserActor) {
     return this.selfExclusion.lift(user.id)
   }
 
   @Get('me/sessions')
-  sessions(@CurrentUser() user: any) {
+  sessions(@CurrentUser() user: UserActor) {
     return this.listSessions.execute(user.id, user.sessionId)
   }
 
   @Delete('me/sessions/:id')
-  revoke(@CurrentUser() user: any, @Param('id') id: string) {
+  revoke(@CurrentUser() user: UserActor, @Param('id') id: string) {
     return this.revokeSession.execute(user.id, id, user.sessionId)
   }
 }

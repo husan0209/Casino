@@ -12,6 +12,7 @@ import {
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+import { type UserActor } from '@/common/types/req-user'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 
@@ -40,18 +41,18 @@ export class PaymentsController {
   @Post('deposit/fiat')
   @UsePipes(new ZodValidationPipe(CreateFiatDepositSchema))
   depositFiat(
-    @CurrentUser() u: any,
+    @CurrentUser() u: UserActor,
     @Body() b: { amount: string; currency: string; method: string },
   ) {
     return this.fiatDep.execute(u.id, { amount: b.amount, currency: b.currency, method: b.method })
   }
   @Post('deposit/crypto')
   @UsePipes(new ZodValidationPipe(CreateCryptoDepositSchema))
-  depositCrypto(@CurrentUser() u: any, @Body() b: { amount: string; currency: string }) {
+  depositCrypto(@CurrentUser() u: UserActor, @Body() b: { amount: string; currency: string }) {
     return this.cryptoDep.execute(u.id, b.amount, b.currency)
   }
   @Get('deposit/:id/status')
-  async depositStatus(@CurrentUser() u: any, @Param('id') id: string) {
+  async depositStatus(@CurrentUser() u: UserActor, @Param('id') id: string) {
     const pr = await this.repo.findById(id)
     if (!pr || pr.userId !== u.id) {
       throw new BadRequestException('NOT_FOUND')
@@ -68,7 +69,7 @@ export class PaymentsController {
   @Post('withdrawal/fiat')
   @UsePipes(new ZodValidationPipe(CreateFiatWithdrawalSchema))
   wdFiat(
-    @CurrentUser() u: any,
+    @CurrentUser() u: UserActor,
     @Body() b: { amount: string; method: string; destination: string },
   ) {
     return this.createWd.execute(u.id, {
@@ -81,7 +82,7 @@ export class PaymentsController {
   @Post('withdrawal/crypto')
   @UsePipes(new ZodValidationPipe(CreateCryptoWithdrawalSchema))
   wdCrypto(
-    @CurrentUser() u: any,
+    @CurrentUser() u: UserActor,
     @Body() b: { amount: string; currency: string; destination: string },
   ) {
     return this.createWd.execute(u.id, {
@@ -91,8 +92,11 @@ export class PaymentsController {
     })
   }
   @Get('withdrawals')
-  async listWd(@CurrentUser() u: any, @Query() q: any) {
-    const page = parseInt(q.page) || 1
+  async listWd(
+    @CurrentUser() u: UserActor,
+    @Query() q: Record<string, string | undefined>,
+  ) {
+    const page = parseInt(q.page ?? '') || 1
     const [items, total] = await this.repo.listUser({
       userId: u.id,
       type: 'withdrawal',
@@ -102,7 +106,7 @@ export class PaymentsController {
     return { items, meta: { page, total } }
   }
   @Post('withdrawal/:id/cancel')
-  cancel(@CurrentUser() u: any, @Param('id') id: string) {
+  cancel(@CurrentUser() u: UserActor, @Param('id') id: string) {
     return this.cancelWd.execute(u.id, id)
   }
 }

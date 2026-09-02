@@ -119,10 +119,10 @@ export class CasinoAdminController {
 
   // games
   @Get('games')
-  async games(@Query() q: any) {
-    const page = parseInt(q.page) || 1,
-      perPage = Math.min(parseInt(q.per_page) || 50, 200)
-    const where: any = {}
+  async games(@Query() q: Record<string, string | undefined>) {
+    const page = parseInt(q.page ?? '') || 1,
+      perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
+    const where: Prisma.GameWhereInput = {}
     if (q.provider_id) {
       where.providerId = q.provider_id
     }
@@ -161,7 +161,7 @@ export class CasinoAdminController {
       tags?: string[]
     },
   ) {
-    const data: any = {}
+    const data: Prisma.GameUpdateInput = {}
     if (b.name_ru !== undefined) {
       data.nameRu = b.name_ru
     }
@@ -203,10 +203,10 @@ export class CasinoAdminController {
 
   // game sessions
   @Get('game-sessions')
-  async sessions(@Query() q: any) {
-    const page = parseInt(q.page) || 1,
-      perPage = Math.min(parseInt(q.per_page) || 50, 200)
-    const where: any = {}
+  async sessions(@Query() q: Record<string, string | undefined>) {
+    const page = parseInt(q.page ?? '') || 1,
+      perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
+    const where: Prisma.GameSessionWhereInput = {}
     if (q.user_id) {
       where.userId = q.user_id
     }
@@ -217,7 +217,7 @@ export class CasinoAdminController {
       where.providerId = q.provider_id
     }
     if (q.status) {
-      where.status = q.status
+      where.status = q.status as Prisma.EnumGameSessionStatusFilter['equals']
     }
     const [items, total] = await Promise.all([
       prisma.gameSession.findMany({
@@ -248,10 +248,10 @@ export class CasinoAdminController {
     return session
   }
   @Get('game-transactions')
-  async gameTx(@Query() q: any) {
-    const page = parseInt(q.page) || 1,
-      perPage = Math.min(parseInt(q.per_page) || 50, 200)
-    const where: any = {}
+  async gameTx(@Query() q: Record<string, string | undefined>) {
+    const page = parseInt(q.page ?? '') || 1,
+      perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
+    const where: Prisma.GameTransactionWhereInput = {}
     if (q.user_id) {
       where.userId = q.user_id
     }
@@ -259,7 +259,7 @@ export class CasinoAdminController {
       where.providerId = q.provider_id
     }
     if (q.type) {
-      where.type = q.type
+      where.type = q.type as Prisma.EnumGameTransactionTypeFilter['equals']
     }
     const [items, total] = await Promise.all([
       prisma.gameTransaction.findMany({
