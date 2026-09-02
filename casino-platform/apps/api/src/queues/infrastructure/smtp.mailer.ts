@@ -48,8 +48,12 @@ export class SmtpMailer implements MailerPort {
     }
     const smtpUser = this.config.get<string>('SMTP_USER')
     const smtpPass = this.config.get<string>('SMTP_PASS')
+    const host = this.config.get<string>('SMTP_HOST')
+    if (host === undefined) {
+      throw new EmailNotConfiguredError()
+    }
     this.transport = nodemailer.createTransport({
-      host: this.config.get<string>('SMTP_HOST'),
+      host,
       port: Number(this.config.get('SMTP_PORT') || 587),
       secure: Number(this.config.get('SMTP_PORT')) === 465,
       ...(smtpUser !== undefined && smtpPass !== undefined && { auth: { user: smtpUser, pass: smtpPass } }),
