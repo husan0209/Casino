@@ -1,7 +1,6 @@
-import { randomUUID } from 'crypto'
-
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { randomUUID } from 'crypto'
 
 import { errorMessage } from '@/common/utils/error-message'
 import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
@@ -9,6 +8,9 @@ import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.se
 import { PaymentProviderError } from '../../domain/errors'
 import { NOWPaymentsClient } from '../../infrastructure/clients/nowpayments.client'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
+
+
+
 
 @Injectable()
 export class CreateCryptoDepositUseCase {

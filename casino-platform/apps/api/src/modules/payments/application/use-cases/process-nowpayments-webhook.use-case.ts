@@ -1,13 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common'
 
 import { errorMessage } from '@/common/utils/error-message'
+import type { Currency } from '@casino/shared-types'
 import { UsersFacade } from '@modules/users/facade/users.facade'
 import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 
-import type { Currency } from '@casino/shared-types'
-
 import { NOWPaymentsClient } from '../../infrastructure/clients/nowpayments.client'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
+
+
+
 
 /** IPN-запрос провайдера: заголовки, разобранный JSON, оригинальные байты тела и IP. */
 export interface ProcessNowPaymentsWebhookInput {

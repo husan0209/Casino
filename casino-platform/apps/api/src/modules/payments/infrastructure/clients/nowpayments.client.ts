@@ -1,12 +1,14 @@
-import { createHmac, timingSafeEqual } from 'crypto'
-
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { createHmac, timingSafeEqual } from 'crypto'
 
 import { errorMessage } from '@/common/utils/error-message'
 import { DISPLAY_RUB_RATES } from '@casino/shared-config'
 
 import { PaymentProviderNotConfiguredError } from './rukassa.client'
+
+
+
 
 const MAP: Record<string, string> = {
   USDT_TRC20: 'usdttrc20',

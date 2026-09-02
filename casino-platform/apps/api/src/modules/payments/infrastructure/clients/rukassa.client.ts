@@ -1,10 +1,11 @@
-import { createHmac, timingSafeEqual } from 'crypto'
-
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { createHmac, timingSafeEqual } from 'crypto'
 
 import { errorMessage } from '@/common/utils/error-message'
 import { AppError } from '@casino/shared-utils'
+
+
 
 export class PaymentProviderNotConfiguredError extends AppError {
   readonly code = 'PAYMENT_PROVIDER_NOT_CONFIGURED'

@@ -1,17 +1,18 @@
-import { createHmac, timingSafeEqual } from 'crypto'
-
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { createHmac, timingSafeEqual } from 'crypto'
 
+import { errorMessage } from '@/common/utils/error-message'
 import {
   type GameProviderAdapter,
   type LaunchParams,
   type ParsedProviderCallback,
   type ProviderGameRow,
 } from '@modules/casino/domain/provider-adapter.interface'
-
-import { errorMessage } from '@/common/utils/error-message'
 import { PaymentProviderNotConfiguredError } from '@modules/payments/infrastructure/clients/rukassa.client'
+
+
+
 
 const has = (v: unknown): boolean => v !== null && v !== undefined
 

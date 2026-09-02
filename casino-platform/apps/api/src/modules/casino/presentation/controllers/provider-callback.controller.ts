@@ -9,6 +9,8 @@ import { GameCallbackService } from '../../application/services/game-callback.se
 import { type ParsedProviderCallback } from '../../domain/provider-adapter.interface'
 import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 
+
+
 /** Доменные ошибки -> коды результата GitSlotPark. */
 const CALLBACK_ERROR_CODES: Record<string, string> = {
   INSUFFICIENT_FUNDS: 'INSUFFICIENT_FUNDS',
