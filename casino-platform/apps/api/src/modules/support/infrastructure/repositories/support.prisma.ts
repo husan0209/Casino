@@ -1,12 +1,22 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma, type SupportTicketCategory, type SupportTicketPriority, type SupportTicketStatus } from '@casino/database'
+import {
+  prisma,
+  type Prisma,
+  type SupportTicketCategory,
+  type SupportTicketPriority,
+  type SupportTicketStatus,
+} from '@casino/database'
 
 import {
   type ISupportRepository,
   type TicketStatus,
   type TicketCategory,
   type TicketPriority,
+  type MessageRow,
+  type TicketListItem,
+  type TicketAttachment,
+  type TicketListItemFilters,
 } from '../../domain/repositories/support.repository'
 
 @Injectable()
@@ -23,27 +33,34 @@ export class PrismaSupportRepository implements ISupportRepository {
     message: string
   }) {
     const { userId, subject, category, message } = args
-    const ticket = await prisma.$transaction(async (tx: { [k: string]: any }) => {
-      const t = await tx.supportTicket.create({
-        data: { userId, subject, category: category as SupportTicketCategory, status: 'open', priority: 'normal' },
-      })
-      await tx.supportMessage.create({
-        data: {
-          ticketId: t.id,
-          senderType: 'user',
-          senderId: userId,
-          message,
-          attachments: [],
-          isInternal: false,
-        },
-      })
-      return t
-    })
+    const ticket = await prisma.$transaction(
+      async (tx: Omit<Prisma.TransactionClient, '$transaction'>) => {
+        const t = await tx.supportTicket.create({
+          data: { userId, subject, category: category as SupportTicketCategory, status: 'open', priority: 'normal' },
+        })
+        await tx.supportMessage.create({
+          data: {
+            ticketId: t.id,
+            senderType: 'user',
+            senderId: userId,
+            message,
+            attachments: [],
+            isInternal: false,
+          },
+        })
+        return t
+      },
+    )
     return { id: ticket.id }
   }
-  async listUserTickets(args: { userId: string; status?: TicketStatus; page: number; perPage: number }) {
+  async listUserTickets(args: {
+    userId: string
+    status?: TicketStatus | undefined
+    page: number
+    perPage: number
+  }): Promise<{ items: TicketListItem[]; total: number }> {
     const { userId, status, page, perPage } = args
-    const where: any = { userId }
+    const where: Prisma.SupportTicketWhereInput = { userId }
     if (status) {
       where.status = status
     }
@@ -77,11 +94,11 @@ export class PrismaSupportRepository implements ISupportRepository {
     senderId: string
     message: string
     isInternal?: boolean
-    attachments?: any[]
+    attachments?: TicketAttachment[]
   }) {
     const { ticketId, senderType, senderId, message } = args
     const isInternal = args.isInternal ?? false
-    const attachments = args.attachments ?? []
+    const attachments = (args.attachments ?? []) as unknown as Prisma.InputJsonValue[]
     const m = await prisma.supportMessage.create({
       data: { ticketId, senderType, senderId, message, attachments, isInternal },
     })
@@ -94,7 +111,7 @@ export class PrismaSupportRepository implements ISupportRepository {
     })
     return m
   }
-  async listMessages(ticketId: string, includeInternal: boolean) {
+  async listMessages(ticketId: string, includeInternal: boolean): Promise<MessageRow[]> {
     return prisma.supportMessage.findMany({
       where: { ticketId, ...(includeInternal ? {} : { isInternal: false }) },
       orderBy: { createdAt: 'asc' },
@@ -106,10 +123,10 @@ export class PrismaSupportRepository implements ISupportRepository {
       data: { status: 'closed', closedAt: new Date(), closedBy },
     })
   }
-  async listAdmin(f: any) {
+  async listAdmin(f: TicketListItemFilters) {
     const page = f.page || 1,
       perPage = Math.min(f.perPage || 20, 100)
-    const where: any = {}
+    const where: Prisma.SupportTicketWhereInput = {}
     if (f.status) {
       where.status = f.status
     }

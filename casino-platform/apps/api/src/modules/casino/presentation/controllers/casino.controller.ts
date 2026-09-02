@@ -1,8 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
+import { type Request } from 'express'
 
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+import { type UserActor } from '@/common/types/req-user'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 
@@ -22,7 +24,7 @@ export class CasinoController {
   ) {}
 
   @Get('games')
-  async games(@Query() queryParams: any) {
+  async games(@Query() queryParams: Record<string, string | undefined>) {
     const result = await this.listGamesUseCase.execute(queryParams)
     return {
       data: result.items,
@@ -50,7 +52,7 @@ export class CasinoController {
       orderBy: { sortOrder: 'asc' },
     })
     return rows.map(
-      (provider: { slug: string; name: string; logoUrl: any; gameCount: number; type: any }) => ({
+      (provider: { slug: string; name: string; logoUrl: string | null; gameCount: number; type: string }) => ({
         slug: provider.slug,
         name: provider.name,
         logo_url: provider.logoUrl,
@@ -85,17 +87,17 @@ export class CasinoController {
   async launch(
     @Param('slug') slug: string,
     @Body() dto: { currency?: string; return_url?: string },
-    @Req() req: any,
+    @Req() req: Request,
   ) {
     const isMobile = /mobile/i.test(req.headers['user-agent'] || '')
     return this.launchGameUseCase.execute({
-      userId: req.user.id,
+      userId: (req.user as UserActor).id,
       gameSlug: slug,
       currency: dto.currency || 'RUB',
       returnUrl: dto.return_url || 'http://localhost:3000',
       isDemo: false,
       isMobile,
-      ip: req.ip,
+      ip: req.ip ?? '',
     })
   }
 
@@ -104,7 +106,7 @@ export class CasinoController {
   async demo(
     @Param('slug') slug: string,
     @Body() dto: { currency?: string; return_url?: string },
-    @Req() req: any,
+    @Req() req: Request,
   ) {
     const isMobile = /mobile/i.test(req.headers['user-agent'] || '')
     return this.launchGameUseCase.execute({
@@ -114,7 +116,7 @@ export class CasinoController {
       returnUrl: dto.return_url || 'http://localhost:3000',
       isDemo: true,
       isMobile,
-      ip: req.ip,
+      ip: req.ip ?? '',
     })
   }
 
@@ -138,7 +140,7 @@ export class CasinoController {
     @CurrentUser() currentUser: { id: string },
     @Query() queryParams: { page?: string; per_page?: string },
   ) {
-    const page = parseInt(queryParams.page || '1', 10) || 1
+    const page = parseInt(queryParams.page ?? '1', 10) || 1
     const perPage = parseInt(queryParams.per_page || '24', 10) || 24
     const result = await this.favoritesUseCase.list(currentUser.id, page, perPage)
     return {
@@ -167,7 +169,7 @@ export class CasinoController {
     @CurrentUser() currentUser: { id: string },
     @Query() queryParams: { page?: string; per_page?: string; game_id?: string },
   ) {
-    const page = parseInt(queryParams.page || '1', 10) || 1
+    const page = parseInt(queryParams.page ?? '1', 10) || 1
     const perPage = parseInt(queryParams.per_page || '20', 10) || 20
     const result = await this.favoritesUseCase.history({
       userId: currentUser.id,

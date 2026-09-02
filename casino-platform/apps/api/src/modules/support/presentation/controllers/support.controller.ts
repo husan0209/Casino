@@ -10,6 +10,7 @@ import { CreateTicketUseCase } from '../../application/use-cases/create-ticket.u
 import { GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
 import { ListUserTicketsUseCase } from '../../application/use-cases/list-user-tickets.use-case'
 import { SendMessageUseCase } from '../../application/use-cases/send-message.use-case'
+import { type TicketCategory, type TicketStatus } from '../../domain/repositories/support.repository'
 import { AddTicketMessageSchema, CreateTicketSchema } from '../dto/support.dto'
 
 @UseGuards(AuthGuard)
@@ -31,7 +32,7 @@ export class SupportController {
   ) {
     return this.createTicketUseCase.execute(currentUser.id, {
       subject: dto.subject,
-      category: dto.category,
+      category: dto.category as TicketCategory,
       message: dto.message,
     })
   }
@@ -45,7 +46,9 @@ export class SupportController {
     const perPage = parseInt(queryParams.per_page || '20', 10) || 20
     const result = await this.listTicketsUseCase.execute({
       userId: currentUser.id,
-      status: queryParams.status,
+      ...(queryParams.status !== undefined
+        ? { status: queryParams.status as TicketStatus }
+        : {}),
       page,
       perPage,
     })

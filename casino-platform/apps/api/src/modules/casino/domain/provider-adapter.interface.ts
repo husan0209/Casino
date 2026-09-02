@@ -19,7 +19,7 @@ export interface ParsedProviderCallback {
   transactionId?: string | undefined
   rollbackTransactionId?: string | undefined
   gameId?: string | undefined
-  rawRequest: any
+  rawRequest: unknown
   currency?: string | undefined
 }
 /** Строка игрового каталога провайдера (нормализованная). */
@@ -31,13 +31,15 @@ export interface ProviderGameRow {
   thumbnailUrl?: string | undefined
   hasDemo: boolean
   rtp?: number | undefined
-  metadata?: any
+  metadata?: Record<string, unknown>
 }
+/** Тело ответа провайдеру на callback (формат зависит от адаптера). */
+export type ProviderCallbackResponse = Record<string, unknown>
 export interface GameProviderAdapter {
   getLaunchUrl(params: LaunchParams): Promise<{ url: string }>
   fetchGameList(): Promise<ProviderGameRow[]>
-  verifyCallback(headers: any, body: any): boolean
-  parseCallback(headers: any, body: any): ParsedProviderCallback
-  formatSuccessResponse(balance: string, transactionId?: string): any
-  formatErrorResponse(code: string, message: string): any
+  verifyCallback(headers: Record<string, unknown>, body: unknown): boolean
+  parseCallback(headers: Record<string, unknown>, body: unknown): ParsedProviderCallback
+  formatSuccessResponse(balance: string, transactionId?: string): ProviderCallbackResponse
+  formatErrorResponse(code: string, message: string): ProviderCallbackResponse
 }

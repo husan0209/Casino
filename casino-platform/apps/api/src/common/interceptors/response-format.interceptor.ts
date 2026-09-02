@@ -10,7 +10,7 @@ import { successResponse } from '@casino/shared-utils'
 
 @Injectable()
 export class ResponseFormatInterceptor implements NestInterceptor {
-  intercept(_context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(_context: ExecutionContext, next: CallHandler): Observable<unknown> {
     return next.handle().pipe(
       map((data) => {
         if (data && typeof data === 'object' && 'success' in data) {

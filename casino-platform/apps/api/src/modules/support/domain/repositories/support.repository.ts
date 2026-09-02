@@ -15,6 +15,48 @@ export interface TicketRow {
   createdAt: Date
   updatedAt: Date
 }
+/** Строка списка тикетов (Prisma select — без user-полей) + счётчик сообщений. */
+export interface TicketListItem {
+  id: string
+  subject: string
+  category: TicketCategory
+  status: TicketStatus
+  priority: TicketPriority
+  createdAt: Date
+  updatedAt: Date
+  _count: { messages: number }
+}
+/** Строка сообщения тикета (Prisma SupportMessage). */
+export interface MessageRow {
+  id: string
+  ticketId: string
+  senderType: string
+  senderId: string | null
+  message: string
+  isInternal: boolean
+  attachments: unknown // Prisma JsonValue
+  createdAt: Date
+}
+/** Prisma JsonValue-совместимый тип для JSON-полей. */
+export type PrismaJsonObject = { [key: string]: PrismaJson }
+export type PrismaJson = string | number | boolean | null | PrismaJson[] | PrismaJsonObject
+/** Вложение к сообщению тикета (ссылка на сохранённый файл). */
+export interface TicketAttachment {
+  url: string
+  name?: string
+  mime?: string
+}
+/** Фильтры admin-списка тикетов (ISupportRepository.listAdmin). */
+export interface TicketListItemFilters {
+  status?: TicketStatus | undefined
+  priority?: TicketPriority | undefined
+  category?: TicketCategory | undefined
+  assignedTo?: string | undefined
+  userId?: string | undefined
+  search?: string | undefined
+  page?: number
+  perPage?: number
+}
 export interface ISupportRepository {
   countOpenByUser(userId: string): Promise<number>
   createTicket(args: {
@@ -28,7 +70,7 @@ export interface ISupportRepository {
     status?: TicketStatus
     page: number
     perPage: number
-  }): Promise<{ items: any[]; total: number }>
+  }): Promise<{ items: TicketListItem[]; total: number }>
   getTicketForUser(ticketId: string, userId: string): Promise<TicketRow | null>
   addMessage(args: {
     ticketId: string
@@ -36,9 +78,9 @@ export interface ISupportRepository {
     senderId: string
     message: string
     isInternal?: boolean
-    attachments?: any[]
-  }): Promise<any>
-  listMessages(ticketId: string, includeInternal: boolean): Promise<any[]>
+    attachments?: TicketAttachment[]
+  }): Promise<{ id: string }>
+  listMessages(ticketId: string, includeInternal: boolean): Promise<MessageRow[]>
   closeTicket(ticketId: string, closedBy: 'user' | 'admin'): Promise<void>
   // admin
   listAdmin(filters: {
@@ -50,7 +92,7 @@ export interface ISupportRepository {
     search?: string | undefined
     page?: number
     perPage?: number
-  }): Promise<{ items: any[]; total: number }>
+  }): Promise<{ items: TicketListItem[]; total: number }>
   getAdmin(ticketId: string): Promise<TicketRow | null>
   assign(ticketId: string, adminId: string | null): Promise<void>
   setPriority(ticketId: string, priority: TicketPriority): Promise<void>

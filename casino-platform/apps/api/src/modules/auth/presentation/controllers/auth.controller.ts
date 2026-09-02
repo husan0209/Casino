@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, Query, Req, Res, UsePipes } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
-import { Request, Response } from 'express'
+import { type Request, Response } from 'express'
 
 import {
   setRefreshTokenCookie,
@@ -93,9 +93,10 @@ export class AuthController {
   }
 
   @Post('logout')
-  async logout(@Req() req: any, @Res({ passthrough: true }) res: Response) {
-    if (req.user?.sessionId) {
-      await this.logoutUc.execute(req.user.sessionId)
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const user = req.user
+    if (user && 'sessionId' in user && user.sessionId) {
+      await this.logoutUc.execute(user.sessionId)
     }
     clearRefreshTokenCookie(res)
     return { ok: true }

@@ -7,8 +7,22 @@ export interface UserProfileFull {
     referralCode: string
     createdAt: Date
   }
-  profile: any | null
-  settings: any | null
+  profile: {
+    firstName: string | null
+    lastName: string | null
+    dateOfBirth: Date | null
+    country: string | null
+    city: string | null
+    avatarUrl: string | null
+    currencyPreference: string
+    lastPaymentMethod: string | null
+  } | null
+  settings: {
+    notificationsEmail: boolean
+    notificationsPush: boolean
+    language: string
+    timezone: string
+  } | null
   kycStatus: string
 }
 

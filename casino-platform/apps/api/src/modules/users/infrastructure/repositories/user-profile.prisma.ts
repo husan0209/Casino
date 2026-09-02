@@ -1,6 +1,14 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+type ProfileUpdateFields = {
+  firstName?: string | undefined
+  lastName?: string | undefined
+  dateOfBirth?: Date | undefined
+  country?: string | undefined
+  city?: string | undefined
+}
+
+import { prisma, type Prisma } from '@casino/database'
 
 import { type IUserProfileRepository } from '../../domain/repositories/user-profile.repository'
 
@@ -59,34 +67,60 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
       create: { userId, lastPaymentMethod: method, currencyPreference: currency },
     })
   }
-  async updateProfile(userId: string, data: any) {
+  async updateProfile(
+    userId: string,
+    data: {
+      firstName?: string | undefined
+      lastName?: string | undefined
+      dateOfBirth?: Date | undefined
+      country?: string | undefined
+      city?: string | undefined
+    },
+  ): Promise<void> {
     await prisma.userProfile.upsert({
       where: { userId },
-      update: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        dateOfBirth: data.dateOfBirth ?? undefined,
-        country: data.country,
-        city: data.city,
-      },
-      create: {
-        userId,
-        firstName: data.firstName ?? null,
-        lastName: data.lastName ?? null,
-        dateOfBirth: data.dateOfBirth ?? null,
-        country: data.country ?? null,
-        city: data.city ?? null,
-      },
+      // exactOptionalPropertyTypes: включаем только заданные поля
+      update: this.profileUpdateData(data),
+      create: this.profileCreateData(data, userId),
     })
   }
-  async updateSettings(userId: string, data: any) {
+
+  private profileUpdateData(data: ProfileUpdateFields): Prisma.UserProfileUpdateInput {
+    return {
+      ...(data.firstName !== undefined && { firstName: data.firstName }),
+      ...(data.lastName !== undefined && { lastName: data.lastName }),
+      ...(data.dateOfBirth !== undefined && { dateOfBirth: data.dateOfBirth }),
+      ...(data.country !== undefined && { country: data.country }),
+      ...(data.city !== undefined && { city: data.city }),
+    }
+  }
+
+  private profileCreateData(data: ProfileUpdateFields, userId: string): Prisma.UserProfileUncheckedCreateInput {
+    return {
+      userId,
+      firstName: data.firstName ?? null,
+      lastName: data.lastName ?? null,
+      dateOfBirth: data.dateOfBirth ?? null,
+      country: data.country ?? null,
+      city: data.city ?? null,
+    }
+  }
+  async updateSettings(
+    userId: string,
+    data: {
+      notificationsEmail?: boolean | undefined
+      notificationsPush?: boolean | undefined
+      language?: string | undefined
+      timezone?: string | undefined
+    },
+  ) {
     await prisma.userSettings.upsert({
       where: { userId },
       update: {
-        notificationsEmail: data.notificationsEmail,
-        notificationsPush: data.notificationsPush,
-        language: data.language,
-        timezone: data.timezone,
+        ...(data.notificationsEmail !== undefined && { notificationsEmail: data.notificationsEmail }),
+        ...(data.notificationsPush !== undefined && { notificationsPush: data.notificationsPush }),
+        ...(data.language !== undefined && { language: data.language }),
+        ...(data.timezone !== undefined && { timezone: data.timezone }),
       },
       create: {
         userId,

@@ -34,7 +34,7 @@ export class ProviderCallbackController {
   async handleOp(
     @Param('providerSlug') slug: string,
     @Param('op') op: string,
-    @Headers() headers: any,
+    @Headers() headers: Record<string, string>,
     @Body() body: Record<string, unknown>,
     @Res() res: Response,
   ) {
@@ -46,7 +46,7 @@ export class ProviderCallbackController {
   @HttpCode(200)
   async handle(
     @Param('providerSlug') slug: string,
-    @Headers() headers: any,
+    @Headers() headers: Record<string, string>,
     @Body() body: Record<string, unknown>,
     @Res() res: Response,
   ) {

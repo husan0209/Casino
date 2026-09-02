@@ -37,7 +37,7 @@ export class PaymentsWebhookController {
   ) {
     return this.rukassa.execute({
       rawHeaders: headers,
-      body,
+      body: body as Record<string, unknown>,
       rawBody: req.rawBody ?? '',
       ip: req.ip ?? '',
     })
@@ -52,7 +52,7 @@ export class PaymentsWebhookController {
   ) {
     return this.np.execute({
       rawHeaders: headers,
-      body,
+      body: body as Record<string, unknown>,
       rawBody: req.rawBody ?? '',
       ip: req.ip ?? '',
     })

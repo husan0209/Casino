@@ -8,10 +8,26 @@ export interface KycSubmitInput {
   documentNumber: string
   documentExpiry?: Date | null
 }
+/** Полная строка KYC-профиля (Prisma KycProfile + documents). */
+export interface KycProfileRow {
+  id: string
+  userId: string
+  status: string
+  firstName: string | null
+  lastName: string | null
+  dateOfBirth: Date | null
+  country: string | null
+  documentType: string | null
+  documentNumber: string | null
+  rejectionReason: string | null
+  submittedAt: Date | null
+  approvedAt: Date | null
+  rejectedAt: Date | null
+}
 export interface IKycRepository {
-  getByUserId(userId: string): Promise<any | null>
-  getById(id: string): Promise<any | null>
-  submit(input: KycSubmitInput): Promise<any>
+  getByUserId(userId: string): Promise<KycProfileRow | null>
+  getById(id: string): Promise<KycProfileRow | null>
+  submit(input: KycSubmitInput): Promise<KycProfileRow>
   addDocument(
     kycProfileId: string,
     doc: {
@@ -21,7 +37,7 @@ export interface IKycRepository {
       fileSize?: number
       mimeType?: string
     },
-  ): Promise<any>
+  ): Promise<void>
   getStatus(
     userId: string,
   ): Promise<{
@@ -34,7 +50,7 @@ export interface IKycRepository {
     status?: string,
     page?: number,
     perPage?: number,
-  ): Promise<{ items: any[]; total: number }>
+  ): Promise<{ items: KycProfileRow[]; total: number }>
   setStatus(args: {
     id: string
     status: 'approved' | 'rejected' | 'requires_resubmission'

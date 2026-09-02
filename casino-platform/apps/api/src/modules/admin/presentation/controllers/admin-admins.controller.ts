@@ -1,13 +1,15 @@
 import { Body, Controller, Get, Param, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
+import { type Request } from 'express'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+import { type AdminActor } from '@/common/types/req-user'
 
 import { AdminUsersService } from '../../application/admin-users.service'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { CreateAdminSchema } from '../dto/admin-admins.dto'
 
-function isSuper(req: any) {
+function isSuper(req: Request) {
   return req.user?.role === 'superadmin'
 }
 @UseGuards(AdminAuthGuard)
@@ -23,17 +25,17 @@ export class AdminAdminsController {
   }
   @Post()
   @UsePipes(new ZodValidationPipe(CreateAdminSchema))
-  async create(@Body() body: Record<string, unknown>, @Req() req: any) {
+  async create(@Body() body: Record<string, unknown>, @Req() req: Request) {
     if (!isSuper(req)) {
       return { success: false, error: { code: 'FORBIDDEN', message: 'superadmin only' } }
     }
     const admin = await this.svc.create(
       body as unknown as Parameters<typeof this.svc.create>[0],
-      req.user.id,
+      (req.user as AdminActor).id,
     )
     await this.audit.log({
       actorType: 'admin',
-      actorId: req.user.id,
+      actorId: (req.user as AdminActor).id,
       action: 'admin.admin_created',
       targetType: 'admin_user',
       targetId: admin.id,
@@ -41,14 +43,14 @@ export class AdminAdminsController {
     return admin
   }
   @Post(':id/deactivate')
-  async deactivate(@Param('id') id: string, @Req() req: any) {
+  async deactivate(@Param('id') id: string, @Req() req: Request) {
     if (!isSuper(req)) {
       return { success: false, error: { code: 'FORBIDDEN', message: 'superadmin only' } }
     }
     await this.svc.block(id)
     await this.audit.log({
       actorType: 'admin',
-      actorId: req.user.id,
+      actorId: (req.user as AdminActor).id,
       action: 'admin.admin_deactivated',
       targetId: id,
     })

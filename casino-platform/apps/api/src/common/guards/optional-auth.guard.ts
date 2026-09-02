@@ -9,7 +9,7 @@ export class OptionalAuthGuard implements CanActivate {
   constructor(private jwt: JwtTokenService) {}
 
   canActivate(ctx: ExecutionContext): boolean {
-    const req = ctx.switchToHttp().getRequest<Request & { user?: any }>()
+    const req = ctx.switchToHttp().getRequest<Request>()
     const auth = req.headers.authorization || ''
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
     if (!token) {

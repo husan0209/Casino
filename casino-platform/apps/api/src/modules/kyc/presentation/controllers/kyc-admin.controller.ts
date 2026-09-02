@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes, Inject 
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+import { type UserActor } from '@/common/types/req-user'
 
 // NB: reviewed_by -> FK на AdminUser (см. схему) — пишем AdminUser.id,
 // а не user.id: AuthGuard+RolesGuard здесь давали FK-violation на КАЖДОМ
@@ -32,19 +33,19 @@ export class KycAdminController {
     return { ...rec, totalDepositedRub: totalDeposited }
   }
   @Post(':id/approve')
-  async approve(@Param('id') id: string, @CurrentUser() u: any) {
+  async approve(@Param('id') id: string, @CurrentUser() u: UserActor) {
     await this.repo.setStatus({ id, status: 'approved', reviewedBy: u.id })
     return { ok: true }
   }
   @Post(':id/reject')
   @UsePipes(new ZodValidationPipe(KycDecisionReasonSchema))
-  async reject(@Param('id') id: string, @Body() b: { reason: string }, @CurrentUser() u: any) {
+  async reject(@Param('id') id: string, @Body() b: { reason: string }, @CurrentUser() u: UserActor) {
     await this.repo.setStatus({ id, status: 'rejected', reason: b.reason, reviewedBy: u.id })
     return { ok: true }
   }
   @Post(':id/request-resubmission')
   @UsePipes(new ZodValidationPipe(KycDecisionReasonSchema))
-  async resubmit(@Param('id') id: string, @Body() b: { reason: string }, @CurrentUser() u: any) {
+  async resubmit(@Param('id') id: string, @Body() b: { reason: string }, @CurrentUser() u: UserActor) {
     await this.repo.setStatus({ id, status: 'requires_resubmission', reason: b.reason, reviewedBy: u.id })
     return { ok: true }
   }

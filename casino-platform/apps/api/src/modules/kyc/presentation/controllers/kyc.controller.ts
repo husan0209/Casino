@@ -21,6 +21,7 @@ import { memoryStorage } from 'multer'
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { extForMime, sniffDocumentMime } from '@/common/files/file-sniffer'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+import { type UserActor } from '@/common/types/req-user'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 
@@ -50,13 +51,13 @@ export class KycController {
     @Inject(KYC_REPOSITORY) private repo: IKycRepository,
   ) {}
   @Get('status')
-  status(@CurrentUser() u: any, @Query('currency') currency?: string) {
+  status(@CurrentUser() u: UserActor, @Query('currency') currency?: string) {
     return this.statusUc.execute(u.id, currency || 'RUB')
   }
   @Post('submit')
   @UsePipes(new ZodValidationPipe(SubmitKycSchema))
   submit(
-    @CurrentUser() u: any,
+    @CurrentUser() u: UserActor,
     @Body()
     body: {
       first_name: string
@@ -88,7 +89,7 @@ export class KycController {
     }),
   )
   async upload(
-    @CurrentUser() u: any,
+    @CurrentUser() u: UserActor,
     @Body(new ZodValidationPipe(KycDocumentTypeSchema)) body: { document_type: string },
     @UploadedFile() file: Express.Multer.File,
   ) {

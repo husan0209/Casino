@@ -11,7 +11,7 @@ export class PrismaUserSessionRepository implements IUserSessionRepository {
       where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' },
     })
-    return rows.map((r: any) => ({
+    return rows.map((r) => ({
       id: r.id,
       ipAddress: r.ipAddress,
       userAgent: r.userAgent,

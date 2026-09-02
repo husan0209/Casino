@@ -1,8 +1,10 @@
 import { Body, Controller, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
+import { type Request } from 'express'
 
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+import { type AdminActor } from '@/common/types/req-user'
 
 import { prisma } from '@casino/database'
 
@@ -19,8 +21,8 @@ export class AdminNotificationsController {
   @UsePipes(new ZodValidationPipe(SendNotificationSchema))
   async sendNotification(
     @Body() body: { userIds: string[]; title: string; message: string; type: string },
-    @CurrentUser() admin: any,
-    @Req() req: any,
+    @CurrentUser() admin: AdminActor,
+    @Req() req: Request,
   ) {
     // Send to specific users or all users if userIds is empty
     let targets = body.userIds

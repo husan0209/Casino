@@ -4,7 +4,7 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 
-import { prisma } from '@casino/database'
+import { prisma, type LedgerEntryType, type Prisma } from '@casino/database'
 import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
@@ -37,15 +37,15 @@ export class WalletController {
     @CurrentUser() currentUser: { id: string },
     @Query() queryParams: { page?: string; per_page?: string; currency?: string; type?: string },
   ) {
-    const page = parseInt(queryParams.page || '1', 10) || 1
-    const perPage = Math.min(parseInt(queryParams.per_page || '20', 10) || 20, 100)
+    const page = parseInt(queryParams.page ?? '1', 10) || 1
+    const perPage = Math.min(parseInt(queryParams.per_page ?? '20', 10) || 20, 100)
 
-    const where: any = { userId: currentUser.id }
+    const where: Prisma.LedgerEntryWhereInput = { userId: currentUser.id }
     if (queryParams.currency) {
       where.walletAccount = { currency: queryParams.currency }
     }
     if (queryParams.type) {
-      where.type = queryParams.type
+      where.type = queryParams.type as LedgerEntryType
     }
 
     const [items, total] = await Promise.all([
@@ -59,7 +59,7 @@ export class WalletController {
       prisma.ledgerEntry.count({ where }),
     ])
 
-    const data = items.map((entry: { [key: string]: any }) => ({
+    const data = items.map((entry) => ({
       id: entry.id,
       transaction_id: entry.transactionId,
       type: entry.type,

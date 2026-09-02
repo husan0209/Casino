@@ -22,7 +22,7 @@ export class NotificationService {
     channel?: 'email' | 'internal'
     title: string
     message: string
-    data?: any
+    data?: Record<string, unknown>
   }) {
     const createData: CreateNotificationInput = {
       userId: input.userId,

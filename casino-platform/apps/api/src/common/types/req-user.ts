@@ -21,3 +21,10 @@ export interface AdminActor {
   role: string
   isAdmin: boolean
 }
+
+declare module 'express-serve-static-core' {
+  interface Request {
+    /** Кладут UserAuthGuard/OptionalAuthGuard (UserActor) или AdminAuthGuard (AdminActor). */
+    user?: UserActor | AdminActor
+  }
+}

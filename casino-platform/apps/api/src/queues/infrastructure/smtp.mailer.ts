@@ -5,6 +5,18 @@ import { AppError } from '@casino/shared-utils'
 
 import { type MailMessage, type MailerPort } from './mailer.port'
 
+/** Минимальная структурная типизация nodemailer (optional peer, типы недоступны). */
+interface SmtpTransport {
+  sendMail(options: Record<string, unknown>): Promise<unknown>
+}
+
+interface SmtpOptions {
+  host: string
+  port: number
+  secure: boolean
+  auth?: { user: string; pass: string }
+}
+
 export class EmailNotConfiguredError extends AppError {
   readonly code = 'EMAIL_NOT_CONFIGURED'
   readonly httpStatus = 500
@@ -16,29 +28,35 @@ export class EmailNotConfiguredError extends AppError {
 @Injectable()
 export class SmtpMailer implements MailerPort {
   private readonly logger = new Logger(SmtpMailer.name)
-  private transport: any | null = null
+  private transport: SmtpTransport | null = null
 
-  constructor(private config: ConfigService) {}
+  constructor(private config: ConfigService) {
+    // пусто: ConfigService через DI
+  }
 
   /** nodemailer — optional peer: require ленивый, чтобы dev-среда без пакета собиралась. */
-  private transporter(): any {
+  private transporter(): SmtpTransport {
     if (this.transport) {
       return this.transport
     }
-    let nodemailer: any
+    let nodemailer: { createTransport: (opts: SmtpOptions) => SmtpTransport }
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       nodemailer = require('nodemailer')
     } catch {
       throw new EmailNotConfiguredError()
     }
+    const smtpUser = this.config.get<string>('SMTP_USER')
+    const smtpPass = this.config.get<string>('SMTP_PASS')
+    const host = this.config.get<string>('SMTP_HOST')
+    if (host === undefined) {
+      throw new EmailNotConfiguredError()
+    }
     this.transport = nodemailer.createTransport({
-      host: this.config.get<string>('SMTP_HOST'),
+      host,
       port: Number(this.config.get('SMTP_PORT') || 587),
       secure: Number(this.config.get('SMTP_PORT')) === 465,
-      auth: this.config.get('SMTP_USER')
-        ? { user: this.config.get<string>('SMTP_USER'), pass: this.config.get<string>('SMTP_PASS') }
-        : undefined,
+      ...(smtpUser !== undefined && smtpPass !== undefined && { auth: { user: smtpUser, pass: smtpPass } }),
     })
     return this.transport
   }
