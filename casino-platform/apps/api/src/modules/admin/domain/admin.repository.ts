@@ -41,8 +41,9 @@ export interface AuditLogInput {
   targetType?: string
   targetId?: string
   payload?: any
-  ipAddress?: string
-  userAgent?: string
+  /** express req.ip может быть undefined — exactOptionalPropertyTypes требует явного | undefined */
+  ipAddress?: string | undefined
+  userAgent?: string | undefined
 }
 
 export interface IAuditLogRepository {

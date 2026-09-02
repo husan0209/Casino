@@ -101,7 +101,7 @@ export class PaymentsController {
       userId: u.id,
       type: 'withdrawal',
       page,
-      perPage: parseInt(q.per_page) || 20,
+      perPage: parseInt(q.per_page ?? '') || 20,
     })
     return { items, meta: { page, total } }
   }

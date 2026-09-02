@@ -8,7 +8,14 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 import { RolesGuard, Roles } from '@modules/auth/presentation/guards/roles.guard'
 
-import { prisma, type GameCategory, type GameType, type Prisma } from '@casino/database'
+import {
+  prisma,
+  type GameCategory,
+  type GameSessionStatus,
+  type GameTransactionType,
+  type GameType,
+  type Prisma,
+} from '@casino/database'
 
 import { type ProviderGameRow } from '../../domain/provider-adapter.interface'
 import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
@@ -217,7 +224,7 @@ export class CasinoAdminController {
       where.providerId = q.provider_id
     }
     if (q.status) {
-      where.status = q.status as Prisma.EnumGameSessionStatusFilter['equals']
+      where.status = q.status as GameSessionStatus
     }
     const [items, total] = await Promise.all([
       prisma.gameSession.findMany({
@@ -259,7 +266,7 @@ export class CasinoAdminController {
       where.providerId = q.provider_id
     }
     if (q.type) {
-      where.type = q.type as Prisma.EnumGameTransactionTypeFilter['equals']
+      where.type = q.type as GameTransactionType
     }
     const [items, total] = await Promise.all([
       prisma.gameTransaction.findMany({

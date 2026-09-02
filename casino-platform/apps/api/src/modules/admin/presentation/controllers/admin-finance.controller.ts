@@ -10,7 +10,14 @@ import { type AdminActor } from '@/common/types/req-user'
 import { PaymentRequestRepository } from '@modules/payments/infrastructure/repositories/payment-request.repository'
 import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 
-import { prisma, type Prisma } from '@casino/database'
+import {
+  prisma,
+  type LedgerEntryType,
+  type PaymentProvider,
+  type PaymentStatus,
+  type PaymentType,
+  type Prisma,
+} from '@casino/database'
 import { type Currency } from '@casino/shared-types'
 import { AppError } from '@casino/shared-utils'
 
@@ -56,7 +63,7 @@ export class AdminFinanceController {
       where.userId = q.user_id
     }
     if (q.type) {
-      where.type = q.type as Prisma.EnumLedgerEntryTypeFilter['equals']
+      where.type = q.type as LedgerEntryType
     }
     if (q.currency) {
       where.walletAccount = { currency: q.currency }
@@ -86,13 +93,13 @@ export class AdminFinanceController {
       where.userId = q.user_id
     }
     if (q.type) {
-      where.type = q.type as Prisma.EnumPaymentTypeFilter['equals']
+      where.type = q.type as PaymentType
     }
     if (q.status) {
-      where.status = q.status as Prisma.EnumPaymentStatusFilter['equals']
+      where.status = q.status as PaymentStatus
     }
     if (q.provider) {
-      where.provider = q.provider as Prisma.EnumPaymentProviderFilter['equals']
+      where.provider = q.provider as PaymentProvider
     }
     const [items, total] = await Promise.all([
       prisma.paymentRequest.findMany({
@@ -126,7 +133,7 @@ export class AdminFinanceController {
     const { page, perPage } = parsePagination(q)
     const where: Prisma.PaymentRequestWhereInput = { type: 'withdrawal' }
     if (q.status) {
-      where.status = q.status as Prisma.EnumPaymentStatusFilter['equals']
+      where.status = q.status as PaymentStatus
     }
     if (q.user_id) {
       where.userId = q.user_id
