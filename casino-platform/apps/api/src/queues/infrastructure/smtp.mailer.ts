@@ -30,7 +30,7 @@ export class SmtpMailer implements MailerPort {
     if (this.transport) {
       return this.transport
     }
-    let nodemailer: { createTransport: (opts: Record<string, unknown>) => Transporter }
+    let nodemailer: { createTransport: (opts: Record<string, unknown>) => SmtpTransport }
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       nodemailer = require('nodemailer')

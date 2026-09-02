@@ -30,7 +30,7 @@ export interface TicketListItem {
 export interface MessageRow {
   id: string
   ticketId: string
-  senderType: 'user' | 'admin' | 'system'
+  senderType: 'user' | 'admin' | 'system' | (string & {})
   senderId: string | null
   message: string
   isInternal: boolean
