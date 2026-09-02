@@ -4,6 +4,7 @@ import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
+
 import { DISPLAY_RUB_RATES } from '@casino/shared-config'
 
 import { PaymentProviderNotConfiguredError } from './rukassa.client'

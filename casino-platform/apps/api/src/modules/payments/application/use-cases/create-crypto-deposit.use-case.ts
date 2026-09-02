@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
+
 import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
 
 import { PaymentProviderError } from '../../domain/errors'

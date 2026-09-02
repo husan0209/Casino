@@ -1,14 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common'
 
 import { errorMessage } from '@/common/utils/error-message'
+
 import { UsersFacade } from '@modules/users/facade/users.facade'
 import { WalletFacade } from '@modules/wallet/application/wallet.facade'
+
+import type { Currency } from '@casino/shared-types'
 
 import { classifyPaymentStatus } from '../../domain/payment-status'
 import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
-
-import type { Currency } from '@casino/shared-types'
 
 /** Rukassa отдаёт id платежа в разных полях в зависимости от сценария. */
 function pickExternalId(body: any): string {

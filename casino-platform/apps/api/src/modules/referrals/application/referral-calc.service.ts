@@ -2,6 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 import Decimal from 'decimal.js'
 
 import { errorMessage } from '@/common/utils/error-message'
+
+import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 import { WalletFacade } from '../../wallet/application/wallet.facade'
@@ -10,8 +12,6 @@ import {
   type CurrencySumRow,
   type IReferralRepository,
 } from '../domain/referral.repository'
-
-import type { Currency } from '@casino/shared-types'
 
 @Injectable()
 export class ReferralCalcService {
