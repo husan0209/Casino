@@ -8,7 +8,7 @@ import { Logger } from 'nestjs-pino'
 
 import { AppModule } from './app.module'
 
-import type { IncomingMessage } from 'http'
+import type { IncomingMessage, ServerResponse } from 'http'
 
 /**
  * Capture the raw request body bytes for webhook signature verification.
@@ -26,7 +26,12 @@ interface RawBodyRequest extends Request {
   rawBody?: string
 }
 
-function captureRawBody(req: IncomingMessage, _res: Response, buf: Buffer, _encoding: string): void {
+function captureRawBody(
+  req: IncomingMessage,
+  _res: ServerResponse<IncomingMessage>,
+  buf: Buffer,
+  _encoding: string,
+): void {
   // verify-колбэк body-parser получает IncomingMessage; Request (с rawBody) — подтип
   (req as RawBodyRequest).rawBody = buf.toString('utf8')
 }
