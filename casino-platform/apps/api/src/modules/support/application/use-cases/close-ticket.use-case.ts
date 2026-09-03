@@ -9,7 +9,7 @@ import {
 @Injectable()
 export class CloseTicketUseCase {
   constructor(@Inject(SUPPORT_REPOSITORY) private repo: ISupportRepository) {}
-  async execute(ticketId: string, closedBy: 'user' | 'admin', userId?: string) {
+  async execute(ticketId: string, closedBy: 'user' | 'admin', userId?: string): Promise<{ ok: boolean; }> {
     const t = await this.repo.getAdmin(ticketId)
     if (!t) {
       throw new TicketNotFoundError()

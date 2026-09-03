@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
+import { UserRole } from '@casino/database'
 
 import { TokenInvalidError, TokenExpiredError, TokenAlreadyUsedError } from '../../domain/errors'
 import {
@@ -19,7 +20,7 @@ export class VerifyEmailUseCase {
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,
     private jwt: JwtTokenService,
   ) {}
-  async execute(token: string, ip?: string, userAgent?: string) {
+  async execute(token: string, ip?: string, userAgent?: string): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string | null; role: UserRole; }; }> {
     const rec = await this.verif.findByToken(token)
     if (!rec) {
       throw new TokenInvalidError()

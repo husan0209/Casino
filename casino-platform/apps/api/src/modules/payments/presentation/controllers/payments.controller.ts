@@ -9,6 +9,7 @@ import {
   BadRequestException,
   UsePipes,
 } from '@nestjs/common'
+import { PaymentProvider, PaymentStatus, PaymentType } from '@casino/database'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -27,6 +28,7 @@ import {
   CreateFiatWithdrawalSchema,
   CreateCryptoWithdrawalSchema,
 } from '../dto/create-withdrawal.dto'
+import { type Prisma } from '@casino/database'
 
 @UseGuards(AuthGuard)
 @Controller('payments')
@@ -43,16 +45,16 @@ export class PaymentsController {
   depositFiat(
     @CurrentUser() u: UserActor,
     @Body() b: { amount: string; currency: string; method: string },
-  ) {
+  ): Promise<{ payment_request_id: string; payment_url: string; currency: string; method: string; }> {
     return this.fiatDep.execute(u.id, { amount: b.amount, currency: b.currency, method: b.method })
   }
   @Post('deposit/crypto')
   @UsePipes(new ZodValidationPipe(CreateCryptoDepositSchema))
-  depositCrypto(@CurrentUser() u: UserActor, @Body() b: { amount: string; currency: string }) {
+  depositCrypto(@CurrentUser() u: UserActor, @Body() b: { amount: string; currency: string }): Promise<{ payment_request_id: string; pay_address: string; pay_amount: string; pay_currency: string; expires_at: string; }> {
     return this.cryptoDep.execute(u.id, b.amount, b.currency)
   }
   @Get('deposit/:id/status')
-  async depositStatus(@CurrentUser() u: UserActor, @Param('id') id: string) {
+  async depositStatus(@CurrentUser() u: UserActor, @Param('id') id: string): Promise<{ id: string; status: PaymentStatus; currency: string; amount: string; payment_url: string | null; completed_at: Date | null; }> {
     const pr = await this.repo.findById(id)
     if (!pr || pr.userId !== u.id) {
       throw new BadRequestException('NOT_FOUND')
@@ -61,7 +63,7 @@ export class PaymentsController {
       id: pr.id,
       status: pr.status,
       currency: pr.currency,
-      amount: pr.amount.toString() ?? pr.amount,
+      amount: pr.amount.toString(),
       payment_url: pr.paymentUrl,
       completed_at: pr.completedAt,
     }
@@ -71,7 +73,7 @@ export class PaymentsController {
   wdFiat(
     @CurrentUser() u: UserActor,
     @Body() b: { amount: string; method: string; destination: string },
-  ) {
+  ): Promise<{ payment_request_id: string; }> {
     return this.createWd.execute(u.id, {
       amount: b.amount,
       currency: 'RUB',
@@ -84,7 +86,7 @@ export class PaymentsController {
   wdCrypto(
     @CurrentUser() u: UserActor,
     @Body() b: { amount: string; currency: string; destination: string },
-  ) {
+  ): Promise<{ payment_request_id: string; }> {
     return this.createWd.execute(u.id, {
       amount: b.amount,
       currency: b.currency,
@@ -95,7 +97,7 @@ export class PaymentsController {
   async listWd(
     @CurrentUser() u: UserActor,
     @Query() q: Record<string, string | undefined>,
-  ) {
+  ): Promise<{ items: { id: string; createdAt: Date; updatedAt: Date; type: PaymentType; amount: Prisma.Decimal; idempotencyKey: string; metadata: Prisma.JsonValue; userId: string; currency: string; status: PaymentStatus; provider: PaymentProvider; method: string | null; amountRub: Prisma.Decimal | null; fee: Prisma.Decimal; externalId: string | null; externalStatus: string | null; paymentUrl: string | null; destination: Prisma.JsonValue; errorMessage: string | null; expiresAt: Date | null; completedAt: Date | null; }[]; meta: { page: number; total: number; }; }> {
     const page = parseInt(q.page ?? '') || 1
     const [items, total] = await this.repo.listUser({
       userId: u.id,
@@ -106,7 +108,7 @@ export class PaymentsController {
     return { items, meta: { page, total } }
   }
   @Post('withdrawal/:id/cancel')
-  cancel(@CurrentUser() u: UserActor, @Param('id') id: string) {
+  cancel(@CurrentUser() u: UserActor, @Param('id') id: string): Promise<{ ok: boolean; }> {
     return this.cancelWd.execute(u.id, id)
   }
 }

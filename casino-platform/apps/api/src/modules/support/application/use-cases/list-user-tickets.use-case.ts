@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
+import { TicketListItem } from '@modules/support/domain/repositories/support.repository'
 
 import {
   ISupportRepository,
@@ -9,7 +10,7 @@ import {
 @Injectable()
 export class ListUserTicketsUseCase {
   constructor(@Inject(SUPPORT_REPOSITORY) private repo: ISupportRepository) {}
-  execute(args: { userId: string; status?: TicketStatus; page: number; perPage: number }) {
+  execute(args: { userId: string; status?: TicketStatus; page: number; perPage: number }): Promise<{ items: TicketListItem[]; total: number; }> {
     return this.repo.listUserTickets({
       userId: args.userId,
       ...(args.status !== undefined ? { status: args.status } : {}),

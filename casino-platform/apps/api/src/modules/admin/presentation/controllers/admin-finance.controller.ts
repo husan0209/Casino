@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
 import { type Request } from 'express'
@@ -56,7 +57,7 @@ export class AdminFinanceController {
 
   // UC-PAY-16 transactions
   @Get('transactions')
-  async transactions(@Query() q: Record<string, string | undefined>) {
+  async transactions(@Query() q: Record<string, string | undefined>): Promise<{ items: ({ user: { email: string | null; } | null; walletAccount: { currency: string; }; } & { id: string; createdAt: Date; transactionId: string; walletAccountId: string; type: LedgerEntryType; amount: Prisma.Decimal; balanceBefore: Prisma.Decimal; balanceAfter: Prisma.Decimal; idempotencyKey: string | null; description: string | null; metadata: Prisma.JsonValue; userId: string | null; })[]; meta: { page: number; perPage: number; total: number; }; }> {
     const { page, perPage } = parsePagination(q)
     const where: Prisma.LedgerEntryWhereInput = {}
     if (q.user_id) {
@@ -86,7 +87,7 @@ export class AdminFinanceController {
 
   // UC-PAY-17 payment_requests
   @Get('payment-requests')
-  async paymentRequests(@Query() q: Record<string, string | undefined>) {
+  async paymentRequests(@Query() q: Record<string, string | undefined>): Promise<{ items: ({ user: { email: string | null; }; } & { id: string; createdAt: Date; updatedAt: Date; type: PaymentType; amount: Prisma.Decimal; idempotencyKey: string; metadata: Prisma.JsonValue; userId: string; currency: string; status: PaymentStatus; provider: PaymentProvider; method: string | null; amountRub: Prisma.Decimal | null; fee: Prisma.Decimal; externalId: string | null; externalStatus: string | null; paymentUrl: string | null; destination: Prisma.JsonValue; errorMessage: string | null; expiresAt: Date | null; completedAt: Date | null; })[]; meta: { page: number; perPage: number; total: number; }; }> {
     const { page, perPage } = parsePagination(q)
     const where: Prisma.PaymentRequestWhereInput = {}
     if (q.user_id) {
@@ -116,7 +117,7 @@ export class AdminFinanceController {
 
   // UC-PAY-18 details
   @Get('payment-requests/:id')
-  async paymentDetail(@Param('id') id: string) {
+  async paymentDetail(@Param('id') id: string): Promise<{ payment_request: ({ user: { email: string | null; }; callbacks: { id: string; createdAt: Date; ipAddress: string | null; provider: string; externalId: string | null; paymentRequestId: string | null; rawHeaders: Prisma.JsonValue; rawBody: string | null; processed: boolean; processingResult: string | null; }[]; } & { id: string; createdAt: Date; updatedAt: Date; type: PaymentType; amount: Prisma.Decimal; idempotencyKey: string; metadata: Prisma.JsonValue; userId: string; currency: string; status: PaymentStatus; provider: PaymentProvider; method: string | null; amountRub: Prisma.Decimal | null; fee: Prisma.Decimal; externalId: string | null; externalStatus: string | null; paymentUrl: string | null; destination: Prisma.JsonValue; errorMessage: string | null; expiresAt: Date | null; completedAt: Date | null; }) | null; callbacks: { id: string; createdAt: Date; ipAddress: string | null; provider: string; externalId: string | null; paymentRequestId: string | null; rawHeaders: Prisma.JsonValue; rawBody: string | null; processed: boolean; processingResult: string | null; }[] | undefined; ledger_entries: { id: string; createdAt: Date; transactionId: string; walletAccountId: string; type: LedgerEntryType; amount: Prisma.Decimal; balanceBefore: Prisma.Decimal; balanceAfter: Prisma.Decimal; idempotencyKey: string | null; description: string | null; metadata: Prisma.JsonValue; userId: string | null; }[] | never[]; }> {
     const pr = await prisma.paymentRequest.findUnique({
       where: { id },
       include: { callbacks: true, user: { select: { email: true } } },
@@ -129,7 +130,7 @@ export class AdminFinanceController {
 
   // UC-PAY-10 withdrawals list
   @Get('withdrawals')
-  async withdrawals(@Query() q: Record<string, string | undefined>) {
+  async withdrawals(@Query() q: Record<string, string | undefined>): Promise<{ items: ({ user: { email: string | null; }; } & { id: string; createdAt: Date; updatedAt: Date; type: PaymentType; amount: Prisma.Decimal; idempotencyKey: string; metadata: Prisma.JsonValue; userId: string; currency: string; status: PaymentStatus; provider: PaymentProvider; method: string | null; amountRub: Prisma.Decimal | null; fee: Prisma.Decimal; externalId: string | null; externalStatus: string | null; paymentUrl: string | null; destination: Prisma.JsonValue; errorMessage: string | null; expiresAt: Date | null; completedAt: Date | null; })[]; meta: { page: number; perPage: number; total: number; }; }> {
     const { page, perPage } = parsePagination(q)
     const where: Prisma.PaymentRequestWhereInput = { type: 'withdrawal' }
     if (q.status) {
@@ -155,7 +156,7 @@ export class AdminFinanceController {
   }
 
   /** Общая логика одобрения одной заявки (single + batch). */
-  private async approveOne(id: string, admin: AdminActor, req: Request) {
+  private async approveOne(id: string, admin: AdminActor, req: Request): Promise<void> {
     const wd = await this.payments.findById(id)
     if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') {
       throw new WithdrawalInvalidStatusError()
@@ -179,7 +180,7 @@ export class AdminFinanceController {
   }
 
   /** Общая логика отклонения одной заявки (single + batch). */
-  private async rejectOne(id: string, reason: string | undefined, admin: AdminActor, req: Request) {
+  private async rejectOne(id: string, reason: string | undefined, admin: AdminActor, req: Request): Promise<void> {
     const wd = await this.payments.findById(id)
     if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') {
       throw new WithdrawalInvalidStatusError()
@@ -204,7 +205,7 @@ export class AdminFinanceController {
 
   // UC-PAY-11 approve
   @Post('withdrawals/:id/approve')
-  async approve(@Param('id') id: string, @CurrentUser() admin: AdminActor, @Req() req: Request) {
+  async approve(@Param('id') id: string, @CurrentUser() admin: AdminActor, @Req() req: Request): Promise<{ ok: boolean; }> {
     await this.approveOne(id, admin, req)
     return { ok: true }
   }
@@ -217,7 +218,7 @@ export class AdminFinanceController {
     @Body() body: { reason: string },
     @CurrentUser() admin: AdminActor,
     @Req() req: Request,
-  ) {
+  ): Promise<{ ok: boolean; }> {
     await this.rejectOne(id, body.reason, admin, req)
     return { ok: true }
   }
@@ -229,7 +230,7 @@ export class AdminFinanceController {
     @Body() body: { ids: string[] },
     @CurrentUser() admin: AdminActor,
     @Req() req: Request,
-  ) {
+  ): Promise<{ ok: boolean; approved: number; failed: { id: string; error: string; }[]; }> {
     const failed: Array<{ id: string; error: string }> = []
     let approved = 0
     for (const id of body.ids) {
@@ -258,7 +259,7 @@ export class AdminFinanceController {
     @Body() body: { ids: string[]; reason: string },
     @CurrentUser() admin: AdminActor,
     @Req() req: Request,
-  ) {
+  ): Promise<{ ok: boolean; rejected: number; failed: { id: string; error: string; }[]; }> {
     const failed: Array<{ id: string; error: string }> = []
     let rejected = 0
     for (const id of body.ids) {
@@ -293,7 +294,7 @@ export class AdminFinanceController {
     @Body() b: { amount: string; currency: string; reason: string },
     @CurrentUser() admin: AdminActor,
     @Req() req: Request,
-  ) {
+  ): Promise<CreditResult> {
     if (admin.role !== 'superadmin') {
       throw new Error('FORBIDDEN')
     }
@@ -326,7 +327,7 @@ export class AdminFinanceController {
     @Body() b: { amount: string; currency: string; reason: string },
     @CurrentUser() admin: AdminActor,
     @Req() req: Request,
-  ) {
+  ): Promise<CreditResult> {
     if (admin.role !== 'superadmin') {
       throw new Error('FORBIDDEN')
     }

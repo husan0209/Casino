@@ -1,6 +1,6 @@
+import { prisma, type GameSession, type Prisma } from '@casino/database'
 import { Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
 
 import {
   type IGameCatalogRepository,
@@ -17,7 +17,6 @@ import {
   type GameCatalogQuery,
 } from '../../domain/repositories/casino.repository'
 
-import type { Prisma } from '@prisma/client'
 
 
 @Injectable()
@@ -118,7 +117,7 @@ export class PrismaGamePlayRepository implements IGamePlayRepository {
     return prisma.gameSession.findUnique({ where: { sessionToken: token }, include: { game: true } })
   }
 
-  findSessionByToken(token: string) {
+  findSessionByToken(token: string): Promise<GameSession | null> {
     return prisma.gameSession.findUnique({ where: { sessionToken: token } })
   }
 
@@ -129,7 +128,9 @@ export class PrismaGamePlayRepository implements IGamePlayRepository {
     })
   }
 
-  createSession(data: Prisma.GameSessionUncheckedCreateInput) {
+  createSession(
+    data: Prisma.GameSessionUncheckedCreateInput,
+  ): Promise<{ id: string; sessionToken: string }> {
     return prisma.gameSession.create({
       data,
       select: { id: true, sessionToken: true },

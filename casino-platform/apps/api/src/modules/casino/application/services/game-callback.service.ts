@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
+import { CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 
 import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 
@@ -216,7 +217,7 @@ export class GameCallbackService {
     isBet: boolean
     /* Тип tx выводим из фасада — прямой импорт prisma в application запрещён (G1) */
     tx: Parameters<Parameters<WalletFacade['runInTransaction']>[0]>[0]
-  }) {
+  }): Promise<{ balance: string; duplicate: boolean; } | { balance: string; duplicate?: never; }> {
     const { cb, providerId, session, originalTx, rollbackAmount, isBet, tx } = args
     // гонка двух одновременных rollback — перепроверка внутри транзакции
     const alreadyInTx = await this.play.findRollbackOf(originalTx.roundId, originalTx.id, tx)
@@ -305,7 +306,7 @@ export class GameCallbackService {
     cb: ParsedProviderCallback
     winAmount: string
     tx?: Parameters<Parameters<WalletFacade['runInTransaction']>[0]>[0]
-  }) {
+  }): Promise<CreditResult> {
     const { session, providerId, cb, winAmount, tx } = args
     return this.wallet.credit({
       userId: session.userId,

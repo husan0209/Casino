@@ -28,13 +28,13 @@ export class NotificationService {
     const createData: CreateNotificationInput = {
       userId: input.userId,
       type: input.type,
-      channel: input.channel || 'internal',
+      channel: input.channel ?? 'internal',
       title: input.title,
       message: input.message,
-      data: (input.data || {}) as CreateNotificationInput['data'],
+      data: (input.data ?? {}) as CreateNotificationInput['data'],
     }
     const n = await this.repo.create(createData)
-    if ((input.channel || 'internal') === 'email') {
+    if ((input.channel ?? 'internal') === 'email') {
       // Check user settings before queuing email
       const settings = await this.repo.findUserSettings(input.userId).catch(() => null)
       const emailEnabled = settings?.notificationsEmail ?? true

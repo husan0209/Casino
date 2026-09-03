@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto'
+import Decimal from 'decimal.js'
 
 import { Inject, Injectable } from '@nestjs/common'
-import Decimal from 'decimal.js'
 
 
 import { WalletFacade } from '@modules/wallet/application/wallet.facade'
@@ -50,7 +50,7 @@ export class LaunchGameUseCase {
     @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
   ) {}
 
-  async execute(input: LaunchGameInput) {
+  async execute(input: LaunchGameInput): Promise<{ session_id: string | null; launch_url: string; currency: string; }> {
     const game = await this.catalog.findBySlug(input.gameSlug)
     if (!game) {
       throw new GameNotFoundError(input.gameSlug)

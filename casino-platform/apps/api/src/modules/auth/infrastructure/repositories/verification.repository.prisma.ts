@@ -18,30 +18,30 @@ const toView = (row: {
 
 @Injectable()
 export class PrismaEmailVerificationRepository implements IEmailVerificationRepository {
-  async create(userId: string, token: string, expiresAt: Date) {
+  async create(userId: string, token: string, expiresAt: Date): Promise<VerificationTokenView> {
     const row = await prisma.emailVerification.create({ data: { userId, token, expiresAt } })
     return toView(row)
   }
-  async findByToken(token: string) {
+  async findByToken(token: string): Promise<VerificationTokenView | null> {
     const row = await prisma.emailVerification.findUnique({ where: { token } })
     return row ? toView(row) : null
   }
-  async markUsed(id: string) {
+  async markUsed(id: string): Promise<void> {
     await prisma.emailVerification.update({ where: { id }, data: { usedAt: new Date() } })
   }
 }
 
 @Injectable()
 export class PrismaPasswordResetRepository implements IPasswordResetRepository {
-  async create(userId: string, token: string, expiresAt: Date) {
+  async create(userId: string, token: string, expiresAt: Date): Promise<VerificationTokenView> {
     const row = await prisma.passwordReset.create({ data: { userId, token, expiresAt } })
     return toView(row)
   }
-  async findByToken(token: string) {
+  async findByToken(token: string): Promise<VerificationTokenView | null> {
     const row = await prisma.passwordReset.findUnique({ where: { token } })
     return row ? toView(row) : null
   }
-  async markUsed(id: string) {
+  async markUsed(id: string): Promise<void> {
     await prisma.passwordReset.update({ where: { id }, data: { usedAt: new Date() } })
   }
 }

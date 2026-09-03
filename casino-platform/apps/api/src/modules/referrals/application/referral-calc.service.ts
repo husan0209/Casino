@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import Decimal from 'decimal.js'
+import { type Prisma } from '@casino/database'
 
 import { errorMessage } from '@/common/utils/error-message'
 
@@ -24,7 +25,7 @@ export class ReferralCalcService {
 
   // TODO(referrals): split runDaily into accrual + payout steps (<60 lines)
   // eslint-disable-next-line max-lines-per-function
-  async runDaily(dateStr?: string) {
+  async runDaily(dateStr?: string): Promise<{ processed: number; credited: number; date: Date; }> {
     const date = dateStr ? new Date(dateStr) : new Date(Date.now() - 86400000)
     const dayStart = new Date(date)
     dayStart.setUTCHours(0, 0, 0, 0)
@@ -61,7 +62,7 @@ export class ReferralCalcService {
     referrerId: string
     dayStart: Date
     dayEnd: Date
-    rewardRate: Decimal
+    rewardRate: Prisma.Decimal
   }): Promise<{ processed: number; credited: number }> {
     const { referredId, referrerId, dayStart, dayEnd, rewardRate } = args
     const bets = await this.repo.sumTransactions({ userId: referredId, type: 'bet', from: dayStart, to: dayEnd })
@@ -96,7 +97,7 @@ export class ReferralCalcService {
     referrerId: string
     dayStart: Date
     dayEnd: Date
-    rewardRate: Decimal
+    rewardRate: Prisma.Decimal
     cur: string
     betSum: string
     winSum: string

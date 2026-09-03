@@ -1,8 +1,9 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common'
+import { ReferralRewardType, ReferralRewardStatus } from '@casino/database'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 
-import { prisma } from '@casino/database'
+import { type Prisma, prisma } from '@casino/database'
 
 import { AuthGuard } from '../../auth/presentation/guards/auth.guard'
 
@@ -10,7 +11,7 @@ import { AuthGuard } from '../../auth/presentation/guards/auth.guard'
 @Controller('referrals')
 export class ReferralsController {
   @Get('info')
-  async info(@CurrentUser() currentUser: { id: string }) {
+  async info(@CurrentUser() currentUser: { id: string }): Promise<{ referral_code: string | undefined; referral_link: string; reward_rate: string; total_referrals: number; active_referrals: number; total_earned: { RUB: string; }; pending_rewards: { RUB: string; }; }> {
     const user = await prisma.user.findUnique({
       where: { id: currentUser.id },
       select: { referralCode: true },
@@ -44,7 +45,7 @@ export class ReferralsController {
   async list(
     @CurrentUser() currentUser: { id: string },
     @Query() queryParams: { page?: string; per_page?: string },
-  ) {
+  ): Promise<{ data: { id: string; registered_at: Date; is_active: boolean; total_earned: string; currency: string; }[]; meta: { page: number; perPage: number; total: number; }; }> {
     const page = parseInt(queryParams.page || '1', 10) || 1
     const perPage = parseInt(queryParams.per_page || '20', 10) || 20
 
@@ -78,7 +79,7 @@ export class ReferralsController {
   async rewards(
     @CurrentUser() currentUser: { id: string },
     @Query() queryParams: { page?: string; per_page?: string },
-  ) {
+  ): Promise<{ data: { id: string; createdAt: Date; type: ReferralRewardType; currency: string; status: ReferralRewardStatus; ledgerEntryId: string | null; rewardAmount: Prisma.Decimal; ggrAmount: Prisma.Decimal; rewardRate: Prisma.Decimal; referrerId: string; referredId: string; periodStart: Date; periodEnd: Date; creditedAt: Date | null; }[]; meta: { page: number; perPage: number; total: number; }; }> {
     const page = parseInt(queryParams.page || '1', 10) || 1
     const perPage = parseInt(queryParams.per_page || '20', 10) || 20
 

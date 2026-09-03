@@ -33,7 +33,7 @@ type GameListEnvelope = RawGameRow[] | { games?: RawGameRow[]; data?: RawGameRow
  * Запуск игры: POST {API}/userAuth {agentID,userID,lang,gameid,isaffiliate,lobbyUrl}
  * Каталог: GET {API}/gamelist
  */
-const AMT = (v: unknown) => Number(v ?? 0).toFixed(2)
+const AMT = (v: unknown): string => Number(v ?? 0).toFixed(2)
 
 /** Первое поле с фактическим значением (undefined/пусто пропускаются). */
 function firstPresent(body: Record<string, unknown>, ...keys: string[]): string | undefined {
@@ -100,7 +100,7 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
 
   constructor(private config: ConfigService) {}
 
-  private creds() {
+  private creds(): { agentId: string; apiToken: string; secret: string; } {
     const agentId = this.config.get<string>('GITSLOTPARK_AGENT_ID')
     const apiToken = this.config.get<string>('GITSLOTPARK_API_TOKEN')
     const secret = this.config.get<string>('GITSLOTPARK_SECRET_KEY')
@@ -210,12 +210,12 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
     }
   }
 
-  formatSuccessResponse(balance: string, _transactionId?: string) {
+  formatSuccessResponse(balance: string, _transactionId?: string): { status: number; balance: string; } {
     // Код результата 0 = success по таблице GitSlotPark
     return { status: 0, balance: Number(balance).toFixed(2) }
   }
 
-  formatErrorResponse(code: string, message: string) {
+  formatErrorResponse(code: string, message: string): { status: number; message: string; } {
     const codes: Record<string, number> = {
       INSUFFICIENT_FUNDS: 6,
       SESSION_EXPIRED: 5,

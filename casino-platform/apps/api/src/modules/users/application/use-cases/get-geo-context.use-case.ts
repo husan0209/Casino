@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
+import { UserGeoContext } from '@modules/geo/domain/geo-config.policy'
 
 import {
   IUserProfileRepository,
@@ -9,7 +10,7 @@ import {
 export class GetGeoContextUseCase {
   constructor(@Inject(USER_PROFILE_REPOSITORY) private profiles: IUserProfileRepository) {}
 
-  execute(userId: string) {
+  execute(userId: string): Promise<UserGeoContext | null> {
     return this.profiles.getGeoContext(userId)
   }
 }

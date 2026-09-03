@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Query, Req, Res, UsePipes } from '@nestjs/common'
+import { UserRole } from '@casino/database'
 import { Throttle } from '@nestjs/throttler'
 import { type Request, Response } from 'express'
 
@@ -49,7 +50,7 @@ export class AuthController {
     @Body() body: RegisterDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ) {
+  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: UserRole; }; referralCode: string; }> {
     const result = await this.registerUc.execute(
       { email: body.email, password: body.password, referralCode: body.referral_code },
       { ip: req.ip, userAgent: req.headers['user-agent'] },
@@ -59,7 +60,7 @@ export class AuthController {
   }
 
   @Get('verify-email')
-  async verify(@Query('token') token: string, @Req() req: Request) {
+  async verify(@Query('token') token: string, @Req() req: Request): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string | null; role: UserRole; }; }> {
     const result = await this.verifyUc.execute(token, req.ip, req.headers['user-agent'])
     return result
   }
@@ -70,7 +71,7 @@ export class AuthController {
     @Body() body: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ) {
+  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: UserRole; }; }> {
     const result = await this.loginUc.execute({
       email: body.email,
       password: body.password,
@@ -82,7 +83,7 @@ export class AuthController {
   }
 
   @Post('refresh')
-  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<{ accessToken: string; }> {
     // Refresh token lives only in the httpOnly cookie. Accepting it from the
     // request body weakens CSRF protection and breaks the cookie-based rotation
     // contract — do not reintroduce the body fallback.
@@ -93,7 +94,7 @@ export class AuthController {
   }
 
   @Post('logout')
-  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<{ ok: boolean; }> {
     const user = req.user
     if (user && 'sessionId' in user && user.sessionId) {
       await this.logoutUc.execute(user.sessionId)
@@ -104,20 +105,20 @@ export class AuthController {
 
   @Post('forgot-password')
   @UsePipes(new ZodValidationPipe(ForgotPasswordSchema))
-  async forgot(@Body() body: { email: string }) {
+  async forgot(@Body() body: { email: string }): Promise<{ message: string; }> {
     return this.forgotUc.execute(body.email)
   }
 
   @Post('reset-password')
   @UsePipes(new ZodValidationPipe(ResetPasswordSchema))
-  async reset(@Body() body: { token: string; new_password: string }) {
+  async reset(@Body() body: { token: string; new_password: string }): Promise<{ ok: boolean; }> {
     return this.resetUc.execute(body.token, body.new_password)
   }
 
   // ===== OAuth (TZ part 2) =====
 
   @Get('google/url')
-  googleUrl(@Query('redirect_uri') redirectUri?: string) {
+  googleUrl(@Query('redirect_uri') redirectUri?: string): { url: string; state: string; } {
     return this.googleUc.buildAuthUrl(redirectUri)
   }
 
@@ -127,7 +128,7 @@ export class AuthController {
     @Body() body: { code: string; redirect_uri?: string; state?: string; referral_code?: string },
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ) {
+  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: string; }; }> {
     const result = await this.googleUc.execute({
       code: body.code,
       redirectUri: body.redirect_uri,
@@ -146,7 +147,7 @@ export class AuthController {
     @Body() payload: Record<string, unknown>,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ) {
+  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: string; }; }> {
     const result = await this.telegramUc.execute(
       payload as unknown as Parameters<typeof this.telegramUc.execute>[0],
       { ip: req.ip, userAgent: req.headers['user-agent'] },

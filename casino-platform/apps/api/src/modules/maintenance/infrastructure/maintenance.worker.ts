@@ -44,7 +44,7 @@ export class MaintenanceWorker implements OnModuleDestroy {
     this.logger.log(`Maintenance worker started on queue "${QUEUES.MAINTENANCE}"`)
   }
 
-  async onModuleDestroy() {
+  async onModuleDestroy(): Promise<void> {
     await this.worker?.close()
   }
 }

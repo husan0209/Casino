@@ -14,7 +14,7 @@ export class CancelWithdrawalUseCase {
     private repo: PaymentRequestRepository,
     private wallet: WalletFacade,
   ) {}
-  async execute(userId: string, id: string) {
+  async execute(userId: string, id: string): Promise<{ ok: boolean; }> {
     const pr = await this.repo.findById(id)
     if (!pr || pr.userId !== userId) {
       throw new ForbiddenException()

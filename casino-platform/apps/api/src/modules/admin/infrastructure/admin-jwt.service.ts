@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto'
+import { AdminRole } from '@casino/database'
 
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
@@ -6,7 +7,7 @@ import * as argon2 from 'argon2'
 
 import { prisma } from '@casino/database'
 
-const b64url = (buf: Buffer) => buf.toString('base64url')
+const b64url = (buf: Buffer): string => buf.toString('base64url')
 
 /** HS256 JWT на node:crypto — jsonwebtoken недоступен как зависимость (см. IMPLEMENTATION_GAPS GAP-01). */
 function hs256(secret: string, header: object, payload: object): string {
@@ -23,13 +24,13 @@ function hs256Verify(secret: string, token: string): Record<string, unknown> {
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
     throw new Error('BAD_SIGNATURE')
   }
-  return JSON.parse(Buffer.from(p!, 'base64url').toString())
+  return JSON.parse(Buffer.from(p!, 'base64url').toString()) as Record<string, unknown>
 }
 
 @Injectable()
 export class AdminAuthService {
   constructor(private config: ConfigService) {}
-  async validate(email: string, password: string) {
+  async validate(email: string, password: string): Promise<{ id: string; email: string; passwordHash: string; role: AdminRole; firstName: string | null; lastName: string | null; isActive: boolean; createdBy: string | null; lastLoginAt: Date | null; createdAt: Date; updatedAt: Date; } | null> {
     const admin = await prisma.adminUser.findUnique({ where: { email: email.toLowerCase() } })
     if (!admin || !admin.isActive) {
       return null

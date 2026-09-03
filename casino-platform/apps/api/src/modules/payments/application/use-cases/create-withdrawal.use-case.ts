@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
+import Decimal from 'decimal.js'
 
 import { Injectable } from '@nestjs/common'
-import { Decimal } from 'decimal.js'
 
 
 import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
@@ -22,7 +22,7 @@ export class CreateWithdrawalUseCase {
   async execute(
     userId: string,
     input: { amount: string; currency: string; method?: string; destination: string },
-  ) {
+  ): Promise<{ payment_request_id: string; }> {
     await this.kyc.assertCanWithdraw(userId)
     const amt = new Decimal(input.amount)
     const min = input.currency === 'RUB' ? '500' : '0.001'

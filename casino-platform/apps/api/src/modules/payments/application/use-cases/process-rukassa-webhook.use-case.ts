@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { PaymentType, PaymentStatus, PaymentProvider } from '@casino/database'
 
 import { errorMessage } from '@/common/utils/error-message'
 
@@ -10,6 +11,7 @@ import type { Currency } from '@casino/shared-types'
 import { classifyPaymentStatus } from '../../domain/payment-status'
 import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
 import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
+import { type Prisma } from '@casino/database'
 
 /** Rukassa отдаёт id платежа в разных полях в зависимости от сценария. */
 function pickExternalId(body: Record<string, unknown>): string {
@@ -39,7 +41,7 @@ export class ProcessRukassaWebhookUseCase {
     private wallet: WalletFacade,
     private users: UsersFacade,
   ) {}
-  async execute(input: ProcessRukassaWebhookInput) {
+  async execute(input: ProcessRukassaWebhookInput): Promise<{ ok: boolean; }> {
     const { rawHeaders, body, rawBody, ip } = input
     // Store the EXACT raw body bytes the provider signed. If we ever need to
     // re-verify or investigate a dispute, we have the original payload.
@@ -82,7 +84,7 @@ export class ProcessRukassaWebhookUseCase {
   }
 
   /** Платёжка: сначала по external_id провайдера, затем по id платежа. */
-  private async resolvePaymentRequest(externalId: string) {
+  private async resolvePaymentRequest(externalId: string): Promise<{ id: string; createdAt: Date; updatedAt: Date; type: PaymentType; amount: Prisma.Decimal; idempotencyKey: string; metadata: Prisma.JsonValue; userId: string; currency: string; status: PaymentStatus; provider: PaymentProvider; method: string | null; amountRub: Prisma.Decimal | null; fee: Prisma.Decimal; externalId: string | null; externalStatus: string | null; paymentUrl: string | null; destination: Prisma.JsonValue; errorMessage: string | null; expiresAt: Date | null; completedAt: Date | null; } | null> {
     const pr = await this.repo.findByExternalId(externalId, 'rukassa')
     if (pr) {
       return pr

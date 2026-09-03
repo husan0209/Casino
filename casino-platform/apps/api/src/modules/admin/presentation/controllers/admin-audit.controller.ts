@@ -8,7 +8,7 @@ import { AdminAuthGuard } from '../admin-auth.guard'
 @Controller('admin/audit-logs')
 export class AdminAuditController {
   @Get()
-  async list(@Query() q: Record<string, string | undefined>) {
+  async list(@Query() q: Record<string, string | undefined>): Promise<{ items: { id: string; createdAt: Date; actorType: ActorType; actorId: string; action: string; targetType: string | null; targetId: string | null; payload: Prisma.JsonValue; ipAddress: string | null; userAgent: string | null; }[]; meta: { page: number; perPage: number; total: number; }; }> {
     const page = parseInt(q.page ?? '') || 1,
       perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
     const where: Prisma.AuditLogWhereInput = {}

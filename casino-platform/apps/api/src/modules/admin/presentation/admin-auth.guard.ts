@@ -5,14 +5,17 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 
+import { getHttpRequest } from '@/common/types/express-context'
+import { type AdminActor } from '@/common/types/req-user'
+
 import { AdminAuthService } from '../infrastructure/admin-jwt.service'
 
 @Injectable()
 export class AdminAuthGuard implements CanActivate {
   constructor(private auth: AdminAuthService) {}
   canActivate(ctx: ExecutionContext): boolean {
-    const req = ctx.switchToHttp().getRequest()
-    const h = req.headers.authorization || ''
+    const req = getHttpRequest(ctx)
+    const h = req.headers.authorization ?? ''
     const token = h.startsWith('Bearer ') ? h.slice(7) : null
     if (!token) {
       throw new UnauthorizedException()
@@ -25,7 +28,7 @@ export class AdminAuthGuard implements CanActivate {
       }
       const sub = typeof p['sub'] === 'string' ? p['sub'] : ''
       const role = typeof p['role'] === 'string' ? p['role'] : ''
-      req.user = { id: sub, role, isAdmin: true }
+      req.user = { id: sub, role, isAdmin: true } satisfies AdminActor
       return true
     } catch {
       throw new UnauthorizedException()

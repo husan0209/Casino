@@ -37,7 +37,7 @@ export class ProviderCallbackController {
     @Headers() headers: Record<string, string>,
     @Body() body: Record<string, unknown>,
     @Res() res: Response,
-  ) {
+  ): Promise<Response<any, Record<string, any>>> {
     headers['x-gsp-op'] = op
     return this.handle(slug, headers, body, res)
   }
@@ -49,7 +49,7 @@ export class ProviderCallbackController {
     @Headers() headers: Record<string, string>,
     @Body() body: Record<string, unknown>,
     @Res() res: Response,
-  ) {
+  ): Promise<Response<any, Record<string, any>>> {
     try {
       const adapter = this.adapters.getAdapter(slug)
       if (!adapter.verifyCallback(headers, body)) {
@@ -79,7 +79,7 @@ export class ProviderCallbackController {
     parsed: ParsedProviderCallback,
     providerId: string,
     res: Response,
-  ) {
+  ): Promise<Response<any, Record<string, any>>> {
     try {
       switch (parsed.action) {
         case 'authenticate': {

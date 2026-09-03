@@ -1,4 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from 'crypto'
+import { OAuthSignInResult } from '@modules/auth/application/use-cases/oauth/oauth-user-provisioning.service'
 
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
@@ -60,7 +61,7 @@ export class TelegramLoginUseCase {
   async execute(
     input: TelegramWidgetPayload & { referralCode?: string | undefined },
     meta?: { ip?: string | undefined; userAgent?: string | undefined },
-  ) {
+  ): Promise<OAuthSignInResult> {
     this.verify(input)
     const displayName =
       [input.first_name, input.last_name].filter(Boolean).join(' ') || input.username

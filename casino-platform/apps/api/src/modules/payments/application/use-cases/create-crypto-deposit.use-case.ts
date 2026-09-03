@@ -20,7 +20,7 @@ export class CreateCryptoDepositUseCase {
     private kycCheck: KycCheckService,
     private config: ConfigService,
   ) {}
-  async execute(userId: string, amount: string, currency: string) {
+  async execute(userId: string, amount: string, currency: string): Promise<{ payment_request_id: string; pay_address: string; pay_amount: string; pay_currency: string; expires_at: string; }> {
     const allowed = ['USDT_TRC20', 'BTC', 'TON', 'TRX', 'LTC']
     if (!allowed.includes(currency)) {
       throw new Error('INVALID_CURRENCY')
@@ -35,7 +35,7 @@ export class CreateCryptoDepositUseCase {
     await this.kycCheck.assertCanDeposit(userId, estimatedRub)
     const idempotencyKey = `dep_${randomUUID()}`
     const ipn =
-      this.config.get('NOWPAYMENTS_WEBHOOK_URL') ||
+      this.config.get<string>('NOWPAYMENTS_WEBHOOK_URL') ||
       'http://localhost:3001/api/v1/payments/webhooks/nowpayments'
     try {
       // create NP payment first to get pay_address

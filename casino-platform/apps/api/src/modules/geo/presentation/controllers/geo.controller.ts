@@ -1,4 +1,5 @@
 import { Controller, Get, Req, UseGuards } from '@nestjs/common'
+import { GeoConfigResult } from '@modules/geo/domain/geo-config.policy'
 import { type Request } from 'express'
 
 import { OptionalAuthGuard } from '@/common/guards/optional-auth.guard'
@@ -11,7 +12,7 @@ export class GeoController {
 
   @Get('config')
   @UseGuards(OptionalAuthGuard)
-  config(@Req() req: Request & { user?: { id: string } }) {
+  config(@Req() req: Request & { user?: { id: string } }): Promise<GeoConfigResult> {
     const countryHeader =
       (req.headers['x-geo-country'] as string) ||
       (req.headers['cf-ipcountry'] as string) ||

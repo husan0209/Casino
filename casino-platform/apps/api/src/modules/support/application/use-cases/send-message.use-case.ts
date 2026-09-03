@@ -16,7 +16,7 @@ export class SendMessageUseCase {
     message: string
     isInternal?: boolean
     ownerCheckUserId?: string
-  }) {
+  }): Promise<{ id: string; }> {
     const t = await this.repo.getAdmin(input.ticketId)
     if (!t) {
       throw new TicketNotFoundError()

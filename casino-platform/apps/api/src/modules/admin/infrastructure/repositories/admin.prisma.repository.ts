@@ -229,7 +229,7 @@ export class PrismaDashboardRepository implements IDashboardRepository {
   }
 }
 
-/** Decimal/bigint/string → строка ('0' для null/пустых значений SQL SUM). */
+/** Prisma.Decimal/bigint/string → строка ('0' для null/пустых значений SQL SUM). */
 function numToString(v: unknown): string {
   return v?.toString?.() ?? '0'
 }

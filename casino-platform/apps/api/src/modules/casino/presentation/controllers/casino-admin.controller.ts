@@ -1,4 +1,5 @@
 import { createHash } from 'crypto'
+import { GameProviderType, GameVolatility, GameRoundStatus } from '@casino/database'
 
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
 
@@ -43,22 +44,22 @@ export class CasinoAdminController {
 
   // providers
   @Get('providers')
-  async providersList() {
+  async providersList(): Promise<{ id: string; createdAt: Date; updatedAt: Date; name: string; type: GameProviderType; slug: string; isEnabled: boolean; sortOrder: number; apiUrl: string | null; apiKey: string | null; apiSecret: string | null; config: Prisma.JsonValue; logoUrl: string | null; gameCount: number; }[]> {
     return prisma.gameProvider.findMany({ orderBy: { sortOrder: 'asc' } })
   }
   @Post('providers/:id/enable')
-  async providerEnable(@Param('id') id: string) {
+  async providerEnable(@Param('id') id: string): Promise<{ ok: boolean; }> {
     await prisma.gameProvider.update({ where: { id }, data: { isEnabled: true } })
     return { ok: true }
   }
   @Post('providers/:id/disable')
-  async providerDisable(@Param('id') id: string) {
+  async providerDisable(@Param('id') id: string): Promise<{ ok: boolean; }> {
     await prisma.gameProvider.update({ where: { id }, data: { isEnabled: false } })
     return { ok: true }
   }
   // UC-GAME-19: синхронизация каталога через ProviderAdapter
   @Post('providers/:id/sync-games')
-  async syncGames(@Param('id') id: string) {
+  async syncGames(@Param('id') id: string): Promise<{ added: number; updated: number; total: number; note: string; }> {
     const provider = await prisma.gameProvider.findUnique({ where: { id } })
     if (!provider) {
       throw new Error('NOT_FOUND')
@@ -97,8 +98,8 @@ export class CasinoAdminController {
   ): Promise<boolean> {
     const data = {
       name: g.name || g.externalGameId,
-      type: g.type as GameType | undefined ?? 'slot',
-      category: g.category as GameCategory | undefined ?? 'slots',
+      type: (g.type ?? 'slot') as GameType,
+      category: (g.category ?? 'slots') as GameCategory,
       thumbnailUrl: g.thumbnailUrl ?? null,
       hasDemo: g.hasDemo,
       rtp: g.rtp !== null && g.rtp !== undefined ? String(g.rtp) : null,
@@ -126,7 +127,7 @@ export class CasinoAdminController {
 
   // games
   @Get('games')
-  async games(@Query() q: Record<string, string | undefined>) {
+  async games(@Query() q: Record<string, string | undefined>): Promise<{ items: ({ provider: { name: string; slug: string; }; } & { id: string; createdAt: Date; updatedAt: Date; name: string; type: GameType; metadata: Prisma.JsonValue; category: GameCategory; providerId: string; externalGameId: string; slug: string; nameRu: string | null; subcategory: string | null; thumbnailUrl: string | null; bannerUrl: string | null; isEnabled: boolean; isFeatured: boolean; isNew: boolean; isPopular: boolean; hasDemo: boolean; rtp: Prisma.Decimal | null; volatility: GameVolatility | null; maxWinMultiplier: Prisma.Decimal | null; minBet: Prisma.Decimal | null; maxBet: Prisma.Decimal | null; supportedCurrencies: Prisma.JsonValue; tags: Prisma.JsonValue; sortOrder: number; launchCount: number; })[]; meta: { page: number; perPage: number; total: number; }; }> {
     const page = parseInt(q.page ?? '') || 1,
       perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
     const where: Prisma.GameWhereInput = {}
@@ -167,7 +168,7 @@ export class CasinoAdminController {
       sort_order?: number
       tags?: string[]
     },
-  ) {
+  ): Promise<{ ok: boolean; }> {
     const data: Prisma.GameUpdateInput = {}
     if (b.name_ru !== undefined) {
       data.nameRu = b.name_ru
@@ -188,29 +189,29 @@ export class CasinoAdminController {
     return { ok: true }
   }
   @Post('games/:id/enable')
-  async gameEnable(@Param('id') id: string) {
+  async gameEnable(@Param('id') id: string): Promise<{ ok: boolean; }> {
     await prisma.game.update({ where: { id }, data: { isEnabled: true } })
     return { ok: true }
   }
   @Post('games/:id/disable')
-  async gameDisable(@Param('id') id: string) {
+  async gameDisable(@Param('id') id: string): Promise<{ ok: boolean; }> {
     await prisma.game.update({ where: { id }, data: { isEnabled: false } })
     return { ok: true }
   }
   @Post('games/:id/feature')
-  async gameFeature(@Param('id') id: string) {
+  async gameFeature(@Param('id') id: string): Promise<{ ok: boolean; }> {
     await prisma.game.update({ where: { id }, data: { isFeatured: true } })
     return { ok: true }
   }
   @Post('games/:id/unfeature')
-  async gameUnfeature(@Param('id') id: string) {
+  async gameUnfeature(@Param('id') id: string): Promise<{ ok: boolean; }> {
     await prisma.game.update({ where: { id }, data: { isFeatured: false } })
     return { ok: true }
   }
 
   // game sessions
   @Get('game-sessions')
-  async sessions(@Query() q: Record<string, string | undefined>) {
+  async sessions(@Query() q: Record<string, string | undefined>): Promise<{ items: ({ user: { email: string | null; }; game: { name: string; slug: string; }; provider: { name: string; }; } & { id: string; ipAddress: string | null; userAgent: string | null; metadata: Prisma.JsonValue; userId: string; currency: string; status: GameSessionStatus; providerId: string; gameId: string; sessionToken: string; isDemo: boolean; startedAt: Date; lastActivityAt: Date; closedAt: Date | null; totalBet: Prisma.Decimal; totalWin: Prisma.Decimal; roundsPlayed: number; })[]; meta: { page: number; perPage: number; total: number; }; }> {
     const page = parseInt(q.page ?? '') || 1,
       perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
     const where: Prisma.GameSessionWhereInput = {}
@@ -243,7 +244,7 @@ export class CasinoAdminController {
     return { items, meta: { page, perPage, total } }
   }
   @Get('game-sessions/:id')
-  async sessionDetail(@Param('id') id: string) {
+  async sessionDetail(@Param('id') id: string): Promise<({ user: { email: string | null; }; game: { id: string; createdAt: Date; updatedAt: Date; name: string; type: GameType; metadata: Prisma.JsonValue; category: GameCategory; providerId: string; externalGameId: string; slug: string; nameRu: string | null; subcategory: string | null; thumbnailUrl: string | null; bannerUrl: string | null; isEnabled: boolean; isFeatured: boolean; isNew: boolean; isPopular: boolean; hasDemo: boolean; rtp: Prisma.Decimal | null; volatility: GameVolatility | null; maxWinMultiplier: Prisma.Decimal | null; minBet: Prisma.Decimal | null; maxBet: Prisma.Decimal | null; supportedCurrencies: Prisma.JsonValue; tags: Prisma.JsonValue; sortOrder: number; launchCount: number; }; gameRounds: ({ gameTransactions: { id: string; createdAt: Date; type: GameTransactionType; amount: Prisma.Decimal; balanceAfter: Prisma.Decimal; metadata: Prisma.JsonValue; userId: string; currency: string; processed: boolean; providerId: string; sessionId: string; roundId: string; externalTransactionId: string; ledgerEntryId: string | null; }[]; } & { id: string; createdAt: Date; userId: string; currency: string; status: GameRoundStatus; providerId: string; gameId: string; closedAt: Date | null; totalBet: Prisma.Decimal; totalWin: Prisma.Decimal; sessionId: string; externalRoundId: string; })[]; } & { id: string; ipAddress: string | null; userAgent: string | null; metadata: Prisma.JsonValue; userId: string; currency: string; status: GameSessionStatus; providerId: string; gameId: string; sessionToken: string; isDemo: boolean; startedAt: Date; lastActivityAt: Date; closedAt: Date | null; totalBet: Prisma.Decimal; totalWin: Prisma.Decimal; roundsPlayed: number; }) | null> {
     const session = await prisma.gameSession.findUnique({
       where: { id },
       include: {
@@ -255,7 +256,7 @@ export class CasinoAdminController {
     return session
   }
   @Get('game-transactions')
-  async gameTx(@Query() q: Record<string, string | undefined>) {
+  async gameTx(@Query() q: Record<string, string | undefined>): Promise<{ items: { id: string; createdAt: Date; type: GameTransactionType; amount: Prisma.Decimal; balanceAfter: Prisma.Decimal; metadata: Prisma.JsonValue; userId: string; currency: string; processed: boolean; providerId: string; sessionId: string; roundId: string; externalTransactionId: string; ledgerEntryId: string | null; }[]; meta: { page: number; perPage: number; total: number; }; }> {
     const page = parseInt(q.page ?? '') || 1,
       perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
     const where: Prisma.GameTransactionWhereInput = {}

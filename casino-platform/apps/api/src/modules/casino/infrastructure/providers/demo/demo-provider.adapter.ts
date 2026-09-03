@@ -13,7 +13,7 @@ import {
 export class DemoProviderAdapter implements GameProviderAdapter {
   constructor(private config: ConfigService) {}
   async getLaunchUrl(params: LaunchParams): Promise<{ url: string }> {
-    const webUrl = this.config.get('APP_URL') || 'http://localhost:3000'
+    const webUrl = this.config.get<string>('APP_URL') || 'http://localhost:3000'
     const url = `${webUrl}/demo-game?token=${encodeURIComponent(params.sessionToken)}&game=${encodeURIComponent(params.gameExternalId)}&currency=${params.currency}&demo=${params.isDemo ? '1' : '0'}`
     return { url }
   }
@@ -46,7 +46,7 @@ export class DemoProviderAdapter implements GameProviderAdapter {
     ]
   }
   verifyCallback(): boolean {
-    const env = this.config.get('NODE_ENV')
+    const env = this.config.get<string>('NODE_ENV')
     if (env === 'production') {
       throw new Error('DEMO_PROVIDER_DISABLED. Demo provider cannot be used in production.')
     }

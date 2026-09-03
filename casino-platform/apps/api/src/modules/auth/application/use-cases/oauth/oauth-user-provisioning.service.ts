@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
+import { type User } from '../../../domain/entities/user.entity'
 
 import {
   IAuthProviderRepository,
@@ -106,7 +107,7 @@ export class OAuthUserProvisioningService {
   }
 
   /** Создание игрока при первом входе через провайдера (без пароля, с реферальным кодом). */
-  private async provisionUser(input: ProviderSignInInput) {
+  private async provisionUser(input: ProviderSignInInput): Promise<User> {
     const referralCode = await this.generateReferralCode()
     let referredBy: string | null = null
     if (input.referralCode) {

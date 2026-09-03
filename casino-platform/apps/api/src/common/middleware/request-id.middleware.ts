@@ -22,7 +22,7 @@ export function resolveRequestId(candidate: unknown): string {
 
 @Injectable()
 export class RequestIdMiddleware implements NestMiddleware {
-  use(req: Request & { id?: string }, res: Response, next: NextFunction) {
+  use(req: Request, res: Response, next: NextFunction): void {
     // req.id может быть уже установлен pino-логгером (genReqId) — не перезатираем,
     // иначе id в логах и в ответе разъедутся.
     const id = req.id ?? resolveRequestId(req.headers['x-request-id'])

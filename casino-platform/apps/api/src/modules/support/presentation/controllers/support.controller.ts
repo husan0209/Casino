@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
+import { TicketListItem, MessageRow, TicketPriority } from '@modules/support/domain/repositories/support.repository'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -29,7 +30,7 @@ export class SupportController {
   create(
     @CurrentUser() currentUser: { id: string },
     @Body() dto: { subject: string; category: string; message: string },
-  ) {
+  ): Promise<{ id: string; }> {
     return this.createTicketUseCase.execute(currentUser.id, {
       subject: dto.subject,
       category: dto.category as TicketCategory,
@@ -41,7 +42,7 @@ export class SupportController {
   async list(
     @CurrentUser() currentUser: { id: string },
     @Query() queryParams: { status?: string; page?: string; per_page?: string },
-  ) {
+  ): Promise<{ data: TicketListItem[]; meta: { total: number; }; }> {
     const page = parseInt(queryParams.page || '1', 10) || 1
     const perPage = parseInt(queryParams.per_page || '20', 10) || 20
     const result = await this.listTicketsUseCase.execute({
@@ -59,7 +60,7 @@ export class SupportController {
   }
 
   @Get('tickets/:id')
-  get(@CurrentUser() currentUser: { id: string }, @Param('id') ticketId: string) {
+  get(@CurrentUser() currentUser: { id: string }, @Param('id') ticketId: string): Promise<{ messages: MessageRow[]; id: string; userId: string; subject: string; category: TicketCategory; status: TicketStatus; priority: TicketPriority; assignedTo: string | null; closedBy?: string | null; closedAt: Date | null; createdAt: Date; updatedAt: Date; }> {
     return this.getTicketUseCase.execute(currentUser.id, ticketId, false)
   }
 
@@ -69,7 +70,7 @@ export class SupportController {
     @CurrentUser() currentUser: { id: string },
     @Param('id') ticketId: string,
     @Body() dto: { message: string },
-  ) {
+  ): Promise<{ id: string; }> {
     return this.sendMessageUseCase.execute({
       ticketId,
       senderType: 'user',
@@ -80,7 +81,7 @@ export class SupportController {
   }
 
   @Post('tickets/:id/close')
-  close(@CurrentUser() currentUser: { id: string }, @Param('id') ticketId: string) {
+  close(@CurrentUser() currentUser: { id: string }, @Param('id') ticketId: string): Promise<{ ok: boolean; }> {
     return this.closeTicketUseCase.execute(ticketId, 'user', currentUser.id)
   }
 }

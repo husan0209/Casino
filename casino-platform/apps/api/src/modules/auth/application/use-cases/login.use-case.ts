@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
+import { UserRole } from '@casino/database'
 
 import { type LockoutConfig } from '../../domain/entities/user.entity'
 import {
@@ -41,7 +42,7 @@ export class LoginUseCase {
     password: string
     ip?: string | undefined
     userAgent?: string | undefined
-  }) {
+  }): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string | null; role: UserRole; }; }> {
     const now = new Date()
     const user = await this.users.findByEmail(input.email.toLowerCase().trim())
     if (!user?.passwordHash) {

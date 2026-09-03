@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common'
+import { SupportSenderType } from '@casino/database'
 
 import {
   prisma,
@@ -115,7 +116,7 @@ export class PrismaSupportRepository implements ISupportRepository {
     message: string
     isInternal?: boolean
     attachments?: TicketAttachment[]
-  }) {
+  }): Promise<{ id: string; createdAt: Date; message: string; senderType: SupportSenderType; senderId: string; attachments: Prisma.JsonValue; isInternal: boolean; ticketId: string; }> {
     const { ticketId, senderType, senderId, message } = args
     const isInternal = args.isInternal ?? false
     const attachments = (args.attachments ?? []) as unknown as Prisma.InputJsonValue[]

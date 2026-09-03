@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto'
+import { UserRole } from '@casino/database'
 
 import { Inject, Injectable } from '@nestjs/common'
 
@@ -48,7 +49,7 @@ export class RegisterUseCase {
   async execute(
     input: { email: string; password: string; referralCode?: string | undefined },
     meta?: { ip?: string | undefined; userAgent?: string | undefined },
-  ) {
+  ): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string | null; role: UserRole; }; referralCode: string; message: string; }> {
     if (input.password.length < 8) {
       throw new WeakPasswordError()
     }

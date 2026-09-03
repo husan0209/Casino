@@ -14,11 +14,11 @@ export class HealthController {
   constructor(private config: ConfigService) {}
 
   @Get()
-  getHealth() {
+  getHealth(): { status: string; timestamp: string; } {
     return { status: 'ok', timestamp: new Date().toISOString() }
   }
 
-  @Get('live') liveness() {
+  @Get('live') liveness(): { live: boolean; } {
     return { live: true }
   }
 
@@ -64,9 +64,9 @@ export class HealthController {
         retryStrategy: () => null,
       })
       await client.connect()
-      const pong = await client.ping()
+      const pong: unknown = await client.ping()
       await client.quit().catch(() => undefined)
-      return pong === 'PONG'
+      return String(pong).toUpperCase() === 'PONG'
     } catch {
       return false
     }

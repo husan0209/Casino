@@ -34,10 +34,10 @@ export interface MessageRow {
   senderId: string | null
   message: string
   isInternal: boolean
-  attachments: unknown // Prisma JsonValue
+  attachments: unknown // Prisma Prisma.JsonValue
   createdAt: Date
 }
-/** Prisma JsonValue-совместимый тип для JSON-полей. */
+/** Prisma Prisma.JsonValue-совместимый тип для JSON-полей. */
 export type PrismaJsonObject = { [key: string]: PrismaJson }
 export type PrismaJson = string | number | boolean | null | PrismaJson[] | PrismaJsonObject
 /** Вложение к сообщению тикета (ссылка на сохранённый файл). */

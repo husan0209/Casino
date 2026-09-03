@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { LedgerEntryType } from '@casino/database'
 
 import { Injectable } from '@nestjs/common'
 
@@ -24,7 +25,7 @@ import {
  * за доменным интерфейсом IWalletLedger. Non-Prisma ledger меняет только этот файл.
  */
 
-/** Prisma возвращает Decimal — все денежные значения идут через toString(). */
+/** Prisma возвращает Prisma.Decimal — все денежные значения идут через toString(). */
 function toMoney(v: Prisma.Decimal | number | bigint | string): MoneyAmount {
   return v.toString()
 }
@@ -104,7 +105,7 @@ export class PrismaWalletLedger implements IWalletLedger {
     tx: Prisma.TransactionClient,
     userId: string,
     currency: Currency,
-  ) {
+  ): Promise<{ id: string; createdAt: Date; updatedAt: Date; userId: string; currency: string; balance: Prisma.Decimal; locked: Prisma.Decimal; version: bigint; }> {
     const wallet = await tx.walletAccount.findUnique({
       where: { userId_currency: { userId, currency } },
     })
@@ -203,7 +204,7 @@ export class PrismaWalletLedger implements IWalletLedger {
     tx: Prisma.TransactionClient,
     userId: string,
     currency: Currency,
-  ) {
+  ): Promise<{ id: string; createdAt: Date; updatedAt: Date; userId: string; currency: string; balance: Prisma.Decimal; locked: Prisma.Decimal; version: bigint; }> {
     const wallet = await tx.walletAccount.findUnique({
       where: { userId_currency: { userId, currency } },
     })
@@ -226,7 +227,7 @@ export class PrismaWalletLedger implements IWalletLedger {
       description: string
       metadata?: Prisma.InputJsonValue
     },
-  ) {
+  ): Promise<{ id: string; createdAt: Date; transactionId: string; walletAccountId: string; type: LedgerEntryType; amount: Prisma.Decimal; balanceBefore: Prisma.Decimal; balanceAfter: Prisma.Decimal; idempotencyKey: string | null; description: string | null; metadata: Prisma.JsonValue; userId: string | null; }> {
     return tx.ledgerEntry.create({
       data: { transactionId: randomUUID(), ...data, metadata: data.metadata ?? {} },
     })

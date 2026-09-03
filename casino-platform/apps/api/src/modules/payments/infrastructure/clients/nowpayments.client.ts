@@ -88,7 +88,7 @@ export class NOWPaymentsClient {
     return this.config.get<string>('NOWPAYMENTS_API_BASE') || 'https://api.nowpayments.io/v1'
   }
 
-  mapCurrency(ours: string) {
+  mapCurrency(ours: string): string {
     return MAP[ours] || ours.toLowerCase()
   }
 
@@ -98,7 +98,7 @@ export class NOWPaymentsClient {
     payCurrency: string
     orderId: string
     ipnCallbackUrl: string
-  }) {
+  }): Promise<{ paymentId: string; payAddress: string; payAmount: string; payCurrency: string; expirationEstimateDate: string; }> {
     if (!this.isProd() && !this.config.get<string>('NOWPAYMENTS_API_KEY')) {
       return this.devStubPayment(params)
     }

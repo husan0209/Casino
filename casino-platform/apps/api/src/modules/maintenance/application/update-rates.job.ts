@@ -76,7 +76,7 @@ export class UpdateRatesJob {
   }
 
   /** Таблица чистится от записей старше недели (тики каждые 5 мин — иначе бесконечный рост). */
-  private async pruneHistory(now: Date) {
+  private async pruneHistory(now: Date): Promise<void> {
     const { prisma } = await import('@casino/database')
     await prisma.exchangeRate
       .deleteMany({ where: { fetchedAt: { lt: new Date(now.getTime() - HISTORY_TTL_MS) } } })

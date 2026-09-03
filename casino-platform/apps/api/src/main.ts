@@ -36,7 +36,7 @@ function captureRawBody(
   (req as RawBodyRequest).rawBody = buf.toString('utf8')
 }
 
-async function bootstrap() {
+async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
     bodyParser: false, // we wire our own to attach the verify callback

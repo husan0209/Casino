@@ -15,7 +15,7 @@ export class RefreshUseCase {
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     private jwt: JwtTokenService,
   ) {}
-  async execute(refreshToken: string) {
+  async execute(refreshToken: string): Promise<{ accessToken: string; refreshToken: string; }> {
     const hash = this.jwt.hashRefreshToken(refreshToken)
     const session = await this.sessions.findByRefreshTokenHash(hash)
     if (!session || session.revokedAt) {

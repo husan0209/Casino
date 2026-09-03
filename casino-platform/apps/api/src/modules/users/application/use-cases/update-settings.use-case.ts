@@ -15,7 +15,7 @@ interface UpdateSettingsInput {
 @Injectable()
 export class UpdateSettingsUseCase {
   constructor(@Inject(USER_PROFILE_REPOSITORY) private repo: IUserProfileRepository) {}
-  async execute(userId: string, input: UpdateSettingsInput) {
+  async execute(userId: string, input: UpdateSettingsInput): Promise<{ ok: boolean; }> {
     await this.repo.updateSettings(userId, {
       ...(input.notifications_email !== undefined && { notificationsEmail: input.notifications_email }),
       ...(input.notifications_push !== undefined && { notificationsPush: input.notifications_push }),

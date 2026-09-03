@@ -71,7 +71,7 @@ import { NOWPaymentsClient } from '../payments/infrastructure/clients/nowpayment
 export class MaintenanceModule implements OnApplicationBootstrap {
   constructor(private readonly scheduler: MaintenanceScheduler) {}
 
-  async onApplicationBootstrap() {
+  async onApplicationBootstrap(): Promise<void> {
     await this.scheduler.registerRepeatableJobs()
   }
 }
