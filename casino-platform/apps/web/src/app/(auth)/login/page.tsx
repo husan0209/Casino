@@ -19,8 +19,11 @@ export default function LoginPage() {
       await login(email, password)
       toast.success('Вход выполнен')
       router.push('/profile')
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error?.message || 'Ошибка входа')
+    } catch (err: unknown) {
+      toast.error(
+        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message || 'Ошибка входа',
+      )
     } finally {
       setLoading(false)
     }

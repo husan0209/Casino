@@ -16,8 +16,11 @@ function ResetInner() {
       await apiPost('/auth/reset-password', { token, new_password: pw })
       toast.success('Пароль изменён')
       router.push('/login')
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error?.message || 'Ошибка')
+    } catch (err: unknown) {
+      toast.error(
+        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message || 'Ошибка',
+      )
     }
   }
   return (

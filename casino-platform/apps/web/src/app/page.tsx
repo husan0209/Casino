@@ -44,7 +44,7 @@ export default function Home() {
         <div className="text-muted py-8 text-center text-sm">Загрузка игр…</div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {list.slice(0, 12).map((g: any, i: number) => (
+          {list.slice(0, 12).map((g, i) => (
             <GameCard
               key={g.slug || i}
               slug={g.slug}

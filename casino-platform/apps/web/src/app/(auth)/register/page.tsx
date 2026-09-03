@@ -17,8 +17,11 @@ export default function RegisterPage() {
       await register(email, password, ref || undefined)
       setSent(true)
       toast.success('Письмо отправлено на email')
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error?.message || 'Ошибка регистрации')
+    } catch (err: unknown) {
+      toast.error(
+        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message || 'Ошибка регистрации',
+      )
     }
   }
   if (sent) {
