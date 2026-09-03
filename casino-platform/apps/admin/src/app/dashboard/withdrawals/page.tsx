@@ -23,11 +23,11 @@ interface WdRow {
   amount: string
   currency: string
   method: string | null
-  destination: any
+  destination: { card_masked?: string; address?: string } | null
   user?: { email: string | null }
 }
 
-const destText = (d: any) =>
+const destText = (d: { card_masked?: string; address?: string } | null): string =>
   typeof d?.card_masked === 'string'
     ? d.card_masked
     : typeof d?.address === 'string'

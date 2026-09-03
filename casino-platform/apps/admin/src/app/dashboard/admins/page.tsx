@@ -161,7 +161,7 @@ export default function AdminsPage() {
         />
         <Select
           value={form.role}
-          onChange={(e) => setForm({ ...form, role: e.target.value as any })}
+          onChange={(e) => setForm({ ...form, role: e.target.value as 'admin' | 'superadmin' })}
           className="w-36"
         >
           <option value="admin">admin</option>
