@@ -4,8 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useEffect, useState, Suspense } from 'react'
 
 import { errText, setAccessToken } from '@/lib/api'
-import { type AuthState, useAuth } from '@/stores/auth'
-import type { WebUser } from '@/stores/auth'
+import { type AuthState, type WebUser, useAuth } from '@/stores/auth'
 
 function VerifyInner(): React.JSX.Element {
   const sp = useSearchParams()
