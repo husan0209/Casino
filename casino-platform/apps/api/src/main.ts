@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core'
 import { type NestExpressApplication } from '@nestjs/platform-express'
 import cookieParser from 'cookie-parser'
 import { json, urlencoded, type Request, type Response } from 'express'
+import type { IncomingMessage } from 'http'
 import helmet from 'helmet'
 import { Logger } from 'nestjs-pino'
 
@@ -24,7 +25,8 @@ interface RawBodyRequest extends Request {
   rawBody?: string
 }
 
-function captureRawBody(req: Request, _res: Response, buf: Buffer, _encoding: string): void {
+function captureRawBody(req: IncomingMessage, _res: Response, buf: Buffer, _encoding: string): void {
+  // verify-колбэк body-parser получает IncomingMessage; Request (с rawBody) — подтип
   (req as RawBodyRequest).rawBody = buf.toString('utf8')
 }
 
