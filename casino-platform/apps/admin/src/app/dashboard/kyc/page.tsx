@@ -112,7 +112,7 @@ export default function KycPage(): React.JSX.Element {
                             className="input text-xs w-40"
                             placeholder="Причина"
                             value={reason}
-                            onChange={(e) => setReason(e.target.value ?? '')}
+                            onChange={(e) => setReason(e.target.value)}
                           />
                           <Btn
                             small

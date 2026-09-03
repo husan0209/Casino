@@ -143,7 +143,7 @@ export default function WithdrawalsPage(): React.JSX.Element {
               small
               placeholder="Причина отказа…"
               value={batchReason}
-              onChange={(e) => setBatchReason(e.target.value ?? '')}
+              onChange={(e) => setBatchReason(e.target.value)}
               className="w-52"
             />
             <Btn

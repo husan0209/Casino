@@ -31,7 +31,7 @@ export const useAuthStore = create<AuthState>()(
       login: async (email, password) => {
         // /admin/auth/login возвращает {accessToken, admin} – без обёртки data
         const res = await apiPost<AdminLoginResponse>('/admin/auth/login', { email, password })
-        if (!res?.accessToken || !res?.admin) {
+        if (!res.accessToken || !res.admin) {
           throw new Error('Ошибка входа')
         }
         set({ token: res.accessToken, admin: res.admin })
