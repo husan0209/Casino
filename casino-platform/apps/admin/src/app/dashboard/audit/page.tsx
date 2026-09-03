@@ -13,7 +13,7 @@ interface AuditRow {
   action: string
   targetType: string | null
   targetId: string | null
-  payload: any
+  payload: Record<string, unknown> | null
   ipAddress: string | null
 }
 

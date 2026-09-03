@@ -4,7 +4,9 @@ module.exports = {
     tsconfigRootDir: __dirname,
   },
   rules: {
-    '@typescript-eslint/no-explicit-any': 'warn',
+    // GAP-39 stage 8: правило поднято до error — в src не осталось any
+    // (13 разобраны: api-клиент на ApiResponse<T>, типы DTO в pages)
+    '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/no-unsafe-assignment': 'warn',
     '@typescript-eslint/no-unsafe-member-access': 'warn',
     '@typescript-eslint/no-unsafe-call': 'warn',

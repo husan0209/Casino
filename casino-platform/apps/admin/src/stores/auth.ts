@@ -10,6 +10,12 @@ interface AdminUser {
   role: 'admin' | 'superadmin'
 }
 
+/** Ответ /admin/auth/login: {accessToken, admin} без обёртки data. */
+interface AdminLoginResponse {
+  accessToken: string
+  admin: AdminUser
+}
+
 interface AuthState {
   token: string | null
   admin: AdminUser | null
@@ -24,9 +30,9 @@ export const useAuthStore = create<AuthState>()(
       admin: null,
       login: async (email, password) => {
         // /admin/auth/login возвращает {accessToken, admin} – без обёртки data
-        const res = await apiPost<any>('/admin/auth/login', { email, password })
-        if (!res?.accessToken) {
-          throw new Error(res?.error?.message || 'Ошибка входа')
+        const res = await apiPost<AdminLoginResponse>('/admin/auth/login', { email, password })
+        if (!res?.accessToken || !res?.admin) {
+          throw new Error('Ошибка входа')
         }
         set({ token: res.accessToken, admin: res.admin })
       },
