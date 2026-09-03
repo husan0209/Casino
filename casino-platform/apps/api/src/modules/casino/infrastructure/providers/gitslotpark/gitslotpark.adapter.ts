@@ -119,7 +119,7 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
   }
 
   /** userAuth → URL игровой сессии. userID передаём наш внутренний userId. */
-  async getLaunchUrl(params: LaunchParams) {
+  async getLaunchUrl(params: LaunchParams): Promise<{ url: string }> {
     const { agentId, apiToken } = this.creds()
     const base = this.config.get<string>('GITSLOTPARK_API_BASE') || 'https://apiv2.gitslotpark.com'
     const res = await fetch(`${base}/userAuth?api_token=${encodeURIComponent(apiToken)}`, {
@@ -149,7 +149,7 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
   }
 
   /** Каталог агрегатора: GET /gamelist?api_token=… */
-  async fetchGameList() {
+  async fetchGameList(): Promise<ProviderGameRow[]> {
     const { apiToken } = this.creds()
     const base = this.config.get<string>('GITSLOTPARK_API_BASE') || 'https://apiv2.gitslotpark.com'
     const res = await fetch(`${base}/gamelist?api_token=${encodeURIComponent(apiToken)}`, {

@@ -5,7 +5,7 @@ import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-import { type ParsedProviderCallback } from '../../domain/provider-adapter.interface'
+import { type ProviderCallbackResponse, type ParsedProviderCallback } from '../../domain/provider-adapter.interface'
 import {
   GAME_PLAY_REPOSITORY,
   type GameRow,
@@ -20,7 +20,8 @@ export class GameCallbackService {
     @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
   ) {}
 
-  async authenticate(sessionToken: string) {
+  /** Стандартный seamless-ответ провайдеру (формат GitSlotPark). */
+  async authenticate(sessionToken: string): Promise<ProviderCallbackResponse> {
     const session = await this.play.findSessionByTokenWithUser(sessionToken)
     if (!session || session.status !== 'active') {
       throw new Error('SESSION_INVALID')
@@ -38,12 +39,12 @@ export class GameCallbackService {
     }
   }
 
-  async balance(sessionToken: string) {
+  async balance(sessionToken: string): Promise<{ balance: string; currency: string }> {
     const a = await this.authenticate(sessionToken)
     return { balance: a.balance, currency: a.currency }
   }
 
-  async bet(cb: ParsedProviderCallback, providerId: string) {
+  async bet(cb: ParsedProviderCallback, providerId: string): Promise<ProviderCallbackResponse> {
     if (!cb.playerToken || !cb.transactionId || !cb.betAmount) {
       throw new Error('INVALID_BET_REQUEST')
     }
@@ -101,7 +102,7 @@ export class GameCallbackService {
     })
   }
 
-  async win(cb: ParsedProviderCallback, providerId: string) {
+  async win(cb: ParsedProviderCallback, providerId: string): Promise<ProviderCallbackResponse> {
     if (!cb.playerToken || !cb.transactionId) {
       throw new Error('INVALID_WIN_REQUEST')
     }
@@ -162,7 +163,7 @@ export class GameCallbackService {
     })
   }
 
-  async rollback(cb: ParsedProviderCallback, providerId: string) {
+  async rollback(cb: ParsedProviderCallback, providerId: string): Promise<ProviderCallbackResponse> {
     if (!cb.playerToken || !cb.rollbackTransactionId) {
       throw new Error('INVALID_ROLLBACK_REQUEST')
     }

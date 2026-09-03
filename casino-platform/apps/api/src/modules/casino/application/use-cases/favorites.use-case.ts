@@ -8,6 +8,17 @@ import {
   IGameFavoritesRepository,
 } from '../../domain/repositories/casino.repository'
 
+interface GameHistoryRow {
+  round_id: string
+  game: { slug: string; name: string; provider: string }
+  currency: string
+  total_bet: string
+  total_win: string
+  profit: string
+  status: string
+  created_at: Date
+}
+
 @Injectable()
 export class FavoritesUseCase {
   constructor(
@@ -15,7 +26,7 @@ export class FavoritesUseCase {
     @Inject(GAME_FAVORITES_REPOSITORY) private readonly favorites: IGameFavoritesRepository,
   ) {}
 
-  async add(userId: string, slug: string) {
+  async add(userId: string, slug: string): Promise<{ ok: boolean }> {
     const game = await this.catalog.findBySlug(slug)
     if (!game) {
       throw new Error('GAME_NOT_FOUND')
@@ -24,7 +35,7 @@ export class FavoritesUseCase {
     return { ok: true }
   }
 
-  async remove(userId: string, slug: string) {
+  async remove(userId: string, slug: string): Promise<{ ok: boolean }> {
     const game = await this.catalog.findBySlug(slug)
     if (game) {
       await this.favorites.remove(userId, game.id)
@@ -32,7 +43,11 @@ export class FavoritesUseCase {
     return { ok: true }
   }
 
-  async list(userId: string, page = 1, perPage = 24) {
+  async list(
+    userId: string,
+    page = 1,
+    perPage = 24,
+  ): Promise<{ items: FavoriteWithGame['game'][]; total: number }> {
     const [rows, total] = await Promise.all([
       this.favorites.findFavorites(userId, (page - 1) * perPage, perPage),
       this.favorites.countFavorites(userId),
@@ -40,12 +55,17 @@ export class FavoritesUseCase {
     return { items: rows.map((r) => r.game), total }
   }
 
-  async recent(userId: string) {
+  async recent(userId: string): Promise<FavoriteWithGame['game'][]> {
     const sessions = await this.favorites.findRecentSessions(userId, 20)
     return sessions.map((s) => s.game)
   }
 
-  async history(args: { userId: string; page: number; perPage: number; gameId?: string }) {
+  async history(args: {
+    userId: string
+    page: number
+    perPage: number
+    gameId?: string
+  }): Promise<{ data: GameHistoryRow[]; total: number }> {
     const { userId, page, perPage, gameId } = args
     const [rounds, total] = await Promise.all([
       this.favorites.findRoundsWithGame({ userId, gameId, skip: (page - 1) * perPage, take: perPage }),
