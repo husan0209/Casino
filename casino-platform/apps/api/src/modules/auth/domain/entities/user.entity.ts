@@ -49,35 +49,35 @@ export class User {
     return new User({ ...row })
   }
 
-  get id() {
+  get id(): string {
     return this.props.id
   }
-  get email() {
+  get email(): string | null {
     return this.props.email
   }
-  get username() {
+  get username(): string | null {
     return this.props.username
   }
-  get passwordHash() {
+  get passwordHash(): string | null {
     return this.props.passwordHash
   }
-  get status() {
+  get status(): UserStatus {
     return this.props.status
   }
-  get role() {
+  get role(): UserRole {
     return this.props.role
   }
-  get emailVerified() {
+  get emailVerified(): boolean {
     return this.props.emailVerified
   }
-  get referralCode() {
+  get referralCode(): string {
     return this.props.referralCode
   }
-  get referredBy() {
+  get referredBy(): string | null {
     return this.props.referredBy
   }
 
-  markLogin() {
+  markLogin(): void {
     this.props.lastLoginAt = new Date()
   }
 
@@ -110,10 +110,10 @@ export class User {
     this.props.lastFailedAt = null
     this.props.lockedUntil = null
   }
-  markEmailVerified() {
+  markEmailVerified(): void {
     this.props.emailVerified = true
   }
-  setPasswordHash(hash: string) {
+  setPasswordHash(hash: string): void {
     this.props.passwordHash = hash
   }
 }

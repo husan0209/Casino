@@ -11,7 +11,8 @@ import {
   OAuthExchangeError,
 } from '@modules/auth/domain/errors'
 
-import { OAuthUserProvisioningService } from './oauth-user-provisioning.service'
+import { OAuthUserProvisioningService,
+  type OAuthSignInResult,} from './oauth-user-provisioning.service'
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
@@ -92,7 +93,7 @@ export class GoogleOAuthUseCase {
     referralCode?: string | undefined
     ip?: string | undefined
     userAgent?: string | undefined
-  }) {
+  }): Promise<OAuthSignInResult> {
     const { clientId, clientSecret } = this.credentials()
     this.verifyState(input.state)
     const redirect =

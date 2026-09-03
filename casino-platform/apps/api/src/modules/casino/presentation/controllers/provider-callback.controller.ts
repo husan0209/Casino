@@ -89,15 +89,15 @@ export class ProviderCallbackController {
         case 'balance':
           return res.json(await this.cb.balance(parsed.playerToken!))
         case 'bet': {
-          const r = await this.cb.bet(parsed, providerId)
+          const r = (await this.cb.bet(parsed, providerId)) as { balance: string }
           return res.json(adapter.formatSuccessResponse(r.balance, parsed.transactionId))
         }
         case 'win': {
-          const r = await this.cb.win(parsed, providerId)
+          const r = (await this.cb.win(parsed, providerId)) as { balance: string }
           return res.json(adapter.formatSuccessResponse(r.balance, parsed.transactionId))
         }
         case 'rollback': {
-          const r = await this.cb.rollback(parsed, providerId)
+          const r = (await this.cb.rollback(parsed, providerId)) as { balance: string }
           return res.json(adapter.formatSuccessResponse(r.balance))
         }
         default:

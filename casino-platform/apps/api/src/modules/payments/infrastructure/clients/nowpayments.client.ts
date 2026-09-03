@@ -57,7 +57,13 @@ export class NOWPaymentsClient {
     priceCurrency: string
     payCurrency: string
     orderId: string
-  }) {
+  }): {
+    paymentId: string
+    payAddress: string
+    payAmount: string
+    payCurrency: string
+    expirationEstimateDate: string
+  } {
     this.logger.log(
       `NOWPayments DEV-STUB create ${params.priceAmount} ${params.priceCurrency}->${params.payCurrency} order=${params.orderId}`,
     )

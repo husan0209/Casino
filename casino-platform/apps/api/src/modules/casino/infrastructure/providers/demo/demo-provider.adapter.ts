@@ -5,17 +5,19 @@ import {
   type GameProviderAdapter,
   type LaunchParams,
   type ParsedProviderCallback,
+  type ProviderCallbackResponse,
+  type ProviderGameRow,
 } from '@modules/casino/domain/provider-adapter.interface'
 
 @Injectable()
 export class DemoProviderAdapter implements GameProviderAdapter {
   constructor(private config: ConfigService) {}
-  async getLaunchUrl(params: LaunchParams) {
+  async getLaunchUrl(params: LaunchParams): Promise<{ url: string }> {
     const webUrl = this.config.get('APP_URL') || 'http://localhost:3000'
     const url = `${webUrl}/demo-game?token=${encodeURIComponent(params.sessionToken)}&game=${encodeURIComponent(params.gameExternalId)}&currency=${params.currency}&demo=${params.isDemo ? '1' : '0'}`
     return { url }
   }
-  async fetchGameList() {
+  async fetchGameList(): Promise<ProviderGameRow[]> {
     return [
       {
         externalGameId: 'demo-sweet-fruits',
@@ -43,7 +45,7 @@ export class DemoProviderAdapter implements GameProviderAdapter {
       },
     ]
   }
-  verifyCallback() {
+  verifyCallback(): boolean {
     const env = this.config.get('NODE_ENV')
     if (env === 'production') {
       throw new Error('DEMO_PROVIDER_DISABLED. Demo provider cannot be used in production.')
@@ -65,10 +67,10 @@ export class DemoProviderAdapter implements GameProviderAdapter {
       rawRequest: body,
     }
   }
-  formatSuccessResponse(balance: string, transactionId?: string) {
+  formatSuccessResponse(balance: string, transactionId?: string): ProviderCallbackResponse {
     return { success: true, balance, transaction_id: transactionId || null }
   }
-  formatErrorResponse(code: string, message: string) {
+  formatErrorResponse(code: string, message: string): ProviderCallbackResponse {
     return { success: false, error: { code, message } }
   }
 }

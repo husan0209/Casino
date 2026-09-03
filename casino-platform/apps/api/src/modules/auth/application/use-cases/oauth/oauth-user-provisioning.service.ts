@@ -14,6 +14,14 @@ import {
 import { IUserRepository, USER_REPOSITORY } from '@modules/auth/domain/repositories/user.repository'
 import { JwtTokenService } from '@modules/auth/infrastructure/services/jwt.service'
 
+/** Результат OAuth-входа: access/refresh + данные игрока. */
+export interface OAuthSignInResult {
+  accessToken: string
+  refreshToken: string
+  user: { id: string; email: string | null; role: string }
+  wasLinked: boolean
+}
+
 export interface ProviderSignInInput {
   provider: AuthProviderKind
   providerUserId: string
@@ -57,7 +65,7 @@ export class OAuthUserProvisioningService {
     throw new Error('REFERRAL_CODE_GENERATION_FAILED')
   }
 
-  async signIn(input: ProviderSignInInput) {
+  async signIn(input: ProviderSignInInput): Promise<OAuthSignInResult> {
     let link = await this.authProviders.findByProvider(input.provider, input.providerUserId)
     const wasLinked = Boolean(link)
     let user = link ? await this.users.findById(link.userId) : null
