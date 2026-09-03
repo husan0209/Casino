@@ -22,7 +22,7 @@ export function AppHeader(): React.JSX.Element {
   }, [user, load, fetchWallets])
 
   const wallet = getActiveWallet()
-  const displayCurrency = config?.activeCurrency || activeCurrency
+  const displayCurrency = config?.activeCurrency ?? activeCurrency
   const balance = wallet?.available ?? '0'
 
   return (

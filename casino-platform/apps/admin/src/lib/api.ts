@@ -1,32 +1,13 @@
 'use client'
 import axios, { type AxiosError } from 'axios'
 
-import { useAuthStore } from '@/stores/auth'
+export const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001/api/v1'
 
-export const API_URL = process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001/api/v1'
-
+/**
+ * Axios-инстанс без interceptor'ов (их подключает lib/api-interceptors.ts
+ * из layout.tsx — без цикла lib/api <-> stores/auth).
+ */
 export const api = axios.create({ baseURL: API_URL })
-
-api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
-  }
-  return config
-})
-
-api.interceptors.response.use(
-  (res) => res,
-  (err: AxiosError) => {
-    if (err.response?.status === 401 && typeof window !== 'undefined') {
-      useAuthStore.getState().logout()
-      if (!window.location.pathname.endsWith('/')) {
-        window.location.href = '/'
-      }
-    }
-    return Promise.reject(err)
-  },
-)
 
 /** Ответ API в конверте: TransformInterceptor оборачивает в {success,data}. */
 interface ApiResponse<T> {
@@ -80,7 +61,6 @@ export function errText(e: unknown): string {
   return (
     respData?.error?.message ??
     respData?.message ??
-    (e as Error).message ??
-    'Ошибка'
+    ((e as Error).message || 'Ошибка')
   )
 }

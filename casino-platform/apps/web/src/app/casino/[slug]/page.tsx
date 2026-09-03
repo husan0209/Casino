@@ -21,7 +21,7 @@ export default function GamePage(): React.JSX.Element {
   const { activeCurrency, fetchWallets, setLastPlayed } = useWalletStore()
   const { config, load } = useGeoStore()
 
-  const currency = config?.activeCurrency || activeCurrency
+  const currency = config?.activeCurrency ?? activeCurrency
 
   const { data: game } = useQuery({
     queryKey: ['game', slug],

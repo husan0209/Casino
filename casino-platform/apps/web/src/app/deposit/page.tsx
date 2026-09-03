@@ -35,7 +35,7 @@ export default function DepositPage(): React.JSX.Element {
       setLoading(false)
     }
   }
-  const submitCrypto = async () => {
+  const submitCrypto = async (): Promise<void> => {
     setLoading(true)
     try {
       const r = await apiPost<{ payment_request_id: string; pay_address: string; pay_amount: string; pay_currency: string }>('/payments/deposit/crypto', { amount, currency })

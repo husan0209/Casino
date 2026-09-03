@@ -142,7 +142,7 @@ export default function SupportPage(): React.JSX.Element {
         <div className="mt-6 bg-[#141420] border border-white/10 rounded-2xl p-4">
           <h3 className="font-semibold mb-3">Диалог #{openId.slice(0, 8)}</h3>
           <div className="max-h-64 overflow-y-auto space-y-2 mb-4">
-            {(messages.data?.data?.messages ?? []).map((m) => (
+            {(messages.data?.data.messages ?? []).map((m) => (
               <div
                 key={m.id}
                 className={`rounded-lg px-3 py-2 text-sm ${m.senderType === 'admin' ? (m.isInternal ? 'bg-yellow-900/40' : 'bg-blue-900/30') : 'bg-white/5'}`}

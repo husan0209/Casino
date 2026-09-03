@@ -32,7 +32,7 @@ export function Btn({
   variant?: BtnVariant
   disabled?: boolean
   small?: boolean
-}) {
+}): React.JSX.Element {
   return (
     <button
       onClick={onClick}
@@ -47,7 +47,7 @@ export function Btn({
 export function Input({
   small,
   ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & { small?: boolean }) {
+}: React.InputHTMLAttributes<HTMLInputElement> & { small?: boolean }): React.JSX.Element {
   return (
     <input
       {...props}
@@ -95,7 +95,7 @@ export function Pager({
   perPage: number
   total: number
   onPage: (p: number) => void
-}) {
+}): React.JSX.Element {
   const pages = Math.max(1, Math.ceil(total / perPage))
   return (
     <div className="flex items-center gap-3 mt-3 text-sm text-[#8b8ba7]">

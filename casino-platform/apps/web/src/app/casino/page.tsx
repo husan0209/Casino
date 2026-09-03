@@ -22,7 +22,7 @@ export default function CasinoPage(): React.JSX.Element {
         search: search || undefined,
       }),
   })
-  const games = data?.data || []
+  const games = data?.data ?? []
   const meta = data?.meta
   const { data: providers } = useQuery({
     queryKey: ['providers'],
