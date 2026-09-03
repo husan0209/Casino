@@ -9,7 +9,7 @@ import {
   IGameFavoritesRepository,
 } from '../../domain/repositories/casino.repository'
 
-interface GameHistoryRow {
+export interface GameHistoryRow {
   round_id: string
   game: { slug: string; name: string; provider: string }
   currency: string
