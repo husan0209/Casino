@@ -3,11 +3,11 @@ import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 
 import { apiGet } from '@/lib/api'
-import { type Currency } from '@casino/shared-types'
 import { useAuth } from '@/stores/auth'
 import type { WalletBalance } from '@/types/wallet'
 import type { WalletTxListDto } from '@/types/wallet-tx'
 
+import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 export default function WalletPage() {
