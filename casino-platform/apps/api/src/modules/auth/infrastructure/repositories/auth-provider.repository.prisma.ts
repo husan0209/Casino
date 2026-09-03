@@ -10,7 +10,10 @@ import type {
 
 @Injectable()
 export class PrismaAuthProviderRepository implements IAuthProviderRepository {
-  async findByProvider(provider: AuthProviderKind, providerUserId: string) {
+  async findByProvider(
+    provider: AuthProviderKind,
+    providerUserId: string,
+  ): Promise<AuthProviderView | null> {
     const row = await prisma.authProvider.findUnique({
       where: { provider_providerUserId: { provider, providerUserId } },
     })
@@ -33,7 +36,7 @@ export class PrismaAuthProviderRepository implements IAuthProviderRepository {
     providerUserId?: string
     providerEmail?: string
     providerData?: unknown
-  }) {
+  }): Promise<AuthProviderView> {
     const row = await prisma.authProvider.create({
       data: {
         userId: input.userId,

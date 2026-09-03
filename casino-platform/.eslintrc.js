@@ -104,9 +104,12 @@ module.exports = {
     {
       // Nest-хендлеры: сигнатуру задаёт фреймворк (декораторы @Param/@Body/@Req/@Res,
       // express verify(req,res,buf,encoding)) — это не наш API-дизайн (GAP-25).
+      // Return-типы хендлеров — HTTP-контракт (см. QUALITY_GATES §2.1.1): interceptor
+      // оборачивает в {success,data}, форма проверяется Zod-схемами фронта и E2E.
       files: ['**/*.controller.ts', '**/src/main.ts'],
       rules: {
         'max-params': 'off',
+        'explicit-function-return-type': 'off',
       },
     },
     {

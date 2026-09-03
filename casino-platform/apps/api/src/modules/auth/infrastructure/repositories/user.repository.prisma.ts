@@ -29,26 +29,26 @@ export class PrismaUserRepository implements IUserRepository {
     })
   }
 
-  async findByEmail(email: string) {
+  async findByEmail(email: string): Promise<User | null> {
     const row = await prisma.user.findUnique({ where: { email } })
     return row ? this.toDomain(row) : null
   }
 
-  async findById(id: string) {
+  async findById(id: string): Promise<User | null> {
     const row = await prisma.user.findUnique({ where: { id } })
     return row ? this.toDomain(row) : null
   }
 
-  async findByReferralCode(code: string) {
+  async findByReferralCode(code: string): Promise<User | null> {
     const row = await prisma.user.findUnique({ where: { referralCode: code } })
     return row ? this.toDomain(row) : null
   }
 
-  async referralCodeExists(code: string) {
+  async referralCodeExists(code: string): Promise<boolean> {
     return (await prisma.user.count({ where: { referralCode: code } })) > 0
   }
 
-  async create(input: CreateUserInput) {
+  async create(input: CreateUserInput): Promise<User> {
     if (input.email === null && input.passwordHash !== null) {
       throw new Error('OAUTH_USER_REQUIRES_NULL_PASSWORD')
     }
@@ -64,7 +64,7 @@ export class PrismaUserRepository implements IUserRepository {
     return this.toDomain(row)
   }
 
-  async update(user: User) {
+  async update(user: User): Promise<void> {
     await prisma.user.update({
       where: { id: user.id },
       data: {
