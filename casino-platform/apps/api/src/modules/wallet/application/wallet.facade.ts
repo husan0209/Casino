@@ -25,6 +25,22 @@ import type { Prisma } from '@prisma/client'
  * семантика операций — в application/use-cases, Prisma-реализация —
  * в infrastructure за доменными интерфейсами.
  */
+/** Строка баланса кошелька (структурно = WalletAccount из репозитория). */
+export type WalletBalanceRow = {
+  currency: string
+  balance: string
+  locked: string
+  version: bigint
+}
+
+/** Текущий баланс для одной валюты (RUB-отображение). */
+export type WalletBalanceView = {
+  currency: string
+  balance: string
+  locked: string
+  available: string
+}
+
 @Injectable()
 export class WalletFacade {
   // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
@@ -44,10 +60,10 @@ export class WalletFacade {
   runInTransaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
     return this.txRunner.runInTransaction(fn)
   }
-  credit(input: CreditInput) {
+  credit(input: CreditInput): Promise<CreditResult> {
     return this.ledger.credit(input)
   }
-  debit(input: CreditInput) {
+  debit(input: CreditInput): Promise<CreditResult> {
     return this.ledger.debit(input)
   }
   lock(args: LockFundsInput): Promise<CreditResult> {
@@ -59,10 +75,10 @@ export class WalletFacade {
   confirmWithdrawal(args: ConfirmWithdrawalInput): Promise<CreditResult> {
     return this.confirmWithdrawalUc.execute(args)
   }
-  getBalances(userId: string) {
+  getBalances(userId: string): Promise<WalletBalanceRow[]> {
     return this.repo.listBalances(userId)
   }
-  async getBalance(userId: string, currency: Currency) {
+  async getBalance(userId: string, currency: Currency): Promise<WalletBalanceView> {
     const w = await this.repo.getBalance(userId, currency)
     if (!w) {
       return { currency, balance: '0', locked: '0', available: '0' }

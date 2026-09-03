@@ -6,6 +6,7 @@ import {
   NOTIFICATION_REPOSITORY,
   type CreateNotificationInput,
   type INotificationRepository,
+  type NotificationRow,
 } from '../domain/notification.repository'
 
 @Injectable()
@@ -23,7 +24,7 @@ export class NotificationService {
     title: string
     message: string
     data?: Record<string, unknown>
-  }) {
+  }): Promise<NotificationRow> {
     const createData: CreateNotificationInput = {
       userId: input.userId,
       type: input.type,
@@ -62,7 +63,12 @@ export class NotificationService {
     return n
   }
 
-  async list(args: { userId: string; page: number; perPage: number; isRead?: boolean }) {
+  async list(args: {
+    userId: string
+    page: number
+    perPage: number
+    isRead?: boolean
+  }): Promise<{ items: NotificationRow[]; total: number; unreadCount: number }> {
     const { userId, page, perPage, isRead } = args
     const where: { userId: string; isRead?: boolean } = { userId }
     if (isRead !== undefined) {
@@ -76,17 +82,17 @@ export class NotificationService {
     return { items, total, unreadCount }
   }
 
-  async markRead(userId: string, id: string) {
+  async markRead(userId: string, id: string): Promise<{ ok: boolean }> {
     await this.repo.markRead(userId, id)
     return { ok: true }
   }
 
-  async markAllRead(userId: string) {
+  async markAllRead(userId: string): Promise<{ ok: boolean }> {
     await this.repo.markAllRead(userId)
     return { ok: true }
   }
 
-  async unreadCount(userId: string) {
+  async unreadCount(userId: string): Promise<{ count: number }> {
     const count = await this.repo.count({ userId, isRead: false })
     return { count }
   }
