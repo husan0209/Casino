@@ -36,6 +36,85 @@ const destText = (d: { card_masked?: string; address?: string } | null): string 
         ? JSON.stringify(d).slice(0, 40)
         : '—'
 
+/** Строка таблицы заявок: чекбокс, реквизиты, кнопки approve/reject (+inline-диалог отказа). */
+function WithdrawalRow({
+  row,
+  selected,
+  rejectId,
+  onToggle,
+  onRejectOpen,
+  onRejectClose,
+  onApprove,
+  onReject,
+  reason,
+  onReasonChange,
+}: {
+  row: WdRow
+  selected: boolean
+  rejectId: string | null
+  onToggle: () => void
+  onRejectOpen: (id: string) => void
+  onRejectClose: () => void
+  onApprove: (id: string) => void
+  onReject: (id: string) => void
+  reason: string
+  onReasonChange: (v: string) => void
+}): React.JSX.Element {
+  return (
+    <tr>
+      <Td>
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggle}
+          disabled={row.status !== 'pending'}
+        />
+      </Td>
+      <Td className="text-[#8b8ba7] whitespace-nowrap">
+        {new Date(row.createdAt).toLocaleString('ru-RU')}
+      </Td>
+      <Td>{row.user?.email ?? '—'}</Td>
+      <Td className="font-mono whitespace-nowrap">
+        {Number(row.amount).toLocaleString('ru-RU')} {row.currency}
+      </Td>
+      <Td className="text-[#8b8ba7] max-w-[200px] truncate">
+        {row.method ?? ''} · {destText(row.destination)}
+      </Td>
+      <Td>
+        <Badge value={row.status} />
+      </Td>
+      <Td>
+        {row.status === 'pending' &&
+          (rejectId === row.id ? (
+            <div className="flex gap-1">
+              <input
+                className="input text-xs w-32"
+                placeholder="Причина"
+                value={reason}
+                onChange={(e) => onReasonChange(e.target.value)}
+              />
+              <Btn small variant="danger" onClick={() => onReject(row.id)}>
+                OK
+              </Btn>
+              <Btn small variant="ghost" onClick={onRejectClose}>
+                ✕
+              </Btn>
+            </div>
+          ) : (
+            <div className="flex gap-1">
+              <Btn small variant="ok" onClick={() => onApprove(row.id)}>
+                Одобрить
+              </Btn>
+              <Btn small variant="danger" onClick={() => onRejectOpen(row.id)}>
+                Отклонить
+              </Btn>
+            </div>
+          ))}
+      </Td>
+    </tr>
+  )
+}
+
 export default function WithdrawalsPage(): React.JSX.Element {
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
@@ -185,72 +264,22 @@ export default function WithdrawalsPage(): React.JSX.Element {
             </thead>
             <tbody>
               {rows.map((w) => (
-                <tr key={w.id}>
-                  <Td>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(w.id)}
-                      onChange={() => toggle(w.id)}
-                      disabled={w.status !== 'pending'}
-                    />
-                  </Td>
-                  <Td className="text-[#8b8ba7] whitespace-nowrap">
-                    {new Date(w.createdAt).toLocaleString('ru-RU')}
-                  </Td>
-                  <Td>{w.user?.email ?? '—'}</Td>
-                  <Td className="font-mono whitespace-nowrap">
-                    {Number(w.amount).toLocaleString('ru-RU')} {w.currency}
-                  </Td>
-                  <Td className="text-[#8b8ba7] max-w-[200px] truncate">
-                    {w.method ?? ''} · {destText(w.destination)}
-                  </Td>
-                  <Td>
-                    <Badge value={w.status} />
-                  </Td>
-                  <Td>
-                    {w.status === 'pending' &&
-                      (rejectId === w.id ? (
-                        <div className="flex gap-1">
-                          <input
-                            className="input text-xs w-32"
-                            placeholder="Причина"
-                            value={reason}
-                            onChange={(e) => setReason(e.target.value)}
-                          />
-                          <Btn
-                            small
-                            variant="danger"
-                            onClick={() => single.mutate({ id: w.id, action: 'reject' })}
-                          >
-                            OK
-                          </Btn>
-                          <Btn small variant="ghost" onClick={() => setRejectId(null)}>
-                            ✕
-                          </Btn>
-                        </div>
-                      ) : (
-                        <div className="flex gap-1">
-                          <Btn
-                            small
-                            variant="ok"
-                            onClick={() => single.mutate({ id: w.id, action: 'approve' })}
-                          >
-                            Одобрить
-                          </Btn>
-                          <Btn
-                            small
-                            variant="danger"
-                            onClick={() => {
-                              setRejectId(w.id)
-                              setReason('')
-                            }}
-                          >
-                            Отклонить
-                          </Btn>
-                        </div>
-                      ))}
-                  </Td>
-                </tr>
+                <WithdrawalRow
+                  key={w.id}
+                  row={w}
+                  selected={selected.has(w.id)}
+                  rejectId={rejectId}
+                  onToggle={() => toggle(w.id)}
+                  onRejectOpen={(id) => {
+                    setRejectId(id)
+                    setReason('')
+                  }}
+                  onRejectClose={() => setRejectId(null)}
+                  onApprove={(id) => single.mutate({ id, action: 'approve' })}
+                  onReject={(id) => single.mutate({ id, action: 'reject' })}
+                  reason={reason}
+                  onReasonChange={setReason}
+                />
               ))}
             </tbody>
           </table>

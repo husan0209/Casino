@@ -1,5 +1,5 @@
 'use client'
-import axios, { type AxiosError } from 'axios'
+import type { AxiosError } from 'axios'
 
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
