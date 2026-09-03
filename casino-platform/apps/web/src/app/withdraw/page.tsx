@@ -22,12 +22,15 @@ export default function WithdrawPage() {
               destination: { card_number: address, card_holder: 'IVAN PETROV' },
             }
           : { amount, currency, destination: { wallet_address: address } }
-      await apiPost(url, body)
+      await apiPost<unknown>(url, body)
       toast.success('Заявка создана, средства заблокированы')
       setAmount('')
       setAddress('')
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error?.message || 'Ошибка вывода')
+    } catch (err: unknown) {
+      toast.error(
+        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message || 'Ошибка вывода',
+      )
     }
   }
   if (!user) {

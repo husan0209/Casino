@@ -11,7 +11,14 @@ export default function DepositPage() {
   const [amount, setAmount] = useState('1000')
   const [currency, setCurrency] = useState('USDT_TRC20')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<{
+    payment_request_id?: string
+    payment_url?: string
+    pay_address?: string
+    pay_amount?: string
+    pay_currency?: string
+    expires_at?: string
+  } | null>(null)
   if (!user) {
     return <div className="container-1 py-8">Войдите в аккаунт</div>
   }
@@ -19,11 +26,14 @@ export default function DepositPage() {
   const submitFiat = async () => {
     setLoading(true)
     try {
-      const r = await apiPost('/payments/deposit/fiat', { amount, method: 'card' })
+      const r = await apiPost<{ payment_request_id: string; payment_url: string }>('/payments/deposit/fiat', { amount, method: 'card' })
       setResult(r)
       toast.success('Платёж создан')
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error?.message || 'Ошибка')
+    } catch (e: unknown) {
+      toast.error(
+        (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message || 'Ошибка',
+      )
     } finally {
       setLoading(false)
     }
@@ -31,11 +41,14 @@ export default function DepositPage() {
   const submitCrypto = async () => {
     setLoading(true)
     try {
-      const r = await apiPost('/payments/deposit/crypto', { amount, currency })
+      const r = await apiPost<{ payment_request_id: string; pay_address: string; pay_amount: string; pay_currency: string }>('/payments/deposit/crypto', { amount, currency })
       setResult(r)
       toast.success('Адрес для оплаты получен')
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error?.message || 'Ошибка')
+    } catch (e: unknown) {
+      toast.error(
+        (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message || 'Ошибка',
+      )
     } finally {
       setLoading(false)
     }
@@ -119,7 +132,10 @@ export default function DepositPage() {
                 </div>
                 <div className="font-mono mt-1">{result.pay_address}</div>
                 <div className="text-xs text-muted mt-2">
-                  Истекает: {new Date(result.expires_at).toLocaleString('ru')}
+                  Истекает:{' '}
+                  {result.expires_at
+                    ? new Date(result.expires_at).toLocaleString('ru')
+                    : '—'}
                 </div>
               </div>
             )}

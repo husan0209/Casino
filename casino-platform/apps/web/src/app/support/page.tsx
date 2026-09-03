@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
+import type { SupportTicketDto } from '@/types/support'
 
 export default function SupportPage() {
   const { user } = useAuth()
@@ -15,23 +16,27 @@ export default function SupportPage() {
   const [message, setMessage] = useState('')
   const { data } = useQuery({
     queryKey: ['support-tickets'],
-    queryFn: () => apiGet<any>('/support/tickets'),
+    queryFn: () => apiGet<SupportTicketDto[] | { data: SupportTicketDto[] }>('/support/tickets'),
     enabled: Boolean(user),
   })
   const createMut = useMutation({
-    mutationFn: () => apiPost('/support/tickets', { subject, category, message }),
+    mutationFn: () => apiPost<unknown>('/support/tickets', { subject, category, message }),
     onSuccess: () => {
       toast.success('Тикет создан')
       setSubject('')
       setMessage('')
       void qc.invalidateQueries({ queryKey: ['support-tickets'] })
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error?.message || 'Ошибка'),
+    onError: (e: unknown) =>
+      toast.error(
+        (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message || 'Ошибка',
+      ),
   })
   if (!user) {
     return <div className="container-1 py-8">Войдите, чтобы создать обращение</div>
   }
-  const tickets = data?.data || data || []
+  const tickets: SupportTicketDto[] = Array.isArray(data) ? data : (data?.data ?? [])
   return (
     <div className="container-1 py-8 max-w-3xl">
       <h1 className="text-2xl font-bold mb-6">Поддержка</h1>
@@ -73,7 +78,7 @@ export default function SupportPage() {
       <div className="card">
         <div className="font-semibold mb-3">Мои тикеты</div>
         <div className="space-y-2">
-          {(Array.isArray(tickets) ? tickets : []).map((t: any) => (
+          {tickets.map((t) => (
             <Link
               key={t.id}
               href={`/support/${t.id}`}
@@ -86,7 +91,7 @@ export default function SupportPage() {
                 <span className="badge">{t.status}</span>
               </div>
               <div className="text-xs text-muted">
-                {t.category} • {new Date(t.updated_at || t.created_at).toLocaleString('ru')}
+                {t.category} • {new Date(t.updatedAt || t.createdAt).toLocaleString('ru')}
               </div>
             </Link>
           ))}

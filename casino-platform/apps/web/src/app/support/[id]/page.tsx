@@ -5,6 +5,7 @@ import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost } from '@/lib/api'
+import type { SupportMessageDto, SupportTicketFullDto } from '@/types/support'
 
 export default function TicketPage() {
   const { id } = useParams() as { id: string }
@@ -12,10 +13,10 @@ export default function TicketPage() {
   const [msg, setMsg] = useState('')
   const { data } = useQuery({
     queryKey: ['ticket', id],
-    queryFn: () => apiGet<any>(`/support/tickets/${id}`),
+    queryFn: () => apiGet<SupportTicketFullDto>(`/support/tickets/${id}`),
   })
   const sendMut = useMutation({
-    mutationFn: () => apiPost(`/support/tickets/${id}/messages`, { message: msg }),
+    mutationFn: () => apiPost<unknown>(`/support/tickets/${id}/messages`, { message: msg }),
     onSuccess: () => {
       setMsg('')
       void qc.invalidateQueries({ queryKey: ['ticket', id] })
@@ -23,7 +24,7 @@ export default function TicketPage() {
     },
   })
   const closeMut = useMutation({
-    mutationFn: () => apiPost(`/support/tickets/${id}/close`, {}),
+    mutationFn: () => apiPost<unknown>(`/support/tickets/${id}/close`, {}),
     onSuccess: () => {
       toast.success('Тикет закрыт')
       void qc.invalidateQueries({ queryKey: ['ticket', id] })
@@ -32,7 +33,7 @@ export default function TicketPage() {
   if (!data) {
     return <div className="container-1 py-8">Загрузка…</div>
   }
-  const messages = data.messages || []
+  const messages: SupportMessageDto[] = data?.messages ?? []
   return (
     <div className="container-1 py-8 max-w-2xl">
       <h1 className="text-xl font-bold mb-2">
@@ -47,13 +48,13 @@ export default function TicketPage() {
         )}
       </div>
       <div className="card space-y-3 mb-4 max-h-[50vh] overflow-auto">
-        {messages.map((m: any) => (
+        {messages.map((m: SupportMessageDto) => (
           <div
             key={m.id}
-            className={m.sender_type === 'admin' ? 'bg-white/5 rounded-xl px-3 py-2' : ''}
+            className={m.senderType === 'admin' ? 'bg-white/5 rounded-xl px-3 py-2' : ''}
           >
             <div className="text-xs text-muted">
-              {m.sender_type} • {new Date(m.created_at).toLocaleString('ru')}
+              {m.senderType} • {new Date(m.createdAt).toLocaleString('ru')}
             </div>
             <div className="text-sm whitespace-pre-wrap">{m.message}</div>
           </div>

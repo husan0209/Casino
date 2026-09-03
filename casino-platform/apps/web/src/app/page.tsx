@@ -5,6 +5,7 @@ import { GameCard } from '@/components/casino/GameCard'
 import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
+import type { GameDto, GamesListDto } from '@/types/casino'
 
 export default function Home() {
   const { user } = useAuth()
@@ -12,16 +13,16 @@ export default function Home() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['games-home'],
-    queryFn: () => apiGet<any>('/casino/games?per_page=12&sort=popular'),
+    queryFn: () => apiGet<GamesListDto | GameDto[]>('/casino/games?per_page=12&sort=popular'),
     retry: false,
   })
 
-  const games = (data?.data || data || []) as any[]
+  const games: GameDto[] = Array.isArray(data) ? data : (data?.data ?? [])
 
-  const fallback = [
-    { slug: 'demo-sweet-fruits', name: 'Sweet Fruits', provider: { name: 'Demo' } },
-    { slug: 'demo-lucky-sevens', name: 'Lucky Sevens', provider: { name: 'Demo' } },
-    { slug: 'demo-book-of-demo', name: 'Book of Demo', provider: { name: 'Demo' } },
+  const fallback: GameDto[] = [
+    { id: 'demo-sweet-fruits', slug: 'demo-sweet-fruits', name: 'Sweet Fruits', provider: { id: 'demo', slug: 'demo', name: 'Demo' } },
+    { id: 'demo-lucky-sevens', slug: 'demo-lucky-sevens', name: 'Lucky Sevens', provider: { id: 'demo', slug: 'demo', name: 'Demo' } },
+    { id: 'demo-book-of-demo', slug: 'demo-book-of-demo', name: 'Book of Demo', provider: { id: 'demo', slug: 'demo', name: 'Demo' } },
   ]
 
   const list = games.length ? games : fallback
@@ -43,7 +44,7 @@ export default function Home() {
         <div className="text-muted py-8 text-center text-sm">Загрузка игр…</div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {list.slice(0, 12).map((g: any, i: number) => (
+          {list.slice(0, 12).map((g, i) => (
             <GameCard
               key={g.slug || i}
               slug={g.slug}

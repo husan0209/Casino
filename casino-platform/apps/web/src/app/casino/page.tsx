@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 import { apiGet } from '@/lib/api'
+import type { GameDto, GamesListDto } from '@/types/casino'
 
 export default function CasinoPage() {
   const [category, setCategory] = useState('')
@@ -13,7 +14,7 @@ export default function CasinoPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['games', category, provider, search, page],
     queryFn: () =>
-      apiGet<any>('/casino/games', {
+      apiGet<GamesListDto>('/casino/games', {
         page,
         per_page: 24,
         category: category || undefined,
@@ -25,10 +26,10 @@ export default function CasinoPage() {
   const meta = data?.meta
   const { data: providers } = useQuery({
     queryKey: ['providers'],
-    queryFn: () => apiGet<any>('/casino/providers'),
+    queryFn: () => apiGet<GameDto[] | { data: GameDto[] }>('/casino/providers'),
     staleTime: 5 * 60 * 1000,
   })
-  const provList: any[] = Array.isArray(providers) ? providers : providers?.data || []
+  const provList: GameDto[] = Array.isArray(providers) ? providers : (providers?.data ?? [])
   return (
     <div className="container-1 py-8">
       <h1 className="text-2xl font-bold mb-4">Каталог игр</h1>
@@ -56,7 +57,7 @@ export default function CasinoPage() {
           className="input w-auto"
         >
           <option value="">Все провайдеры</option>
-          {provList.map((p: any) => (
+          {provList.map((p) => (
             <option key={p.slug} value={p.slug}>
               {p.name}
             </option>
@@ -76,7 +77,7 @@ export default function CasinoPage() {
         </div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {games.map((g: any) => (
+        {games.map((g) => (
           <Link
             key={g.slug}
             href={`/casino/${g.slug}`}

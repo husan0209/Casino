@@ -4,20 +4,23 @@ import Link from 'next/link'
 
 import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
+import type { WalletBalance } from '@/types/wallet'
+import type { WalletTxListDto } from '@/types/wallet-tx'
 
+import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 export default function WalletPage() {
   const { user } = useAuth()
   const { data: balances } = useQuery({
     queryKey: ['wallet', 'balances'],
-    queryFn: () => apiGet<any[]>('/wallet/balances'),
+    queryFn: () => apiGet<WalletBalance[]>('/wallet/balances'),
     enabled: Boolean(user),
     refetchInterval: 10000,
   })
   const { data: tx } = useQuery({
     queryKey: ['wallet', 'tx'],
-    queryFn: () => apiGet<any>('/wallet/transactions?per_page=20'),
+    queryFn: () => apiGet<WalletTxListDto>('/wallet/transactions?per_page=20'),
     enabled: Boolean(user),
   })
   if (!user) {
@@ -37,12 +40,12 @@ export default function WalletPage() {
         </div>
       </div>
       <div className="grid md:grid-cols-3 gap-4 mb-8">
-        {(balances || []).map((b: any) => (
+        {(balances ?? []).map((b) => (
           <div key={b.currency} className="card">
             <div className="text-muted text-sm">{b.currency}</div>
-            <div className="text-2xl font-bold">{money.toDisplay(b.available, b.currency)}</div>
+            <div className="text-2xl font-bold">{money.toDisplay(b.available, b.currency as Currency)}</div>
             <div className="text-xs text-muted">
-              Заблокировано: {money.toDisplay(b.locked, b.currency)}
+              Заблокировано: {money.toDisplay(b.locked, b.currency as Currency)}
             </div>
           </div>
         ))}
@@ -63,7 +66,7 @@ export default function WalletPage() {
             </tr>
           </thead>
           <tbody>
-            {(tx?.data || []).map((t: any) => (
+            {(tx?.data ?? []).map((t) => (
               <tr key={t.id}>
                 <td>{new Date(t.created_at).toLocaleString('ru')}</td>
                 <td>

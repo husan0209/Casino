@@ -10,6 +10,14 @@ export const api = axios.create({ baseURL: API_URL, withCredentials: true })
 
 let refreshPromise: Promise<boolean> | null = null
 
+/** Ответ API в конверте: TransformInterceptor оборачивает в {success,data}. */
+interface ApiResponse<T> {
+  success?: boolean
+  data: T
+  message?: string
+  error?: { message?: string; code?: string }
+}
+
 /**
  * P1 #11: silent refresh — один общий запрос (single-flight), чтобы параллельные
  * 401 не устроили шторм /auth/refresh. Новый access-token кладётся в память
@@ -70,18 +78,20 @@ api.interceptors.response.use(
 
 /** GET c разворачиванием конверта {success,data} → data */
 export async function apiGet<T>(url: string, params?: Record<string, unknown>): Promise<T> {
-  const res = await api.get(url, { params })
-  return res.data?.data as T
+  const res = await api.get<ApiResponse<T>>(url, { params })
+  return res.data.data
 }
 
-export async function apiPost<T = any>(url: string, body?: unknown): Promise<T> {
-  const res = await api.post(url, body)
-  return res.data?.data ?? res.data
+/** POST c разворачиванием конверта {success,data} → data */
+export async function apiPost<T>(url: string, body?: unknown): Promise<T> {
+  const res = await api.post<ApiResponse<T>>(url, body)
+  return res.data.data
 }
 
-export async function apiPatch<T = any>(url: string, body?: unknown): Promise<T> {
-  const res = await api.patch(url, body)
-  return res.data?.data ?? res.data
+/** PATCH c разворачиванием конверта {success,data} → data */
+export async function apiPatch<T>(url: string, body?: unknown): Promise<T> {
+  const res = await api.patch<ApiResponse<T>>(url, body)
+  return res.data.data
 }
 
 export function setAccessToken(token: string) {
@@ -93,7 +103,7 @@ export function setAccessToken(token: string) {
 }
 
 export function errText(e: unknown): string {
-  const ax = e as AxiosError<any>
+  const ax = e as AxiosError<ApiResponse<unknown>>
   return (
     ax.response?.data?.error?.message ??
     ax.response?.data?.message ??

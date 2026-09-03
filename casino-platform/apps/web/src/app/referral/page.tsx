@@ -4,23 +4,24 @@ import { useQuery } from '@tanstack/react-query'
 import { toast } from '@/components/ui/toaster'
 import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
+import type { ReferralInfoDto, ReferralRewardsDto } from '@/types/referral'
 
 export default function ReferralPage() {
   const { user } = useAuth()
   const { data: info } = useQuery({
     queryKey: ['ref-info'],
-    queryFn: () => apiGet<any>('/referrals/info'),
+    queryFn: () => apiGet<ReferralInfoDto>('/referrals/info'),
     enabled: Boolean(user),
   })
   const { data: list } = useQuery({
     queryKey: ['ref-list'],
-    queryFn: () => apiGet<any>('/referrals/list'),
+    queryFn: () => apiGet<{ data: { id: string; status: string; created_at: string }[] }>('/referrals/list'),
     enabled: Boolean(user),
   })
   void list
   const { data: rewards } = useQuery({
     queryKey: ['ref-rewards'],
-    queryFn: () => apiGet<any>('/referrals/rewards'),
+    queryFn: () => apiGet<ReferralRewardsDto>('/referrals/rewards'),
     enabled: Boolean(user),
   })
   if (!user) {
@@ -74,11 +75,11 @@ export default function ReferralPage() {
             </tr>
           </thead>
           <tbody>
-            {(rewards?.data || []).slice(0, 20).map((r: any) => (
+            {(rewards?.data ?? []).slice(0, 20).map((r) => (
               <tr key={r.id}>
-                <td>{r.date || r.period_start?.slice(0, 10)}</td>
-                <td>{r.ggr_amount}</td>
-                <td>{r.reward_amount}</td>
+                <td>{String(r.periodStart).slice(0, 10)}</td>
+                <td>{r.ggrAmount}</td>
+                <td>{r.rewardAmount}</td>
                 <td>{r.currency}</td>
                 <td>{r.status}</td>
               </tr>

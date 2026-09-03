@@ -15,7 +15,15 @@ export default function KycPage() {
     queryFn: () => getKycStatus(),
     enabled: Boolean(user),
   })
-  const [form, setForm] = useState<any>({
+  const [form, setForm] = useState<{
+    first_name: string
+    last_name: string
+    date_of_birth: string
+    country: string
+    document_type: string
+    document_number: string
+    document_expiry: string
+  }>({
     first_name: '',
     last_name: '',
     date_of_birth: '',
@@ -36,8 +44,11 @@ export default function KycPage() {
       await apiPost('/kyc/submit', form)
       toast.success('KYC заявка подана')
       void refetch()
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error?.message || 'Ошибка')
+    } catch (err: unknown) {
+      toast.error(
+        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message || 'Ошибка',
+      )
     }
   }
   const uploadDoc = async (type: string) => {
@@ -135,29 +146,29 @@ export default function KycPage() {
               className="input"
               placeholder="Имя"
               required
-              onChange={(e) => setForm((f: any) => ({ ...f, first_name: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
             />
             <input
               className="input"
               placeholder="Фамилия"
               required
-              onChange={(e) => setForm((f: any) => ({ ...f, last_name: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
             />
             <input
               className="input"
               type="date"
               required
-              onChange={(e) => setForm((f: any) => ({ ...f, date_of_birth: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, date_of_birth: e.target.value }))}
             />
             <input
               className="input"
               placeholder="Страна (RU)"
               defaultValue="RU"
-              onChange={(e) => setForm((f: any) => ({ ...f, country: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
             />
             <select
               className="input"
-              onChange={(e) => setForm((f: any) => ({ ...f, document_type: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, document_type: e.target.value }))}
             >
               <option value="passport">Паспорт</option>
               <option value="id_card">ID карта</option>
@@ -167,13 +178,13 @@ export default function KycPage() {
               className="input"
               placeholder="Номер документа"
               required
-              onChange={(e) => setForm((f: any) => ({ ...f, document_number: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, document_number: e.target.value }))}
             />
             <input
               className="input"
               type="date"
               placeholder="Срок действия"
-              onChange={(e) => setForm((f: any) => ({ ...f, document_expiry: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, document_expiry: e.target.value }))}
             />
           </div>
           <button className="btn">Подать заявку KYC</button>

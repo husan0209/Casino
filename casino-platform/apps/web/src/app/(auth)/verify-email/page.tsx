@@ -5,6 +5,7 @@ import { useEffect, useState, Suspense } from 'react'
 
 import { setAccessToken } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
+import type { WebUser } from '@/stores/auth'
 
 function VerifyInner() {
   const sp = useSearchParams()
@@ -24,15 +25,21 @@ function VerifyInner() {
           token,
       )
       .then((r) => {
-        const d = r.data?.data || r.data
-        if (d.accessToken) {
+        const d = (r.data?.data ?? r.data) as { accessToken?: string; user?: WebUser }
+        if (d.accessToken && d.user) {
           setAuth(d.user, d.accessToken)
           setAccessToken(d.accessToken)
         }
         setStatus('Email подтверждён! Перенаправляем…')
         setTimeout(() => router.push('/profile'), 1200)
       })
-      .catch((e) => setStatus('Ошибка: ' + (e?.response?.data?.error?.message || 'неверный токен')))
+      .catch((e: unknown) =>
+        setStatus(
+          'Ошибка: ' +
+            ((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data
+              ?.error?.message || 'неверный токен'),
+        ),
+      )
   }, [token, router, setAuth])
   return (
     <div className="container-1 py-12 max-w-sm mx-auto">
