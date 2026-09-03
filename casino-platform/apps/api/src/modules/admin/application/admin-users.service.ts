@@ -3,6 +3,7 @@ import * as argon2 from 'argon2'
 
 import {
   ADMIN_USER_REPOSITORY,
+  type AdminUserRow,
   type CreateAdminUserInput,
   type IAdminUserRepository,
 } from '../domain/admin.repository'
@@ -24,7 +25,7 @@ export class AdminUsersService {
       role: 'admin' | 'superadmin'
     },
     createdBy?: string,
-  ) {
+  ): Promise<AdminUserRow> {
     const passwordHash = await argon2.hash(data.password, {
       type: argon2.argon2id,
       memoryCost: 65536,
@@ -48,11 +49,11 @@ export class AdminUsersService {
     return this.repo.create(createInput)
   }
 
-  async block(id: string) {
+  async block(id: string): Promise<AdminUserRow> {
     return this.repo.setActive(id, false)
   }
 
-  async unblock(id: string) {
+  async unblock(id: string): Promise<AdminUserRow> {
     return this.repo.setActive(id, true)
   }
 }

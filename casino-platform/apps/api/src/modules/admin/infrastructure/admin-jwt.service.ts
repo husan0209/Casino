@@ -40,7 +40,7 @@ export class AdminAuthService {
     }
     return admin
   }
-  sign(admin: { id: string; role: string }) {
+  sign(admin: { id: string; role: string }): string {
     const now = Math.floor(Date.now() / 1000)
     const token = hs256(
       this.config.get<string>('JWT_ACCESS_SECRET')!,
