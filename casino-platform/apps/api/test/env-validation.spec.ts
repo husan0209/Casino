@@ -104,5 +104,43 @@ describe('Environment Validation', () => {
 
       expect(() => validateEnv(env)).not.toThrow()
     })
+
+    // ── GAP-40: SMTP-пароль обязателен в проде, если SMTP-хост и пользователь заданы
+    describe('GAP-40 SMTP_PASSWORD required in production', () => {
+      it('rejects production with SMTP_HOST + SMTP_USER but no SMTP_PASSWORD', () => {
+        const env = {
+          ...prodEnv,
+          RUKASSA_SECRET_KEY: 'real_production_secret_1234567890abcdefghij',
+          NOWPAYMENTS_IPN_SECRET: 'real_production_secret_0987654321fedcbahgij',
+          DEMO_PROVIDER_ENABLED: 'false',
+          SMTP_HOST: 'smtp.resend.com',
+          SMTP_USER: 'resend',
+        }
+        expect(() => validateEnv(env)).toThrow(/SMTP_PASSWORD/)
+      })
+
+      it('accepts production with full SMTP configuration', () => {
+        const env = {
+          ...prodEnv,
+          RUKASSA_SECRET_KEY: 'real_production_secret_1234567890abcdefghij',
+          NOWPAYMENTS_IPN_SECRET: 'real_production_secret_0987654321fedcbahgij',
+          DEMO_PROVIDER_ENABLED: 'false',
+          SMTP_HOST: 'smtp.resend.com',
+          SMTP_USER: 'resend',
+          SMTP_PASSWORD: 're_real_resend_api_key_xxxxxxxxx',
+        }
+        expect(() => validateEnv(env)).not.toThrow()
+      })
+
+      it('не требует SMTP_PASSWORD если SMTP_HOST не задан', () => {
+        const env = {
+          ...prodEnv,
+          RUKASSA_SECRET_KEY: 'real_production_secret_1234567890abcdefghij',
+          NOWPAYMENTS_IPN_SECRET: 'real_production_secret_0987654321fedcbahgij',
+          DEMO_PROVIDER_ENABLED: 'false',
+        }
+        expect(() => validateEnv(env)).not.toThrow()
+      })
+    })
   })
 })

@@ -47,7 +47,10 @@ export class SmtpMailer implements MailerPort {
       throw new EmailNotConfiguredError()
     }
     const smtpUser = this.config.get<string>('SMTP_USER')
-    const smtpPass = this.config.get<string>('SMTP_PASS')
+    // GAP-40: каноническое имя — SMTP_PASSWORD (см. .env.example и
+    // ENVIRONMENT_VARIABLES.md §10). Раньше читалось SMTP_PASS — оператор
+    // заполнял прод по доке, пароль не доезжал до nodemailer, SMTP-auth падал.
+    const smtpPassword = this.config.get<string>('SMTP_PASSWORD')
     const host = this.config.get<string>('SMTP_HOST')
     if (host === undefined) {
       throw new EmailNotConfiguredError()
@@ -56,7 +59,7 @@ export class SmtpMailer implements MailerPort {
       host,
       port: Number(this.config.get<string>('SMTP_PORT') || 587),
       secure: Number(this.config.get<string>('SMTP_PORT')) === 465,
-      ...(smtpUser !== undefined && smtpPass !== undefined && { auth: { user: smtpUser, pass: smtpPass } }),
+      ...(smtpUser !== undefined && smtpPassword !== undefined && { auth: { user: smtpUser, pass: smtpPassword } }),
     })
     return this.transport
   }
