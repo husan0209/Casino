@@ -20,7 +20,7 @@ export function saveDepositContext(paymentId: string, gameSlug?: string | null):
   }
 }
 
-export function DepositReturnHandler(): React.JSX.Element {
+export function DepositReturnHandler(): React.JSX.Element | null {
   const router = useRouter()
   const { fetchWallets } = useWalletStore()
   const { pendingGameSlug } = useUIStore()

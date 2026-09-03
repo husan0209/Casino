@@ -14,7 +14,7 @@ import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
-export function DepositSheet(): React.JSX.Element {
+export function DepositSheet(): React.JSX.Element | null {
   const { depositSheet, closeDeposit, depositCurrency, pendingGameSlug } = useUIStore()
   const { config, load } = useGeoStore()
   const { activeCurrency, setActiveCurrency } = useWalletStore()

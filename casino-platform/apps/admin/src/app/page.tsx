@@ -6,7 +6,7 @@ import { Btn, ErrorBox, Input } from '@/components/ui'
 import { errText } from '@/lib/api'
 import { type AuthState, useAuthStore } from '@/stores/auth'
 
-export default function LoginPage(): React.JSX.Element {
+export default function LoginPage(): React.JSX.Element | null {
   const router = useRouter()
   const login = useAuthStore((s: AuthState) => s.login)
   const token = useAuthStore((s: AuthState) => s.token)

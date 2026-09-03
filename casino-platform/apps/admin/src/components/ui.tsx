@@ -112,7 +112,7 @@ export function Pager({
   )
 }
 
-export function ErrorBox({ msg }: { msg?: string | undefined }): React.JSX.Element {
+export function ErrorBox({ msg }: { msg?: string | undefined }): React.JSX.Element | null {
   if (!msg) {
     return null
   }

@@ -6,7 +6,7 @@ import { errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 
-export function LoginSheet(): React.JSX.Element {
+export function LoginSheet(): React.JSX.Element | null {
   const { loginSheet, closeLogin, pendingGameSlug } = useUIStore()
   const { login, register } = useAuth()
   const [mode, setMode] = useState<'login' | 'register'>('login')

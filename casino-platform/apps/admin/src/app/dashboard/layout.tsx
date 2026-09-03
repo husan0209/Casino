@@ -21,7 +21,7 @@ const nav: Array<[string, string]> = [
   ['Настройки', '/dashboard/settings'],
 ]
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }): React.JSX.Element {
+export default function DashboardLayout({ children }: { children: React.ReactNode }): React.JSX.Element | null {
   const router = useRouter()
   const token = useAuthStore((s: AuthState) => s.token)
   const admin = useAuthStore((s: AuthState) => s.admin)

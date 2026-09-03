@@ -57,7 +57,7 @@ export default function WithdrawalsPage(): React.JSX.Element {
     refetchInterval: 15000,
   })
 
-  function invalidate(): React.JSX.Element {
+  function invalidate(): void {
     void qc.invalidateQueries({ queryKey: ['withdrawals'] })
     setSelected(new Set())
   }
