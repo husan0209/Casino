@@ -10,9 +10,11 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { extForMime, sniffDocumentMime } from '@/common/files/file-sniffer'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
-import { type DisplayCurrency } from '@casino/shared-config'
+
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 import { type IKycRepository, KYC_REPOSITORY, type KycProfileRow } from '@modules/kyc/domain/repositories/kyc.repository'
+
+import { type DisplayCurrency } from '@casino/shared-config'
 
 import { type GetKycStatusUseCase } from '../../application/use-cases/get-kyc-status.use-case'
 import { type SubmitKycUseCase } from '../../application/use-cases/submit-kyc.use-case'

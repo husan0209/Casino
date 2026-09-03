@@ -2,9 +2,7 @@ import { Injectable } from '@nestjs/common'
 
 import { type GameSession, prisma, type Prisma } from '@casino/database'
 
-import { type FavoriteWithGame, type GameCatalogQuery, type GameRow, type GameSessionWithGame, type GameSessionWithUser, type GameTransactionRow, type GameWithProvider, IGameCatalogRepository, IGameFavoritesRepository, IGamePlayRepository, type RecentSessionRow, type RoundHistoryRow } from '../../domain/repositories/casino.repository'
-
-
+import { type FavoriteWithGame, type GameCatalogQuery, type GameRow, type GameSessionWithGame, type GameSessionWithUser, type GameTransactionRow, type GameWithProvider, type IGameCatalogRepository, type IGameFavoritesRepository, type IGamePlayRepository, type RecentSessionRow, type RoundHistoryRow } from '../../domain/repositories/casino.repository'
 
 @Injectable()
 export class PrismaGameCatalogRepository implements IGameCatalogRepository {

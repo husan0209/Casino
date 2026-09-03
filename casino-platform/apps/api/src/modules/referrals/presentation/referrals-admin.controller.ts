@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
 import { prisma, type Prisma, type ReferralRewardStatus, type ReferralRewardType } from '@casino/database'
 
 import { type AuditLogService } from '../../admin/application/audit-log.service'

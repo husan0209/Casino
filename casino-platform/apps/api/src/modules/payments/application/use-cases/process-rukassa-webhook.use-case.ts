@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common'
 
 import { errorMessage } from '@/common/utils/error-message'
-import { type Currency } from '@casino/shared-types'
+
 import { type UsersFacade } from '@modules/users/facade/users.facade'
 import { type WalletFacade } from '@modules/wallet/application/wallet.facade'
+
+import { type Currency } from '@casino/shared-types'
 
 import { classifyPaymentStatus } from '../../domain/payment-status'
 import { type RukassaClient } from '../../infrastructure/clients/rukassa.client'

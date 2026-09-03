@@ -2,6 +2,7 @@ import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { type UserActor } from '@/common/types/req-user'
+
 import { type NotificationChannel, type Prisma } from '@casino/database'
 
 import { AuthGuard } from '../../auth/presentation/guards/auth.guard'

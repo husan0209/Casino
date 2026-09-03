@@ -2,6 +2,7 @@ import { Controller, Get, Req, UseGuards } from '@nestjs/common'
 import { type Request } from 'express'
 
 import { OptionalAuthGuard } from '@/common/guards/optional-auth.guard'
+
 import { type GeoConfigResult } from '@modules/geo/domain/geo-config.policy'
 
 import { type GeoFacade } from '../../facade/geo.facade'

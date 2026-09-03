@@ -1,6 +1,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
+
 import { prisma, type Prisma, type ReferralRewardStatus, type ReferralRewardType } from '@casino/database'
 
 import { AuthGuard } from '../../auth/presentation/guards/auth.guard'

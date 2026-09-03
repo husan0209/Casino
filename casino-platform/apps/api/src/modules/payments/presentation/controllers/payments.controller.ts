@@ -3,8 +3,10 @@ import { BadRequestException, Body, Controller, Get, Param, Post, Query, UseGuar
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
-import { type PaymentProvider, type PaymentStatus, type PaymentType, type Prisma } from '@casino/database'
+
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+
+import { type PaymentProvider, type PaymentStatus, type PaymentType, type Prisma } from '@casino/database'
 
 import { type CancelWithdrawalUseCase } from '../../application/use-cases/cancel-withdrawal.use-case'
 import { type CreateCryptoDepositUseCase } from '../../application/use-cases/create-crypto-deposit.use-case'

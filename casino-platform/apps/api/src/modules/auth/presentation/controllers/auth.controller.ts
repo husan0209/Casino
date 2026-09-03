@@ -4,6 +4,7 @@ import { type Request, type Response } from 'express'
 
 import { clearRefreshTokenCookie, setRefreshTokenCookie } from '@/common/cookies/refresh-token-cookie'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
 import { type UserRole } from '@casino/database'
 
 import { type ForgotPasswordUseCase } from '../../application/use-cases/forgot-password.use-case'
@@ -80,7 +81,10 @@ export class AuthController {
   }
 
   @Post('refresh')
-  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<{ accessToken: string; }> {
+  async refresh(
+    @Req() req: Request & { cookies: Record<string, string | undefined> },
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ accessToken: string; }> {
     // Refresh token lives only in the httpOnly cookie. Accepting it from the
     // request body weakens CSRF protection and breaks the cookie-based rotation
     // contract — do not reintroduce the body fallback.

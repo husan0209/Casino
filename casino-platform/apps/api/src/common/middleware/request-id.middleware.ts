@@ -16,7 +16,7 @@ const REQUEST_ID_PATTERN = /^[a-zA-Z0-9-]{1,128}$/
  * уважает клиентский X-Request-Id из белого списка, иначе генерирует UUID.
  */
 export function resolveRequestId(candidate: unknown): string {
-  const value = Array.isArray(candidate) ? candidate[0] : candidate
+  const value = Array.isArray(candidate) ? (candidate as unknown[])[0] : candidate
   return typeof value === 'string' && REQUEST_ID_PATTERN.test(value) ? value : randomUUID()
 }
 

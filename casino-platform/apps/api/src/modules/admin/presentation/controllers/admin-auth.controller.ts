@@ -1,6 +1,7 @@
 import { Body, Controller, Post, UsePipes } from '@nestjs/common'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
 import { type AdminRole, prisma } from '@casino/database'
 
 import { type AuditLogService } from '../../application/audit-log.service'

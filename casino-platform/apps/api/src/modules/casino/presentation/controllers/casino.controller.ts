@@ -4,9 +4,11 @@ import { type Request } from 'express'
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
-import { type GameCategory, type GameType, type GameVolatility, prisma, type Prisma } from '@casino/database'
+
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 import { type FavoritesUseCase, type GameHistoryRow } from '@modules/casino/application/use-cases/favorites.use-case'
+
+import { type GameCategory, type GameType, type GameVolatility, prisma, type Prisma } from '@casino/database'
 
 import { type LaunchGameUseCase } from '../../application/use-cases/launch-game.use-case'
 import { type ListGamesUseCase } from '../../application/use-cases/list-games.use-case'

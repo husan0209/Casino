@@ -2,6 +2,7 @@ import { Body, Controller, Get, Inject, Param, Patch, Post, Query, UseGuards, Us
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 import { Roles, RolesGuard } from '@modules/auth/presentation/guards/roles.guard'
 import { type ISupportRepository, type MessageRow, SUPPORT_REPOSITORY, type TicketCategory, type TicketListItem, type TicketPriority, type TicketStatus } from '@modules/support/domain/repositories/support.repository'

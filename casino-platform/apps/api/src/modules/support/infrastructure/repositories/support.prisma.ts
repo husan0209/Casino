@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 
 import { prisma, type Prisma, type SupportSenderType, type SupportTicketCategory, type SupportTicketPriority, type SupportTicketStatus } from '@casino/database'
 
-import { ISupportRepository, type MessageRow, type TicketAttachment, type TicketCategory, type TicketListItem, type TicketListItemFilters, type TicketPriority, type TicketRow, type TicketStatus } from '../../domain/repositories/support.repository'
+import { type ISupportRepository, type MessageRow, type TicketAttachment, type TicketCategory, type TicketListItem, type TicketListItemFilters, type TicketPriority, type TicketRow, type TicketStatus } from '../../domain/repositories/support.repository'
 
 /** Полная карточка тикета для админки (getAdmin): TicketRow + user + assignee + messages. */
 export type AdminTicketFull = TicketRow & {

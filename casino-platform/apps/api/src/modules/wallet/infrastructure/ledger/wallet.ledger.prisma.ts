@@ -7,7 +7,7 @@ import { type Currency, type MoneyAmount, ZERO } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 import { InsufficientFundsError, OptimisticLockError } from '../../domain/errors'
-import { type CreditInput, type CreditResult, IWalletLedger, IWalletRepository, type WalletAccount, type WithdrawalOpArgs } from '../../domain/repositories/wallet.repository'
+import { type CreditInput, type CreditResult, type IWalletLedger, type IWalletRepository, type WalletAccount, type WithdrawalOpArgs } from '../../domain/repositories/wallet.repository'
 
 /**
  * Architecture (AUDIT_REPORT.md §A1, GAP-22): семантика операций — в

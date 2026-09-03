@@ -9,6 +9,7 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { extForMime, sniffDocumentMime } from '@/common/files/file-sniffer'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
+
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 import { type UserProfileFull } from '@modules/users/domain/repositories/user-profile.repository'
 
