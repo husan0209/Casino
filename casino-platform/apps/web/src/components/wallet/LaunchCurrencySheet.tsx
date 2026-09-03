@@ -3,7 +3,7 @@ import { formatBalance, formatAmount } from '@/lib/format/currency'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
-export function LaunchCurrencySheet(): React.JSX.Element {
+export function LaunchCurrencySheet(): React.JSX.Element | null {
   const { launchCurrencySheet, launchCurrencyOptions, closeLaunchCurrency, openDeposit } =
     useUIStore()
   const { setActiveCurrency } = useWalletStore()

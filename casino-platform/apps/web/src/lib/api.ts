@@ -29,7 +29,7 @@ function trySilentRefresh(): Promise<boolean> {
       // отдельный запрос без interceptor'ов — иначе зациклится на собственном 401
       .post<ApiResponse<{ accessToken: string }>>(`${API_URL}/auth/refresh`, null, { withCredentials: true })
       .then((r) => {
-        const token: string | undefined = r.data?.data?.accessToken ?? r.data?.accessToken
+        const token: string | undefined = r.data?.data.accessToken
         if (!token) {
           return false
         }

@@ -26,7 +26,7 @@ function mergeWallets(balances: WalletBalance[], enabled: string[]): WalletBalan
   )
 }
 
-export function WalletSwitcher(): React.JSX.Element {
+export function WalletSwitcher(): React.JSX.Element | null {
   const { walletSwitcher, closeWalletSwitcher } = useUIStore()
   const { wallets, activeCurrency, fetchWallets, setActiveCurrency } = useWalletStore()
   const { config, load } = useGeoStore()

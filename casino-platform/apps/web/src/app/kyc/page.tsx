@@ -197,7 +197,7 @@ export default function KycPage(): React.JSX.Element {
                 type="file"
                 accept="image/*,.pdf"
                 className="text-sm"
-                onChange={(e) => setFiles((f) => ({ ...f, [t]: e.target.files[0] || null }))}
+                onChange={(e) => setFiles((f) => ({ ...f, [t]: e.target.files?.[0] ?? null }))}
               />
               <span className="text-sm text-muted w-32">
                 {t === 'front' ? 'Лицевая' : t === 'back' ? 'Обратная' : 'Селфи'}
