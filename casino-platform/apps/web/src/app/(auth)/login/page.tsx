@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
+import { errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 
 export default function LoginPage() {
@@ -20,10 +21,7 @@ export default function LoginPage() {
       toast.success('Вход выполнен')
       router.push('/profile')
     } catch (err: unknown) {
-      toast.error(
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'Ошибка входа',
-      )
+      toast.error(errText(err) || 'Ошибка входа')
     } finally {
       setLoading(false)
     }

@@ -37,7 +37,7 @@ export default function ReferralPage() {
         </div>
         <div className="card">
           <div className="text-muted text-sm">Заработано</div>
-          <div className="text-2xl font-bold">{info?.total_earned?.RUB || '0'} ₽</div>
+          <div className="text-2xl font-bold">{info?.total_earned.RUB || '0'} ₽</div>
         </div>
         <div className="card">
           <div className="text-muted text-sm">Ставка</div>

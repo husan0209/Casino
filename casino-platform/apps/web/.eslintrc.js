@@ -18,7 +18,13 @@ module.exports = {
       { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
     ],
     '@typescript-eslint/no-unnecessary-condition': 'warn',
-    '@typescript-eslint/prefer-nullish-coalescing': 'warn',
+    // ignorePrimitives: на строках/числах семантика || осознанная — пустая строка
+    // и 0 невалидны (URL, сообщения, валюта) и должны фолбэкаться. Опция
+    // оставляет правило включённым для nullable-объектов (GAP-39 stage 9).
+    '@typescript-eslint/prefer-nullish-coalescing': [
+      'warn',
+      { ignorePrimitives: true },
+    ],
     '@typescript-eslint/prefer-optional-chain': 'warn',
     'import/no-cycle': 'warn',
     '@typescript-eslint/explicit-function-return-type': [

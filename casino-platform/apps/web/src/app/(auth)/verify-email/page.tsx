@@ -3,7 +3,7 @@ import axios from 'axios'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useEffect, useState, Suspense } from 'react'
 
-import { setAccessToken } from '@/lib/api'
+import { errText, setAccessToken } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import type { WebUser } from '@/stores/auth'
 
@@ -25,7 +25,7 @@ function VerifyInner() {
           token,
       )
       .then((r) => {
-        const d = (r.data?.data ?? r.data) as { accessToken?: string; user?: WebUser }
+        const d = (r.data.data ?? r.data) as { accessToken?: string; user?: WebUser }
         if (d.accessToken && d.user) {
           setAuth(d.user, d.accessToken)
           setAccessToken(d.accessToken)
@@ -34,11 +34,7 @@ function VerifyInner() {
         setTimeout(() => router.push('/profile'), 1200)
       })
       .catch((e: unknown) =>
-        setStatus(
-          'Ошибка: ' +
-            ((e as { response?: { data?: { error?: { message?: string } } } })?.response?.data
-              ?.error?.message || 'неверный токен'),
-        ),
+        setStatus('Ошибка: ' + (errText(e) || 'неверный токен')),
       )
   }, [token, router, setAuth])
   return (

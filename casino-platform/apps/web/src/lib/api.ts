@@ -27,7 +27,7 @@ function trySilentRefresh(): Promise<boolean> {
   if (!refreshPromise) {
     refreshPromise = axios
       // отдельный запрос без interceptor'ов — иначе зациклится на собственном 401
-      .post(`${API_URL}/auth/refresh`, null, { withCredentials: true })
+      .post<ApiResponse<{ accessToken: string }>>(`${API_URL}/auth/refresh`, null, { withCredentials: true })
       .then((r) => {
         const token: string | undefined = r.data?.data?.accessToken ?? r.data?.accessToken
         if (!token) {
@@ -102,11 +102,18 @@ export function setAccessToken(token: string) {
   }
 }
 
+/** Код ошибки из конверта (для branch-логики по коду, напр. INSUFFICIENT_FUNDS). */
+export function errCode(e: unknown): string | undefined {
+  const ax = e as AxiosError<ApiResponse<unknown>> | null
+  return ax?.response?.data?.error?.code
+}
+
 export function errText(e: unknown): string {
-  const ax = e as AxiosError<ApiResponse<unknown>>
+  const ax = e as AxiosError<ApiResponse<unknown>> | null
+  const respData = ax?.response?.data
   return (
-    ax.response?.data?.error?.message ??
-    ax.response?.data?.message ??
+    respData?.error?.message ??
+    respData?.message ??
     (e as Error).message ??
     'Ошибка'
   )

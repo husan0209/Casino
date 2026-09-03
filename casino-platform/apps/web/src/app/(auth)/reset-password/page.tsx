@@ -3,7 +3,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useState, Suspense } from 'react'
 
 import { toast } from '@/components/ui/toaster'
-import { apiPost } from '@/lib/api'
+import { apiPost, errText } from '@/lib/api'
 
 function ResetInner() {
   const sp = useSearchParams()
@@ -17,10 +17,7 @@ function ResetInner() {
       toast.success('Пароль изменён')
       router.push('/login')
     } catch (err: unknown) {
-      toast.error(
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'Ошибка',
-      )
+      toast.error(errText(err) || 'Ошибка')
     }
   }
   return (

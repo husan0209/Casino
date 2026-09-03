@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
-import { apiGet, apiPost } from '@/lib/api'
+import { apiGet, apiPost, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import type { MeDto } from '@/types/user'
 
@@ -25,10 +25,7 @@ export default function ProfilePage() {
       toast.success('Сохранено')
       void refetch()
     } catch (e: unknown) {
-      toast.error(
-        (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'Ошибка',
-      )
+      toast.error(errText(e) || 'Ошибка')
     }
   }
   return (

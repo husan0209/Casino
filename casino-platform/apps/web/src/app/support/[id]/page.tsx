@@ -33,11 +33,11 @@ export default function TicketPage() {
   if (!data) {
     return <div className="container-1 py-8">Загрузка…</div>
   }
-  const messages: SupportMessageDto[] = data?.messages ?? []
+  const messages: SupportMessageDto[] = data.messages ?? []
   return (
     <div className="container-1 py-8 max-w-2xl">
       <h1 className="text-xl font-bold mb-2">
-        #{data.id?.slice(0, 8)} {data.subject}
+        #{data.id.slice(0, 8)} {data.subject}
       </h1>
       <div className="text-sm text-muted mb-4">
         {data.category} • {data.status}

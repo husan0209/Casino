@@ -2,7 +2,7 @@
 import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
-import { apiPost } from '@/lib/api'
+import { apiPost, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 
 export default function DepositPage() {
@@ -30,10 +30,7 @@ export default function DepositPage() {
       setResult(r)
       toast.success('Платёж создан')
     } catch (e: unknown) {
-      toast.error(
-        (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'Ошибка',
-      )
+      toast.error(errText(e) || 'Ошибка')
     } finally {
       setLoading(false)
     }
@@ -45,10 +42,7 @@ export default function DepositPage() {
       setResult(r)
       toast.success('Адрес для оплаты получен')
     } catch (e: unknown) {
-      toast.error(
-        (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'Ошибка',
-      )
+      toast.error(errText(e) || 'Ошибка')
     } finally {
       setLoading(false)
     }

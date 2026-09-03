@@ -2,7 +2,7 @@
 import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
-import { apiPost } from '@/lib/api'
+import { apiPost, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 
 export default function WithdrawPage() {
@@ -27,10 +27,7 @@ export default function WithdrawPage() {
       setAmount('')
       setAddress('')
     } catch (err: unknown) {
-      toast.error(
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'Ошибка вывода',
-      )
+      toast.error(errText(err) || 'Ошибка вывода')
     }
   }
   if (!user) {

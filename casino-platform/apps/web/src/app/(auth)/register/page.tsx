@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
+import { errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 
 export default function RegisterPage() {
@@ -18,10 +19,7 @@ export default function RegisterPage() {
       setSent(true)
       toast.success('Письмо отправлено на email')
     } catch (err: unknown) {
-      toast.error(
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'Ошибка регистрации',
-      )
+      toast.error(errText(err) || 'Ошибка регистрации')
     }
   }
   if (sent) {

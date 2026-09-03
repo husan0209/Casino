@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
-import { apiPost } from '@/lib/api'
+import { apiPost, errText } from '@/lib/api'
 import { getKycStatus } from '@/lib/api/kyc.api'
 import { formatAmount } from '@/lib/format/currency'
 import { useAuth } from '@/stores/auth'
@@ -45,10 +45,7 @@ export default function KycPage() {
       toast.success('KYC заявка подана')
       void refetch()
     } catch (err: unknown) {
-      toast.error(
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'Ошибка',
-      )
+      toast.error(errText(err) || 'Ошибка')
     }
   }
   const uploadDoc = async (type: string) => {
@@ -200,7 +197,7 @@ export default function KycPage() {
                 type="file"
                 accept="image/*,.pdf"
                 className="text-sm"
-                onChange={(e) => setFiles((f) => ({ ...f, [t]: e.target.files?.[0] || null }))}
+                onChange={(e) => setFiles((f) => ({ ...f, [t]: e.target.files[0] || null }))}
               />
               <span className="text-sm text-muted w-32">
                 {t === 'front' ? 'Лицевая' : t === 'back' ? 'Обратная' : 'Селфи'}
