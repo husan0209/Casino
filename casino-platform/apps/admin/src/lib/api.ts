@@ -57,7 +57,7 @@ export async function apiGet<T>(url: string, params?: Record<string, unknown>): 
 export async function apiGetFull<T>(
   url: string,
   params?: Record<string, unknown>,
-): Promise<{ data: T; meta?: ApiMeta }> {
+): Promise<{ data: T; meta?: ApiMeta | undefined }> {
   const res = await api.get<ApiResponse<T> & { meta?: ApiMeta }>(url, { params })
   return { data: res.data.data, meta: res.data.meta }
 }
