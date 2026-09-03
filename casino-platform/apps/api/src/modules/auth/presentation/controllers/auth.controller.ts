@@ -21,6 +21,11 @@ import { GoogleLoginSchema, TelegramLoginSchema } from '../dto/oauth.dto'
 import { ForgotPasswordSchema, ResetPasswordSchema } from '../dto/password-reset.dto'
 import { type RegisterDto, RegisterSchema } from '../dto/register.dto'
 
+/** Точечное сужение: req.cookies в @types/express — any (GAP-39 stage 10). */
+interface RequestWithCookies {
+  cookies: Record<string, string | undefined>
+}
+
 @Controller('auth')
 // GAP-19: брутфорс-защита логина/регистрации — строже глобального лимита.
 @Throttle({
@@ -82,13 +87,13 @@ export class AuthController {
 
   @Post('refresh')
   async refresh(
-    @Req() req: Request & { cookies: Record<string, string | undefined> },
+    @Req() req: RequestWithCookies,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ accessToken: string; }> {
     // Refresh token lives only in the httpOnly cookie. Accepting it from the
     // request body weakens CSRF protection and breaks the cookie-based rotation
     // contract — do not reintroduce the body fallback.
-    const token = req.cookies.refresh_token
+    const token = req.cookies.refresh_token ?? ''
     const result = await this.refreshUc.execute(token)
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken }
