@@ -10,7 +10,7 @@ import type { WalletTxListDto } from '@/types/wallet-tx'
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-export default function WalletPage() {
+export default function WalletPage(): React.JSX.Element {
   const { user } = useAuth()
   const { data: balances } = useQuery({
     queryKey: ['wallet', 'balances'],

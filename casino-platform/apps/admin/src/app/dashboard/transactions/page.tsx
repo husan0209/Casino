@@ -23,7 +23,7 @@ const POSITIVE = new Set([
   'ROLLBACK',
 ])
 
-export default function TransactionsPage() {
+export default function TransactionsPage(): React.JSX.Element {
   const [page, setPage] = useState(1)
   const [type, setType] = useState('')
   const { data, isLoading } = useQuery({

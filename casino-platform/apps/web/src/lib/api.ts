@@ -94,7 +94,7 @@ export async function apiPatch<T>(url: string, body?: unknown): Promise<T> {
   return res.data.data
 }
 
-export function setAccessToken(token: string) {
+export function setAccessToken(token: string): void {
   if (token) {
     api.defaults.headers.common.Authorization = `Bearer ${token}`
   } else {

@@ -7,7 +7,7 @@ interface GameCardProps {
   onPlay: () => void
 }
 
-export function GameCard({ name, provider, onPlay }: GameCardProps) {
+export function GameCard({ name, provider, onPlay }: GameCardProps): void {
   return (
     <button
       type="button"

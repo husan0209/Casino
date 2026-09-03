@@ -10,7 +10,7 @@ import { useWalletStore } from '@/stores/wallet'
 const PAYMENT_KEY = 'casino_pending_payment_id'
 const GAME_KEY = 'casino_pending_game_slug'
 
-export function saveDepositContext(paymentId: string, gameSlug?: string | null) {
+export function saveDepositContext(paymentId: string, gameSlug?: string | null): void {
   if (typeof window === 'undefined') {
     return
   }
@@ -20,7 +20,7 @@ export function saveDepositContext(paymentId: string, gameSlug?: string | null) 
   }
 }
 
-export function DepositReturnHandler() {
+export function DepositReturnHandler(): React.JSX.Element {
   const router = useRouter()
   const { fetchWallets } = useWalletStore()
   const { pendingGameSlug } = useUIStore()
@@ -46,7 +46,7 @@ export function DepositReturnHandler() {
     const paymentId = sessionStorage.getItem(PAYMENT_KEY)
     const gameSlug = sessionStorage.getItem(GAME_KEY) || pendingGameSlug
 
-    const cleanUrl = () => {
+    const cleanUrl = (): void => {
       const path = window.location.pathname
       window.history.replaceState({}, '', path)
     }
@@ -59,7 +59,7 @@ export function DepositReturnHandler() {
     let attempts = 0
     const maxAttempts = 30
 
-    const tick = async () => {
+    const tick = async (): Promise<void> => {
       attempts += 1
       try {
         const st = await pollDepositStatus(paymentId)
@@ -92,7 +92,7 @@ export function DepositReturnHandler() {
     return null
   }
 
-  const returnToGame = () => {
+  const returnToGame = (): void => {
     setSuccess(null)
     sessionStorage.removeItem(GAME_KEY)
     if (success.gameSlug) {

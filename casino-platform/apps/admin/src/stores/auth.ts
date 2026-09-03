@@ -16,7 +16,7 @@ interface AdminLoginResponse {
   admin: AdminUser
 }
 
-interface AuthState {
+export interface AuthState {
   token: string | null
   admin: AdminUser | null
   login: (email: string, password: string) => Promise<void>

@@ -14,7 +14,7 @@ import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
-export function DepositSheet() {
+export function DepositSheet(): React.JSX.Element {
   const { depositSheet, closeDeposit, depositCurrency, pendingGameSlug } = useUIStore()
   const { config, load } = useGeoStore()
   const { activeCurrency, setActiveCurrency } = useWalletStore()
@@ -71,7 +71,7 @@ export function DepositSheet() {
 
   const currencyLabel = formatAmount(0, payCurrency).replace(/^0\s?/, '').trim() || payCurrency
 
-  const pay = async () => {
+  const pay = async (): Promise<void> => {
     if (!amount || !method) {
       return
     }
@@ -94,7 +94,7 @@ export function DepositSheet() {
     }
   }
 
-  const openCrypto = () => {
+  const openCrypto = (): void => {
     setMode('crypto')
     setShowCrypto(true)
     if (cryptoMethods[0]) {

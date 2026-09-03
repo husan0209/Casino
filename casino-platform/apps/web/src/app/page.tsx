@@ -7,7 +7,7 @@ import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import type { GameDto, GamesListDto } from '@/types/casino'
 
-export default function Home() {
+export default function Home(): React.JSX.Element {
   const { user } = useAuth()
   const { openLogin } = useUIStore()
 

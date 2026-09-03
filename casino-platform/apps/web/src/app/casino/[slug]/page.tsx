@@ -12,7 +12,7 @@ import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 import type { GameDetailsDto, GameLaunchDto } from '@/types/casino'
 
-export default function GamePage() {
+export default function GamePage(): React.JSX.Element {
   const { slug } = useParams() as { slug: string }
   const search = useSearchParams()
   const shouldLaunch = search.get('launch') === '1'

@@ -4,10 +4,10 @@ import { useState } from 'react'
 import { toast } from '@/components/ui/toaster'
 import { apiPost } from '@/lib/api'
 
-export default function ForgotPage() {
+export default function ForgotPage(): React.JSX.Element {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     await apiPost('/auth/forgot-password', { email })
     setSent(true)

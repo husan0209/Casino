@@ -16,7 +16,7 @@ interface KycRow {
   user?: { email: string | null }
 }
 
-export default function KycPage() {
+export default function KycPage(): React.JSX.Element {
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('pending')

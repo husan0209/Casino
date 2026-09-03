@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 
 import { useAuthStore } from '@/stores/auth'
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({ children }: { children: React.ReactNode }): void {
   const [client] = useState(
     () =>
       new QueryClient({

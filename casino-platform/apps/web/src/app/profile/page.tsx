@@ -7,7 +7,7 @@ import { apiGet, apiPost, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import type { MeDto } from '@/types/user'
 
-export default function ProfilePage() {
+export default function ProfilePage(): React.JSX.Element {
   const { user } = useAuth()
   const { data, refetch, isLoading } = useQuery({
     queryKey: ['me'],
@@ -19,7 +19,7 @@ export default function ProfilePage() {
     return <div className="container-1 py-8">Войдите в аккаунт</div>
   }
   const p = data?.profile
-  const save = async () => {
+  const save = async (): Promise<void> => {
     try {
       await apiPost('/users/me/profile', form)
       toast.success('Сохранено')

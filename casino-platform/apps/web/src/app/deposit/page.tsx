@@ -5,7 +5,7 @@ import { toast } from '@/components/ui/toaster'
 import { apiPost, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 
-export default function DepositPage() {
+export default function DepositPage(): React.JSX.Element {
   const { user } = useAuth()
   const [tab, setTab] = useState<'fiat' | 'crypto'>('fiat')
   const [amount, setAmount] = useState('1000')
@@ -23,7 +23,7 @@ export default function DepositPage() {
     return <div className="container-1 py-8">Войдите в аккаунт</div>
   }
 
-  const submitFiat = async () => {
+  const submitFiat = async (): Promise<void> => {
     setLoading(true)
     try {
       const r = await apiPost<{ payment_request_id: string; payment_url: string }>('/payments/deposit/fiat', { amount, method: 'card' })

@@ -7,7 +7,7 @@ import { DepositSheet } from '@/components/wallet/DepositSheet'
 import { LaunchCurrencySheet } from '@/components/wallet/LaunchCurrencySheet'
 import { WalletSwitcher } from '@/components/wallet/WalletSwitcher'
 
-export function MainShell({ children }: { children: React.ReactNode }) {
+export function MainShell({ children }: { children: React.ReactNode }): void {
   return (
     <>
       <AppHeader />

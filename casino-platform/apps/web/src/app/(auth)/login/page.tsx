@@ -5,15 +5,15 @@ import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
 import { errText } from '@/lib/api'
-import { useAuth } from '@/stores/auth'
+import { type AuthState, useAuth } from '@/stores/auth'
 
-export default function LoginPage() {
+export default function LoginPage(): React.JSX.Element {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const login = useAuth((s) => s.login)
+  const login = useAuth((s: AuthState) => s.login)
   const router = useRouter()
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     setLoading(true)
     try {

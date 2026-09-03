@@ -17,7 +17,7 @@ interface PaymentRow {
   user?: { email: string | null }
 }
 
-export default function PaymentsPage() {
+export default function PaymentsPage(): React.JSX.Element {
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('')
   const [type, setType] = useState('')

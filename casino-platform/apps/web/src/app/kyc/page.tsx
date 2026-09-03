@@ -8,7 +8,7 @@ import { getKycStatus } from '@/lib/api/kyc.api'
 import { formatAmount } from '@/lib/format/currency'
 import { useAuth } from '@/stores/auth'
 
-export default function KycPage() {
+export default function KycPage(): React.JSX.Element {
   const { user } = useAuth()
   const { data, refetch } = useQuery({
     queryKey: ['kyc-status'],
@@ -38,7 +38,7 @@ export default function KycPage() {
     selfie: null,
   })
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     try {
       await apiPost('/kyc/submit', form)
@@ -48,7 +48,7 @@ export default function KycPage() {
       toast.error(errText(err) || 'Ошибка')
     }
   }
-  const uploadDoc = async (type: string) => {
+  const uploadDoc = async (type: string): Promise<void> => {
     const file = files[type]
     if (!file) {
       return

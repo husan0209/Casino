@@ -26,7 +26,7 @@ function mergeWallets(balances: WalletBalance[], enabled: string[]): WalletBalan
   )
 }
 
-export function WalletSwitcher() {
+export function WalletSwitcher(): React.JSX.Element {
   const { walletSwitcher, closeWalletSwitcher } = useUIStore()
   const { wallets, activeCurrency, fetchWallets, setActiveCurrency } = useWalletStore()
   const { config, load } = useGeoStore()
@@ -45,7 +45,7 @@ export function WalletSwitcher() {
   const enabled = [...(config?.enabledFiat ?? ['RUB']), ...(config?.enabledCrypto ?? [])]
   const list = sortWallets(mergeWallets(wallets, enabled), activeCurrency)
 
-  const pick = async (currency: string) => {
+  const pick = async (currency: string): Promise<void> => {
     await setActiveCurrency(currency)
     closeWalletSwitcher()
   }

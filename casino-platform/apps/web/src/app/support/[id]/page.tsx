@@ -7,7 +7,7 @@ import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost } from '@/lib/api'
 import type { SupportMessageDto, SupportTicketFullDto } from '@/types/support'
 
-export default function TicketPage() {
+export default function TicketPage(): React.JSX.Element {
   const { id } = useParams() as { id: string }
   const qc = useQueryClient()
   const [msg, setMsg] = useState('')

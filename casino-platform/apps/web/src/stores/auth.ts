@@ -15,7 +15,7 @@ interface AuthResponse {
   user: WebUser
 }
 
-interface AuthState {
+export interface AuthState {
   token: string | null
   user: WebUser | null
   /** P1 #11: попытка восстановления сессии уже была (после reload) */

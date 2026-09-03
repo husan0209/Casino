@@ -4,14 +4,14 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useEffect, useState, Suspense } from 'react'
 
 import { errText, setAccessToken } from '@/lib/api'
-import { useAuth } from '@/stores/auth'
+import { type AuthState, useAuth } from '@/stores/auth'
 import type { WebUser } from '@/stores/auth'
 
-function VerifyInner() {
+function VerifyInner(): React.JSX.Element {
   const sp = useSearchParams()
   const token = sp.get('token')
   const router = useRouter()
-  const setAuth = useAuth((s) => s.setAuth)
+  const setAuth = useAuth((s: AuthState) => s.setAuth)
   const [status, setStatus] = useState('Проверка…')
   useEffect(() => {
     if (!token) {

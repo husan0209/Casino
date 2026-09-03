@@ -18,7 +18,7 @@ interface GameRow {
   provider?: { name: string }
 }
 
-export default function GamesPage() {
+export default function GamesPage(): React.JSX.Element {
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')

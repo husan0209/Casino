@@ -5,12 +5,12 @@ import { useState, Suspense } from 'react'
 import { toast } from '@/components/ui/toaster'
 import { apiPost, errText } from '@/lib/api'
 
-function ResetInner() {
+function ResetInner(): React.JSX.Element {
   const sp = useSearchParams()
   const token = sp.get('token') || ''
   const [pw, setPw] = useState('')
   const router = useRouter()
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     try {
       await apiPost('/auth/reset-password', { token, new_password: pw })

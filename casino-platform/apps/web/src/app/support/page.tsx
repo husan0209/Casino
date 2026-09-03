@@ -8,7 +8,7 @@ import { apiGet, apiPost, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import type { SupportTicketDto } from '@/types/support'
 
-export default function SupportPage() {
+export default function SupportPage(): React.JSX.Element {
   const { user } = useAuth()
   const qc = useQueryClient()
   const [subject, setSubject] = useState('')

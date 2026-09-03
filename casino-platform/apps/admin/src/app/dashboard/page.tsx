@@ -34,7 +34,7 @@ type Period = 'today' | '7d' | '30d' | '90d'
 const fmt = (v: string | number) =>
   typeof v === 'number' ? v.toLocaleString('ru-RU') : `${Number(v).toLocaleString('ru-RU')} ₽`
 
-export default function DashboardPage() {
+export default function DashboardPage(): React.JSX.Element {
   const [period, setPeriod] = useState<Period>('today')
   const [chartDays, setChartDays] = useState<Exclude<Period, 'today'>>('7d')
 

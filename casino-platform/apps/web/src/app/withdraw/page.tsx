@@ -5,12 +5,12 @@ import { toast } from '@/components/ui/toaster'
 import { apiPost, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 
-export default function WithdrawPage() {
+export default function WithdrawPage(): React.JSX.Element {
   const { user } = useAuth()
   const [amount, setAmount] = useState('500')
   const [currency, setCurrency] = useState('RUB')
   const [address, setAddress] = useState('')
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     try {
       const url = currency === 'RUB' ? '/payments/withdrawal/fiat' : '/payments/withdrawal/crypto'

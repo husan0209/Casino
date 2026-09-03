@@ -36,7 +36,7 @@ const destText = (d: { card_masked?: string; address?: string } | null): string 
         ? JSON.stringify(d).slice(0, 40)
         : '—'
 
-export default function WithdrawalsPage() {
+export default function WithdrawalsPage(): React.JSX.Element {
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('pending')
@@ -57,7 +57,7 @@ export default function WithdrawalsPage() {
     refetchInterval: 15000,
   })
 
-  function invalidate() {
+  function invalidate(): React.JSX.Element {
     void qc.invalidateQueries({ queryKey: ['withdrawals'] })
     setSelected(new Set())
   }

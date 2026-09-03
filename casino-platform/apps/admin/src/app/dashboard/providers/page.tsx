@@ -20,7 +20,7 @@ interface SyncResult {
   note?: string
 }
 
-export default function ProvidersPage() {
+export default function ProvidersPage(): React.JSX.Element {
   const qc = useQueryClient()
   const [err, setErr] = useState<string>()
   const [note, setNote] = useState<string>()

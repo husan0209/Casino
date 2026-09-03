@@ -8,7 +8,7 @@ import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
-export function AppHeader() {
+export function AppHeader(): React.JSX.Element {
   const { user } = useAuth()
   const { activeCurrency, getActiveWallet, fetchWallets } = useWalletStore()
   const { config, load } = useGeoStore()

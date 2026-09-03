@@ -3,7 +3,7 @@ import { formatBalance, formatAmount } from '@/lib/format/currency'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
-export function LaunchCurrencySheet() {
+export function LaunchCurrencySheet(): React.JSX.Element {
   const { launchCurrencySheet, launchCurrencyOptions, closeLaunchCurrency, openDeposit } =
     useUIStore()
   const { setActiveCurrency } = useWalletStore()
@@ -15,13 +15,13 @@ export function LaunchCurrencySheet() {
   const { activeCurrency, targetCurrency, targetAmount, slug, onPlayInTarget } =
     launchCurrencyOptions
 
-  const playInTarget = async () => {
+  const playInTarget = async (): Promise<void> => {
     await setActiveCurrency(targetCurrency)
     closeLaunchCurrency()
     onPlayInTarget?.()
   }
 
-  const topUp = () => {
+  const topUp = (): void => {
     closeLaunchCurrency()
     openDeposit(activeCurrency)
   }

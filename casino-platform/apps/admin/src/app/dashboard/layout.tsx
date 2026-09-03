@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
-import { useAuthStore } from '@/stores/auth'
+import { type AuthState, useAuthStore } from '@/stores/auth'
 
 const nav: Array<[string, string]> = [
   ['Дашборд', '/dashboard'],
@@ -21,11 +21,11 @@ const nav: Array<[string, string]> = [
   ['Настройки', '/dashboard/settings'],
 ]
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }): React.JSX.Element {
   const router = useRouter()
-  const token = useAuthStore((s) => s.token)
-  const admin = useAuthStore((s) => s.admin)
-  const logout = useAuthStore((s) => s.logout)
+  const token = useAuthStore((s: AuthState) => s.token)
+  const admin = useAuthStore((s: AuthState) => s.admin)
+  const logout = useAuthStore((s: AuthState) => s.logout)
 
   useEffect(() => {
     if (!token) {

@@ -1,7 +1,7 @@
 'use client'
 import { type ReactNode } from 'react'
 
-export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Card({ children, className = '' }: { children: ReactNode; className?: string }): void {
   return (
     <div className={`bg-[#141420] rounded-2xl border border-white/5 p-4 ${className}`}>
       {children}
@@ -9,7 +9,7 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
   )
 }
 
-export function PageTitle({ children }: { children: ReactNode }) {
+export function PageTitle({ children }: { children: ReactNode }): void {
   return <h1 className="text-xl font-bold mb-4">{children}</h1>
 }
 
@@ -56,7 +56,7 @@ export function Input({
   )
 }
 
-export function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+export function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>): void {
   return (
     <select {...props} className="input">
       {children}
@@ -80,7 +80,7 @@ const badgeColors: Record<string, string> = {
   open: 'bg-sky-900/60 text-sky-300',
   waiting_user: 'bg-purple-900/60 text-purple-300',
 }
-export function Badge({ value }: { value: string }) {
+export function Badge({ value }: { value: string }): void {
   const cls = badgeColors[value] ?? 'bg-white/10 text-white'
   return <span className={`inline-block rounded-md px-2 py-0.5 text-xs ${cls}`}>{value}</span>
 }
@@ -112,7 +112,7 @@ export function Pager({
   )
 }
 
-export function ErrorBox({ msg }: { msg?: string | undefined }) {
+export function ErrorBox({ msg }: { msg?: string | undefined }): void {
   if (!msg) {
     return null
   }
@@ -123,17 +123,17 @@ export function ErrorBox({ msg }: { msg?: string | undefined }) {
   )
 }
 
-export function Loading() {
+export function Loading(): React.JSX.Element {
   return <div className="text-sm text-[#8b8ba7] py-6">Загрузка…</div>
 }
 
-export function Th({ children }: { children?: ReactNode }) {
+export function Th({ children }: { children?: ReactNode }): void {
   return (
     <th className="text-left text-xs uppercase tracking-wide text-[#8b8ba7] px-3 py-2 border-b border-white/10">
       {children}
     </th>
   )
 }
-export function Td({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Td({ children, className = '' }: { children: ReactNode; className?: string }): void {
   return <td className={`px-3 py-2 border-b border-white/5 align-top ${className}`}>{children}</td>
 }
