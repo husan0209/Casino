@@ -18,7 +18,7 @@ export class UsersFacade {
     return this.getGeoContextUseCase.execute(userId)
   }
 
-  updateCurrencyPreference(userId: string, currency: string): Promise<void> {
+  updateCurrencyPreference(userId: string, currency: string): Promise<{ currency_preference: string }> {
     return this.updateCurrency.execute(userId, currency)
   }
 

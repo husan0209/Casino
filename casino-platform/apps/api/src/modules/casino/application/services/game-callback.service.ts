@@ -5,13 +5,21 @@ import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-import { type ProviderCallbackResponse, type ParsedProviderCallback } from '../../domain/provider-adapter.interface'
+import { type ParsedProviderCallback, type ProviderCallbackResponse } from '../../domain/provider-adapter.interface'
 import {
   GAME_PLAY_REPOSITORY,
   type GameRow,
   type GameSessionWithGame,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
+
+interface AuthenticateResult {
+  player_id: string
+  currency: string
+  balance: string
+  nickname: string
+  operator_session: string
+}
 
 @Injectable()
 export class GameCallbackService {
@@ -21,7 +29,7 @@ export class GameCallbackService {
   ) {}
 
   /** Стандартный seamless-ответ провайдеру (формат GitSlotPark). */
-  async authenticate(sessionToken: string): Promise<ProviderCallbackResponse> {
+  async authenticate(sessionToken: string): Promise<AuthenticateResult> {
     const session = await this.play.findSessionByTokenWithUser(sessionToken)
     if (!session || session.status !== 'active') {
       throw new Error('SESSION_INVALID')
@@ -36,6 +44,7 @@ export class GameCallbackService {
       currency: session.currency,
       balance,
       nickname: session.user.email || session.user.id.slice(0, 8),
+      operator_session: session.id,
     }
   }
 
