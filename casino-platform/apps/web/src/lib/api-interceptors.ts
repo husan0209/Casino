@@ -2,7 +2,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
 import { API_URL, type ApiResponse, api } from '@/lib/api'
-
 import { useAuthStore } from '@/stores/auth'
 
 let refreshPromise: Promise<boolean> | null = null
@@ -20,7 +19,7 @@ function trySilentRefresh(): Promise<boolean> {
         withCredentials: true,
       })
       .then((r) => {
-        const token: string | undefined = r.data?.data.accessToken
+        const token: string | undefined = r.data.data.accessToken
         if (!token) {
           return false
         }

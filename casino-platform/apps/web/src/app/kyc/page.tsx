@@ -8,6 +8,78 @@ import { getKycStatus } from '@/lib/api/kyc.api'
 import { formatAmount } from '@/lib/format/currency'
 import { useAuth } from '@/stores/auth'
 
+/** Форма персональных данных KYC (первый шаг заявки). */
+function KycForm({
+  form,
+  onField,
+  onSubmit,
+}: {
+  form: {
+    first_name: string
+    last_name: string
+    date_of_birth: string
+    country: string
+    document_type: string
+    document_number: string
+    document_expiry: string
+  }
+  onField: (key: keyof typeof form, value: string) => void
+  onSubmit: (e: React.FormEvent) => void
+}): React.JSX.Element {
+  return (
+    <form id="kyc-form" onSubmit={onSubmit} className="card space-y-3 mb-6">
+      <div className="font-semibold">Персональные данные</div>
+      <div className="grid md:grid-cols-2 gap-3">
+        <input
+          className="input"
+          placeholder="Имя"
+          required
+          onChange={(e) => onField('first_name', e.target.value)}
+        />
+        <input
+          className="input"
+          placeholder="Фамилия"
+          required
+          onChange={(e) => onField('last_name', e.target.value)}
+        />
+        <input
+          className="input"
+          type="date"
+          required
+          onChange={(e) => onField('date_of_birth', e.target.value)}
+        />
+        <input
+          className="input"
+          placeholder="Страна (RU)"
+          defaultValue="RU"
+          onChange={(e) => onField('country', e.target.value)}
+        />
+        <select
+          className="input"
+          onChange={(e) => onField('document_type', e.target.value)}
+        >
+          <option value="passport">Паспорт</option>
+          <option value="id_card">ID карта</option>
+          <option value="drivers_license">Водительское</option>
+        </select>
+        <input
+          className="input"
+          placeholder="Номер документа"
+          required
+          onChange={(e) => onField('document_number', e.target.value)}
+        />
+        <input
+          className="input"
+          type="date"
+          placeholder="Срок действия"
+          onChange={(e) => onField('document_expiry', e.target.value)}
+        />
+      </div>
+      <button className="btn">Подать заявку KYC</button>
+    </form>
+  )
+}
+
 export default function KycPage(): React.JSX.Element {
   const { user } = useAuth()
   const { data, refetch } = useQuery({
@@ -38,15 +110,19 @@ export default function KycPage(): React.JSX.Element {
     selfie: null,
   })
 
-  const submit = async (e: React.FormEvent): Promise<void> => {
+  const setField = (key: keyof typeof form, value: string): void =>
+    setForm((f) => ({ ...f, [key]: value }))
+
+  const submit = (e: React.FormEvent): void => {
     e.preventDefault()
-    try {
-      await apiPost('/kyc/submit', form)
-      toast.success('KYC заявка подана')
-      void refetch()
-    } catch (err: unknown) {
-      toast.error(errText(err) || 'Ошибка')
-    }
+    void apiPost('/kyc/submit', form)
+      .then(() => {
+        toast.success('KYC заявка подана')
+        void refetch()
+      })
+      .catch((err: unknown) => {
+        toast.error(errText(err) || 'Ошибка')
+      })
   }
   const uploadDoc = async (type: string): Promise<void> => {
     const file = files[type]
@@ -136,56 +212,7 @@ export default function KycPage(): React.JSX.Element {
       {(status === 'not_started' ||
         status === 'requires_resubmission' ||
         status === 'rejected') && (
-        <form id="kyc-form" onSubmit={submit} className="card space-y-3 mb-6">
-          <div className="font-semibold">Персональные данные</div>
-          <div className="grid md:grid-cols-2 gap-3">
-            <input
-              className="input"
-              placeholder="Имя"
-              required
-              onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
-            />
-            <input
-              className="input"
-              placeholder="Фамилия"
-              required
-              onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
-            />
-            <input
-              className="input"
-              type="date"
-              required
-              onChange={(e) => setForm((f) => ({ ...f, date_of_birth: e.target.value }))}
-            />
-            <input
-              className="input"
-              placeholder="Страна (RU)"
-              defaultValue="RU"
-              onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
-            />
-            <select
-              className="input"
-              onChange={(e) => setForm((f) => ({ ...f, document_type: e.target.value }))}
-            >
-              <option value="passport">Паспорт</option>
-              <option value="id_card">ID карта</option>
-              <option value="drivers_license">Водительское</option>
-            </select>
-            <input
-              className="input"
-              placeholder="Номер документа"
-              required
-              onChange={(e) => setForm((f) => ({ ...f, document_number: e.target.value }))}
-            />
-            <input
-              className="input"
-              type="date"
-              placeholder="Срок действия"
-              onChange={(e) => setForm((f) => ({ ...f, document_expiry: e.target.value }))}
-            />
-          </div>
-          <button className="btn">Подать заявку KYC</button>
-        </form>
+        <KycForm form={form} onField={setField} onSubmit={submit} />
       )}
 
       {(status === 'pending' || status === 'requires_resubmission') && (
