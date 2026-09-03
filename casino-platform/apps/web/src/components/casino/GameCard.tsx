@@ -7,7 +7,7 @@ interface GameCardProps {
   onPlay: () => void
 }
 
-export function GameCard({ name, provider, onPlay }: GameCardProps): void {
+export function GameCard({ name, provider, onPlay }: GameCardProps): React.JSX.Element {
   return (
     <button
       type="button"
