@@ -1,8 +1,8 @@
 'use client'
-import type { AxiosError } from 'axios'
-
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
+
+import type { AxiosError } from 'axios'
 
 /**
  * Регистрирует axios-interceptors (auth-token + logout на 401).
