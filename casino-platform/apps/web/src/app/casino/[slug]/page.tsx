@@ -7,6 +7,7 @@ import { useEffect } from 'react'
 import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
+import type { GameDetailsDto, GameLaunchDto } from '@/types/casino'
 import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
@@ -24,12 +25,12 @@ export default function GamePage() {
 
   const { data: game } = useQuery({
     queryKey: ['game', slug],
-    queryFn: () => apiGet<any>(`/casino/games/${slug}`),
+    queryFn: () => apiGet<GameDetailsDto>(`/casino/games/${slug}`),
   })
 
   const launch = useMutation({
     mutationFn: () =>
-      apiPost<{ launch_url: string; session_id: string }>(`/casino/games/${slug}/launch`, {
+      apiPost<GameLaunchDto>(`/casino/games/${slug}/launch`, {
         currency,
         return_url: window.location.href,
       }),
@@ -37,8 +38,9 @@ export default function GamePage() {
       setLastPlayed(slug, currency)
       window.location.href = `/casino/${slug}/play?url=${encodeURIComponent(res.launch_url)}`
     },
-    onError: (e: any) => {
-      const code = e?.response?.data?.error?.code
+    onError: (e: unknown) => {
+      const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response
+        ?.data?.error?.code
       if (code === 'INSUFFICIENT_FUNDS') {
         openDeposit(currency)
         return
@@ -102,7 +104,7 @@ export default function GamePage() {
             type="button"
             className="btn-ghost w-full"
             onClick={async () => {
-              const res = await apiPost<any>(`/casino/games/${slug}/demo`, { currency })
+              const res = await apiPost<GameLaunchDto>(`/casino/games/${slug}/demo`, { currency })
               if (res?.launch_url) {
                 window.open(res.launch_url, '_blank')
               }

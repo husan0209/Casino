@@ -9,6 +9,12 @@ export interface WebUser {
   role: string
 }
 
+/** Ответ /auth/login и /auth/register: {accessToken, user}. */
+interface AuthResponse {
+  accessToken: string
+  user: WebUser
+}
+
 interface AuthState {
   token: string | null
   user: WebUser | null
@@ -33,7 +39,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
   user: null,
   hydrated: false,
   login: async (email, password) => {
-    const res = await apiPost<any>('/auth/login', { email, password })
+    const res = await apiPost<AuthResponse>('/auth/login', { email, password })
     if (!res?.accessToken) {
       throw new Error(res?.error?.message || 'Ошибка входа')
     }
@@ -44,7 +50,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
   setAuth: (user, token) => set({ token, user }),
   /** регистрация нового пользователя (письмо-подтверждение уходит с API) */
   register: async (email, password, referralCode) => {
-    const res = await apiPost<any>('/auth/register', {
+    const res = await apiPost<AuthResponse>('/auth/register', {
       email,
       password,
       referral_code: referralCode,
@@ -58,7 +64,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
   logout: () => {
     // серверная часть: инвалидирует refresh-токен и чистит httpOnly-cookie
     // (fire-and-forget: при истёкшей сессии /auth/logout вернёт 401 — не страшно)
-    void apiPost('/auth/logout').catch(() => {})
+    void apiPost<unknown>('/auth/logout').catch(() => {})
     set({ token: null, user: null })
   },
   hydrate: async () => {
@@ -66,7 +72,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       return
     }
     try {
-      const res = await apiPost<any>('/auth/refresh')
+      const res = await apiPost<{ accessToken: string }>('/auth/refresh')
       if (!res?.accessToken) {
         throw new Error('no access token')
       }

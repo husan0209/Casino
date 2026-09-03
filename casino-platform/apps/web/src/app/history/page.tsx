@@ -4,6 +4,7 @@ import Link from 'next/link'
 
 import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
+import type { HistoryDto, HistoryRowDto } from '@/types/casino'
 
 import { money } from '@casino/shared-utils'
 
@@ -11,13 +12,13 @@ export default function HistoryPage() {
   const { user } = useAuth()
   const { data } = useQuery({
     queryKey: ['casino-history'],
-    queryFn: () => apiGet<any>('/casino/history?per_page=50'),
+    queryFn: () => apiGet<HistoryDto>('/casino/history?per_page=50'),
     enabled: Boolean(user),
   })
   if (!user) {
     return <div className="container-1 py-8">Войдите в аккаунт</div>
   }
-  const rows = data?.data || []
+  const rows: HistoryRowDto[] = data?.data ?? []
   return (
     <div className="container-1 py-8">
       <h1 className="text-2xl font-bold mb-4">История игр</h1>
@@ -34,7 +35,7 @@ export default function HistoryPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r: any) => (
+            {rows.map((r) => (
               <tr key={r.round_id}>
                 <td>{new Date(r.created_at).toLocaleString('ru')}</td>
                 <td>

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { GameCard } from '@/components/casino/GameCard'
 import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
+import type { GameDto, GamesListDto } from '@/types/casino'
 import { useUIStore } from '@/stores/ui'
 
 export default function Home() {
@@ -12,11 +13,11 @@ export default function Home() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['games-home'],
-    queryFn: () => apiGet<any>('/casino/games?per_page=12&sort=popular'),
+    queryFn: () => apiGet<GamesListDto | GameDto[]>('/casino/games?per_page=12&sort=popular'),
     retry: false,
   })
 
-  const games = (data?.data || data || []) as any[]
+  const games: GameDto[] = Array.isArray(data) ? data : (data?.data ?? [])
 
   const fallback = [
     { slug: 'demo-sweet-fruits', name: 'Sweet Fruits', provider: { name: 'Demo' } },
