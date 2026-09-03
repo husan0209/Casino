@@ -41,8 +41,8 @@ export class SmtpMailer implements MailerPort {
     }
     let nodemailer: { createTransport: (opts: SmtpOptions) => SmtpTransport }
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      nodemailer = require('nodemailer')
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-unsafe-assignment -- ленивый require optional-peer (GAP-01): тип сужен локальной аннотацией
+      nodemailer = require('nodemailer') as typeof nodemailer
     } catch {
       throw new EmailNotConfiguredError()
     }
@@ -54,14 +54,14 @@ export class SmtpMailer implements MailerPort {
     }
     this.transport = nodemailer.createTransport({
       host,
-      port: Number(this.config.get('SMTP_PORT') || 587),
-      secure: Number(this.config.get('SMTP_PORT')) === 465,
+      port: Number(this.config.get<string>('SMTP_PORT') || 587),
+      secure: Number(this.config.get<string>('SMTP_PORT')) === 465,
       ...(smtpUser !== undefined && smtpPass !== undefined && { auth: { user: smtpUser, pass: smtpPass } }),
     })
     return this.transport
   }
 
-  async send(msg: MailMessage) {
+  async send(msg: MailMessage): Promise<void> {
     if (!this.config.get<string>('SMTP_HOST')) {
       throw new EmailNotConfiguredError()
     }
@@ -82,7 +82,7 @@ export class DevLogMailer implements MailerPort {
   constructor(config: ConfigService) {
     void config
   }
-  async send(msg: MailMessage) {
+  async send(msg: MailMessage): Promise<void> {
     this.logger.log(`EMAIL[dev-mailer] to=${msg.to} subject="${msg.subject}"\n${msg.text}`)
   }
 }

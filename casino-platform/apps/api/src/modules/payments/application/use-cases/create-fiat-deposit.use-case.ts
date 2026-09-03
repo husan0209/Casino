@@ -34,7 +34,7 @@ export class CreateFiatDepositUseCase {
     private users: UsersFacade,
   ) {}
 
-  async execute(userId: string, input: CreateFiatDepositInput) {
+  async execute(userId: string, input: CreateFiatDepositInput): Promise<{ payment_request_id: string; payment_url: string; currency: string; method: string; }> {
     const { amount, currency, method } = input
 
     const userContext = await this.users.getGeoContext(userId)
@@ -67,11 +67,11 @@ export class CreateFiatDepositUseCase {
     })
 
     const webhookUrl =
-      this.config.get('RUKASSA_WEBHOOK_URL') ||
+      this.config.get<string>('RUKASSA_WEBHOOK_URL') ||
       'http://localhost:3001/api/v1/payments/webhooks/rukassa'
     const successUrl =
-      this.config.get('RUKASSA_SUCCESS_URL') || 'http://localhost:3000/?deposit=success'
-    const failUrl = this.config.get('RUKASSA_FAIL_URL') || 'http://localhost:3000/?deposit=failed'
+      this.config.get<string>('RUKASSA_SUCCESS_URL') || 'http://localhost:3000/?deposit=success'
+    const failUrl = this.config.get<string>('RUKASSA_FAIL_URL') || 'http://localhost:3000/?deposit=failed'
 
     try {
       const res = await this.rukassa.createPayment({

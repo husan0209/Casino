@@ -15,7 +15,6 @@ import type {
   GameTransaction,
   User,
 } from '@prisma/client'
-import type { Decimal } from 'decimal.js'
 
 export type GameWithProvider = Game & { provider: GameProvider }
 export type GameSessionWithUser = GameSession & { user: User }
@@ -52,8 +51,8 @@ export interface FavoriteWithGame {
 export interface RoundHistoryRow {
   id: string
   currency: string
-  totalBet: Decimal
-  totalWin: Decimal
+  totalBet: Prisma.Decimal
+  totalWin: Prisma.Decimal
   status: string
   createdAt: Date
   game: { slug: string; name: string; provider: { name: string } }

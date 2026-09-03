@@ -171,7 +171,7 @@ export class RukassaClient {
 
   /** HMAC-SHA256 подпись для payload: shop_id:order_id:amount. */
   private expectedSignature(rawBody: unknown, secret: string): string {
-    const shopId = this.config.get('RUKASSA_SHOP_ID') || ''
+    const shopId = this.config.get<string>('RUKASSA_SHOP_ID') || ''
     const body = (rawBody ?? {}) as Record<string, unknown>
     const orderId = String(body['order_id'] || body['merchant_order_id'] || '')
     const amount = String(body['amount'] || '')

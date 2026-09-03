@@ -10,7 +10,7 @@ import {
 @Injectable()
 export class CreateTicketUseCase {
   constructor(@Inject(SUPPORT_REPOSITORY) private repo: ISupportRepository) {}
-  async execute(userId: string, input: { subject: string; category: TicketCategory; message: string }) {
+  async execute(userId: string, input: { subject: string; category: TicketCategory; message: string }): Promise<{ id: string; }> {
     const open = await this.repo.countOpenByUser(userId)
     if (open >= 5) {
       throw new TooManyOpenTicketsError()

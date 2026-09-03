@@ -2,19 +2,7 @@ import { randomUUID } from 'crypto'
 import { mkdirSync, writeFileSync } from 'fs'
 import { extname } from 'path'
 
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  Post,
-  Query,
-  UploadedFile,
-  UseGuards,
-  UseInterceptors,
-  UsePipes,
-  Inject,
-} from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, Inject, Post, Query, UploadedFile, UseGuards, UseInterceptors, UsePipes } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 
@@ -24,14 +12,13 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+import { IKycRepository, KYC_REPOSITORY, type KycProfileRow } from '@modules/kyc/domain/repositories/kyc.repository'
+
+import { type DisplayCurrency } from '@casino/shared-config'
 
 import { GetKycStatusUseCase } from '../../application/use-cases/get-kyc-status.use-case'
 import { SubmitKycUseCase } from '../../application/use-cases/submit-kyc.use-case'
-import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
-import {
-  KycDocumentTypeSchema,
-  SubmitKycSchema,
-} from '../dto/kyc.dto'
+import { KycDocumentTypeSchema, SubmitKycSchema } from '../dto/kyc.dto'
 
 // SECURITY_BASELINE.md §7.1 — KYC documents whitelist.
 // P1 #12: MIME-фильтр Multer'а — только первая линия; клиентский Content-Type
@@ -51,7 +38,7 @@ export class KycController {
     @Inject(KYC_REPOSITORY) private repo: IKycRepository,
   ) {}
   @Get('status')
-  status(@CurrentUser() u: UserActor, @Query('currency') currency?: string) {
+  status(@CurrentUser() u: UserActor, @Query('currency') currency?: string): Promise<{ deposit_limit_rub: string; total_deposited_rub: string; limit_remaining: string; limit_currency: DisplayCurrency; status?: string; submittedAt?: Date | null; rejectionReason?: string | null; documents?: string[]; }> {
     return this.statusUc.execute(u.id, currency || 'RUB')
   }
   @Post('submit')
@@ -68,7 +55,7 @@ export class KycController {
       document_number: string
       document_expiry?: string
     },
-  ) {
+  ): Promise<KycProfileRow> {
     return this.submitUc.execute({ userId: u.id, ...body })
   }
   @Post('documents')
@@ -92,7 +79,7 @@ export class KycController {
     @CurrentUser() u: UserActor,
     @Body(new ZodValidationPipe(KycDocumentTypeSchema)) body: { document_type: string },
     @UploadedFile() file: Express.Multer.File,
-  ) {
+  ): Promise<{ ok: boolean; file_url: string; }> {
     const profile = await this.repo.getByUserId(u.id)
     if (!profile) {
       throw new Error('KYC_NOT_SUBMITTED')

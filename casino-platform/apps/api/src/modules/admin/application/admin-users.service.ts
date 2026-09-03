@@ -5,14 +5,14 @@ import {
   ADMIN_USER_REPOSITORY,
   type AdminUserRow,
   type CreateAdminUserInput,
-  type IAdminUserRepository,
+  IAdminUserRepository,
 } from '../domain/admin.repository'
 
 @Injectable()
 export class AdminUsersService {
   constructor(@Inject(ADMIN_USER_REPOSITORY) private readonly repo: IAdminUserRepository) {}
 
-  list(page = 1, perPage = 20) {
+  list(page = 1, perPage = 20): Promise<{ items: AdminUserRow[]; total: number; }> {
     return this.repo.list(page, perPage)
   }
 

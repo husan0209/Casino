@@ -28,7 +28,7 @@ export class ProcessNOWPaymentsWebhookUseCase {
     private wallet: WalletFacade,
     private users: UsersFacade,
   ) {}
-  async execute(input: ProcessNowPaymentsWebhookInput) {
+  async execute(input: ProcessNowPaymentsWebhookInput): Promise<{ ok: boolean; }> {
     const { rawHeaders, body, rawBody, ip } = input
     const signature = rawHeaders['x-nowpayments-sig'] || ''
     // Store the exact raw body bytes for forensics and re-verification.
@@ -70,8 +70,7 @@ export class ProcessNOWPaymentsWebhookUseCase {
   private async applyPaymentStatus(
     pr: { id: string; userId: string; status: string; currency: string; amount: { toString(): string } },
     paymentStatus: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- NOWPayments IPN payload, body поля читаются через String()/|| fallback
-    body: Record<string, any>,
+    body: Record<string, unknown>,
   ): Promise<void> {
     if (['finished', 'confirmed'].includes(paymentStatus)) {
       await this.creditCryptoDeposit(pr, body)
@@ -86,10 +85,10 @@ export class ProcessNOWPaymentsWebhookUseCase {
 
   private async creditCryptoDeposit(
     pr: { id: string; userId: string; currency: string; amount: { toString(): string } },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- NOWPayments IPN payload, body поля читаются через String()/|| fallback
-    body: Record<string, any>,
+    body: Record<string, unknown>,
   ): Promise<void> {
-    const actuallyPaid = body.actually_paid || body.pay_amount || pr.amount.toString()
+    const actuallyPaid =
+      String(body.actually_paid ?? '') || String(body.pay_amount ?? '') || pr.amount.toString()
     await this.wallet.credit({
       userId: pr.userId,
       currency: pr.currency as Currency,
@@ -97,11 +96,11 @@ export class ProcessNOWPaymentsWebhookUseCase {
       type: 'DEPOSIT',
       // GAP-28 (defense-in-depth): ключ от external_id провайдера — повторная доставка
       // IPN по тому же payment_id не зачислит дважды.
-      idempotencyKey: 'deposit_nowpayments_' + String(body.payment_id),
+      idempotencyKey: 'deposit_nowpayments_' + String(body.payment_id ?? ''),
       description: 'Крипто-пополнение через NOWPayments',
       metadata: {
         provider: 'nowpayments',
-        external_id: String(body.payment_id),
+        external_id: String(body.payment_id ?? ''),
         actually_paid: actuallyPaid,
       },
     })
@@ -109,7 +108,7 @@ export class ProcessNOWPaymentsWebhookUseCase {
     await this.users.onDepositCompleted(pr.userId, pr.currency, cryptoMethod)
     await this.repo.updateStatus(pr.id, 'completed', {
       completedAt: new Date(),
-      externalStatus: body.payment_status,
+      externalStatus: String(body.payment_status ?? ''),
     })
   }
 }

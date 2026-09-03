@@ -107,7 +107,7 @@ export class PrismaKycRepository implements IKycRepository {
     status: 'approved' | 'rejected' | 'requires_resubmission'
     reason?: string
     reviewedBy?: string
-  }) {
+  }): Promise<void> {
     const { id, status, reason, reviewedBy } = args
     await prisma.kycProfile.update({
       where: { id },

@@ -4,8 +4,7 @@ import { Worker } from 'bullmq'
 
 import { queueConnection } from '../../../queues/infrastructure/email.queue'
 import { QUEUES } from '../../../queues/queue.types'
-import { MAINTENANCE_HANDLERS } from '../domain/maintenance.ports'
-import { type MaintenanceHandlers } from '../domain/maintenance.ports'
+import { MaintenanceHandlers, MAINTENANCE_HANDLERS } from '../domain/maintenance.ports'
 
 /**
  * Воркер maintenance-очереди (GAP-33): диспетчер по job.name — каждый
@@ -44,7 +43,7 @@ export class MaintenanceWorker implements OnModuleDestroy {
     this.logger.log(`Maintenance worker started on queue "${QUEUES.MAINTENANCE}"`)
   }
 
-  async onModuleDestroy() {
+  async onModuleDestroy(): Promise<void> {
     await this.worker?.close()
   }
 }

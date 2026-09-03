@@ -16,9 +16,9 @@ export class GetKycStatusUseCase {
     private config: ConfigService,
   ) {}
 
-  async execute(userId: string, currency = 'RUB') {
+  async execute(userId: string, currency = 'RUB'): Promise<{ deposit_limit_rub: string; total_deposited_rub: string; limit_remaining: string; limit_currency: DisplayCurrency; status?: string; submittedAt?: Date | null; rejectionReason?: string | null; documents?: string[]; }> {
     const status = await this.repo.getStatus(userId)
-    const limitRub = this.config.get('KYC_DEPOSIT_LIMIT_RUB') || '5000'
+    const limitRub = this.config.get<string>('KYC_DEPOSIT_LIMIT_RUB') || '5000'
     const totalRub = (await this.repo.getTotalDepositedRub(userId)) || '0'
     const remainingRub = money.isGreaterThan(totalRub, limitRub)
       ? '0'

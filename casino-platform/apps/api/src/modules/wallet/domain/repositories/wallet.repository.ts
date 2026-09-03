@@ -17,7 +17,7 @@ export interface CreditInput {
   type: LedgerEntryType
   idempotencyKey: string
   description?: string
-  /** Prisma InputJsonValue: Record<string, unknown> не проходит компилятор без приведения. */
+  /** Prisma Prisma.InputJsonValue: Record<string, unknown> не проходит компилятор без приведения. */
   metadata?: Prisma.InputJsonValue
   /**
    * P0 #3: внешний Prisma-клиент транзакции. Если задан — ledger НЕ открывает

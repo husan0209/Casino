@@ -17,7 +17,7 @@ export class UpdateProfileUseCase {
       country?: string
       city?: string
     },
-  ) {
+  ): Promise<{ ok: boolean; }> {
     await this.repo.updateProfile(userId, {
       firstName: input.first_name,
       lastName: input.last_name,

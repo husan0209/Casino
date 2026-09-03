@@ -25,7 +25,7 @@ export const RATE_STALE_AFTER_MS = 60 * 60 * 1000
 
 /**
  * GAP-34: конвертация display-валют из БД/кеша; DISPLAY_RUB_RATES — только fallback.
- * Деньги — только string/Decimal.
+ * Деньги — только string/Prisma.Decimal.
  */
 @Injectable()
 export class ExchangeRatesService {

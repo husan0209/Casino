@@ -1,17 +1,13 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
-import Decimal from 'decimal.js'
+import { Decimal } from 'decimal.js'
 
 import { errorMessage } from '@/common/utils/error-message'
 
-import type { Currency } from '@casino/shared-types'
+import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 import { WalletFacade } from '../../wallet/application/wallet.facade'
-import {
-  REFERRAL_REPOSITORY,
-  type CurrencySumRow,
-  type IReferralRepository,
-} from '../domain/referral.repository'
+import { type CurrencySumRow, IReferralRepository, REFERRAL_REPOSITORY } from '../domain/referral.repository'
 
 @Injectable()
 export class ReferralCalcService {
@@ -24,7 +20,7 @@ export class ReferralCalcService {
 
   // TODO(referrals): split runDaily into accrual + payout steps (<60 lines)
   // eslint-disable-next-line max-lines-per-function
-  async runDaily(dateStr?: string) {
+  async runDaily(dateStr?: string): Promise<{ processed: number; credited: number; date: Date; }> {
     const date = dateStr ? new Date(dateStr) : new Date(Date.now() - 86400000)
     const dayStart = new Date(date)
     dayStart.setUTCHours(0, 0, 0, 0)

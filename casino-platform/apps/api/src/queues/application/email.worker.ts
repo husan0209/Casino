@@ -5,7 +5,7 @@ import { Worker } from 'bullmq'
 import { prisma } from '@casino/database'
 
 import { queueConnection } from '../infrastructure/email.queue'
-import { type MailerPort } from '../infrastructure/mailer.port'
+import { MailerPort } from '../infrastructure/mailer.port'
 import { type EmailJobData, MAILER_PORT, QUEUES } from '../queue.types'
 
 /** Воркер: разбирает очередь `email` и шлёт через MailerPort (SMTP/dev-log). */
@@ -32,7 +32,7 @@ export class EmailWorker implements OnModuleDestroy {
     this.logger.log(`Email worker started on queue "${QUEUES.EMAIL}"`)
   }
 
-  private async handle(job: EmailJobData) {
+  private async handle(job: EmailJobData): Promise<void> {
     await this.mailer.send({ to: job.to, subject: job.subject, text: job.text, html: job.html })
     if (job.notificationId) {
       await prisma.notification
@@ -44,7 +44,7 @@ export class EmailWorker implements OnModuleDestroy {
     }
   }
 
-  async onModuleDestroy() {
+  async onModuleDestroy(): Promise<void> {
     await this.worker?.close()
   }
 }

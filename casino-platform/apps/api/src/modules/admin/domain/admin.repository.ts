@@ -4,7 +4,8 @@
  * Дашборд читает чужие агрегаты (users/payments/kyc/tickets) — админ-модуль
  * по назначению кросс-доменный; TODO(GAP-22): рассмотреть Facade-порты.
  */
-import type { Decimal } from 'decimal.js'
+import { type Decimal } from 'decimal.js'
+
 
 export interface AdminUserRow {
   id: string

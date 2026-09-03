@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common'
 
 import { prisma, type Prisma, type PaymentCallback, type PaymentProvider, type PaymentRequest, type PaymentStatus } from '@casino/database'
 
+export type { PaymentRequest, PaymentProvider, PaymentStatus, PaymentType } from '@casino/database'
+
 @Injectable()
 export class PaymentRequestRepository {
   create(data: Prisma.PaymentRequestUncheckedCreateInput): Promise<PaymentRequest> {

@@ -17,7 +17,7 @@ export class ReferralDailyJob {
 
   constructor(private readonly referralCalc: ReferralCalcService) {}
 
-  async execute(dateStr?: string) {
+  async execute(dateStr?: string): Promise<{ processed: number; credited: number; date: Date; }> {
     const res = await this.referralCalc.runDaily(dateStr)
     this.logger.log(
       `referral-daily: date=${res.date.toISOString().slice(0, 10)} processed=${res.processed} credited=${res.credited}`,

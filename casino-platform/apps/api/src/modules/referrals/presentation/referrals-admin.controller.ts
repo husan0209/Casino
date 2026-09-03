@@ -4,12 +4,11 @@ import { z } from 'zod'
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
-import { prisma, type Prisma } from '@casino/database'
-
+import { prisma, type Prisma, type ReferralRewardStatus, type ReferralRewardType } from '@casino/database'
 
 import { AuditLogService } from '../../admin/application/audit-log.service'
 import { AuthGuard } from '../../auth/presentation/guards/auth.guard'
-import { RolesGuard, Roles } from '../../auth/presentation/guards/roles.guard'
+import { Roles, RolesGuard } from '../../auth/presentation/guards/roles.guard'
 import { ReferralCalcService } from '../application/referral-calc.service'
 
 // GAP-21: ручной триггер начислений — date опционален (YYYY-MM-DD)
@@ -44,7 +43,7 @@ export class ReferralsAdminController {
   async runDaily(
     @Body() dto: RunDailyDto,
     @CurrentUser() admin: { id: string; email?: string },
-  ) {
+  ): Promise<{ date: string; processed: number; credited: number; ok: boolean; }> {
     const result = await this.referralCalc.runDaily(dto.date)
     await this.audit.log({
       actorType: 'user',
@@ -57,7 +56,7 @@ export class ReferralsAdminController {
   }
 
   @Get('stats')
-  async stats() {
+  async stats(): Promise<{ total_referrals: number; total_rewards_paid: string; top_referrers: { user_id: string; email: string | null | undefined; referral_count: number; total_earned: string; }[]; }> {
     const totalReferrals = await prisma.user.count({ where: { referredBy: { not: null } } })
     const paid = await prisma.referralReward.aggregate({
       where: { status: 'credited' },
@@ -98,7 +97,7 @@ export class ReferralsAdminController {
     }
   }
   @Get()
-  async list(@Query() q: Record<string, string | undefined>) {
+  async list(@Query() q: Record<string, string | undefined>): Promise<{ data: ({ referrer: { email: string | null; }; referred: { email: string | null; }; } & { id: string; createdAt: Date; type: ReferralRewardType; currency: string; status: ReferralRewardStatus; ledgerEntryId: string | null; rewardAmount: Prisma.Decimal; ggrAmount: Prisma.Decimal; rewardRate: Prisma.Decimal; referrerId: string; referredId: string; periodStart: Date; periodEnd: Date; creditedAt: Date | null; })[]; meta: { page: number; perPage: number; total: number; }; }> {
     const page = parseInt(q.page ?? '') || 1,
       perPage = parseInt(q.per_page ?? '') || 20
     const where: Prisma.ReferralRewardWhereInput = {}

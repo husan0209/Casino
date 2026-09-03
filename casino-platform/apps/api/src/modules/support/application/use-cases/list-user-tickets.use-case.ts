@@ -1,15 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import {
-  ISupportRepository,
-  SUPPORT_REPOSITORY,
-  type TicketStatus,
-} from '../../domain/repositories/support.repository'
+import { ISupportRepository, SUPPORT_REPOSITORY, type TicketListItem, type TicketStatus } from '@modules/support/domain/repositories/support.repository'
 
 @Injectable()
 export class ListUserTicketsUseCase {
   constructor(@Inject(SUPPORT_REPOSITORY) private repo: ISupportRepository) {}
-  execute(args: { userId: string; status?: TicketStatus; page: number; perPage: number }) {
+  execute(args: { userId: string; status?: TicketStatus; page: number; perPage: number }): Promise<{ items: TicketListItem[]; total: number; }> {
     return this.repo.listUserTickets({
       userId: args.userId,
       ...(args.status !== undefined ? { status: args.status } : {}),

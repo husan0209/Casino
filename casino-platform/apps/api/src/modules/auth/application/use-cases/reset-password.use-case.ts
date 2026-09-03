@@ -24,7 +24,7 @@ export class ResetPasswordUseCase {
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,
     private hasher: PasswordHasher,
   ) {}
-  async execute(token: string, newPassword: string) {
+  async execute(token: string, newPassword: string): Promise<{ ok: boolean; }> {
     if (newPassword.length < 8) {
       throw new WeakPasswordError()
     }

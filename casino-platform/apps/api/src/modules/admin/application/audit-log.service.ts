@@ -3,7 +3,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import {
   AUDIT_LOG_REPOSITORY,
   type AuditLogInput,
-  type IAuditLogRepository,
+  IAuditLogRepository,
 } from '../domain/admin.repository'
 
 @Injectable()

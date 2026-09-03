@@ -58,7 +58,7 @@ export class MaintenanceScheduler implements OnModuleDestroy {
     }
   }
 
-  async onModuleDestroy() {
+  async onModuleDestroy(): Promise<void> {
     await this.queue?.close()
     this.connection?.disconnect()
   }

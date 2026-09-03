@@ -34,7 +34,7 @@ export class PaymentsWebhookController {
     @Headers() headers: Record<string, string>,
     @Body() body: unknown,
     @Req() req: { rawBody?: string; ip?: string },
-  ) {
+  ): Promise<{ ok: boolean; }> {
     return this.rukassa.execute({
       rawHeaders: headers,
       body: body as Record<string, unknown>,
@@ -49,7 +49,7 @@ export class PaymentsWebhookController {
     @Headers() headers: Record<string, string>,
     @Body() body: unknown,
     @Req() req: { rawBody?: string; ip?: string },
-  ) {
+  ): Promise<{ ok: boolean; }> {
     return this.np.execute({
       rawHeaders: headers,
       body: body as Record<string, unknown>,

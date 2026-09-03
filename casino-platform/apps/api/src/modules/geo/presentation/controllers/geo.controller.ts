@@ -3,6 +3,8 @@ import { type Request } from 'express'
 
 import { OptionalAuthGuard } from '@/common/guards/optional-auth.guard'
 
+import { type GeoConfigResult } from '@modules/geo/domain/geo-config.policy'
+
 import { GeoFacade } from '../../facade/geo.facade'
 
 @Controller('geo')
@@ -11,7 +13,7 @@ export class GeoController {
 
   @Get('config')
   @UseGuards(OptionalAuthGuard)
-  config(@Req() req: Request & { user?: { id: string } }) {
+  config(@Req() req: Request & { user?: { id: string } }): Promise<GeoConfigResult> {
     const countryHeader =
       (req.headers['x-geo-country'] as string) ||
       (req.headers['cf-ipcountry'] as string) ||

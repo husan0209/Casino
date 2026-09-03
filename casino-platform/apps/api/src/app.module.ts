@@ -63,7 +63,7 @@ import { QueuesModule } from './queues/queues.module'
   ],
 })
 export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
+  configure(consumer: MiddlewareConsumer): void {
     consumer.apply(RequestIdMiddleware).forRoutes('*')
   }
 }

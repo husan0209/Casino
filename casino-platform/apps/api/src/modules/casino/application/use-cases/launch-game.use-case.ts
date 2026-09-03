@@ -1,27 +1,15 @@
 import { randomBytes } from 'crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
-import Decimal from 'decimal.js'
-
+import { Decimal } from 'decimal.js'
 
 import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 import { InsufficientFundsError } from '@modules/wallet/domain/errors'
 
-import type { Currency } from '@casino/shared-types'
+import { type Currency } from '@casino/shared-types'
 
-import {
-  CurrencyNotSupportedError,
-  GameDisabledError,
-  GameNotFoundError,
-  ProviderDisabledError,
-} from '../../domain/errors'
-import {
-  GAME_CATALOG_REPOSITORY,
-  GAME_PLAY_REPOSITORY,
-  type GameWithProvider,
-  type IGameCatalogRepository,
-  type IGamePlayRepository,
-} from '../../domain/repositories/casino.repository'
+import { CurrencyNotSupportedError, GameDisabledError, GameNotFoundError, ProviderDisabledError } from '../../domain/errors'
+import { GAME_CATALOG_REPOSITORY, GAME_PLAY_REPOSITORY, type GameWithProvider, IGameCatalogRepository, IGamePlayRepository } from '../../domain/repositories/casino.repository'
 import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 
 interface LaunchGameInput {
@@ -50,7 +38,7 @@ export class LaunchGameUseCase {
     @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
   ) {}
 
-  async execute(input: LaunchGameInput) {
+  async execute(input: LaunchGameInput): Promise<{ session_id: string | null; launch_url: string; currency: string; }> {
     const game = await this.catalog.findBySlug(input.gameSlug)
     if (!game) {
       throw new GameNotFoundError(input.gameSlug)

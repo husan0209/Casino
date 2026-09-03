@@ -2,16 +2,11 @@ import { randomBytes } from 'crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 
+import { type UserRole } from '../../domain/entities/user.entity'
 import { EmailAlreadyExistsError, WeakPasswordError } from '../../domain/errors'
-import {
-  ISessionRepository,
-  SESSION_REPOSITORY,
-} from '../../domain/repositories/session.repository'
+import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
-import {
-  IEmailVerificationRepository,
-  EMAIL_VERIFICATION_REPOSITORY,
-} from '../../domain/repositories/verification-token.repository'
+import { EMAIL_VERIFICATION_REPOSITORY, IEmailVerificationRepository } from '../../domain/repositories/verification-token.repository'
 import { EmailQueueService } from '../../infrastructure/services/email-queue.service'
 import { JwtTokenService } from '../../infrastructure/services/jwt.service'
 import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
@@ -48,7 +43,7 @@ export class RegisterUseCase {
   async execute(
     input: { email: string; password: string; referralCode?: string | undefined },
     meta?: { ip?: string | undefined; userAgent?: string | undefined },
-  ) {
+  ): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string | null; role: UserRole; }; referralCode: string; message: string; }> {
     if (input.password.length < 8) {
       throw new WeakPasswordError()
     }

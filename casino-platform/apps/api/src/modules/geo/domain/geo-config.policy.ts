@@ -8,6 +8,7 @@ import {
   cryptoMethods,
   liveFiatCurrencies,
   resolveLegalCountry,
+  type CurrencyLimitsDef,
   type DisplayCurrency,
   CURRENCY_LIMITS,
 } from '@casino/shared-config'
@@ -47,7 +48,7 @@ export function resolveGeoConfig(input: {
   const enabledFiat = profile.enabledFiat.filter((c) => liveFiatCurrencies().includes(c))
   const fiatMethods = filterMethodsForCurrency(profile.fiatMethods, activeCurrency, enabledFiat)
   const sortedFiat = sortByLastMethod(fiatMethods, input.userContext?.lastPaymentMethod)
-  const limits = CURRENCY_LIMITS[activeCurrency] ?? CURRENCY_LIMITS.RUB
+  const limits = CURRENCY_LIMITS[activeCurrency]
 
   return {
     hostname: input.hostname || 'localhost',
@@ -81,8 +82,8 @@ export function assertFiatDepositMethod(
   return found
 }
 
-export function getCurrencyLimits(currency: DisplayCurrency) {
-  return CURRENCY_LIMITS[currency] ?? CURRENCY_LIMITS.RUB
+export function getCurrencyLimits(currency: DisplayCurrency): CurrencyLimitsDef {
+  return CURRENCY_LIMITS[currency]
 }
 
 /** Display-only: RUB remaining → target currency (KYC UI)

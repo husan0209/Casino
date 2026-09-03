@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
+import { IKycRepository, KYC_REPOSITORY, type KycProfileRow } from '@modules/kyc/domain/repositories/kyc.repository'
 
 interface KycSubmitInput {
   userId: string
@@ -16,7 +16,7 @@ interface KycSubmitInput {
 @Injectable()
 export class SubmitKycUseCase {
   constructor(@Inject(KYC_REPOSITORY) private repo: IKycRepository) {}
-  async execute(input: KycSubmitInput) {
+  async execute(input: KycSubmitInput): Promise<KycProfileRow> {
     return this.repo.submit({
       userId: input.userId,
       firstName: input.first_name,

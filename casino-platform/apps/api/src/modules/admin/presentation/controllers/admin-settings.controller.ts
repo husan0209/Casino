@@ -17,7 +17,7 @@ export class AdminSettingsController {
   constructor(private audit: AuditLogService) {}
 
   @Get()
-  async getSettings() {
+  async getSettings(): Promise<{ id: string; updatedAt: Date; type: SystemSettingType; description: string | null; key: string; value: string; category: string | null; updatedBy: string | null; }[]> {
     return prisma.systemSetting.findMany()
   }
 
@@ -27,7 +27,7 @@ export class AdminSettingsController {
     @Body() body: { key: string; value: string; type: string },
     @CurrentUser() admin: AdminActor,
     @Req() req: Request,
-  ) {
+  ): Promise<{ id: string; updatedAt: Date; type: SystemSettingType; description: string | null; key: string; value: string; category: string | null; updatedBy: string | null; }> {
     const setting = await prisma.systemSetting.upsert({
       where: { key: body.key },
       update: { value: body.value, updatedBy: admin.id },
@@ -52,7 +52,7 @@ export class AdminSettingsController {
 
   // Email template management (simulated via SystemSettings since there is no EmailTemplate model)
   @Get('email-templates')
-  async getEmailTemplates() {
+  async getEmailTemplates(): Promise<{ id: string; updatedAt: Date; type: SystemSettingType; description: string | null; key: string; value: string; category: string | null; updatedBy: string | null; }[]> {
     return prisma.systemSetting.findMany({
       where: { key: { startsWith: 'email_template_' } },
     })
@@ -64,7 +64,7 @@ export class AdminSettingsController {
     @Body() body: { name: string; subject: string; htmlBody: string },
     @CurrentUser() admin: AdminActor,
     @Req() req: Request,
-  ) {
+  ): Promise<{ name: string; subject: string; htmlBody: string; }> {
     const templateKey = `email_template_${body.name}`
     const templateValue = JSON.stringify({ subject: body.subject, htmlBody: body.htmlBody })
     await prisma.systemSetting.upsert({

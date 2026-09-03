@@ -23,7 +23,7 @@ export class AdminNotificationsController {
     @Body() body: { userIds: string[]; title: string; message: string; type: string },
     @CurrentUser() admin: AdminActor,
     @Req() req: Request,
-  ) {
+  ): Promise<{ success: boolean; sentCount: number; }> {
     // Send to specific users or all users if userIds is empty
     let targets = body.userIds
     if (targets.length === 0) {

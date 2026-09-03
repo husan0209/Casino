@@ -8,7 +8,7 @@ import {
 @Injectable()
 export class RevokeSessionUseCase {
   constructor(@Inject(USER_SESSION_REPOSITORY) private repo: IUserSessionRepository) {}
-  async execute(userId: string, sessionId: string, currentSessionId?: string) {
+  async execute(userId: string, sessionId: string, currentSessionId?: string): Promise<{ ok: boolean; }> {
     if (sessionId === currentSessionId) {
       throw new ForbiddenException('Cannot revoke current session, use logout')
     }

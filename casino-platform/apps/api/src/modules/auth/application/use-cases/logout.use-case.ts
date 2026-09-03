@@ -8,7 +8,7 @@ import {
 @Injectable()
 export class LogoutUseCase {
   constructor(@Inject(SESSION_REPOSITORY) private sessions: ISessionRepository) {}
-  async execute(sessionId: string) {
+  async execute(sessionId: string): Promise<{ ok: boolean; }> {
     await this.sessions.revoke(sessionId)
     return { ok: true }
   }

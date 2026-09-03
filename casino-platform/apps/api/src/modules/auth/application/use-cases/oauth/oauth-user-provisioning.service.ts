@@ -2,17 +2,12 @@ import { randomBytes } from 'node:crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 
-import {
-  IAuthProviderRepository,
-  AUTH_PROVIDER_REPOSITORY,
-  type AuthProviderKind,
-} from '@modules/auth/domain/repositories/auth-provider.repository'
-import {
-  ISessionRepository,
-  SESSION_REPOSITORY,
-} from '@modules/auth/domain/repositories/session.repository'
+import { AUTH_PROVIDER_REPOSITORY, type AuthProviderKind, IAuthProviderRepository } from '@modules/auth/domain/repositories/auth-provider.repository'
+import { ISessionRepository, SESSION_REPOSITORY } from '@modules/auth/domain/repositories/session.repository'
 import { IUserRepository, USER_REPOSITORY } from '@modules/auth/domain/repositories/user.repository'
 import { JwtTokenService } from '@modules/auth/infrastructure/services/jwt.service'
+
+import { type User } from '../../../domain/entities/user.entity'
 
 /** Результат OAuth-входа: access/refresh + данные игрока. */
 export interface OAuthSignInResult {
@@ -106,7 +101,7 @@ export class OAuthUserProvisioningService {
   }
 
   /** Создание игрока при первом входе через провайдера (без пароля, с реферальным кодом). */
-  private async provisionUser(input: ProviderSignInInput) {
+  private async provisionUser(input: ProviderSignInInput): Promise<User> {
     const referralCode = await this.generateReferralCode()
     let referredBy: string | null = null
     if (input.referralCode) {

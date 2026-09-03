@@ -1,12 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { TokenInvalidError, TokenExpiredError, TokenAlreadyUsedError } from '../../domain/errors'
-import {
-  IEmailVerificationRepository,
-  EMAIL_VERIFICATION_REPOSITORY,
-  ISessionRepository,
-  SESSION_REPOSITORY,
-} from '../../domain/repositories'
+import { type UserRole } from '../../domain/entities/user.entity'
+import { TokenAlreadyUsedError, TokenExpiredError, TokenInvalidError } from '../../domain/errors'
+import { EMAIL_VERIFICATION_REPOSITORY, IEmailVerificationRepository, ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 import { JwtTokenService } from '../../infrastructure/services/jwt.service'
 
@@ -19,7 +15,7 @@ export class VerifyEmailUseCase {
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,
     private jwt: JwtTokenService,
   ) {}
-  async execute(token: string, ip?: string, userAgent?: string) {
+  async execute(token: string, ip?: string, userAgent?: string): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string | null; role: UserRole; }; }> {
     const rec = await this.verif.findByToken(token)
     if (!rec) {
       throw new TokenInvalidError()

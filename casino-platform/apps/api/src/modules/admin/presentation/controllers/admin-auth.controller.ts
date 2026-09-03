@@ -2,7 +2,7 @@ import { Body, Controller, Post, UsePipes } from '@nestjs/common'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
-import { prisma } from '@casino/database'
+import { type AdminRole, prisma } from '@casino/database'
 
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthService } from '../../infrastructure/admin-jwt.service'
@@ -16,7 +16,7 @@ export class AdminAuthController {
   ) {}
   @Post('login')
   @UsePipes(new ZodValidationPipe(AdminLoginSchema))
-  async login(@Body() body: { email: string; password: string }) {
+  async login(@Body() body: { email: string; password: string }): Promise<{ success: boolean; error: { code: string; message: string; }; accessToken?: never; admin?: never; } | { accessToken: string; admin: { id: string; email: string; role: AdminRole; }; success?: never; error?: never; }> {
     const admin = await this.auth.validate(body.email, body.password)
     if (!admin) {
       return {

@@ -7,7 +7,10 @@ import {
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
-export const Roles = (...roles: string[]) => SetMetadata('roles', roles)
+import { getHttpRequest } from '@/common/types/express-context'
+
+export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
+  SetMetadata('roles', roles)
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
@@ -22,8 +25,7 @@ export class RolesGuard implements CanActivate {
     if (!roles) {
       return true
     }
-    const req = ctx.switchToHttp().getRequest()
-    const user = req.user
+    const user = getHttpRequest(ctx).user
     if (!user || !roles.includes(user.role)) {
       throw new ForbiddenException('INSUFFICIENT_PERMISSIONS')
     }

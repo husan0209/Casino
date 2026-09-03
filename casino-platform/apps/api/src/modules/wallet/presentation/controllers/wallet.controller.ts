@@ -3,13 +3,11 @@ import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common'
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+import { type WalletBalanceView, WalletFacade } from '@modules/wallet/application/wallet.facade'
 
-import { prisma, type LedgerEntryType, type Prisma } from '@casino/database'
-import type { Currency } from '@casino/shared-types'
+import { type LedgerEntryType, prisma, type Prisma } from '@casino/database'
+import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
-
-
-import { WalletFacade } from '../../application/wallet.facade'
 
 @UseGuards(AuthGuard)
 @Controller('wallet')
@@ -17,7 +15,7 @@ export class WalletController {
   constructor(private readonly walletFacade: WalletFacade) {}
 
   @Get('balances')
-  async balances(@CurrentUser() currentUser: { id: string }) {
+  async balances(@CurrentUser() currentUser: { id: string }): Promise<{ currency: string; balance: string; locked: string; available: string; }[]> {
     const rows = await this.walletFacade.getBalances(currentUser.id)
     return rows.map((row) => ({
       currency: row.currency,
@@ -28,7 +26,7 @@ export class WalletController {
   }
 
   @Get('balances/:currency')
-  async balance(@CurrentUser() currentUser: { id: string }, @Param('currency') currency: string) {
+  async balance(@CurrentUser() currentUser: { id: string }, @Param('currency') currency: string): Promise<WalletBalanceView> {
     return this.walletFacade.getBalance(currentUser.id, currency as Currency)
   }
 
@@ -36,7 +34,7 @@ export class WalletController {
   async transactions(
     @CurrentUser() currentUser: { id: string },
     @Query() queryParams: { page?: string; per_page?: string; currency?: string; type?: string },
-  ) {
+  ): Promise<{ data: { id: string; transaction_id: string; type: LedgerEntryType; amount: string; currency: string; balance_before: string; balance_after: string; description: string | null; created_at: Date; }[]; meta: { page: number; per_page: number; total: number; total_pages: number; hasNext: boolean; hasPrev: boolean; }; }> {
     const page = parseInt(queryParams.page ?? '1', 10) || 1
     const perPage = Math.min(parseInt(queryParams.per_page ?? '20', 10) || 20, 100)
 

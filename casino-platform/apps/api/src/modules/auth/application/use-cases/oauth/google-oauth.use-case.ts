@@ -34,7 +34,7 @@ export class GoogleOAuthUseCase {
     private provisioning: OAuthUserProvisioningService,
   ) {}
 
-  private credentials() {
+  private credentials(): { clientId: string; clientSecret: string; } {
     const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')
     const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET')
     if (!clientId || !clientSecret) {
@@ -52,7 +52,7 @@ export class GoogleOAuthUseCase {
     return `${body}.${sig}`
   }
 
-  private verifyState(state?: string) {
+  private verifyState(state?: string): void {
     if (!state) {
       throw new OAuthStateError()
     }

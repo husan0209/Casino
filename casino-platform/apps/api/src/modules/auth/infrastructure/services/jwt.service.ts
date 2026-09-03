@@ -3,7 +3,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
-const b64url = (buf: Buffer) => buf.toString('base64url')
+const b64url = (buf: Buffer): string => buf.toString('base64url')
 
 function expiresToSeconds(v: string | undefined, fallback: number): number {
   if (!v) {

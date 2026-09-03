@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
-import { EMAIL_QUEUE_PORT, EmailQueuePort } from '@/queues/queue.types'
+import { EMAIL_QUEUE_PORT, EmailQueuePort, type EnqueueResult } from '@/queues/queue.types'
 
 /**
  * Продюсер писей аутентификации (verify-email / reset-password).
@@ -19,7 +19,7 @@ export class EmailQueueService {
     return this.config.get<string>('APP_URL') || 'http://localhost:3000'
   }
 
-  sendVerificationEmail(to: string, token: string) {
+  sendVerificationEmail(to: string, token: string): Promise<EnqueueResult> {
     const link = `${this.base()}/verify-email?token=${token}`
     return this.emailQueue.enqueue({
       to,
@@ -29,7 +29,7 @@ export class EmailQueueService {
     })
   }
 
-  sendPasswordReset(to: string, token: string) {
+  sendPasswordReset(to: string, token: string): Promise<EnqueueResult> {
     const link = `${this.base()}/reset-password?token=${token}`
     return this.emailQueue.enqueue({
       to,

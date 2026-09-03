@@ -15,8 +15,8 @@ export class ProviderAdapterFactory {
   getAdapter(slug: string): GameProviderAdapter {
     switch (slug) {
       case 'demo-provider': {
-        const env = this.config.get('NODE_ENV')
-        const demoEnabled = this.config.get('DEMO_PROVIDER_ENABLED')
+        const env = this.config.get<string>('NODE_ENV')
+        const demoEnabled = this.config.get<string>('DEMO_PROVIDER_ENABLED')
 
         if (env === 'production') {
           this.logger.error('Demo provider requested in production. DEMO_PROVIDER_DISABLED.')

@@ -64,7 +64,7 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
     })
   }
 
-  async updateAfterDeposit(userId: string, currency: string, method: string) {
+  async updateAfterDeposit(userId: string, currency: string, method: string): Promise<void> {
     await prisma.userProfile.upsert({
       where: { userId },
       update: { lastPaymentMethod: method, currencyPreference: currency },
@@ -117,7 +117,7 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
       language?: string | undefined
       timezone?: string | undefined
     },
-  ) {
+  ): Promise<void> {
     await prisma.userSettings.upsert({
       where: { userId },
       update: {

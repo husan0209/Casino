@@ -16,7 +16,7 @@ export class ForgotPasswordUseCase {
     @Inject(PASSWORD_RESET_REPOSITORY) private resets: IPasswordResetRepository,
     private email: EmailQueueService,
   ) {}
-  async execute(emailInput: string) {
+  async execute(emailInput: string): Promise<{ message: string; }> {
     const user = await this.users.findByEmail(emailInput.toLowerCase().trim())
     if (user) {
       const token = randomBytes(64).toString('hex')
