@@ -2,7 +2,7 @@ import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
 import { type NestExpressApplication } from '@nestjs/platform-express'
 import cookieParser from 'cookie-parser'
-import { json, urlencoded, type Request, type Response } from 'express'
+import { json, urlencoded, type Request } from 'express'
 import helmet from 'helmet'
 import { Logger } from 'nestjs-pino'
 
