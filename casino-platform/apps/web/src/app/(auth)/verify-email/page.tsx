@@ -26,7 +26,7 @@ function VerifyInner() {
       )
       .then((r) => {
         const d = (r.data?.data ?? r.data) as { accessToken?: string; user?: WebUser }
-        if (d.accessToken) {
+        if (d.accessToken && d.user) {
           setAuth(d.user, d.accessToken)
           setAccessToken(d.accessToken)
         }

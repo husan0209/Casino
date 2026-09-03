@@ -17,6 +17,7 @@ export default function DepositPage() {
     pay_address?: string
     pay_amount?: string
     pay_currency?: string
+    expires_at?: string
   } | null>(null)
   if (!user) {
     return <div className="container-1 py-8">Войдите в аккаунт</div>
