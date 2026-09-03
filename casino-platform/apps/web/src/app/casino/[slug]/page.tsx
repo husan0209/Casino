@@ -7,10 +7,10 @@ import { useEffect } from 'react'
 import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
-import type { GameDetailsDto, GameLaunchDto } from '@/types/casino'
 import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
+import type { GameDetailsDto, GameLaunchDto } from '@/types/casino'
 
 export default function GamePage() {
   const { slug } = useParams() as { slug: string }

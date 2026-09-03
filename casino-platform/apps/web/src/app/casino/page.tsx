@@ -5,8 +5,6 @@ import { useState } from 'react'
 
 import { apiGet } from '@/lib/api'
 
-import type { GameDto, GamesListDto } from '@/types/casino'
-
 export default function CasinoPage() {
   const [category, setCategory] = useState('')
   const [provider, setProvider] = useState('')

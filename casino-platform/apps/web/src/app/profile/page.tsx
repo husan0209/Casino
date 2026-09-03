@@ -4,8 +4,8 @@ import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost } from '@/lib/api'
-import type { MeDto } from '@/types/user'
 import { useAuth } from '@/stores/auth'
+import type { MeDto } from '@/types/user'
 
 export default function ProfilePage() {
   const { user } = useAuth()

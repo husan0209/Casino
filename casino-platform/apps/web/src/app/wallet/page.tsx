@@ -3,9 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 
 import { apiGet } from '@/lib/api'
+import { useAuth } from '@/stores/auth'
 import type { WalletBalance } from '@/types/wallet'
 import type { WalletTxListDto } from '@/types/wallet-tx'
-import { useAuth } from '@/stores/auth'
 
 import { money } from '@casino/shared-utils'
 

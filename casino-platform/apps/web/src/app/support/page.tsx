@@ -5,8 +5,8 @@ import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost } from '@/lib/api'
-import type { SupportTicketDto } from '@/types/support'
 import { useAuth } from '@/stores/auth'
+import type { SupportTicketDto } from '@/types/support'
 
 export default function SupportPage() {
   const { user } = useAuth()

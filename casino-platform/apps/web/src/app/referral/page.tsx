@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 
 import { toast } from '@/components/ui/toaster'
 import { apiGet } from '@/lib/api'
-import type { ReferralInfoDto, ReferralRewardsDto } from '@/types/referral'
 import { useAuth } from '@/stores/auth'
+import type { ReferralInfoDto, ReferralRewardsDto } from '@/types/referral'
 
 export default function ReferralPage() {
   const { user } = useAuth()
