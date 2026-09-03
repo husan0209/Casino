@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { type GameCategory, type GameType, type GameVolatility, type Prisma } from '@prisma/client'
 
-import { GAME_CATALOG_REPOSITORY, type IGameCatalogRepository } from '../../domain/repositories/casino.repository'
+import { GAME_CATALOG_REPOSITORY, IGameCatalogRepository } from '../../domain/repositories/casino.repository'
 
 
 

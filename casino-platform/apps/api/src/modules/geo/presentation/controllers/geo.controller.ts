@@ -5,7 +5,7 @@ import { OptionalAuthGuard } from '@/common/guards/optional-auth.guard'
 
 import { type GeoConfigResult } from '@modules/geo/domain/geo-config.policy'
 
-import { type GeoFacade } from '../../facade/geo.facade'
+import { GeoFacade } from '../../facade/geo.facade'
 
 @Controller('geo')
 export class GeoController {

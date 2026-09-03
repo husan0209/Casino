@@ -10,7 +10,7 @@ import { Roles, RolesGuard } from '@modules/auth/presentation/guards/roles.guard
 import { type GameCategory, type GameProviderType, type GameRoundStatus, type GameSessionStatus, type GameTransactionType, type GameType, type GameVolatility, prisma, type Prisma } from '@casino/database'
 
 import { type ProviderGameRow } from '../../domain/provider-adapter.interface'
-import { type ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
+import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 import { UpdateGameSchema } from '../dto/admin-game.dto'
 
 /** Стабильный slug игры: читаемая база + хэш пары (provider, externalId). */

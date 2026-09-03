@@ -6,8 +6,8 @@ import { errorMessage } from '@/common/utils/error-message'
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-import { type WalletFacade } from '../../wallet/application/wallet.facade'
-import { type CurrencySumRow, type IReferralRepository, REFERRAL_REPOSITORY } from '../domain/referral.repository'
+import { WalletFacade } from '../../wallet/application/wallet.facade'
+import { type CurrencySumRow, IReferralRepository, REFERRAL_REPOSITORY } from '../domain/referral.repository'
 
 @Injectable()
 export class ReferralCalcService {

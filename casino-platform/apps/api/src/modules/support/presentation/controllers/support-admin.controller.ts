@@ -5,11 +5,11 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 import { Roles, RolesGuard } from '@modules/auth/presentation/guards/roles.guard'
-import { type ISupportRepository, type MessageRow, SUPPORT_REPOSITORY, type TicketCategory, type TicketListItem, type TicketPriority, type TicketStatus } from '@modules/support/domain/repositories/support.repository'
+import { ISupportRepository, type MessageRow, SUPPORT_REPOSITORY, type TicketCategory, type TicketListItem, type TicketPriority, type TicketStatus } from '@modules/support/domain/repositories/support.repository'
 
-import { type CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
-import { type GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
-import { type SendMessageUseCase } from '../../application/use-cases/send-message.use-case'
+import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
+import { GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
+import { SendMessageUseCase } from '../../application/use-cases/send-message.use-case'
 import { AddAdminMessageSchema, AssignTicketSchema, SetPrioritySchema } from '../dto/support.dto'
 
 @UseGuards(AuthGuard, RolesGuard)

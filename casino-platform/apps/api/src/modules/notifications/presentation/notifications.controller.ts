@@ -6,7 +6,7 @@ import { type UserActor } from '@/common/types/req-user'
 import { type NotificationChannel, type Prisma } from '@casino/database'
 
 import { AuthGuard } from '../../auth/presentation/guards/auth.guard'
-import { type NotificationService } from '../application/notification.service'
+import { NotificationService } from '../application/notification.service'
 
 @UseGuards(AuthGuard)
 @Controller('notifications')

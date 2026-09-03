@@ -1,13 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { type WalletFacade } from '@modules/wallet/application/wallet.facade'
+import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 import { type ParsedProviderCallback, type ProviderCallbackResponse } from '../../domain/provider-adapter.interface'
-import { GAME_PLAY_REPOSITORY, type GameRow, type GameSessionWithGame, type IGamePlayRepository } from '../../domain/repositories/casino.repository'
+import { GAME_PLAY_REPOSITORY, type GameRow, type GameSessionWithGame, IGamePlayRepository } from '../../domain/repositories/casino.repository'
 
 interface AuthenticateResult {
   player_id: string

@@ -2,9 +2,9 @@ import { Inject, Injectable } from '@nestjs/common'
 
 import { type UserRole } from '../../domain/entities/user.entity'
 import { TokenAlreadyUsedError, TokenExpiredError, TokenInvalidError } from '../../domain/errors'
-import { EMAIL_VERIFICATION_REPOSITORY, type IEmailVerificationRepository, type ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories'
-import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
-import { type JwtTokenService } from '../../infrastructure/services/jwt.service'
+import { EMAIL_VERIFICATION_REPOSITORY, IEmailVerificationRepository, ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories'
+import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { JwtTokenService } from '../../infrastructure/services/jwt.service'
 
 @Injectable()
 export class VerifyEmailUseCase {

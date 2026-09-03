@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { type IKycRepository, KYC_REPOSITORY, type KycProfileRow } from '@modules/kyc/domain/repositories/kyc.repository'
+import { IKycRepository, KYC_REPOSITORY, type KycProfileRow } from '@modules/kyc/domain/repositories/kyc.repository'
 
 interface KycSubmitInput {
   userId: string

@@ -3,13 +3,13 @@ import { randomUUID } from 'crypto'
 import { Injectable } from '@nestjs/common'
 import { Decimal } from 'decimal.js'
 
-import { type KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
-import { type WalletFacade } from '@modules/wallet/application/wallet.facade'
+import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
+import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 
 import { type Currency } from '@casino/shared-types'
 
 import { AmountTooLargeError, AmountTooSmallError } from '../../domain/errors'
-import { type PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
+import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 
 @Injectable()
 export class CreateWithdrawalUseCase {

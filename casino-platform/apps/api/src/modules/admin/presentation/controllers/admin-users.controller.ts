@@ -6,7 +6,7 @@ import { type AdminActor } from '@/common/types/req-user'
 
 import { type KycDocumentType, type KycStatus, prisma, type Prisma, type UserRole, type UserStatus } from '@casino/database'
 
-import { type AuditLogService } from '../../application/audit-log.service'
+import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { BlockUserSchema } from '../dto/admin-users.dto'
 

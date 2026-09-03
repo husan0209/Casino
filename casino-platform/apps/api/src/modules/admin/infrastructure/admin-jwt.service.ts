@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 
 import { Injectable } from '@nestjs/common'
-import { type ConfigService } from '@nestjs/config'
+import { ConfigService } from '@nestjs/config'
 import * as argon2 from 'argon2'
 
 import { type AdminRole, prisma } from '@casino/database'

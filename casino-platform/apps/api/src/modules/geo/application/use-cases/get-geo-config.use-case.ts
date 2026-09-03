@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
 
 import { type GeoConfigResult, resolveGeoConfig } from '@modules/geo/domain/geo-config.policy'
-import { type UsersFacade } from '@modules/users/facade/users.facade'
+import { UsersFacade } from '@modules/users/facade/users.facade'
 
 export interface ResolveGeoInput {
   hostname?: string | undefined

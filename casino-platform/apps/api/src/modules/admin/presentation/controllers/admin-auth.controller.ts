@@ -4,8 +4,8 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
 import { type AdminRole, prisma } from '@casino/database'
 
-import { type AuditLogService } from '../../application/audit-log.service'
-import { type AdminAuthService } from '../../infrastructure/admin-jwt.service'
+import { AuditLogService } from '../../application/audit-log.service'
+import { AdminAuthService } from '../../infrastructure/admin-jwt.service'
 import { AdminLoginSchema } from '../dto/admin-auth.dto'
 
 @Controller('admin/auth')
