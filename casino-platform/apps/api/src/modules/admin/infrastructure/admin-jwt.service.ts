@@ -56,7 +56,7 @@ export class AdminAuthService {
     )
     return token
   }
-  verify(token: string) {
+  verify(token: string): Record<string, unknown> {
     const payload = hs256Verify(this.config.get<string>('JWT_ACCESS_SECRET')!, token)
     const exp = typeof payload['exp'] === 'number' ? payload['exp'] : 0
     if (exp * 1000 < Date.now()) {
