@@ -318,13 +318,15 @@ describe('GAP-42 GoogleOAuthUseCase', () => {
   })
 
   it('без GOOGLE_CLIENT_SECRET → OAuthNotConfiguredError (503) на execute', async () => {
-    // buildAuthUrl требует только clientId, execute требует оба.
+    // buildAuthUrl() тоже требует оба ключа (через credentials()), поэтому
+    // генерируем state напрямую: credentials() вызывается ПЕРВЫМ в execute и
+    // бросит до verifyState — содержимое state не важно.
     const { useCase } = makeGoogleUseCase({ GOOGLE_CLIENT_SECRET: '' })
-    const { state } = useCase.buildAuthUrl()
+    const fakeState = `${Buffer.from(JSON.stringify({ t: Date.now() })).toString('base64url')}.sig`
 
     let caught: unknown
     try {
-      await useCase.execute({ code: 'x', state })
+      await useCase.execute({ code: 'x', state: fakeState })
     } catch (e) {
       caught = e
     }
