@@ -19,7 +19,7 @@ export default function Home() {
 
   const games: GameDto[] = Array.isArray(data) ? data : (data?.data ?? [])
 
-  const fallback = [
+  const fallback: GameDto[] = [
     { slug: 'demo-sweet-fruits', name: 'Sweet Fruits', provider: { name: 'Demo' } },
     { slug: 'demo-lucky-sevens', name: 'Lucky Sevens', provider: { name: 'Demo' } },
     { slug: 'demo-book-of-demo', name: 'Book of Demo', provider: { name: 'Demo' } },

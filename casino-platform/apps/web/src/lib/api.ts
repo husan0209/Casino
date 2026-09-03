@@ -14,6 +14,7 @@ let refreshPromise: Promise<boolean> | null = null
 interface ApiResponse<T> {
   success?: boolean
   data: T
+  message?: string
   error?: { message?: string; code?: string }
 }
 

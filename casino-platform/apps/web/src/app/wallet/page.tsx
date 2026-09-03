@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 
 import { apiGet } from '@/lib/api'
+import { type Currency } from '@casino/shared-types'
 import { useAuth } from '@/stores/auth'
 import type { WalletBalance } from '@/types/wallet'
 import type { WalletTxListDto } from '@/types/wallet-tx'
@@ -42,9 +43,9 @@ export default function WalletPage() {
         {(balances ?? []).map((b) => (
           <div key={b.currency} className="card">
             <div className="text-muted text-sm">{b.currency}</div>
-            <div className="text-2xl font-bold">{money.toDisplay(b.available, b.currency)}</div>
+            <div className="text-2xl font-bold">{money.toDisplay(b.available, b.currency as Currency)}</div>
             <div className="text-xs text-muted">
-              Заблокировано: {money.toDisplay(b.locked, b.currency)}
+              Заблокировано: {money.toDisplay(b.locked, b.currency as Currency)}
             </div>
           </div>
         ))}

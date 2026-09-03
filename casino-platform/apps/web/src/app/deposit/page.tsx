@@ -132,7 +132,10 @@ export default function DepositPage() {
                 </div>
                 <div className="font-mono mt-1">{result.pay_address}</div>
                 <div className="text-xs text-muted mt-2">
-                  Истекает: {new Date(result.expires_at).toLocaleString('ru')}
+                  Истекает:{' '}
+                  {result.expires_at
+                    ? new Date(result.expires_at).toLocaleString('ru')
+                    : '—'}
                 </div>
               </div>
             )}

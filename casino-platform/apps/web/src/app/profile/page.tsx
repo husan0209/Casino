@@ -34,7 +34,7 @@ export default function ProfilePage() {
   return (
     <div className="container-1 py-8 max-w-3xl">
       <h1 className="text-2xl font-bold mb-6">Профиль</h1>
-      {isLoading ? (
+      {isLoading || !data ? (
         'Загрузка…'
       ) : (
         <div className="grid md:grid-cols-2 gap-6">
