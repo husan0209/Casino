@@ -10,11 +10,15 @@ type ProfileUpdateFields = {
 
 import { prisma, type Prisma } from '@casino/database'
 
-import { type IUserProfileRepository } from '../../domain/repositories/user-profile.repository'
+import {
+  type IUserProfileRepository,
+  type UserProfileFull,
+  type UserGeoContext,
+} from '../../domain/repositories/user-profile.repository'
 
 @Injectable()
 export class PrismaUserProfileRepository implements IUserProfileRepository {
-  async getMe(userId: string) {
+  async getMe(userId: string): Promise<UserProfileFull | null> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: { profile: true, settings: true, kycProfile: true },
@@ -37,7 +41,7 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
     }
   }
 
-  async getGeoContext(userId: string) {
+  async getGeoContext(userId: string): Promise<UserGeoContext | null> {
     const profile = await prisma.userProfile.findUnique({
       where: { userId },
       select: { currencyPreference: true, lastPaymentMethod: true, country: true },
@@ -52,7 +56,7 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
     }
   }
 
-  async updateCurrencyPreference(userId: string, currency: string) {
+  async updateCurrencyPreference(userId: string, currency: string): Promise<void> {
     await prisma.userProfile.upsert({
       where: { userId },
       update: { currencyPreference: currency },
@@ -131,7 +135,7 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
       },
     })
   }
-  async setAvatar(userId: string, avatarUrl: string) {
+  async setAvatar(userId: string, avatarUrl: string): Promise<void> {
     await prisma.userProfile.upsert({
       where: { userId },
       update: { avatarUrl },

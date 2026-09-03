@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma, type Prisma, type PaymentProvider , type PaymentStatus } from '@casino/database'
+import { prisma, type Prisma, type PaymentCallback, type PaymentProvider, type PaymentRequest, type PaymentStatus } from '@casino/database'
 
 @Injectable()
 export class PaymentRequestRepository {
-  create(data: Prisma.PaymentRequestUncheckedCreateInput) {
+  create(data: Prisma.PaymentRequestUncheckedCreateInput): Promise<PaymentRequest> {
     return prisma.paymentRequest.create({ data })
   }
-  findById(id: string) {
+  findById(id: string): Promise<PaymentRequest | null> {
     return prisma.paymentRequest.findUnique({ where: { id } })
   }
-  findByExternalId(externalId: string, provider: string) {
+  findByExternalId(externalId: string, provider: string): Promise<PaymentRequest | null> {
     return prisma.paymentRequest.findFirst({ where: { externalId, provider: provider as PaymentProvider } })
   }
   updateStatus(
@@ -23,7 +23,7 @@ export class PaymentRequestRepository {
       externalId?: string | undefined
       paymentUrl?: string | undefined
     } = {},
-  ) {
+  ): Promise<PaymentRequest> {
     // exactOptionalPropertyTypes: Prisma не принимает явный undefined —
     // включаем в data только заданные поля (undefined -> отсутствие -> NULL)
     return prisma.paymentRequest.update({
@@ -44,7 +44,7 @@ export class PaymentRequestRepository {
     type?: 'deposit' | 'withdrawal'
     page: number
     perPage: number
-  }) {
+  }): Promise<[PaymentRequest[], number]> {
     const { userId, type, page, perPage } = args
     const where: Prisma.PaymentRequestWhereInput = { userId }
     if (type) {
@@ -67,7 +67,7 @@ export class PaymentRequestRepository {
     rawHeaders: Record<string, string>
     rawBody: string
     ipAddress?: string
-  }) {
+  }): Promise<PaymentCallback> {
     return prisma.paymentCallback.create({
       data: {
         provider: data.provider,
@@ -80,7 +80,7 @@ export class PaymentRequestRepository {
       },
     })
   }
-  markCallbackProcessed(id: string, result?: string) {
+  markCallbackProcessed(id: string, result?: string): Promise<PaymentCallback> {
     return prisma.paymentCallback.update({
       where: { id },
       data: { processed: true, processingResult: result ?? null },

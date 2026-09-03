@@ -2,14 +2,19 @@ import { Injectable } from '@nestjs/common'
 
 import { prisma, type KycDocumentType, type KycStatus , type KycFileType } from '@casino/database'
 
-import { type IKycRepository, type KycSubmitInput } from '../../domain/repositories/kyc.repository'
+import {
+  type IKycRepository,
+  type KycSubmitInput,
+  type KycProfileRow,
+} from '../../domain/repositories/kyc.repository'
+
 
 @Injectable()
 export class PrismaKycRepository implements IKycRepository {
-  async getByUserId(userId: string) {
+  async getByUserId(userId: string): Promise<KycProfileRow | null> {
     return prisma.kycProfile.findUnique({ where: { userId }, include: { documents: true } })
   }
-  async getById(id: string) {
+  async getById(id: string): Promise<(KycProfileRow & { user: { id: string; email: string | null; createdAt: Date; status: string } }) | null> {
     return prisma.kycProfile.findUnique({
       where: { id },
       include: {
@@ -18,7 +23,7 @@ export class PrismaKycRepository implements IKycRepository {
       },
     })
   }
-  async submit(input: KycSubmitInput) {
+  async submit(input: KycSubmitInput): Promise<KycProfileRow> {
     return prisma.kycProfile.upsert({
       where: { userId: input.userId },
       update: {
@@ -68,7 +73,7 @@ export class PrismaKycRepository implements IKycRepository {
       },
     })
   }
-  async getStatus(userId: string) {
+  async getStatus(userId: string): Promise<{ status: string; submittedAt: Date | null; rejectionReason: string | null; documents: string[] } | null> {
     const p = await prisma.kycProfile.findUnique({
       where: { userId },
       include: { documents: true },
@@ -83,7 +88,7 @@ export class PrismaKycRepository implements IKycRepository {
       documents: p.documents.map((d: { documentType: string }) => d.documentType),
     }
   }
-  async listAdmin(status?: string, page = 1, perPage = 20) {
+  async listAdmin(status?: string, page = 1, perPage = 20): Promise<{ items: KycProfileRow[]; total: number }> {
     const where = status ? { status: status as KycStatus } : {}
     const [items, total] = await Promise.all([
       prisma.kycProfile.findMany({

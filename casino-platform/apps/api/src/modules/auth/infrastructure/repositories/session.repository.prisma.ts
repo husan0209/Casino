@@ -22,12 +22,12 @@ export class PrismaSessionRepository implements ISessionRepository {
     return { ...row }
   }
 
-  async create(input: SessionCreateInput) {
+  async create(input: SessionCreateInput): Promise<SessionView> {
     const row = await prisma.session.create({ data: input })
     return this.toView(row)
   }
 
-  async findByRefreshTokenHash(hash: string) {
+  async findByRefreshTokenHash(hash: string): Promise<SessionView | null> {
     const row = await prisma.session.findFirst({
       where: { refreshTokenHash: hash },
       orderBy: { createdAt: 'desc' },
@@ -35,14 +35,14 @@ export class PrismaSessionRepository implements ISessionRepository {
     return row ? this.toView(row) : null
   }
 
-  async revoke(id: string) {
+  async revoke(id: string): Promise<void> {
     await prisma.session.updateMany({
       where: { id, revokedAt: null },
       data: { revokedAt: new Date() },
     })
   }
 
-  async revokeAllUserSessions(userId: string) {
+  async revokeAllUserSessions(userId: string): Promise<void> {
     await prisma.session.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },

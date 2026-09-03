@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import type { DisplayCurrency, LegalCountry } from '@casino/shared-config'
+import type { DisplayCurrency, LegalCountry, PaymentMethodDef } from '@casino/shared-config'
 
 import { ExchangeRatesService } from '../application/exchange-rates.service'
 import {
@@ -8,6 +8,7 @@ import {
   type ResolveGeoInput,
 } from '../application/use-cases/get-geo-config.use-case'
 import {
+  type GeoConfigResult,
   assertFiatDepositMethod,
   convertRubToDisplayAmount,
   getCurrencyLimits,
@@ -22,29 +23,33 @@ export class GeoFacade {
     private rates: ExchangeRatesService,
   ) {}
 
-  resolveConfig(input: ResolveGeoInput) {
+  resolveConfig(input: ResolveGeoInput): Promise<GeoConfigResult> {
     return this.getGeoConfig.execute(input)
   }
 
-  validateFiatDepositMethod(country: LegalCountry, currency: string, method: string) {
+  validateFiatDepositMethod(
+    country: LegalCountry,
+    currency: string,
+    method: string,
+  ): PaymentMethodDef {
     return assertFiatDepositMethod(country, currency, method)
   }
 
-  getLimits(currency: DisplayCurrency) {
+  getLimits(currency: DisplayCurrency): ReturnType<typeof getCurrencyLimits> {
     return getCurrencyLimits(currency)
   }
 
   /** GAP-34: крипто-курс из БД/кеша (fallback — константы); фиат — политические константы */
-  async convertRubToDisplay(amountRub: string, currency: DisplayCurrency) {
+  async convertRubToDisplay(amountRub: string, currency: DisplayCurrency): Promise<string> {
     const { rate } = await this.rates.getRubRate(currency)
     return convertRubToDisplayAmount(amountRub, currency, rate)
   }
 
-  toRubEquivalent(amount: string, currency: DisplayCurrency) {
+  toRubEquivalent(amount: string, currency: DisplayCurrency): string {
     return toRubEquivalent(amount, currency)
   }
 
-  resolveLegalCountry(countryCode: string | null | undefined) {
+  resolveLegalCountry(countryCode: string | null | undefined): LegalCountry {
     return resolveLegalCountryForUser(countryCode)
   }
 }

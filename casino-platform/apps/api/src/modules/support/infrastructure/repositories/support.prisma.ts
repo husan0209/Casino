@@ -10,6 +10,7 @@ import {
 
 import {
   type ISupportRepository,
+  type TicketRow,
   type TicketStatus,
   type TicketCategory,
   type TicketPriority,
@@ -19,9 +20,28 @@ import {
   type TicketListItemFilters,
 } from '../../domain/repositories/support.repository'
 
+/** Полная карточка тикета для админки (getAdmin): TicketRow + user + assignee + messages. */
+export type AdminTicketFull = TicketRow & {
+  user: { id: string; email: string | null }
+  assignee: AdminUserRow | null
+  messages: MessageRow[]
+}
+
+type AdminUserRow = {
+  id: string
+  email: string
+  role: string
+  firstName: string | null
+  lastName: string | null
+  isActive: boolean
+  passwordHash: string
+  createdAt: Date
+  updatedAt: Date
+}
+
 @Injectable()
 export class PrismaSupportRepository implements ISupportRepository {
-  async countOpenByUser(userId: string) {
+  async countOpenByUser(userId: string): Promise<number> {
     return prisma.supportTicket.count({
       where: { userId, status: { in: ['open', 'in_progress', 'waiting_user'] } },
     })
@@ -31,7 +51,7 @@ export class PrismaSupportRepository implements ISupportRepository {
     subject: string
     category: TicketCategory
     message: string
-  }) {
+  }): Promise<{ id: string }> {
     const { userId, subject, category, message } = args
     const ticket = await prisma.$transaction(
       async (tx: Omit<Prisma.TransactionClient, '$transaction'>) => {
@@ -85,7 +105,7 @@ export class PrismaSupportRepository implements ISupportRepository {
     ])
     return { items, total }
   }
-  async getTicketForUser(ticketId: string, userId: string) {
+  async getTicketForUser(ticketId: string, userId: string): Promise<TicketRow | null> {
     return prisma.supportTicket.findFirst({ where: { id: ticketId, userId } })
   }
   async addMessage(args: {
@@ -117,13 +137,13 @@ export class PrismaSupportRepository implements ISupportRepository {
       orderBy: { createdAt: 'asc' },
     })
   }
-  async closeTicket(ticketId: string, closedBy: 'user' | 'admin') {
+  async closeTicket(ticketId: string, closedBy: 'user' | 'admin'): Promise<void> {
     await prisma.supportTicket.update({
       where: { id: ticketId },
       data: { status: 'closed', closedAt: new Date(), closedBy },
     })
   }
-  async listAdmin(f: TicketListItemFilters) {
+  async listAdmin(f: TicketListItemFilters): Promise<{ items: TicketListItem[]; total: number }> {
     const page = f.page || 1,
       perPage = Math.min(f.perPage || 20, 100)
     const where: Prisma.SupportTicketWhereInput = {}
@@ -161,26 +181,28 @@ export class PrismaSupportRepository implements ISupportRepository {
     ])
     return { items, total }
   }
-  async getAdmin(ticketId: string) {
-    return prisma.supportTicket.findUnique({
+  async getAdmin(ticketId: string): Promise<AdminTicketFull | null> {
+    // Prisma-enum (SupportTicketCategory/Priority) -> доменные string-union:
+    // один каст на границе репозитория (значения совпадают со схемой)
+    return (await prisma.supportTicket.findUnique({
       where: { id: ticketId },
       include: {
         user: { select: { id: true, email: true } },
         messages: { orderBy: { createdAt: 'asc' } },
         assignee: true,
       },
-    })
+    })) as AdminTicketFull | null
   }
-  async assign(ticketId: string, adminId: string | null) {
+  async assign(ticketId: string, adminId: string | null): Promise<void> {
     await prisma.supportTicket.update({ where: { id: ticketId }, data: { assignedTo: adminId } })
   }
-  async setPriority(ticketId: string, priority: TicketPriority) {
+  async setPriority(ticketId: string, priority: TicketPriority): Promise<void> {
     await prisma.supportTicket.update({
       where: { id: ticketId },
       data: { priority: priority as SupportTicketPriority },
     })
   }
-  async setStatus(ticketId: string, status: TicketStatus) {
+  async setStatus(ticketId: string, status: TicketStatus): Promise<void> {
     await prisma.supportTicket.update({ where: { id: ticketId }, data: { status: status as SupportTicketStatus } })
   }
 }
