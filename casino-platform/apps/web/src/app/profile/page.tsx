@@ -4,27 +4,31 @@ import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost } from '@/lib/api'
+import type { MeDto } from '@/types/user'
 import { useAuth } from '@/stores/auth'
 
 export default function ProfilePage() {
   const { user } = useAuth()
   const { data, refetch, isLoading } = useQuery({
     queryKey: ['me'],
-    queryFn: () => apiGet<any>('/users/me'),
+    queryFn: () => apiGet<MeDto>('/users/me'),
     enabled: Boolean(user),
   })
-  const [form, setForm] = useState<any>({})
+  const [form, setForm] = useState<Record<string, string>>({})
   if (!user) {
     return <div className="container-1 py-8">Войдите в аккаунт</div>
   }
-  const p = data?.profile || {}
+  const p = data?.profile
   const save = async () => {
     try {
       await apiPost('/users/me/profile', form)
       toast.success('Сохранено')
       void refetch()
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error?.message || 'Ошибка')
+    } catch (e: unknown) {
+      toast.error(
+        (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+          ?.message || 'Ошибка',
+      )
     }
   }
   return (
@@ -39,36 +43,36 @@ export default function ProfilePage() {
             <div>{data.user.email}</div>
             <div className="text-sm text-muted">KYC статус</div>
             <div>
-              <span className="badge">{data.kyc_status}</span>
+              <span className="badge">{data.kycStatus}</span>
             </div>
             <div className="text-sm text-muted">Реферальный код</div>
-            <div className="font-mono">{data.user.referral_code}</div>
+            <div className="font-mono">{data.user.referralCode}</div>
           </div>
           <div className="card space-y-3">
             <div className="font-semibold">Личные данные</div>
             <input
               className="input"
               placeholder="Имя"
-              defaultValue={p.first_name || ''}
-              onChange={(e) => setForm((f: any) => ({ ...f, first_name: e.target.value }))}
+              defaultValue={p?.firstName ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
             />
             <input
               className="input"
               placeholder="Фамилия"
-              defaultValue={p.last_name || ''}
-              onChange={(e) => setForm((f: any) => ({ ...f, last_name: e.target.value }))}
+              defaultValue={p?.lastName ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
             />
             <input
               className="input"
               placeholder="Страна (RU)"
-              defaultValue={p.country || ''}
-              onChange={(e) => setForm((f: any) => ({ ...f, country: e.target.value }))}
+              defaultValue={p?.country ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
             />
             <input
               className="input"
               placeholder="Город"
-              defaultValue={p.city || ''}
-              onChange={(e) => setForm((f: any) => ({ ...f, city: e.target.value }))}
+              defaultValue={p?.city ?? ''}
+              onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
             />
             <button onClick={save} className="btn w-full">
               Сохранить
