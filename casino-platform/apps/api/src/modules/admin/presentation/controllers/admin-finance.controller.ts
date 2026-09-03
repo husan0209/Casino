@@ -232,7 +232,7 @@ export class AdminFinanceController {
   ) {
     const failed: Array<{ id: string; error: string }> = []
     let approved = 0
-    for (const id of body.ids ?? []) {
+    for (const id of body.ids) {
       try {
         await this.approveOne(id, admin, req)
         approved++
@@ -245,7 +245,7 @@ export class AdminFinanceController {
       actorId: admin.id,
       action: 'admin.withdrawal.batch_approved',
       targetType: 'payment_request',
-      payload: { requested: body.ids.length ?? 0, approved, failed: failed.length },
+      payload: { requested: body.ids.length, approved, failed: failed.length },
       ipAddress: req.ip,
     })
     return { ok: true, approved, failed }
@@ -261,7 +261,7 @@ export class AdminFinanceController {
   ) {
     const failed: Array<{ id: string; error: string }> = []
     let rejected = 0
-    for (const id of body.ids ?? []) {
+    for (const id of body.ids) {
       try {
         await this.rejectOne(id, body.reason, admin, req)
         rejected++
@@ -275,7 +275,7 @@ export class AdminFinanceController {
       action: 'admin.withdrawal.batch_rejected',
       targetType: 'payment_request',
       payload: {
-        requested: body.ids.length ?? 0,
+        requested: body.ids.length,
         rejected,
         failed: failed.length,
         reason: body.reason,

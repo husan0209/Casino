@@ -26,10 +26,6 @@ export class AdminAuthGuard implements CanActivate {
       const sub = typeof p['sub'] === 'string' ? p['sub'] : ''
       const role = typeof p['role'] === 'string' ? p['role'] : ''
       req.user = { id: sub, role, isAdmin: true }
-      if (p.aud !== 'admin') {
-        throw new Error()
-      }
-      req.user = { id: p.sub, role: p.role, isAdmin: true }
       return true
     } catch {
       throw new UnauthorizedException()

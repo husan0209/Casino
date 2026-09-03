@@ -15,7 +15,7 @@ export class RolesGuard implements CanActivate {
     // getAllAndOverride по [handler, class]: class-level @Roles применялся ранее
     // только через get(handler) и ИГНОРИРОВАЛСЯ — любой авторизованный user
     // проходил на admin-эндпоинты (найдено при GAP-32, фикс + test/roles-guard.spec.ts)
-    const roles = this.reflector.getAllAndOverride<string[]>('roles', [
+    const roles = this.reflector.getAllAndOverride<string[] | undefined>('roles', [
       ctx.getHandler(),
       ctx.getClass(),
     ])

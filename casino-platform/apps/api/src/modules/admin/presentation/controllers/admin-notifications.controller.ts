@@ -26,7 +26,7 @@ export class AdminNotificationsController {
   ) {
     // Send to specific users or all users if userIds is empty
     let targets = body.userIds
-    if (!targets || targets.length === 0) {
+    if (targets.length === 0) {
       const allUsers = await prisma.user.findMany({ select: { id: true } })
       targets = allUsers.map((u: { id: string }) => u.id)
     }

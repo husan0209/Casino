@@ -97,7 +97,7 @@ export class KycController {
     if (!profile) {
       throw new Error('KYC_NOT_SUBMITTED')
     }
-    if (!file.buffer || file.buffer.length === 0) {
+    if (file.buffer.length === 0) {
       throw new BadRequestException('File is required')
     }
     // P1 #12: реальный тип — только по magic bytes, не по клиентскому Content-Type

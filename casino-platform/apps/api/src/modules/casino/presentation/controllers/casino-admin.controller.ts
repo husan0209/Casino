@@ -97,11 +97,11 @@ export class CasinoAdminController {
   ): Promise<boolean> {
     const data = {
       name: g.name || g.externalGameId,
-      type: (g.type as GameType) ?? 'slot',
-      category: (g.category as GameCategory) ?? 'slots',
+      type: g.type as GameType | undefined ?? 'slot',
+      category: g.category as GameCategory | undefined ?? 'slots',
       thumbnailUrl: g.thumbnailUrl ?? null,
-      hasDemo: g.hasDemo ?? false,
-      rtp: g.rtp != null ? String(g.rtp) : null, // eslint-disable-line eqeqeq -- null|undefined guard on provider payload
+      hasDemo: g.hasDemo,
+      rtp: g.rtp !== null && g.rtp !== undefined ? String(g.rtp) : null,
       metadata: (g.metadata ?? {}) as Prisma.InputJsonValue,
     }
     const existing = await prisma.game.findUnique({

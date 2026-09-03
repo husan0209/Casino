@@ -30,7 +30,7 @@ export class MaintenanceWorker implements OnModuleDestroy {
     this.worker = new Worker(
       QUEUES.MAINTENANCE,
       async (job) => {
-        const handler = this.handlers[job.name as keyof MaintenanceHandlers]
+        const handler = this.handlers[job.name as keyof MaintenanceHandlers] as (() => Promise<unknown>) | undefined
         if (!handler) {
           throw new Error(`Unknown maintenance job: ${job.name}`)
         }

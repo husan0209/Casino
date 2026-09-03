@@ -73,7 +73,7 @@ export class PaymentRequestRepository {
         provider: data.provider,
         externalId: data.externalId ?? null,
         paymentRequestId: data.paymentRequestId ?? null,
-        rawHeaders: data.rawHeaders ?? {},
+        rawHeaders: data.rawHeaders,
         rawBody: data.rawBody,
         ipAddress: data.ipAddress ?? null,
         processed: false,
