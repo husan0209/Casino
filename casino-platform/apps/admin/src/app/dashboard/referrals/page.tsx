@@ -16,6 +16,21 @@ interface Stats {
   }>
 }
 
+/** Строка начисления (GET /admin/referrals — Prisma ReferralReward + emails). */
+interface AdminReferralReward {
+  id: string
+  referrerId: string
+  referredId: string
+  ggrAmount: string
+  rewardRate: string
+  rewardAmount: string
+  currency: string
+  status: string
+  createdAt: string
+  referrer: { email: string | null } | null
+  referred: { email: string | null } | null
+}
+
 export default function ReferralsPage() {
   const [page, setPage] = useState(1)
   const stats = useQuery({
@@ -24,7 +39,8 @@ export default function ReferralsPage() {
   })
   const list = useQuery({
     queryKey: ['ref-list', page],
-    queryFn: () => apiGetFull<any[]>('/admin/referrals', { page, per_page: 20 }),
+    queryFn: () =>
+      apiGetFull<AdminReferralReward[]>('/admin/referrals', { page, per_page: 20 }),
   })
 
   return (
