@@ -4,6 +4,7 @@ import Decimal from 'decimal.js'
 import {
   GAME_CATALOG_REPOSITORY,
   GAME_FAVORITES_REPOSITORY,
+  type FavoriteWithGame,
   IGameCatalogRepository,
   IGameFavoritesRepository,
 } from '../../domain/repositories/casino.repository'
