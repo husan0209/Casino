@@ -61,7 +61,6 @@ export function errText(e: unknown): string {
   return (
     respData?.error?.message ??
     respData?.message ??
-    (e as Error).message ||
-    'Ошибка'
+    ((e as Error).message || 'Ошибка')
   )
 }
