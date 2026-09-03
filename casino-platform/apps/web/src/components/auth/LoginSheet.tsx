@@ -6,7 +6,7 @@ import { errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 
-export function LoginSheet() {
+export function LoginSheet(): React.JSX.Element | null {
   const { loginSheet, closeLogin, pendingGameSlug } = useUIStore()
   const { login, register } = useAuth()
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -18,7 +18,7 @@ export function LoginSheet() {
     return null
   }
 
-  const submit = async () => {
+  const submit = async (): Promise<void> => {
     setLoading(true)
     try {
       if (mode === 'login') {

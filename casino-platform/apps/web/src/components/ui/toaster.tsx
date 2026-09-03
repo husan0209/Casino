@@ -29,7 +29,7 @@ export const toast = {
 }
 
 /** Рендерится один раз в корневом layout. */
-export function Toaster() {
+export function Toaster(): React.JSX.Element | null {
   const [list, setList] = useState<ToastItem[]>(items)
   useEffect(() => {
     listeners.add(setList)

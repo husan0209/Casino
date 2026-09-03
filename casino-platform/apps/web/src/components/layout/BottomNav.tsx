@@ -8,7 +8,7 @@ const items = [
   { href: '/profile', label: 'Профиль' },
 ]
 
-export function BottomNav() {
+export function BottomNav(): React.JSX.Element | null {
   const pathname = usePathname()
   if (pathname.startsWith('/login') || pathname.startsWith('/register')) {
     return null

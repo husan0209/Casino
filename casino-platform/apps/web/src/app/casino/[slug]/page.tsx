@@ -5,14 +5,14 @@ import { useParams, useSearchParams } from 'next/navigation'
 import { useEffect } from 'react'
 
 import { toast } from '@/components/ui/toaster'
-import { apiGet, apiPost, errText } from '@/lib/api'
+import { apiGet, apiPost, errCode, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 import type { GameDetailsDto, GameLaunchDto } from '@/types/casino'
 
-export default function GamePage() {
+export default function GamePage(): React.JSX.Element {
   const { slug } = useParams() as { slug: string }
   const search = useSearchParams()
   const shouldLaunch = search.get('launch') === '1'
@@ -39,8 +39,7 @@ export default function GamePage() {
       window.location.href = `/casino/${slug}/play?url=${encodeURIComponent(res.launch_url)}`
     },
     onError: (e: unknown) => {
-      const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response
-        ?.data?.error?.code
+      const code = errCode(e)
       if (code === 'INSUFFICIENT_FUNDS') {
         openDeposit(currency)
         return
@@ -105,7 +104,7 @@ export default function GamePage() {
             className="btn-ghost w-full"
             onClick={async () => {
               const res = await apiPost<GameLaunchDto>(`/casino/games/${slug}/demo`, { currency })
-              if (res?.launch_url) {
+              if (res.launch_url) {
                 window.open(res.launch_url, '_blank')
               }
             }}

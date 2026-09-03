@@ -6,7 +6,7 @@ import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import type { ReferralInfoDto, ReferralRewardsDto } from '@/types/referral'
 
-export default function ReferralPage() {
+export default function ReferralPage(): React.JSX.Element {
   const { user } = useAuth()
   const { data: info } = useQuery({
     queryKey: ['ref-info'],
@@ -37,7 +37,7 @@ export default function ReferralPage() {
         </div>
         <div className="card">
           <div className="text-muted text-sm">Заработано</div>
-          <div className="text-2xl font-bold">{info?.total_earned?.RUB || '0'} ₽</div>
+          <div className="text-2xl font-bold">{info?.total_earned.RUB || '0'} ₽</div>
         </div>
         <div className="card">
           <div className="text-muted text-sm">Ставка</div>

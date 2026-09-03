@@ -15,12 +15,12 @@ interface ProviderRow {
 }
 interface SyncResult {
   added: number
-  updated?: number
-  total?: number
-  note?: string
+  updated: number
+  total: number
+  note: string
 }
 
-export default function ProvidersPage() {
+export default function ProvidersPage(): React.JSX.Element {
   const qc = useQueryClient()
   const [err, setErr] = useState<string>()
   const [note, setNote] = useState<string>()
@@ -37,7 +37,7 @@ export default function ProvidersPage() {
       setErr(undefined)
       void qc.invalidateQueries({ queryKey: ['providers'] })
       if (vars.action === 'sync-games') {
-        setNote(res.note ?? `Добавлено ${res.added ?? 0}, всего ${res.total ?? '—'}`)
+        setNote(res.note ?? `Добавлено ${res.added}, всего ${res.total}`)
       }
     },
     onError: (e) => setErr(errText(e)),

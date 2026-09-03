@@ -5,7 +5,7 @@ import { formatBalance } from '@/lib/format/currency'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
-export default function GamePlayPage() {
+export default function GamePlayPage(): React.JSX.Element {
   const params = useSearchParams()
   const router = useRouter()
   const url = params.get('url')

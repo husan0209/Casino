@@ -25,7 +25,7 @@ interface UserRow {
   referralCode: string
 }
 
-export default function UsersPage() {
+export default function UsersPage(): React.JSX.Element {
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')

@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import { Btn, ErrorBox, Input, Loading, PageTitle, Td } from '@/components/ui'
 import { apiGet, apiPost, errText } from '@/lib/api'
-import { useAuthStore } from '@/stores/auth'
+import { type AuthState, useAuthStore } from '@/stores/auth'
 
 interface SettingRow {
   id: string
@@ -15,9 +15,9 @@ interface SettingRow {
   updatedAt: string
 }
 
-export default function SettingsPage() {
+export default function SettingsPage(): React.JSX.Element {
   const qc = useQueryClient()
-  const me = useAuthStore((s) => s.admin)
+  const me = useAuthStore((s: AuthState) => s.admin)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [err, setErr] = useState<string>()
   const [okMsg, setOkMsg] = useState<string>()

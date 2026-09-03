@@ -32,7 +32,7 @@ interface AdminTicketFull {
   messages: AdminMessageRow[]
 }
 
-export default function SupportPage() {
+export default function SupportPage(): React.JSX.Element {
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('open')

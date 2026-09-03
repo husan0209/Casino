@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 import { Badge, Btn, ErrorBox, Input, Loading, PageTitle, Select, Td, Th } from '@/components/ui'
 import { apiGet, apiPost, errText } from '@/lib/api'
-import { useAuthStore } from '@/stores/auth'
+import { type AuthState, useAuthStore } from '@/stores/auth'
 
 interface AdminRow {
   id: string
@@ -16,9 +16,9 @@ interface AdminRow {
   lastLoginAt: string | null
 }
 
-export default function AdminsPage() {
+export default function AdminsPage(): React.JSX.Element {
   const qc = useQueryClient()
-  const me = useAuthStore((s) => s.admin)
+  const me = useAuthStore((s: AuthState) => s.admin)
   const [err, setErr] = useState<string>()
   const [ok, setOk] = useState<string>()
   const [form, setForm] = useState({

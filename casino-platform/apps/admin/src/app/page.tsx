@@ -4,12 +4,12 @@ import { useState } from 'react'
 
 import { Btn, ErrorBox, Input } from '@/components/ui'
 import { errText } from '@/lib/api'
-import { useAuthStore } from '@/stores/auth'
+import { type AuthState, useAuthStore } from '@/stores/auth'
 
-export default function LoginPage() {
+export default function LoginPage(): React.JSX.Element | null {
   const router = useRouter()
-  const login = useAuthStore((s) => s.login)
-  const token = useAuthStore((s) => s.token)
+  const login = useAuthStore((s: AuthState) => s.login)
+  const token = useAuthStore((s: AuthState) => s.token)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [err, setErr] = useState<string>()
@@ -20,7 +20,7 @@ export default function LoginPage() {
     return null
   }
 
-  async function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent): Promise<void> {
     e.preventDefault()
     setErr(undefined)
     setBusy(true)

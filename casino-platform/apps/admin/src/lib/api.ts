@@ -75,10 +75,11 @@ export async function apiPatch<T>(url: string, body?: unknown): Promise<T> {
 }
 
 export function errText(e: unknown): string {
-  const ax = e as AxiosError<ApiResponse<unknown>>
+  const ax = e as AxiosError<ApiResponse<unknown>> | null
+  const respData = ax?.response?.data
   return (
-    ax.response?.data?.error?.message ??
-    ax.response?.data?.message ??
+    respData?.error?.message ??
+    respData?.message ??
     (e as Error).message ??
     'Ошибка'
   )

@@ -17,7 +17,7 @@ interface AuditRow {
   ipAddress: string | null
 }
 
-export default function AuditPage() {
+export default function AuditPage(): React.JSX.Element {
   const [page, setPage] = useState(1)
   const [actorType, setActorType] = useState('')
   const [action, setAction] = useState('')

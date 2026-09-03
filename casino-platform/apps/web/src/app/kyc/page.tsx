@@ -3,12 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
-import { apiPost } from '@/lib/api'
+import { apiPost, errText } from '@/lib/api'
 import { getKycStatus } from '@/lib/api/kyc.api'
 import { formatAmount } from '@/lib/format/currency'
 import { useAuth } from '@/stores/auth'
 
-export default function KycPage() {
+export default function KycPage(): React.JSX.Element {
   const { user } = useAuth()
   const { data, refetch } = useQuery({
     queryKey: ['kyc-status'],
@@ -38,20 +38,17 @@ export default function KycPage() {
     selfie: null,
   })
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     try {
       await apiPost('/kyc/submit', form)
       toast.success('KYC заявка подана')
       void refetch()
     } catch (err: unknown) {
-      toast.error(
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'Ошибка',
-      )
+      toast.error(errText(err) || 'Ошибка')
     }
   }
-  const uploadDoc = async (type: string) => {
+  const uploadDoc = async (type: string): Promise<void> => {
     const file = files[type]
     if (!file) {
       return
@@ -200,7 +197,7 @@ export default function KycPage() {
                 type="file"
                 accept="image/*,.pdf"
                 className="text-sm"
-                onChange={(e) => setFiles((f) => ({ ...f, [t]: e.target.files?.[0] || null }))}
+                onChange={(e) => setFiles((f) => ({ ...f, [t]: e.target.files?.[0] ?? null }))}
               />
               <span className="text-sm text-muted w-32">
                 {t === 'front' ? 'Лицевая' : t === 'back' ? 'Обратная' : 'Селфи'}

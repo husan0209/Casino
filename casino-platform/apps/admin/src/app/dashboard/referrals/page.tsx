@@ -31,7 +31,7 @@ interface AdminReferralReward {
   referred: { email: string | null } | null
 }
 
-export default function ReferralsPage() {
+export default function ReferralsPage(): React.JSX.Element {
   const [page, setPage] = useState(1)
   const stats = useQuery({
     queryKey: ['ref-stats'],

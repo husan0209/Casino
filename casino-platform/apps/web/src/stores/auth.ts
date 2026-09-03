@@ -15,7 +15,7 @@ interface AuthResponse {
   user: WebUser
 }
 
-interface AuthState {
+export interface AuthState {
   token: string | null
   user: WebUser | null
   /** P1 #11: попытка восстановления сессии уже была (после reload) */
@@ -40,7 +40,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
   hydrated: false,
   login: async (email, password) => {
     const res = await apiPost<AuthResponse>('/auth/login', { email, password })
-    if (!res?.accessToken || !res?.user) {
+    if (!res.accessToken || !res.user) {
       throw new Error('Ошибка входа')
     }
     set({ token: res.accessToken, user: res.user })
@@ -55,7 +55,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       password,
       referral_code: referralCode,
     })
-    if (res?.accessToken && res?.user) {
+    if (res.accessToken && res.user) {
       set({ token: res.accessToken, user: res.user })
       return
     }
@@ -73,12 +73,12 @@ export const useAuth = create<AuthState>()((set, get) => ({
     }
     try {
       const res = await apiPost<{ accessToken: string }>('/auth/refresh')
-      if (!res?.accessToken) {
+      if (!res.accessToken) {
         throw new Error('no access token')
       }
       set({ token: res.accessToken })
       const me = await apiGet<WebUser>('/users/me')
-      set({ user: me ?? null, hydrated: true })
+      set({ user: me, hydrated: true })
     } catch {
       set({ token: null, user: null, hydrated: true })
     }

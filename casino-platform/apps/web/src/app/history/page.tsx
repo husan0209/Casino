@@ -8,7 +8,7 @@ import type { HistoryDto, HistoryRowDto } from '@/types/casino'
 
 import { money } from '@casino/shared-utils'
 
-export default function HistoryPage() {
+export default function HistoryPage(): React.JSX.Element {
   const { user } = useAuth()
   const { data } = useQuery({
     queryKey: ['casino-history'],

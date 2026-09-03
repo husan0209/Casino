@@ -3,25 +3,23 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
-import { useAuth } from '@/stores/auth'
+import { errText } from '@/lib/api'
+import { type AuthState, useAuth } from '@/stores/auth'
 
-export default function RegisterPage() {
+export default function RegisterPage(): React.JSX.Element {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [ref, setRef] = useState('')
   const [sent, setSent] = useState(false)
-  const register = useAuth((s) => s.register)
-  const submit = async (e: React.FormEvent) => {
+  const register = useAuth((s: AuthState) => s.register)
+  const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     try {
       await register(email, password, ref || undefined)
       setSent(true)
       toast.success('Письмо отправлено на email')
     } catch (err: unknown) {
-      toast.error(
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'Ошибка регистрации',
-      )
+      toast.error(errText(err) || 'Ошибка регистрации')
     }
   }
   if (sent) {

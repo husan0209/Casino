@@ -4,11 +4,11 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
-import { apiGet, apiPost } from '@/lib/api'
+import { apiGet, apiPost, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import type { SupportTicketDto } from '@/types/support'
 
-export default function SupportPage() {
+export default function SupportPage(): React.JSX.Element {
   const { user } = useAuth()
   const qc = useQueryClient()
   const [subject, setSubject] = useState('')
@@ -28,10 +28,7 @@ export default function SupportPage() {
       void qc.invalidateQueries({ queryKey: ['support-tickets'] })
     },
     onError: (e: unknown) =>
-      toast.error(
-        (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'Ошибка',
-      ),
+      toast.error(errText(e) || 'Ошибка'),
   })
   if (!user) {
     return <div className="container-1 py-8">Войдите, чтобы создать обращение</div>

@@ -16,7 +16,7 @@ interface KycRow {
   user?: { email: string | null }
 }
 
-export default function KycPage() {
+export default function KycPage(): React.JSX.Element {
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('pending')
@@ -112,7 +112,7 @@ export default function KycPage() {
                             className="input text-xs w-40"
                             placeholder="Причина"
                             value={reason}
-                            onChange={(e) => setReason(e.target.value ?? '')}
+                            onChange={(e) => setReason(e.target.value)}
                           />
                           <Btn
                             small

@@ -4,15 +4,16 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
-import { useAuth } from '@/stores/auth'
+import { errText } from '@/lib/api'
+import { type AuthState, useAuth } from '@/stores/auth'
 
-export default function LoginPage() {
+export default function LoginPage(): React.JSX.Element {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const login = useAuth((s) => s.login)
+  const login = useAuth((s: AuthState) => s.login)
   const router = useRouter()
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     setLoading(true)
     try {
@@ -20,10 +21,7 @@ export default function LoginPage() {
       toast.success('Вход выполнен')
       router.push('/profile')
     } catch (err: unknown) {
-      toast.error(
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message || 'Ошибка входа',
-      )
+      toast.error(errText(err) || 'Ошибка входа')
     } finally {
       setLoading(false)
     }
