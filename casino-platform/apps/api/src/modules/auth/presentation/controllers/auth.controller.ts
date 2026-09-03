@@ -2,10 +2,7 @@ import { Body, Controller, Get, Post, Query, Req, Res, UsePipes } from '@nestjs/
 import { Throttle } from '@nestjs/throttler'
 import { type Request, type Response } from 'express'
 
-import {
-  setRefreshTokenCookie,
-  clearRefreshTokenCookie,
-} from '@/common/cookies/refresh-token-cookie'
+import { clearRefreshTokenCookie, setRefreshTokenCookie } from '@/common/cookies/refresh-token-cookie'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserRole } from '@casino/database'
 
@@ -18,10 +15,10 @@ import { type RefreshUseCase } from '../../application/use-cases/refresh.use-cas
 import { type RegisterUseCase } from '../../application/use-cases/register.use-case'
 import { type ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case'
 import { type VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case'
-import { LoginSchema, type LoginDto } from '../dto/login.dto'
+import { type LoginDto, LoginSchema } from '../dto/login.dto'
 import { GoogleLoginSchema, TelegramLoginSchema } from '../dto/oauth.dto'
 import { ForgotPasswordSchema, ResetPasswordSchema } from '../dto/password-reset.dto'
-import { RegisterSchema, type RegisterDto } from '../dto/register.dto'
+import { type RegisterDto, RegisterSchema } from '../dto/register.dto'
 
 @Controller('auth')
 // GAP-19: брутфорс-защита логина/регистрации — строже глобального лимита.

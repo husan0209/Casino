@@ -6,8 +6,8 @@ import {
   MAINTENANCE_EMAIL_PORT,
   PAYMENT_MAINTENANCE_REPO,
   REMINDER_AUDIT_REPO,
-  type IPaymentMaintenanceRepo,
-  type IReminderAuditRepo,
+  IPaymentMaintenanceRepo,
+  IReminderAuditRepo,
   type ReminderResult,
 } from '../domain/maintenance.ports'
 

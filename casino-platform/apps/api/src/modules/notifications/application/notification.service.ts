@@ -5,7 +5,7 @@ import { EMAIL_QUEUE_PORT, EmailQueuePort } from '@/queues/queue.types'
 import {
   NOTIFICATION_REPOSITORY,
   type CreateNotificationInput,
-  type INotificationRepository,
+  INotificationRepository,
   type NotificationRow,
 } from '../domain/notification.repository'
 

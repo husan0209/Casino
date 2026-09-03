@@ -1,6 +1,6 @@
 import { Body, Controller, Headers, Param, Post, Res, HttpCode } from '@nestjs/common'
 import { SkipThrottle } from '@nestjs/throttler'
-import { Response, Response as ExpressResponse } from 'express'
+import { Response, type Response as ExpressResponse } from 'express'
 
 import { errorMessage } from '@/common/utils/error-message'
 import { prisma } from '@casino/database'

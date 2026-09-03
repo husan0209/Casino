@@ -1,20 +1,7 @@
 import { randomUUID } from 'crypto'
 import { mkdirSync, writeFileSync } from 'fs'
 
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  UploadedFile,
-  UseGuards,
-  UseInterceptors,
-  UsePipes,
-} from '@nestjs/common'
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseGuards, UseInterceptors, UsePipes } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 
@@ -32,11 +19,7 @@ import { type SelfExclusionUseCase } from '../../application/use-cases/self-excl
 import { type UpdateCurrencyPreferenceUseCase } from '../../application/use-cases/update-currency-preference.use-case'
 import { type UpdateProfileUseCase } from '../../application/use-cases/update-profile.use-case'
 import { type UpdateSettingsUseCase } from '../../application/use-cases/update-settings.use-case'
-import {
-  SelfExcludeSchema,
-  UpdateProfileSchema,
-  UpdateSettingsSchema,
-} from '../dto/profile-settings.dto'
+import { SelfExcludeSchema, UpdateProfileSchema, UpdateSettingsSchema } from '../dto/profile-settings.dto'
 import { UpdateCurrencySchema } from '../dto/update-currency.dto'
 
 @UseGuards(AuthGuard)

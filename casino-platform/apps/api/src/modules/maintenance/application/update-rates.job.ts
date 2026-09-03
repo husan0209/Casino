@@ -7,8 +7,8 @@ import { DISPLAY_RUB_RATES } from '@casino/shared-config'
 import {
   EXCHANGE_RATE_WRITER,
   RATES_PROVIDER,
-  type IExchangeRateWriter,
-  type IRatesProvider,
+  IExchangeRateWriter,
+  IRatesProvider,
   type RatesResult,
 } from '../domain/maintenance.ports'
 

@@ -5,7 +5,7 @@ import { Worker } from 'bullmq'
 import { prisma } from '@casino/database'
 
 import { queueConnection } from '../infrastructure/email.queue'
-import { type MailerPort } from '../infrastructure/mailer.port'
+import { MailerPort } from '../infrastructure/mailer.port'
 import { type EmailJobData, MAILER_PORT, QUEUES } from '../queue.types'
 
 /** Воркер: разбирает очередь `email` и шлёт через MailerPort (SMTP/dev-log). */

@@ -5,7 +5,7 @@ import {
   ADMIN_USER_REPOSITORY,
   type AdminUserRow,
   type CreateAdminUserInput,
-  type IAdminUserRepository,
+  IAdminUserRepository,
 } from '../domain/admin.repository'
 
 @Injectable()

@@ -4,15 +4,9 @@ import { Inject, Injectable } from '@nestjs/common'
 
 import { type UserRole } from '../../domain/entities/user.entity'
 import { EmailAlreadyExistsError, WeakPasswordError } from '../../domain/errors'
-import {
-  type ISessionRepository,
-  SESSION_REPOSITORY,
-} from '../../domain/repositories/session.repository'
+import { type ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
 import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
-import {
-  type IEmailVerificationRepository,
-  EMAIL_VERIFICATION_REPOSITORY,
-} from '../../domain/repositories/verification-token.repository'
+import { EMAIL_VERIFICATION_REPOSITORY, type IEmailVerificationRepository } from '../../domain/repositories/verification-token.repository'
 import { type EmailQueueService } from '../../infrastructure/services/email-queue.service'
 import { type JwtTokenService } from '../../infrastructure/services/jwt.service'
 import { type PasswordHasher } from '../../infrastructure/services/password-hasher.service'

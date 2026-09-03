@@ -3,7 +3,7 @@ import { Decimal } from 'decimal.js'
 
 import {
   DASHBOARD_REPOSITORY,
-  type IDashboardRepository,
+  IDashboardRepository,
 } from '../domain/admin.repository'
 
 export type DashPeriod = 'today' | '7d' | '30d' | '90d'

@@ -2,19 +2,7 @@ import { randomUUID } from 'crypto'
 import { mkdirSync, writeFileSync } from 'fs'
 import { extname } from 'path'
 
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  Post,
-  Query,
-  UploadedFile,
-  UseGuards,
-  UseInterceptors,
-  UsePipes,
-  Inject,
-} from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, Inject, Post, Query, UploadedFile, UseGuards, UseInterceptors, UsePipes } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 
@@ -24,15 +12,11 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
 import { type DisplayCurrency } from '@casino/shared-config'
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
-import { type KycProfileRow } from '@modules/kyc/domain/repositories/kyc.repository'
+import { type IKycRepository, KYC_REPOSITORY, type KycProfileRow } from '@modules/kyc/domain/repositories/kyc.repository'
 
 import { type GetKycStatusUseCase } from '../../application/use-cases/get-kyc-status.use-case'
 import { type SubmitKycUseCase } from '../../application/use-cases/submit-kyc.use-case'
-import { type IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
-import {
-  KycDocumentTypeSchema,
-  SubmitKycSchema,
-} from '../dto/kyc.dto'
+import { KycDocumentTypeSchema, SubmitKycSchema } from '../dto/kyc.dto'
 
 // SECURITY_BASELINE.md §7.1 — KYC documents whitelist.
 // P1 #12: MIME-фильтр Multer'а — только первая линия; клиентский Content-Type

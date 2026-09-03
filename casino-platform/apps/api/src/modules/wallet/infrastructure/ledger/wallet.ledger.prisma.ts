@@ -2,19 +2,12 @@ import { randomUUID } from 'crypto'
 
 import { Injectable } from '@nestjs/common'
 
-import { type LedgerEntryType, prisma, Prisma } from '@casino/database'
-import { ZERO, type Currency, type MoneyAmount } from '@casino/shared-types'
+import { type LedgerEntryType, prisma, type Prisma } from '@casino/database'
+import { type Currency, type MoneyAmount, ZERO } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 import { InsufficientFundsError, OptimisticLockError } from '../../domain/errors'
-import {
-  IWalletRepository,
-  IWalletLedger,
-  type CreditInput,
-  type CreditResult,
-  type WalletAccount,
-  type WithdrawalOpArgs,
-} from '../../domain/repositories/wallet.repository'
+import { type CreditInput, type CreditResult, IWalletLedger, IWalletRepository, type WalletAccount, type WithdrawalOpArgs } from '../../domain/repositories/wallet.repository'
 
 /**
  * Architecture (AUDIT_REPORT.md §A1, GAP-22): семантика операций — в

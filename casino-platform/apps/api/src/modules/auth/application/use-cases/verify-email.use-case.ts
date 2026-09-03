@@ -1,13 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common'
 
 import { type UserRole } from '../../domain/entities/user.entity'
-import { TokenInvalidError, TokenExpiredError, TokenAlreadyUsedError } from '../../domain/errors'
-import {
-  type IEmailVerificationRepository,
-  EMAIL_VERIFICATION_REPOSITORY,
-  type ISessionRepository,
-  SESSION_REPOSITORY,
-} from '../../domain/repositories'
+import { TokenAlreadyUsedError, TokenExpiredError, TokenInvalidError } from '../../domain/errors'
+import { EMAIL_VERIFICATION_REPOSITORY, type IEmailVerificationRepository, type ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories'
 import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 import { type JwtTokenService } from '../../infrastructure/services/jwt.service'
 

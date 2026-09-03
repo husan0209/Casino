@@ -2,15 +2,8 @@ import { randomBytes } from 'node:crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 
-import {
-  type IAuthProviderRepository,
-  AUTH_PROVIDER_REPOSITORY,
-  type AuthProviderKind,
-} from '@modules/auth/domain/repositories/auth-provider.repository'
-import {
-  type ISessionRepository,
-  SESSION_REPOSITORY,
-} from '@modules/auth/domain/repositories/session.repository'
+import { AUTH_PROVIDER_REPOSITORY, type AuthProviderKind, type IAuthProviderRepository } from '@modules/auth/domain/repositories/auth-provider.repository'
+import { type ISessionRepository, SESSION_REPOSITORY } from '@modules/auth/domain/repositories/session.repository'
 import { type IUserRepository, USER_REPOSITORY } from '@modules/auth/domain/repositories/user.repository'
 import { type JwtTokenService } from '@modules/auth/infrastructure/services/jwt.service'
 

@@ -1,14 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-  UseGuards,
-  BadRequestException,
-  UsePipes,
-} from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -23,10 +13,7 @@ import { type CreateWithdrawalUseCase } from '../../application/use-cases/create
 import { type PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 import { CreateCryptoDepositSchema } from '../dto/create-crypto-deposit.dto'
 import { CreateFiatDepositSchema } from '../dto/create-fiat-deposit.dto'
-import {
-  CreateFiatWithdrawalSchema,
-  CreateCryptoWithdrawalSchema,
-} from '../dto/create-withdrawal.dto'
+import { CreateCryptoWithdrawalSchema, CreateFiatWithdrawalSchema } from '../dto/create-withdrawal.dto'
 
 @UseGuards(AuthGuard)
 @Controller('payments')

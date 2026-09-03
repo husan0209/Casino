@@ -5,7 +5,7 @@ import { Worker } from 'bullmq'
 import { queueConnection } from '../../../queues/infrastructure/email.queue'
 import { QUEUES } from '../../../queues/queue.types'
 import { MAINTENANCE_HANDLERS } from '../domain/maintenance.ports'
-import { type MaintenanceHandlers } from '../domain/maintenance.ports'
+import { MaintenanceHandlers } from '../domain/maintenance.ports'
 
 /**
  * Воркер maintenance-очереди (GAP-33): диспетчер по job.name — каждый

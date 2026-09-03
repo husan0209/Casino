@@ -1,20 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common'
 
 import { type LockoutConfig, type UserRole } from '../../domain/entities/user.entity'
-import {
-  InvalidCredentialsError,
-  AccountBlockedError,
-  AccountLockedError,
-  SelfExcludedError,
-} from '../../domain/errors'
-import {
-  type ISessionRepository,
-  SESSION_REPOSITORY,
-} from '../../domain/repositories/session.repository'
-import {
-  type IUserSettingsRepository,
-  USER_SETTINGS_REPOSITORY,
-} from '../../domain/repositories/user-settings.repository'
+import { AccountBlockedError, AccountLockedError, InvalidCredentialsError, SelfExcludedError } from '../../domain/errors'
+import { type ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
+import { type IUserSettingsRepository, USER_SETTINGS_REPOSITORY } from '../../domain/repositories/user-settings.repository'
 import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 import { type JwtTokenService } from '../../infrastructure/services/jwt.service'
 import { type PasswordHasher } from '../../infrastructure/services/password-hasher.service'

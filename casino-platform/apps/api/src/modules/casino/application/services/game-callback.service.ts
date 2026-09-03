@@ -6,12 +6,7 @@ import { type WalletFacade } from '@modules/wallet/application/wallet.facade'
 import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 
 import { type ParsedProviderCallback, type ProviderCallbackResponse } from '../../domain/provider-adapter.interface'
-import {
-  GAME_PLAY_REPOSITORY,
-  type GameRow,
-  type GameSessionWithGame,
-  type IGamePlayRepository,
-} from '../../domain/repositories/casino.repository'
+import { GAME_PLAY_REPOSITORY, type GameRow, type GameSessionWithGame, type IGamePlayRepository } from '../../domain/repositories/casino.repository'
 
 interface AuthenticateResult {
   player_id: string

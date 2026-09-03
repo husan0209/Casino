@@ -1,12 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { type TicketListItem } from '@modules/support/domain/repositories/support.repository'
-
-import {
-  type ISupportRepository,
-  SUPPORT_REPOSITORY,
-  type TicketStatus,
-} from '../../domain/repositories/support.repository'
+import { type ISupportRepository, SUPPORT_REPOSITORY, type TicketListItem, type TicketStatus } from '@modules/support/domain/repositories/support.repository'
 
 @Injectable()
 export class ListUserTicketsUseCase {

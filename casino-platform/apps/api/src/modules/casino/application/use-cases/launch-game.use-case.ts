@@ -3,23 +3,12 @@ import { randomBytes } from 'crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import { Decimal } from 'decimal.js'
 
-import type { Currency } from '@casino/shared-types'
+import { type Currency } from '@casino/shared-types'
 import { type WalletFacade } from '@modules/wallet/application/wallet.facade'
 import { InsufficientFundsError } from '@modules/wallet/domain/errors'
 
-import {
-  CurrencyNotSupportedError,
-  GameDisabledError,
-  GameNotFoundError,
-  ProviderDisabledError,
-} from '../../domain/errors'
-import {
-  GAME_CATALOG_REPOSITORY,
-  GAME_PLAY_REPOSITORY,
-  type GameWithProvider,
-  type IGameCatalogRepository,
-  type IGamePlayRepository,
-} from '../../domain/repositories/casino.repository'
+import { CurrencyNotSupportedError, GameDisabledError, GameNotFoundError, ProviderDisabledError } from '../../domain/errors'
+import { GAME_CATALOG_REPOSITORY, GAME_PLAY_REPOSITORY, type GameWithProvider, type IGameCatalogRepository, type IGamePlayRepository } from '../../domain/repositories/casino.repository'
 import { type ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 
 interface LaunchGameInput {

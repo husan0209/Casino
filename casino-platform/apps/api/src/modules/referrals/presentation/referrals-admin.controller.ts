@@ -3,11 +3,11 @@ import { z } from 'zod'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
-import { prisma, type ReferralRewardStatus, type ReferralRewardType, type Prisma } from '@casino/database'
+import { prisma, type Prisma, type ReferralRewardStatus, type ReferralRewardType } from '@casino/database'
 
 import { type AuditLogService } from '../../admin/application/audit-log.service'
 import { AuthGuard } from '../../auth/presentation/guards/auth.guard'
-import { RolesGuard, Roles } from '../../auth/presentation/guards/roles.guard'
+import { Roles, RolesGuard } from '../../auth/presentation/guards/roles.guard'
 import { type ReferralCalcService } from '../application/referral-calc.service'
 
 // GAP-21: ручной триггер начислений — date опционален (YYYY-MM-DD)

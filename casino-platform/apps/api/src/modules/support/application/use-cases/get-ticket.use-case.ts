@@ -1,12 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { type MessageRow, type TicketCategory, type TicketStatus, type TicketPriority } from '@modules/support/domain/repositories/support.repository'
+import { type ISupportRepository, type MessageRow, SUPPORT_REPOSITORY, type TicketCategory, type TicketPriority, type TicketStatus } from '@modules/support/domain/repositories/support.repository'
 
-import { TicketNotFoundError, ForbiddenTicketError } from '../../domain/errors'
-import {
-  type ISupportRepository,
-  SUPPORT_REPOSITORY,
-} from '../../domain/repositories/support.repository'
+import { ForbiddenTicketError, TicketNotFoundError } from '../../domain/errors'
 
 @Injectable()
 export class GetTicketUseCase {

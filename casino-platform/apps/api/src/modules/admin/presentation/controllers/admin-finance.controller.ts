@@ -6,14 +6,7 @@ import { type Request } from 'express'
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
-import {
-  prisma,
-  type LedgerEntryType,
-  type PaymentProvider,
-  type PaymentStatus,
-  type PaymentType,
-  Prisma,
-} from '@casino/database'
+import { type LedgerEntryType, type PaymentProvider, type PaymentStatus, type PaymentType, prisma, type Prisma } from '@casino/database'
 import { type Currency } from '@casino/shared-types'
 import { AppError } from '@casino/shared-utils'
 import { type PaymentRequestRepository } from '@modules/payments/infrastructure/repositories/payment-request.repository'
@@ -22,12 +15,7 @@ import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.re
 
 import { type AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
-import {
-  BatchApproveSchema,
-  BatchRejectSchema,
-  RejectWithdrawalSchema,
-  WalletAdjustSchema,
-} from '../dto/admin-finance.dto'
+import { BatchApproveSchema, BatchRejectSchema, RejectWithdrawalSchema, WalletAdjustSchema } from '../dto/admin-finance.dto'
 
 export class WithdrawalInvalidStatusError extends AppError {
   readonly code = 'WITHDRAWAL_INVALID_STATUS'

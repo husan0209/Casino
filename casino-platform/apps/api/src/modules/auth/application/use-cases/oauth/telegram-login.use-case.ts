@@ -3,10 +3,8 @@ import { createHash, createHmac, timingSafeEqual } from 'crypto'
 import { Injectable } from '@nestjs/common'
 import { type ConfigService } from '@nestjs/config'
 
-import { type OAuthSignInResult } from '@modules/auth/application/use-cases/oauth/oauth-user-provisioning.service'
-import { OAuthNotConfiguredError, OAuthExchangeError } from '@modules/auth/domain/errors'
-
-import { type OAuthUserProvisioningService } from './oauth-user-provisioning.service'
+import { type OAuthSignInResult, type OAuthUserProvisioningService } from '@modules/auth/application/use-cases/oauth/oauth-user-provisioning.service'
+import { OAuthExchangeError, OAuthNotConfiguredError } from '@modules/auth/domain/errors'
 
 const MAX_AUTH_AGE_SEC = 86_400 // виджет Telegram рекомендует отвергать данные старше суток
 

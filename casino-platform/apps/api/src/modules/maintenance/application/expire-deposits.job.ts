@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 import {
   PAYMENT_MAINTENANCE_REPO,
   type ExpiredCountResult,
-  type IPaymentMaintenanceRepo,
+  IPaymentMaintenanceRepo,
 } from '../domain/maintenance.ports'
 
 /** Окно ожидания депозита для фиата (без expires_at) — ТЗ ч.3 §13: 2 часа. */

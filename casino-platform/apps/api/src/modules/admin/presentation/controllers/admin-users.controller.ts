@@ -3,7 +3,7 @@ import { type Request } from 'express'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
-import { type KycDocumentType, type KycStatus, prisma, type Prisma, type UserStatus, type UserRole } from '@casino/database'
+import { type KycDocumentType, type KycStatus, prisma, type Prisma, type UserRole, type UserStatus } from '@casino/database'
 
 import { type AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'

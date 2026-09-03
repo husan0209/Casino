@@ -1,5 +1,5 @@
 import { type ArgumentMetadata, type PipeTransform, BadRequestException } from '@nestjs/common'
-import { type ZodType } from 'zod'
+import { ZodType } from 'zod'
 
 import { errorMessage } from '@/common/utils/error-message'
 

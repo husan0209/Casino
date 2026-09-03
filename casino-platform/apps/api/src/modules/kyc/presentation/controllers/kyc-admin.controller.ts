@@ -1,12 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes, Inject } from '@nestjs/common'
+import { Body, Controller, Get, Inject, Param, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
 import { AdminAuthGuard } from '@modules/admin/presentation/admin-auth.guard'
-import { type KycProfileRow } from '@modules/kyc/domain/repositories/kyc.repository'
+import { type IKycRepository, KYC_REPOSITORY, type KycProfileRow } from '@modules/kyc/domain/repositories/kyc.repository'
 
-import { type IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
 import { KycDecisionReasonSchema } from '../dto/kyc.dto'
 
 @UseGuards(AdminAuthGuard)
