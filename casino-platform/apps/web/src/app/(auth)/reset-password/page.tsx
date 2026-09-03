@@ -13,7 +13,7 @@ function ResetInner(): React.JSX.Element {
   const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     try {
-      await apiPost('/auth/reset-password', { token, new_password: pw })
+      await apiPost<unknown>('/auth/reset-password', { token, new_password: pw })
       toast.success('Пароль изменён')
       router.push('/login')
     } catch (err: unknown) {
@@ -39,7 +39,7 @@ function ResetInner(): React.JSX.Element {
     </div>
   )
 }
-export default function ResetPasswordPage() {
+export default function ResetPasswordPage(): React.JSX.Element {
   return (
     <Suspense>
       <ResetInner />

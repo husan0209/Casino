@@ -33,7 +33,7 @@ export default function TicketPage(): React.JSX.Element {
   if (!data) {
     return <div className="container-1 py-8">Загрузка…</div>
   }
-  const messages: SupportMessageDto[] = data.messages ?? []
+  const messages: SupportMessageDto[] = data.messages
   return (
     <div className="container-1 py-8 max-w-2xl">
       <h1 className="text-xl font-bold mb-2">

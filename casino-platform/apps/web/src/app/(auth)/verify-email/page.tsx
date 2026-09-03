@@ -12,13 +12,18 @@ function VerifyInner(): React.JSX.Element {
   const router = useRouter()
   const setAuth = useAuth((s: AuthState) => s.setAuth)
   const [status, setStatus] = useState('Проверка…')
-  useEffect(() => {
+  useEffect((): void => {
     if (!token) {
       setStatus('Нет токена')
       return
     }
     axios
-      .get(
+      .get<
+        { data?: { data?: { accessToken?: string; user?: WebUser } } } & {
+          accessToken?: string
+          user?: WebUser
+        }
+      >(
         (process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001/api/v1') +
           '/auth/verify-email?token=' +
           token,
@@ -42,7 +47,7 @@ function VerifyInner(): React.JSX.Element {
     </div>
   )
 }
-export default function VerifyEmailPage() {
+export default function VerifyEmailPage(): React.JSX.Element {
   return (
     <Suspense>
       <VerifyInner />

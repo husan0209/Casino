@@ -31,7 +31,7 @@ interface Metrics {
 }
 type Period = 'today' | '7d' | '30d' | '90d'
 
-const fmt = (v: string | number) =>
+const fmt = (v: string | number): string =>
   typeof v === 'number' ? v.toLocaleString('ru-RU') : `${Number(v).toLocaleString('ru-RU')} ₽`
 
 export default function DashboardPage(): React.JSX.Element {

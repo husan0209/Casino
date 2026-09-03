@@ -40,9 +40,6 @@ export const useAuth = create<AuthState>()((set, get) => ({
   hydrated: false,
   login: async (email, password) => {
     const res = await apiPost<AuthResponse>('/auth/login', { email, password })
-    if (!res.accessToken || !res.user) {
-      throw new Error('Ошибка входа')
-    }
     set({ token: res.accessToken, user: res.user })
   },
   setSession: (token, user) => set({ token, user }),
@@ -55,11 +52,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       password,
       referral_code: referralCode,
     })
-    if (res.accessToken && res.user) {
-      set({ token: res.accessToken, user: res.user })
-      return
-    }
-    throw new Error('Ошибка регистрации')
+    set({ token: res.accessToken, user: res.user })
   },
   logout: () => {
     // серверная часть: инвалидирует refresh-токен и чистит httpOnly-cookie

@@ -99,7 +99,7 @@ export default function WithdrawalsPage(): React.JSX.Element {
   })
 
   const rows = data?.data ?? []
-  const toggle = (id: string) =>
+  const toggle = (id: string): void =>
     setSelected((prev) => {
       const n = new Set(prev)
       n.has(id) ? n.delete(id) : n.add(id)

@@ -12,7 +12,7 @@ let items: ToastItem[] = []
 const listeners = new Set<(v: ToastItem[]) => void>()
 let nextId = 1
 
-function emit(kind: ToastKind, message: string) {
+function emit(kind: ToastKind, message: string): void {
   const item = { id: nextId++, kind, message }
   items = [...items, item]
   listeners.forEach((l) => l(items))

@@ -37,7 +37,7 @@ export default function ProvidersPage(): React.JSX.Element {
       setErr(undefined)
       void qc.invalidateQueries({ queryKey: ['providers'] })
       if (vars.action === 'sync-games') {
-        setNote(res.note ?? `Добавлено ${res.added}, всего ${res.total}`)
+        setNote(res.note)
       }
     },
     onError: (e) => setErr(errText(e)),

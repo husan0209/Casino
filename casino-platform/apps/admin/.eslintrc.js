@@ -38,10 +38,12 @@ module.exports = {
   },
   overrides: [
     {
-      // Dashboard pages are declarative JSX blocks, not logic functions
+      // Dashboard pages are declarative JSX blocks, not logic functions.
+      // GAP-39 stage 9: 140 -> 200 — Next.js pages это разметка+UI
+      // (бизнес-логика живёт в apps/api, там max-lines-per-function: error(60))
       files: ['**/app/**/{page,layout,providers}.tsx'],
       rules: {
-        'max-lines-per-function': ['warn', { max: 140, skipBlankLines: true, skipComments: true }],
+        'max-lines-per-function': ['warn', { max: 200, skipBlankLines: true, skipComments: true }],
         complexity: 'off',
         'max-depth': 'off',
       },
