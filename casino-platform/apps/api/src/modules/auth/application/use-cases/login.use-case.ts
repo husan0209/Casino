@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { UserRole } from '@casino/database'
 
-import { type LockoutConfig } from '../../domain/entities/user.entity'
+import { type LockoutConfig, type UserRole } from '../../domain/entities/user.entity'
 import {
   InvalidCredentialsError,
   AccountBlockedError,
@@ -9,16 +8,16 @@ import {
   SelfExcludedError,
 } from '../../domain/errors'
 import {
-  ISessionRepository,
+  type ISessionRepository,
   SESSION_REPOSITORY,
 } from '../../domain/repositories/session.repository'
 import {
-  IUserSettingsRepository,
+  type IUserSettingsRepository,
   USER_SETTINGS_REPOSITORY,
 } from '../../domain/repositories/user-settings.repository'
-import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
-import { JwtTokenService } from '../../infrastructure/services/jwt.service'
-import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
+import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { type JwtTokenService } from '../../infrastructure/services/jwt.service'
+import { type PasswordHasher } from '../../infrastructure/services/password-hasher.service'
 
 @Injectable()
 export class LoginUseCase {

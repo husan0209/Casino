@@ -1,10 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
-
-import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
+import { type WalletFacade } from '@modules/wallet/application/wallet.facade'
+import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 
 import { type ParsedProviderCallback, type ProviderCallbackResponse } from '../../domain/provider-adapter.interface'
 import {

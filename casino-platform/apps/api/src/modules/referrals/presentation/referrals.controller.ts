@@ -1,9 +1,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common'
-import { ReferralRewardType, ReferralRewardStatus } from '@casino/database'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
-
-import { type Prisma, prisma } from '@casino/database'
+import { prisma, type ReferralRewardStatus, type ReferralRewardType, type Prisma } from '@casino/database'
 
 import { AuthGuard } from '../../auth/presentation/guards/auth.guard'
 

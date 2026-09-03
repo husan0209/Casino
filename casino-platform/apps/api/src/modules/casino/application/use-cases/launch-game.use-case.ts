@@ -1,13 +1,11 @@
 import { randomBytes } from 'crypto'
-import Decimal from 'decimal.js'
 
 import { Inject, Injectable } from '@nestjs/common'
-
-
-import { WalletFacade } from '@modules/wallet/application/wallet.facade'
-import { InsufficientFundsError } from '@modules/wallet/domain/errors'
+import { Decimal } from 'decimal.js'
 
 import type { Currency } from '@casino/shared-types'
+import { type WalletFacade } from '@modules/wallet/application/wallet.facade'
+import { InsufficientFundsError } from '@modules/wallet/domain/errors'
 
 import {
   CurrencyNotSupportedError,
@@ -22,7 +20,7 @@ import {
   type IGameCatalogRepository,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
-import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
+import { type ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 
 interface LaunchGameInput {
   userId?: string | null

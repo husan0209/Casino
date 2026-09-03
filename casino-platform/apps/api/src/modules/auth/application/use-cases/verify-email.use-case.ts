@@ -1,15 +1,15 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { UserRole } from '@casino/database'
 
+import { type UserRole } from '../../domain/entities/user.entity'
 import { TokenInvalidError, TokenExpiredError, TokenAlreadyUsedError } from '../../domain/errors'
 import {
-  IEmailVerificationRepository,
+  type IEmailVerificationRepository,
   EMAIL_VERIFICATION_REPOSITORY,
-  ISessionRepository,
+  type ISessionRepository,
   SESSION_REPOSITORY,
 } from '../../domain/repositories'
-import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
-import { JwtTokenService } from '../../infrastructure/services/jwt.service'
+import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { type JwtTokenService } from '../../infrastructure/services/jwt.service'
 
 @Injectable()
 export class VerifyEmailUseCase {

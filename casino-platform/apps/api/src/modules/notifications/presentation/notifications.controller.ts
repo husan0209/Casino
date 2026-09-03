@@ -1,12 +1,11 @@
 import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common'
-import { NotificationChannel } from '@casino/database'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { type UserActor } from '@/common/types/req-user'
+import { type NotificationChannel, type Prisma } from '@casino/database'
 
 import { AuthGuard } from '../../auth/presentation/guards/auth.guard'
-import { NotificationService } from '../application/notification.service'
-import { type Prisma } from '@casino/database'
+import { type NotificationService } from '../application/notification.service'
 
 @UseGuards(AuthGuard)
 @Controller('notifications')

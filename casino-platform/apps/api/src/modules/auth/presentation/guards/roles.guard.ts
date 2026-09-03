@@ -9,7 +9,8 @@ import { Reflector } from '@nestjs/core'
 
 import { getHttpRequest } from '@/common/types/express-context'
 
-export const Roles = (...roles: string[]) => SetMetadata('roles', roles)
+export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
+  SetMetadata('roles', roles)
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}

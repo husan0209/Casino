@@ -1,16 +1,14 @@
 import { randomUUID } from 'crypto'
-import Decimal from 'decimal.js'
 
 import { Injectable } from '@nestjs/common'
-
-
-import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
-import { WalletFacade } from '@modules/wallet/application/wallet.facade'
+import { Decimal } from 'decimal.js'
 
 import type { Currency } from '@casino/shared-types'
+import { type KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
+import { type WalletFacade } from '@modules/wallet/application/wallet.facade'
 
 import { AmountTooSmallError, AmountTooLargeError } from '../../domain/errors'
-import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
+import { type PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 
 @Injectable()
 export class CreateWithdrawalUseCase {

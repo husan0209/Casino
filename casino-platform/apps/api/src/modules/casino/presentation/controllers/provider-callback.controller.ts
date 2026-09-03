@@ -1,9 +1,8 @@
 import { Body, Controller, Headers, Param, Post, Res, HttpCode } from '@nestjs/common'
 import { SkipThrottle } from '@nestjs/throttler'
-import { Response } from 'express'
+import { Response, Response as ExpressResponse } from 'express'
 
 import { errorMessage } from '@/common/utils/error-message'
-
 import { prisma } from '@casino/database'
 
 import { GameCallbackService } from '../../application/services/game-callback.service'
@@ -37,7 +36,7 @@ export class ProviderCallbackController {
     @Headers() headers: Record<string, string>,
     @Body() body: Record<string, unknown>,
     @Res() res: Response,
-  ): Promise<Response<any, Record<string, any>>> {
+  ): Promise<ExpressResponse> {
     headers['x-gsp-op'] = op
     return this.handle(slug, headers, body, res)
   }
@@ -49,7 +48,7 @@ export class ProviderCallbackController {
     @Headers() headers: Record<string, string>,
     @Body() body: Record<string, unknown>,
     @Res() res: Response,
-  ): Promise<Response<any, Record<string, any>>> {
+  ): Promise<ExpressResponse> {
     try {
       const adapter = this.adapters.getAdapter(slug)
       if (!adapter.verifyCallback(headers, body)) {
@@ -79,7 +78,7 @@ export class ProviderCallbackController {
     parsed: ParsedProviderCallback,
     providerId: string,
     res: Response,
-  ): Promise<Response<any, Record<string, any>>> {
+  ): Promise<ExpressResponse> {
     try {
       switch (parsed.action) {
         case 'authenticate': {

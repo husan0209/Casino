@@ -1,16 +1,15 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
-import { TicketListItem, MessageRow, TicketPriority } from '@modules/support/domain/repositories/support.repository'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
-
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+import { type TicketListItem, type MessageRow, type TicketPriority } from '@modules/support/domain/repositories/support.repository'
 
-import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
-import { CreateTicketUseCase } from '../../application/use-cases/create-ticket.use-case'
-import { GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
-import { ListUserTicketsUseCase } from '../../application/use-cases/list-user-tickets.use-case'
-import { SendMessageUseCase } from '../../application/use-cases/send-message.use-case'
+import { type CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
+import { type CreateTicketUseCase } from '../../application/use-cases/create-ticket.use-case'
+import { type GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
+import { type ListUserTicketsUseCase } from '../../application/use-cases/list-user-tickets.use-case'
+import { type SendMessageUseCase } from '../../application/use-cases/send-message.use-case'
 import { type TicketCategory, type TicketStatus } from '../../domain/repositories/support.repository'
 import { AddTicketMessageSchema, CreateTicketSchema } from '../dto/support.dto'
 

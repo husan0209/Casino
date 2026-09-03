@@ -9,6 +9,12 @@ export {}
 
 declare global {
   namespace Express {
+    /** request-id: ставится pino genReqId (logger.options.ts) и RequestIdMiddleware. */
+    interface Request {
+      id?: string
+      /** cookie-parser: типизируем вместо express `cookies: any` (GAP-39). */
+      cookies: Record<string, string | undefined>
+    }
     namespace Multer {
       interface File {
         fieldname: string

@@ -9,26 +9,24 @@ import {
   BadRequestException,
   UsePipes,
 } from '@nestjs/common'
-import { PaymentProvider, PaymentStatus, PaymentType } from '@casino/database'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
-
+import { type PaymentProvider, type PaymentStatus, type PaymentType, type Prisma } from '@casino/database'
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 
-import { CancelWithdrawalUseCase } from '../../application/use-cases/cancel-withdrawal.use-case'
-import { CreateCryptoDepositUseCase } from '../../application/use-cases/create-crypto-deposit.use-case'
-import { CreateFiatDepositUseCase } from '../../application/use-cases/create-fiat-deposit.use-case'
-import { CreateWithdrawalUseCase } from '../../application/use-cases/create-withdrawal.use-case'
-import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
+import { type CancelWithdrawalUseCase } from '../../application/use-cases/cancel-withdrawal.use-case'
+import { type CreateCryptoDepositUseCase } from '../../application/use-cases/create-crypto-deposit.use-case'
+import { type CreateFiatDepositUseCase } from '../../application/use-cases/create-fiat-deposit.use-case'
+import { type CreateWithdrawalUseCase } from '../../application/use-cases/create-withdrawal.use-case'
+import { type PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 import { CreateCryptoDepositSchema } from '../dto/create-crypto-deposit.dto'
 import { CreateFiatDepositSchema } from '../dto/create-fiat-deposit.dto'
 import {
   CreateFiatWithdrawalSchema,
   CreateCryptoWithdrawalSchema,
 } from '../dto/create-withdrawal.dto'
-import { type Prisma } from '@casino/database'
 
 @UseGuards(AuthGuard)
 @Controller('payments')

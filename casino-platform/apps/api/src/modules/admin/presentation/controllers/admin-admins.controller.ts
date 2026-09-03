@@ -1,12 +1,12 @@
 import { Body, Controller, Get, Param, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
-import { AdminUserRow } from '@modules/admin/domain/admin.repository'
 import { type Request } from 'express'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
+import { type AdminUserRow } from '@modules/admin/domain/admin.repository'
 
-import { AdminUsersService } from '../../application/admin-users.service'
-import { AuditLogService } from '../../application/audit-log.service'
+import { type AdminUsersService } from '../../application/admin-users.service'
+import { type AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { CreateAdminSchema } from '../dto/admin-admins.dto'
 

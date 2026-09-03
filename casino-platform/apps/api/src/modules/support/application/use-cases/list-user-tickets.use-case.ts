@@ -1,8 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { TicketListItem } from '@modules/support/domain/repositories/support.repository'
+
+import { type TicketListItem } from '@modules/support/domain/repositories/support.repository'
 
 import {
-  ISupportRepository,
+  type ISupportRepository,
   SUPPORT_REPOSITORY,
   type TicketStatus,
 } from '../../domain/repositories/support.repository'

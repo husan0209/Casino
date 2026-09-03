@@ -1,16 +1,13 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common'
-import { WalletBalanceView } from '@modules/wallet/application/wallet.facade'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
-
-import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
-
 import { prisma, type LedgerEntryType, type Prisma } from '@casino/database'
 import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
+import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+import { type WalletBalanceView } from '@modules/wallet/application/wallet.facade'
 
-
-import { WalletFacade } from '../../application/wallet.facade'
+import { type WalletFacade } from '../../application/wallet.facade'
 
 @UseGuards(AuthGuard)
 @Controller('wallet')

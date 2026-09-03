@@ -10,7 +10,7 @@ export interface UserProfileProps {
 }
 export class UserProfileEntity {
   constructor(public props: UserProfileProps) {}
-  get userId() {
+  get userId(): string {
     return this.props.userId
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common'
-import { GeoConfigResult } from '@modules/geo/domain/geo-config.policy'
 
-import { UsersFacade } from '@modules/users/facade/users.facade'
+import { type GeoConfigResult } from '@modules/geo/domain/geo-config.policy'
+import { type UsersFacade } from '@modules/users/facade/users.facade'
 
 import { resolveGeoConfig } from '../../domain/geo-config.policy'
 

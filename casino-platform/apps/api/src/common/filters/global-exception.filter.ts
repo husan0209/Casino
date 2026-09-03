@@ -46,7 +46,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     this.pinoLogger.setContext(GlobalExceptionFilter.name)
   }
 
-  catch(exception: unknown, host: ArgumentsHost): Response<any, Record<string, any>> {
+  catch(exception: unknown, host: ArgumentsHost): Response {
     const ctx = host.switchToHttp()
     const response = ctx.getResponse<Response>()
     const request = ctx.getRequest<Request & { id?: string }>()
@@ -86,7 +86,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     exception: HttpException,
     response: Response,
     requestId: string | undefined,
-  ): Response<any, Record<string, any>> {
+  ): Response {
     const status = exception.getStatus()
     const res = exception.getResponse()
     // NestJS validation pipe returns { message: string | string[], error, statusCode }.

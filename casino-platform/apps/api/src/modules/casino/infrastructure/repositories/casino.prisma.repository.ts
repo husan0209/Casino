@@ -1,11 +1,11 @@
-import { prisma, type GameSession, type Prisma } from '@casino/database'
 import { Injectable } from '@nestjs/common'
 
+import { prisma, type GameSession, type Prisma } from '@casino/database'
 
 import {
-  type IGameCatalogRepository,
-  type IGameFavoritesRepository,
-  type IGamePlayRepository,
+  IGameCatalogRepository,
+  IGameFavoritesRepository,
+  IGamePlayRepository,
   type GameWithProvider,
   type GameSessionWithUser,
   type GameSessionWithGame,

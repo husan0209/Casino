@@ -1,25 +1,14 @@
 import { createHash } from 'crypto'
-import { GameProviderType, GameVolatility, GameRoundStatus } from '@casino/database'
 
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
 
-
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
-
+import { type GameProviderType, type GameRoundStatus, type GameVolatility, prisma, type GameCategory, type GameSessionStatus, type GameTransactionType, type GameType, Prisma } from '@casino/database'
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 import { RolesGuard, Roles } from '@modules/auth/presentation/guards/roles.guard'
 
-import {
-  prisma,
-  type GameCategory,
-  type GameSessionStatus,
-  type GameTransactionType,
-  type GameType,
-  type Prisma,
-} from '@casino/database'
-
 import { type ProviderGameRow } from '../../domain/provider-adapter.interface'
-import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
+import { type ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 import { UpdateGameSchema } from '../dto/admin-game.dto'
 
 /** Стабильный slug игры: читаемая база + хэш пары (provider, externalId). */
@@ -102,7 +91,7 @@ export class CasinoAdminController {
       category: (g.category ?? 'slots') as GameCategory,
       thumbnailUrl: g.thumbnailUrl ?? null,
       hasDemo: g.hasDemo,
-      rtp: g.rtp !== null && g.rtp !== undefined ? String(g.rtp) : null,
+      rtp: g.rtp !== undefined ? String(g.rtp) : null,
       metadata: (g.metadata ?? {}) as Prisma.InputJsonValue,
     }
     const existing = await prisma.game.findUnique({

@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto'
-import { UserProfileFull } from '@modules/users/domain/repositories/user-profile.repository'
 import { mkdirSync, writeFileSync } from 'fs'
 
 import {
@@ -23,16 +22,16 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { extForMime, sniffDocumentMime } from '@/common/files/file-sniffer'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
-
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+import { type UserProfileFull } from '@modules/users/domain/repositories/user-profile.repository'
 
-import { GetMeUseCase } from '../../application/use-cases/get-me.use-case'
-import { ListSessionsUseCase } from '../../application/use-cases/list-sessions.use-case'
-import { RevokeSessionUseCase } from '../../application/use-cases/revoke-session.use-case'
-import { SelfExclusionUseCase } from '../../application/use-cases/self-exclusion.use-case'
-import { UpdateCurrencyPreferenceUseCase } from '../../application/use-cases/update-currency-preference.use-case'
-import { UpdateProfileUseCase } from '../../application/use-cases/update-profile.use-case'
-import { UpdateSettingsUseCase } from '../../application/use-cases/update-settings.use-case'
+import { type GetMeUseCase } from '../../application/use-cases/get-me.use-case'
+import { type ListSessionsUseCase } from '../../application/use-cases/list-sessions.use-case'
+import { type RevokeSessionUseCase } from '../../application/use-cases/revoke-session.use-case'
+import { type SelfExclusionUseCase } from '../../application/use-cases/self-exclusion.use-case'
+import { type UpdateCurrencyPreferenceUseCase } from '../../application/use-cases/update-currency-preference.use-case'
+import { type UpdateProfileUseCase } from '../../application/use-cases/update-profile.use-case'
+import { type UpdateSettingsUseCase } from '../../application/use-cases/update-settings.use-case'
 import {
   SelfExcludeSchema,
   UpdateProfileSchema,

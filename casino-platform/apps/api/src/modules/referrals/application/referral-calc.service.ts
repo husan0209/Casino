@@ -1,13 +1,11 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
-import Decimal from 'decimal.js'
-import { type Prisma } from '@casino/database'
+import { Decimal } from 'decimal.js'
 
 import { errorMessage } from '@/common/utils/error-message'
-
 import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-import { WalletFacade } from '../../wallet/application/wallet.facade'
+import { type WalletFacade } from '../../wallet/application/wallet.facade'
 import {
   REFERRAL_REPOSITORY,
   type CurrencySumRow,
@@ -62,7 +60,7 @@ export class ReferralCalcService {
     referrerId: string
     dayStart: Date
     dayEnd: Date
-    rewardRate: Prisma.Decimal
+    rewardRate: Decimal
   }): Promise<{ processed: number; credited: number }> {
     const { referredId, referrerId, dayStart, dayEnd, rewardRate } = args
     const bets = await this.repo.sumTransactions({ userId: referredId, type: 'bet', from: dayStart, to: dayEnd })
@@ -97,7 +95,7 @@ export class ReferralCalcService {
     referrerId: string
     dayStart: Date
     dayEnd: Date
-    rewardRate: Prisma.Decimal
+    rewardRate: Decimal
     cur: string
     betSum: string
     winSum: string

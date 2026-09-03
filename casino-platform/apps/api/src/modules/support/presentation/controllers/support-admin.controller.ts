@@ -1,17 +1,16 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes, Inject } from '@nestjs/common'
-import { TicketListItem, MessageRow } from '@modules/support/domain/repositories/support.repository'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
-
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 import { RolesGuard, Roles } from '@modules/auth/presentation/guards/roles.guard'
+import { type TicketListItem, type MessageRow } from '@modules/support/domain/repositories/support.repository'
 
-import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
-import { GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
-import { SendMessageUseCase } from '../../application/use-cases/send-message.use-case'
+import { type CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
+import { type GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
+import { type SendMessageUseCase } from '../../application/use-cases/send-message.use-case'
 import {
-  ISupportRepository,
+  type ISupportRepository,
   SUPPORT_REPOSITORY,
   type TicketCategory,
   type TicketPriority,

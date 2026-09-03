@@ -1,13 +1,11 @@
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
-import { KycStatus, KycDocumentType, UserRole } from '@casino/database'
 import { type Request } from 'express'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
+import { type KycDocumentType, type KycStatus, prisma, type Prisma, type UserStatus, type UserRole } from '@casino/database'
 
-import { prisma, type Prisma, type UserStatus } from '@casino/database'
-
-import { AuditLogService } from '../../application/audit-log.service'
+import { type AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { BlockUserSchema } from '../dto/admin-users.dto'
 

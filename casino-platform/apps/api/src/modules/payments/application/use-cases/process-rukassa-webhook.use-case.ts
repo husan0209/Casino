@@ -1,17 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { PaymentType, PaymentStatus, PaymentProvider } from '@casino/database'
 
 import { errorMessage } from '@/common/utils/error-message'
-
-import { UsersFacade } from '@modules/users/facade/users.facade'
-import { WalletFacade } from '@modules/wallet/application/wallet.facade'
-
 import type { Currency } from '@casino/shared-types'
+import { type UsersFacade } from '@modules/users/facade/users.facade'
+import { type WalletFacade } from '@modules/wallet/application/wallet.facade'
 
 import { classifyPaymentStatus } from '../../domain/payment-status'
-import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
-import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
-import { type Prisma } from '@casino/database'
+import { type RukassaClient } from '../../infrastructure/clients/rukassa.client'
+import {
+  type PaymentRequestRepository,
+  type PaymentRequest,
+} from '../../infrastructure/repositories/payment-request.repository'
 
 /** Rukassa отдаёт id платежа в разных полях в зависимости от сценария. */
 function pickExternalId(body: Record<string, unknown>): string {
@@ -84,7 +83,7 @@ export class ProcessRukassaWebhookUseCase {
   }
 
   /** Платёжка: сначала по external_id провайдера, затем по id платежа. */
-  private async resolvePaymentRequest(externalId: string): Promise<{ id: string; createdAt: Date; updatedAt: Date; type: PaymentType; amount: Prisma.Decimal; idempotencyKey: string; metadata: Prisma.JsonValue; userId: string; currency: string; status: PaymentStatus; provider: PaymentProvider; method: string | null; amountRub: Prisma.Decimal | null; fee: Prisma.Decimal; externalId: string | null; externalStatus: string | null; paymentUrl: string | null; destination: Prisma.JsonValue; errorMessage: string | null; expiresAt: Date | null; completedAt: Date | null; } | null> {
+  private async resolvePaymentRequest(externalId: string): Promise<PaymentRequest | null> {
     const pr = await this.repo.findByExternalId(externalId, 'rukassa')
     if (pr) {
       return pr

@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { UserProfileFull } from '@modules/users/domain/repositories/user-profile.repository'
 
 import {
+  type IUserProfileRepository,
   USER_PROFILE_REPOSITORY,
-  IUserProfileRepository,
+  type UserProfileFull,
 } from '../../domain/repositories/user-profile.repository'
 
 @Injectable()

@@ -4,7 +4,8 @@
  * Дашборд читает чужие агрегаты (users/payments/kyc/tickets) — админ-модуль
  * по назначению кросс-доменный; TODO(GAP-22): рассмотреть Facade-порты.
  */
-import { type Prisma } from '@casino/database'
+import { type Decimal } from 'decimal.js'
+
 
 export interface AdminUserRow {
   id: string
@@ -56,7 +57,7 @@ export interface AdminFeedPayment {
   createdAt: Date
   type: string
   status: string
-  amount: string | number | bigint | Prisma.Decimal
+  amount: string | number | bigint | Decimal
   currency: string
   user: { email: string | null }
 }
@@ -67,7 +68,7 @@ export interface AdminFeedKyc {
 }
 export interface AdminFeedBigWin {
   createdAt: Date
-  amount: string | number | bigint | Prisma.Decimal
+  amount: string | number | bigint | Decimal
   currency: string
   user: { email: string | null }
 }

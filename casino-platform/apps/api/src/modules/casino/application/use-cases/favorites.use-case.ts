@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import Decimal from 'decimal.js'
+import { Decimal } from 'decimal.js'
 
 import {
   GAME_CATALOG_REPOSITORY,

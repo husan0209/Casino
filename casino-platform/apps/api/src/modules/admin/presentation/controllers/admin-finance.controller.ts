@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto'
-import { CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 
 import { Body, Controller, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
 import { type Request } from 'express'
@@ -7,22 +6,21 @@ import { type Request } from 'express'
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
-
-import { PaymentRequestRepository } from '@modules/payments/infrastructure/repositories/payment-request.repository'
-import { WalletFacade } from '@modules/wallet/application/wallet.facade'
-
 import {
   prisma,
   type LedgerEntryType,
   type PaymentProvider,
   type PaymentStatus,
   type PaymentType,
-  type Prisma,
+  Prisma,
 } from '@casino/database'
 import { type Currency } from '@casino/shared-types'
 import { AppError } from '@casino/shared-utils'
+import { type PaymentRequestRepository } from '@modules/payments/infrastructure/repositories/payment-request.repository'
+import { type WalletFacade } from '@modules/wallet/application/wallet.facade'
+import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 
-import { AuditLogService } from '../../application/audit-log.service'
+import { type AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import {
   BatchApproveSchema,

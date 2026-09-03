@@ -41,8 +41,8 @@ export class SmtpMailer implements MailerPort {
     }
     let nodemailer: { createTransport: (opts: SmtpOptions) => SmtpTransport }
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      nodemailer = require('nodemailer')
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-unsafe-assignment -- ленивый require optional-peer (GAP-01): тип сужен локальной аннотацией
+      nodemailer = require('nodemailer') as typeof nodemailer
     } catch {
       throw new EmailNotConfiguredError()
     }

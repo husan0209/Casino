@@ -1,16 +1,15 @@
 import { randomUUID } from 'crypto'
-import { LedgerEntryType } from '@casino/database'
 
 import { Injectable } from '@nestjs/common'
 
-import { prisma, type Prisma } from '@casino/database'
+import { type LedgerEntryType, prisma, Prisma } from '@casino/database'
 import { ZERO, type Currency, type MoneyAmount } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 import { InsufficientFundsError, OptimisticLockError } from '../../domain/errors'
 import {
-  type IWalletRepository,
-  type IWalletLedger,
+  IWalletRepository,
+  IWalletLedger,
   type CreditInput,
   type CreditResult,
   type WalletAccount,

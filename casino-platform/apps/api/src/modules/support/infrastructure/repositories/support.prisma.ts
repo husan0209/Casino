@@ -1,16 +1,9 @@
 import { Injectable } from '@nestjs/common'
-import { SupportSenderType } from '@casino/database'
+
+import { prisma, type SupportSenderType, Prisma, type SupportTicketCategory, type SupportTicketPriority, type SupportTicketStatus } from '@casino/database'
 
 import {
-  prisma,
-  type Prisma,
-  type SupportTicketCategory,
-  type SupportTicketPriority,
-  type SupportTicketStatus,
-} from '@casino/database'
-
-import {
-  type ISupportRepository,
+  ISupportRepository,
   type TicketRow,
   type TicketStatus,
   type TicketCategory,

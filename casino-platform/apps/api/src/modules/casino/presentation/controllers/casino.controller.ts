@@ -1,20 +1,16 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
-import { GameHistoryRow } from '@modules/casino/application/use-cases/favorites.use-case'
-import { GameType, GameVolatility } from '@casino/database'
 import { type Request } from 'express'
-
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
-
+import { type GameType, type GameVolatility, prisma, type GameCategory, type Prisma } from '@casino/database'
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+import { type GameHistoryRow } from '@modules/casino/application/use-cases/favorites.use-case'
 
-import { type Prisma, prisma, type GameCategory } from '@casino/database'
-
-import { FavoritesUseCase } from '../../application/use-cases/favorites.use-case'
-import { LaunchGameUseCase } from '../../application/use-cases/launch-game.use-case'
-import { ListGamesUseCase } from '../../application/use-cases/list-games.use-case'
+import { type FavoritesUseCase } from '../../application/use-cases/favorites.use-case'
+import { type LaunchGameUseCase } from '../../application/use-cases/launch-game.use-case'
+import { type ListGamesUseCase } from '../../application/use-cases/list-games.use-case'
 import { LaunchGameSchema } from '../dto/launch.dto'
 
 @Controller('casino')
