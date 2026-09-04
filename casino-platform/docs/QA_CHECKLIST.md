@@ -1,6 +1,6 @@
 # QA Checklist – Casino Platform
 
-> **Сводка покрытия (GAP-45, 2026-09-03):** 33 пункта. **14 закрыто автотестами полностью** (`[x]` + `[auto: файл::тест]` — 117 unit + 9 E2E, зелёные в CI на каждом push); **10 закрыто частично** (`[x*]` — код-путь/криптография покрыты спеками, боевой внешний контур остаётся на GAP-46); **9 требуют стенда** (`[manual: ...]`). Ручной остаток ≈ GAP-46 (runtime-приёмка: Rukassa/NOWPayments/GitSlotPark/Google OAuth/Telegram/первый деплой/restore) плюс UI-верификация почты и админ-консоли.
+> **Сводка покрытия (GAP-45, 2026-09-03):** 33 пункта. **10 закрыто автотестами полностью** (`[x]` + `[auto: файл::тест]` — 147 unit + 9 E2E = 156 it-блоков в `apps/api/test/`, зелёные в CI на каждом push); **7 закрыто частично** (`[x*]` — код-путь/криптография покрыты спеками, боевой внешний контур остаётся на GAP-46); **16 требуют стенда** (`[manual: ...]`). Ручной остаток ≈ GAP-46 (runtime-приёмка: Rukassa/NOWPayments/GitSlotPark/Google OAuth/Telegram/первый деплой/restore) плюс UI-верификация почты и админ-консоли.
 >
 > Обозначения: `[x]` — закрыто автотестом целиком (`[auto: <файл>::<имя теста>]`, файлы в `apps/api/test/`); `[x*]` — частично: покрытая часть помечена `[auto:...]`, хвост боевой интеграции/UI — `[manual:...]` (сводится к GAP-46); `[ ]` — `[manual: что и где проверять]`.
 
@@ -66,4 +66,4 @@
 | **Итого** | **33** | **10** | **7** | **16** |
 
 **Автопокрытие в сумме: 17 из 33** (10 полных + 7 частичных). Пропорция отвечает фактическому состоянию: весь money-путь и роль-гейт закрыты спеками, внешний контур (SMTP/PSP/OAuth/домен) — осознанный ручной остаток GAP-46.
-**Куда идти за деталями:** автопокрытие — `apps/api/test/` (17 файлов, 126 тестов: 117 проходят + 9 skipped в CI); ручной остаток — GAP-46 в [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) (пп. 1–9), session-expire при нагрузке — GAP-47.
+**Куда идти за деталями:** автопокрытие — `apps/api/test/` (18 файлов в корне + 1 в `e2e/` = 19 спецификаций: money-flow, ledger.integration, deposit-idempotency, nowpayments-ipn, roles-guard, account-lockout, logger-redact, seed-guard, health-ready, exchange-rates, kyc-limit-rates.integration, kyc-file-sniffer, env-validation, game-round.integration, referral-payout.integration, maintenance-jobs, provider-stubs, gitslotpark-adapter, smtp-mailer + e2e/player-lifecycle); ручной остаток — GAP-46 в [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) (пп. 1–9), session-expire при нагрузке — GAP-47.
