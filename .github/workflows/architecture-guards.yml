@@ -288,6 +288,28 @@ jobs:
           fi
           echo "✅ G12 OK (branch: $BR)"
 
+      # ──────────────────────────────────────────────────────────────
+      # M. Tier 1: порог «0 warnings» закрепобрён в lint-скриптах приложений
+      # Catches: молчаливый возврат долга GAP-39. Без --max-warnings eslint
+      #          отдаёт exit 0 при тысячах warnings (exit-code отражает только
+      #          errors) — ровно так GAP-39 и жил с 1171 warning при зелёном CI.
+      # Rule: docs/QUALITY_GATES.md §2.4; критерий приёмки 1 из GAP-39
+      # ──────────────────────────────────────────────────────────────
+      - name: G13 — lint scripts enforce zero warnings
+        id: g13
+        run: |
+          MISS=""
+          for p in apps/api apps/web apps/admin; do
+            grep -q -- '--max-warnings=0' "$p/package.json" || MISS="$MISS $p"
+          done
+          if [ -n "$MISS" ]; then
+            echo "❌ G13 FAIL: в lint-скриптах не найдено --max-warnings=0:$MISS"
+            echo '   Без флага pnpm lint зелёный и при тысячах warnings — exit-code показывает только errors.'
+            echo '   См. docs/QUALITY_GATES.md §2.4 и критерий приёмки 1 из GAP-39.'
+            exit 1
+          fi
+          echo "✅ G13 OK (api/web/admin: --max-warnings=0)"
+
       # ── Final summary ─────────────────────────────────────────────
       - name: Summary
         if: always()
@@ -305,3 +327,4 @@ jobs:
           echo "- G10 docker non-root:     ${{ steps.g10.outcome }}"
           echo "- G11 env placeholders:    ${{ steps.g11.outcome }}"
           echo "- G12 branch name:         ${{ steps.g12.outcome }}"
+          echo "- G13 zero-warnings gate:  ${{ steps.g13.outcome }}"

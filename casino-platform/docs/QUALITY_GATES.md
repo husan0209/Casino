@@ -18,7 +18,7 @@ last_updated: 2026-08-28
 
 | Tier | Что | Где | Что ловит |
 |------|-----|-----|-----------|
-| **Tier 1** | ESLint (strict) | `.eslintrc.js` | `any`, `console.log`, `parseFloat`, циклы модулей, длинные методы, прямые импорты prisma в domain/application |
+| **Tier 1** | ESLint (strict) | `.eslintrc.js` + `--max-warnings=0` в lint-скриптах | `any`, `console.log`, `parseFloat`, циклы модулей, длинные методы, прямые импорты prisma в domain/application. Падает и на **warnings**, не только на errors (GAP-39) |
 | **Tier 2** | Architecture guards (CI) | `.github/workflows/architecture-guards.yml` | 12 grep-проверок, которых ESLint не умеет: webhook raw body, Serializable в транзакциях, KYC fileFilter, Dockerfile USER, refresh-cookie secure, и т.д. |
 | **Tier 2.5** | Docs guards (CI) | `.github/workflows/docs-guard.yml` (локально — `scripts/docs-guard-local.sh`, он же берёт тело шага и гоняет с флагами runner'а) | D1–D7: битые ссылки, существование путей в живых доках, env-parity (`.env.example` ↔ ENVIRONMENT_VARIABLES), честность SECURITY_CHECKLIST, drift машинных файлов, job-имена branch protection, **D7 — env-имена из кода (`process.env.*`, `config.get(...)`) описаны в `.env.example`** (GAP-41) |
 
@@ -113,6 +113,28 @@ pnpm lint --fix                # auto-fix (только для safe правил
 ```
 
 В CI: `pnpm lint` (без `|| true` — теперь exit-code реален). ВАЖНО: если в `ci.yml` есть `pnpm lint || true` — **убери `|| true`**, иначе Tier 1 не работает.
+
+⚠️ **Exit-code ESLint без `--max-warnings` отражает только errors.** Именно поэтому
+GAP-39 жил при зелёном CI со `✖ 1171 problems (0 errors, 1171 warnings)`: правила стояли
+в `warn`, а `warn` не ломал сборку. С 2026-09-03 порог закреплён машиной — во всех трёх
+приложениях с `lint`-скриптом стоит `--max-warnings=0`:
+
+| Приложение | Скрипт |
+|---|---|
+| `apps/api` | `eslint src --ext .ts --max-warnings=0` |
+| `apps/web` | `next lint --max-warnings=0` |
+| `apps/admin` | `next lint --max-warnings=0` |
+
+Форма с `=` (а не `--max-warnings 0`) выбрана намеренно: у `next lint` аргумент объявлен
+как необязательный (`[maxWarnings]`), а `0` для ESLint — falsy, так что `=` убирает обе
+вольности трактовки. По коду Next проверка такая: `isError = errors > 0 || (maxWarnings >= 0
+&& totalWarnings > maxWarnings)` — то есть `0` обрабатывается корректно (сравнение `>= 0`,
+не truthiness). Проверено на установленном `next@14.2.35`.
+
+Чтобы порог не «испарился» от обратной правки скриптов, его сторожит guard **G13**
+(`.github/workflows/architecture-guards.yml`): отсутствие `--max-warnings=0` хотя бы в одном
+из трёх `package.json` — падение Tier 2. Список warnings локально по-прежнему видно: ESLint
+печатает отчёт до выхода с кодом 1; для автофикса — `pnpm lint --fix`.
 
 ### 2.5. Ожидаемый эффект
 
@@ -221,6 +243,7 @@ Tier 1 + Tier 2 ловят **синтаксические** и **структу�
 | 2026-08-28 | Tier 2.5: `docs-guard.yml` (D1–D6) + PR-шаблон с docs-чеклистом | AI agent (фаза 3: автопроверка) |
 | 2026-08-28 | PR-0: typecheck-конфиг починен (rootDir/tsconfig.build.json, пакеты → dist), тесты переписаны на vitest (18/18), lint 0 ошибок, `max-lines-per-function` 60→90 (GAP-30) | AI agent (PR-0: ликвидация долга CI) |
 | 2026-09-01 | GAP-25 закрыт: `max-params` error(3) + `complexity` error(10), разобраны 45 + 13 нарушений, §2.1.1 (исключения Nest); GAP-26 закрыт: 72 глубоких относительных импорта → `@/`+`@modules/`, билд через `tsc-alias` | AI agent (GAP-25/26) |
+| 2026-09-03 | Tier 1: порог «0 warnings» закреплён машиной — `--max-warnings=0` в lint-скриптах `api`/`web`/`admin` + guard **G13** (Tier 2), который не даёт убрать флаг. До этого `pnpm lint` возвращал 0 и при 1171 warnings — так GAP-39 числился «зелёным» до 2026-09-02 | AI agent (закрепление GAP-39) |
 | 2026-09-03 | GAP-41 закрыт: **Tier 2.5 += D7** (код ↔ `.env.example`) — закрывает слепое пятно D3 (сверяет `.env.example` ↔ §22, но не код); в `.env.example`/ENVIRONMENT_VARIABLES добавлены `GITSLOTPARK_*` (4) и `RUKASSA_API_BASE`; allowlist D7: `NODE_ENV`, `CI`, `*_INTEGRATION`, `E2E_*`, `SMTP_PASS` (до мержа GAP-40). **Попутно:** шаг CI выполняется под `bash -e -o pipefail` — извлечение-в-файл с пустым `grep` убивало guard молча, D3/D6/D7 защищены (`\|\| true`, явный ❌ D6); добавлен `scripts/docs-guard-local.sh` (локальный прогон чеков СВОЕЙ ветки с флагами runner'а, вместо ручной копии в `$HOME`) | AI agent (GAP-41) |
 
 ---

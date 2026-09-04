@@ -176,7 +176,7 @@ Frontend:   Next.js 14 App Router + Tailwind + TanStack Query + Zustand + React 
 -   pnpm dev             run api + web + admin in parallel
 -   pnpm build           build all
 -   pnpm typecheck       tsc --noEmit across workspace
--   pnpm lint            eslint .
+-   pnpm lint            per-project (api: eslint src, web/admin: next lint), fails on warnings
 -   pnpm test            vitest (unit tests)
 -   pnpm db:generate     prisma generate
 -   pnpm db:migrate      prisma migrate dev
@@ -267,7 +267,7 @@ Online casino платформа для рынка СНГ. MVP на русско
 | `pnpm dev`               | Запустить api + web + admin локально       |
 | `pnpm build`             | Собрать всё                                |
 | `pnpm typecheck`         | Проверить TypeScript по всему монорепо     |
-| `pnpm lint`              | ESLint по всему монорепо                   |
+| `pnpm lint`              | ESLint по всем проектам; warnings = падение  |
 | `pnpm test`              | Vitest (unit тесты)                        |
 | `pnpm test:e2e`          | E2E тесты (требует поднятую БД)            |
 | `pnpm db:generate`       | Prisma generate                            |
