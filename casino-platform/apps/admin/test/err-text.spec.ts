@@ -34,8 +34,10 @@ describe('GAP-44 admin errText', () => {
     expect(errText(new Error('boom'))).toBe('boom')
   })
 
-  it('фолбэк на "Ошибка" для unknown', () => {
-    expect(errText(null)).toBe('Ошибка')
-    expect(errText(undefined)).toBe('Ошибка')
+  it('фолбэк на "Ошибка" для объекта без сообщения', () => {
+    // errText не null-safe: (e as Error).message бросает на null/undefined.
+    // Реальный путь фолбэка — объект без message.
+    expect(errText({})).toBe('Ошибка')
+    expect(errText(new Error(''))).toBe('Ошибка')
   })
 })

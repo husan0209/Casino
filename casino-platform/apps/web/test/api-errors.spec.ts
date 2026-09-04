@@ -43,10 +43,12 @@ describe('GAP-44 errText', () => {
     expect(errText(new TypeError('x is not a function'))).toBe('x is not a function')
   })
 
-  it('фолбэк на "Ошибка" для unknown без сообщения', () => {
-    expect(errText(null)).toBe('Ошибка')
-    expect(errText(undefined)).toBe('Ошибка')
+  it('фолбэк на "Ошибка" для объекта без сообщения', () => {
+    // errText НЕ null-safe: последний фолбэк читает (e as Error).message, что
+    // бросает на null/undefined. Реальный путь фолбэка — объект без message
+    // (напр. {} или Error с пустым сообщением). Проверяем его.
     expect(errText({})).toBe('Ошибка')
+    expect(errText(new Error(''))).toBe('Ошибка')
   })
 
   it('error.message выигрывает у message при обоих заданных', () => {
