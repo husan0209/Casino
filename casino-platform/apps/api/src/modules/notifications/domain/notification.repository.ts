@@ -1,7 +1,12 @@
 /**
  * Репозиторий уведомлений. Application-слой не трогает Prisma напрямую
- * (audit §A3/H5). Чтения user/userSettings — cross-module компромисс,
- * TODO(GAP-22): заменить на Facade users-модуля.
+ * (audit §A3/H5). Чтения user/userSettings — cross-module компромисс:
+ * таблицы принадлежат users-модулю, а читаются напрямую (`user`, `user_settings`)
+ * вместо `UsersFacade`. Заменить на порт users-модуля — см. **GAP-51**.
+ *
+ * (Раньше здесь стоял TODO со ссылкой на GAP-22, но тот гэп закрыт 2026-08-31 и
+ * про другое: 4-слойка wallet, `toMoney`, `runCreditDebit` — эта работа в его
+ * критериях не значилась, то есть метка указывала на закрытый гэп и долг не трекся.)
  */
 import type { Prisma, Notification } from '@prisma/client'
 
