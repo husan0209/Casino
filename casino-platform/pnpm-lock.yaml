@@ -93,6 +93,9 @@ importers:
       typescript:
         specifier: ^5.5.4
         version: 5.9.3
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@20.19.43)(terser@5.49.0)
 
   apps/api:
     dependencies:
@@ -254,6 +257,9 @@ importers:
       typescript:
         specifier: ^5.5.4
         version: 5.9.3
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@20.19.43)(terser@5.49.0)
 
   packages/database:
     dependencies:
