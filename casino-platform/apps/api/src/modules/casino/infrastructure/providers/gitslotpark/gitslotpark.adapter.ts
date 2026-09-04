@@ -83,8 +83,12 @@ function mapProviderGame(g: RawGameRow): ProviderGameRow {
 /**
  * Порядок конкатенации полей подписи по операциям (Withdraw/Deposit/BetWin).
  * ⚠️ Сверить с менеджером GitSlotPark при выдаче боевых ключей.
+ *
+ * Экспортируется (GAP-43): контракт зафиксирован в `apps/api/test/gitslotpark-adapter.spec.ts`,
+ * после сверки с менеджером правится **только** эта таблица, и спек сразу показывает
+ * diff (expected vs actual HMAC для каждой операции).
  */
-const CALLBACK_MESSAGE_BUILDERS: Record<string, (body: Record<string, unknown>) => string> = {
+export const CALLBACK_MESSAGE_BUILDERS: Record<string, (body: Record<string, unknown>) => string> = {
   getbalance: (b) => `${b.agentID}${b.userID}`,
   withdraw: (b) => `${b.agentID}${b.userID}${AMT(b.amount)}${b.transactionID}${b.roundID}`,
   deposit: (b) =>
