@@ -10,6 +10,7 @@ export default function RegisterPage(): React.JSX.Element {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [ref, setRef] = useState('')
+  const [adult, setAdult] = useState(false)
   const [sent, setSent] = useState(false)
   const register = useAuth((s: AuthState) => s.register)
   const submit = async (e: React.FormEvent): Promise<void> => {
@@ -59,7 +60,30 @@ export default function RegisterPage(): React.JSX.Element {
             value={ref}
             onChange={(e) => setRef(e.target.value)}
           />
-          <button className="btn w-full">Зарегистрироваться</button>
+          {/* GAP-49 / ТЗ ч.5 §16.3: возрастной гейт 18+ на регистрации */}
+          <label className="flex items-start gap-2 text-xs text-muted">
+            <input
+              type="checkbox"
+              className="mt-0.5 accent-[#6C63FF]"
+              checked={adult}
+              onChange={(e) => setAdult(e.target.checked)}
+              required
+            />
+            <span>
+              Мне 18+ лет. Я принимаю{' '}
+              <Link href="/legal/terms" className="text-white underline">
+                условия использования
+              </Link>{' '}
+              и{' '}
+              <Link href="/legal/privacy" className="text-white underline">
+                политику конфиденциальности
+              </Link>
+              .
+            </span>
+          </label>
+          <button className="btn w-full" disabled={!adult}>
+            Зарегистрироваться
+          </button>
         </form>
         <div className="text-sm text-muted mt-3">
           Есть аккаунт?{' '}
