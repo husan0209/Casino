@@ -138,9 +138,9 @@ jobs:
           #   NODE_ENV, CI   — окружение исполнения, а не конфиг приложения
           #   *_INTEGRATION  — флаги включения интеграционных спеков (LEDGER_INTEGRATION)
           #   E2E_*          — переменные e2e-раннера
-          #   SMTP_PASS      — канонизируется в SMTP_PASSWORD в GAP-40; удалить запись
-          #                    после мержа GAP-40 (имя исчезнет из кода)
-          D7_ALLOW='^(NODE_ENV|CI|SMTP_PASS)$|_INTEGRATION$|^E2E_'
+          # (Запись SMTP_PASS, временно разрешавшая дрейф до мержа GAP-40, удалена:
+          #  #53 влит, код читает канонический SMTP_PASSWORD.)
+          D7_ALLOW='^(NODE_ENV|CI)$|_INTEGRATION$|^E2E_'
           D7_RX="process\.env\.[A-Z][A-Z0-9_]+|process\.env\[[\"'][A-Z][A-Z0-9_]+[\"']\]|[A-Za-z_][A-Za-z0-9_.]*\.get[A-Za-z]*[<(][^)]*['\"][A-Z][A-Z0-9_]+['\"]"
           grep -rhoE "$D7_RX" apps/api/src packages/*/src --include='*.ts' 2>/dev/null \
             | grep -oE '[A-Z][A-Z0-9_]{2,}' | sort -u > "$TMPD/d7_code.txt" || true
