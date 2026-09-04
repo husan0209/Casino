@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * GAP-44: smoke-тесты для чистых функций форматирования денег в web-клиенте.
- * Контракт:
- *   - фиат RUB/UAH/BYN/KZT/UZS — целое число с разделителем тысяч (пробел) и символом валюты;
- *   - USDT_TRC20 — 2 знака после запятой, символ «USDT»;
- *   - BTC — 8 знаков (full) / 4 (compact), символ «BTC»;
- *   - нечисловой ввод — фолбэк на String(amount) (НЕ падать в UI).
+ * Фиксирует ФАКТИЧЕСКИЙ контракт apps/web/src/lib/format/currency.ts:
+ *   - фиат RUB/UAH/BYN/KZT/UZS — целое (0 знаков) с разделителем тысяч и символом;
+ *   - USDT_TRC20 — ВСЕГДА 2 знака (compact не убирает дробь: decimalsFor игнорирует
+ *     compact для USDT);
+ *   - BTC — 8 знаков full / 4 compact;
+ *   - нечисловая строка → new Decimal() БРОСАЕТ DecimalError (не фолбэк);
+ *   - NaN → isFinite false → String(amount).
  */
 import { formatAmount, formatBalance } from '../src/lib/format/currency'
 
@@ -24,9 +26,7 @@ describe('GAP-44 formatAmount', () => {
       expect(formatAmount('500', 'UZS')).toBe('500 soʻm')
     })
 
-    it('compact=true НЕ меняет фиат (compact применим только к крипте)', () => {
-      // фиат в compact-режиме остаётся как обычно: 0 знаков после запятой,
-      // символ валюты; compact не добавляет .00
+    it('compact=true НЕ меняет фиат (0 знаков, округление до целого)', () => {
       expect(formatAmount('1500.99', 'RUB', true)).toBe('1 501 ₽')
     })
 
@@ -36,13 +36,14 @@ describe('GAP-44 formatAmount', () => {
   })
 
   describe('USDT_TRC20', () => {
-    it('full: ровно 2 знака после запятой, без точки перед USDT', () => {
+    it('full: ровно 2 знака после запятой', () => {
       expect(formatAmount('100', 'USDT_TRC20')).toBe('100.00 USDT')
       expect(formatAmount('1500.5', 'USDT_TRC20')).toBe('1 500.50 USDT')
     })
 
-    it('compact: без дробной части', () => {
-      expect(formatAmount('1500', 'USDT_TRC20', true)).toBe('1 500 USDT')
+    it('compact: ВСЁ РАВНО 2 знака (decimalsFor для USDT игнорирует compact)', () => {
+      // Контракт: USDT всегда показывает дробь. compact не убирает '.00'.
+      expect(formatAmount('1500', 'USDT_TRC20', true)).toBe('1 500.00 USDT')
     })
   })
 
@@ -51,16 +52,21 @@ describe('GAP-44 formatAmount', () => {
       expect(formatAmount('0.12345678', 'BTC')).toBe('0.12345678 BTC')
     })
 
-    it('compact: 4 знака после запятой', () => {
+    it('compact: 4 знака после запятой (округление)', () => {
       expect(formatAmount('0.12345678', 'BTC', true)).toBe('0.1235 BTC')
     })
   })
 
   describe('edge cases', () => {
-    it('нечисловой ввод — фолбэк на String(amount) (НЕ падает в UI)', () => {
-      // Decimal('abc') даёт NaN → isFinite() === false → return String(amount)
-      expect(formatAmount('abc', 'RUB')).toBe('abc')
+    it('NaN → фолбэк на String(amount) (isFinite false)', () => {
       expect(formatAmount(NaN, 'RUB')).toBe('NaN')
+    })
+
+    it('нечисловая строка → Decimal бросает (НЕ фолбэк) — фиксируем текущий контракт', () => {
+      // new Decimal('abc') кидает DecimalError. formatAmount не ловит его,
+      // значит вызывающий обязан передавать валидное число. Тест-страховка:
+      // если кто-то добавит try/catch-фолбэк — этот кейс напомнит обновить тест.
+      expect(() => formatAmount('abc', 'RUB')).toThrow()
     })
 
     it('ноль: «0 ₽» для фиата', () => {
@@ -68,7 +74,6 @@ describe('GAP-44 formatAmount', () => {
     })
 
     it('отрицательное число: разделитель тысяч и символ', () => {
-      // Decimal корректно обрабатывает минус
       expect(formatAmount('-1500', 'RUB')).toBe('-1 500 ₽')
     })
   })
@@ -76,8 +81,8 @@ describe('GAP-44 formatAmount', () => {
 
 describe('GAP-44 formatBalance', () => {
   it('проксирует в formatAmount с compact=true', () => {
-    // formatBalance используется для отображения баланса кошелька → compact.
     expect(formatBalance('0.12345678', 'BTC')).toBe('0.1235 BTC')
-    expect(formatBalance('1500', 'USDT_TRC20')).toBe('1 500 USDT')
+    // USDT compact сохраняет 2 знака (см. контракт выше)
+    expect(formatBalance('1500', 'USDT_TRC20')).toBe('1 500.00 USDT')
   })
 })
