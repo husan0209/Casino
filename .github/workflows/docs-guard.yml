@@ -1,6 +1,7 @@
 # Docs Guard — автопроверка документации (Фаза 3)
 # D1 markdown-ссылки · D2 пути в живых доках · D3 env-parity
 # D4 честность SECURITY_CHECKLIST · D5 drift машинных файлов · D6 job-имена branch protection
+# D7 env-имена из кода описаны в .env.example
 #
 # Замороженная спека (docs/tz-part-*) и immutable-снапшоты (docs/archive/)
 # исключены из D2/D3 по design: их пути — историческая фиксация v1.0
@@ -31,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: D1–D6 checks
+      - name: D1–D7 checks
         run: |
           set -uo pipefail
           ERR="$(mktemp)"
@@ -64,13 +65,17 @@ jobs:
 
           # ── D3: .env.example ↔ ENVIRONMENT_VARIABLES §22 ─────────
           echo "D3: env parity…"
-          grep -vE '^\s*#|^\s*$' .env.example | cut -d= -f1 | sort -u > "$TMPD/d3_ex.txt"
-          awk '/^## 22\./,0' docs/ENVIRONMENT_VARIABLES.md | grep -E '^[A-Z][A-Z0-9_]+=' | cut -d= -f1 | sort -u > "$TMPD/d3_doc.txt"
+          # ВАЖНО: шаг выполняется под `bash -e -o pipefail` (флаги runner'а). Пайплайн,
+          # где grep легитимно не находит совпадений, возвращает 1 и УБИВАЕТ весь guard
+          # молча — без ❌ и без перечня. Отсюда `|| true` на каждом извлечении-в-файл:
+          # пустой результат ниже всё равно ловится diff/comm как честный ❌.
+          grep -vE '^\s*#|^\s*$' .env.example | cut -d= -f1 | sort -u > "$TMPD/d3_ex.txt" || true
+          awk '/^## 22\./,0' docs/ENVIRONMENT_VARIABLES.md | grep -E '^[A-Z][A-Z0-9_]+=' | cut -d= -f1 | sort -u > "$TMPD/d3_doc.txt" || true
           if ! diff -q "$TMPD/d3_doc.txt" "$TMPD/d3_ex.txt" >/dev/null 2>&1; then
             fail "D3: ENVIRONMENT_VARIABLES §22 ≠ .env.example:"
             diff "$TMPD/d3_doc.txt" "$TMPD/d3_ex.txt" | sed 's/^/    /' >> "$ERR"
           fi
-          grep -oE '^  [A-Z][A-Z0-9_]+:' packages/shared-config/src/env.validation.ts | tr -d ' :' | sort -u > "$TMPD/d3_val.txt"
+          grep -oE '^  [A-Z][A-Z0-9_]+:' packages/shared-config/src/env.validation.ts | tr -d ' :' | sort -u > "$TMPD/d3_val.txt" || true
           MISSING=$(comm -13 "$TMPD/d3_val.txt" "$TMPD/d3_ex.txt" | paste -sd, -)
           [ -n "$MISSING" ] && echo "⚠️  D3 (не блокирует): env.validation.ts не валидирует: $MISSING — см. GAP-29"
 
@@ -96,7 +101,10 @@ jobs:
           BP=docs/BRANCH_PROTECTION.md
           WS="${GITHUB_WORKSPACE:-..}" # в Actions — корень репо; локально — родитель casino-platform
           SEC=$(awk '/Require status checks/{flag=1} /⚠️/{flag=0} flag' "$BP")
-          echo "$SEC" | grep -oE '`[^`]+`' | tr -d '`' | grep -vE '\.yml$|^guards$|^step$' | sort -u > "$TMPD/checks.txt"
+          echo "$SEC" | grep -oE '`[^`]+`' | tr -d '`' | grep -vE '\.yml$|^guards$|^step$' | sort -u > "$TMPD/checks.txt" || true
+          # пустой список = не найден сам раздел в доке: раньше это была молчаливая смерть
+          # от errexit, теперь — явный ❌ (D6 не должен «зеленеть» от отсутствия данных)
+          [ -s "$TMPD/checks.txt" ] || fail "D6: не удалось извлечь список required checks из '$BP' (раздел 'Require status checks'?"
           # Правило имён required check: чек-ран = job name (если задан) или job id.
           # Токен с пробелом → обязан быть display-name; токен без пробелов → job id БЕЗ name:
           # (иначе чек придёт под display-name и ruleset вечно будет ждать "Expected").
@@ -117,6 +125,32 @@ jobs:
             esac
           done < "$TMPD/checks.txt"
 
+          # ── D7: env-имена, которые читает код, описаны оператору ──
+          echo "D7: code ↔ .env.example env parity…"
+          # Код читает конфигурацию тремя способами: process.env.X, process.env['X'] и
+          # config.get*(... 'X'). Каждое имя обязано встречаться в .env.example — иначе
+          # оператор, поднимающий прод по доке, о нём не узнает (история: GITSLOTPARK_*
+          # имели 0 упоминаний и давали PaymentProviderNotConfiguredError на первом
+          # launch). Закомментированная строка тоже считается описанной — так в
+          # .env.example уже заведено для опциональных overrides с дефолтом в коде
+          # (NOWPAYMENTS_API_BASE, RUKASSA_API_BASE).
+          # Allowlist — только с обоснованием (конвенция D2):
+          #   NODE_ENV, CI   — окружение исполнения, а не конфиг приложения
+          #   *_INTEGRATION  — флаги включения интеграционных спеков (LEDGER_INTEGRATION)
+          #   E2E_*          — переменные e2e-раннера
+          #   SMTP_PASS      — канонизируется в SMTP_PASSWORD в GAP-40; удалить запись
+          #                    после мержа GAP-40 (имя исчезнет из кода)
+          D7_ALLOW='^(NODE_ENV|CI|SMTP_PASS)$|_INTEGRATION$|^E2E_'
+          D7_RX="process\.env\.[A-Z][A-Z0-9_]+|process\.env\[[\"'][A-Z][A-Z0-9_]+[\"']\]|[A-Za-z_][A-Za-z0-9_.]*\.get[A-Za-z]*[<(][^)]*['\"][A-Z][A-Z0-9_]+['\"]"
+          grep -rhoE "$D7_RX" apps/api/src packages/*/src --include='*.ts' 2>/dev/null \
+            | grep -oE '[A-Z][A-Z0-9_]{2,}' | sort -u > "$TMPD/d7_code.txt" || true
+          grep -oE '^[[:space:]]*#?[[:space:]]*[A-Z][A-Z0-9_]+=' .env.example \
+            | grep -oE '[A-Z][A-Z0-9_]+' | sort -u > "$TMPD/d7_ex.txt" || true
+          # `|| true` внутри $() обязательно: шаг выполняется под `bash -e`, а пустой
+          # результат grep -vE (всё покрыто allowlist'ом) = exit 1 = смерть всего guard'а
+          D7_MISSING=$(comm -23 "$TMPD/d7_code.txt" "$TMPD/d7_ex.txt" | grep -vE "$D7_ALLOW" | paste -sd' ' - || true)
+          [ -n "$D7_MISSING" ] && fail "D7: код читает, а .env.example не описывает: $D7_MISSING — добавь в .env.example + ENVIRONMENT_VARIABLES (см. GAP-41)"
+
           # ── итог ─────────────────────────────────────────────────
           if [ -s "$ERR" ]; then
             echo
@@ -124,4 +158,4 @@ jobs:
             cat "$ERR"
             exit 1
           fi
-          echo "✅ Docs guard: D1–D6 OK"
+          echo "✅ Docs guard: D1–D7 OK"

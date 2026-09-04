@@ -305,7 +305,7 @@ Frontend env доступны после `NEXT_PUBLIC_` prefix. Все оста�
 
 - [ ] Все `REQUIRED` переменные установлены
 - [ ] `JWT_*_SECRET` ≥ 64 символов
-- [ ] `RUKASSA_*` / `NOWPAYMENTS_*` секреты не дефолтные
+- [ ] `RUKASSA_*` / `NOWPAYMENTS_*` / `GITSLOTPARK_*` секреты не дефолтные
 - [ ] `SMTP_*` credentials протестированы
 - [ ] `.env.production` НЕ в git
 - [ ] CORS origins только свои домены
@@ -313,13 +313,37 @@ Frontend env доступны после `NEXT_PUBLIC_` prefix. Все оста�
 
 ---
 
-## 21. Casino Demo Provider
+## 21. Casino & Game Providers
+
+### 21.1. Demo Provider
 
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `DEMO_PROVIDER_ENABLED` | bool | ❌ | `false` (не задана) | Включить DemoProvider. Dev/staging only; в production должен быть выключен — см. README «Payment security (fail-closed)» |
 
 Код: `apps/api/src/modules/casino/infrastructure/providers/provider-adapter.factory.ts`.
+
+### 21.2. GitSlotPark (агрегатор слотов)
+
+Один seamless-протокол на 4 бренда: **Pragmatic Play, PG Soft, Amatic, Amusnet**
+(GAP-08). Ключи выдаёт менеджер провайдера; боевые значения приходят вместе с
+контрактом. Без trio ключей любой `launch` игры этих брендов падает
+**fail-closed** — `PaymentProviderNotConfiguredError` (503), а не тихая заглушка:
+поднимая прод по этой доке, оператор обязан заполнить все три, иначе каталог
+GitSlotPark не играется.
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `GITSLOTPARK_AGENT_ID` | string | ✅ (для брендов агрегатора) | — | ID агента из контракта; участвует в подписи `userAuth`/`gamelist` |
+| `GITSLOTPARK_API_TOKEN` | string | ✅ (для брендов агрегатора) | — | Токен в query-параметре `api_token` |
+| `GITSLOTPARK_SECRET_KEY` | string | ✅ (для брендов агрегатора) | — | Секрет HMAC-SHA256 для sign/verify коллбэков (bet/win/rollback/deposit/withdraw) |
+| `GITSLOTPARK_API_BASE` | URL | ❌ | `https://apiv2.gitslotpark.com` | База API (песочница/стенд провайдера — другой хост) |
+
+Код: `apps/api/src/modules/casino/infrastructure/providers/gitslotpark/gitslotpark.adapter.ts`.
+
+⚠️ Порядок конкатенации полей подписи по каждой из 5 callback-операций сверяется с
+менеджером GSP перед боевым подключением — риск зафиксирован в GAP-43 (контракт
+покрыт тестами, правка возможна только в `CALLBACK_MESSAGE_BUILDERS`).
 
 ---
 
@@ -383,6 +407,7 @@ RUKASSA_SECRET_KEY=dev_secret_key
 RUKASSA_WEBHOOK_URL=http://localhost:3001/api/v1/payments/webhooks/rukassa
 RUKASSA_SUCCESS_URL=http://localhost:3000/wallet?deposit=success
 RUKASSA_FAIL_URL=http://localhost:3000/wallet?deposit=failed
+# RUKASSA_API_BASE=https://pay.rukassa.is  # optional override, code default
 
 # ── NOWPayments ────────────────────────────────────────────
 NOWPAYMENTS_API_KEY=dev_nowpayments_key
@@ -392,6 +417,13 @@ NOWPAYMENTS_WEBHOOK_URL=http://localhost:3001/api/v1/payments/webhooks/nowpaymen
 
 # ── Casino & Game Providers ─────────────────────────────────
 DEMO_PROVIDER_ENABLED=true
+
+# GitSlotPark — агрегатор Pragmatic Play / PG Soft / Amatic / Amusnet (GAP-08).
+# Без trio ключей launch этих брендов падает fail-closed (см. §21.2).
+GITSLOTPARK_AGENT_ID=dev_gsp_agent_id
+GITSLOTPARK_API_TOKEN=dev_gsp_api_token
+GITSLOTPARK_SECRET_KEY=dev_gsp_secret_key_local_testing_only
+# GITSLOTPARK_API_BASE=https://apiv2.gitslotpark.com  # optional override, code default
 
 # ── SMTP ───────────────────────────────────────────────────
 SMTP_HOST=smtp.resend.com

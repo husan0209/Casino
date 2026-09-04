@@ -20,7 +20,7 @@ last_updated: 2026-08-28
 |------|-----|-----|-----------|
 | **Tier 1** | ESLint (strict) | `.eslintrc.js` | `any`, `console.log`, `parseFloat`, циклы модулей, длинные методы, прямые импорты prisma в domain/application |
 | **Tier 2** | Architecture guards (CI) | `.github/workflows/architecture-guards.yml` | 12 grep-проверок, которых ESLint не умеет: webhook raw body, Serializable в транзакциях, KYC fileFilter, Dockerfile USER, refresh-cookie secure, и т.д. |
-| **Tier 2.5** | Docs guards (CI) | `.github/workflows/docs-guard.yml` | D1–D6: битые ссылки, существование путей в живых доках, env-parity (`.env.example` ↔ ENVIRONMENT_VARIABLES), честность SECURITY_CHECKLIST, drift машинных файлов, job-имена branch protection |
+| **Tier 2.5** | Docs guards (CI) | `.github/workflows/docs-guard.yml` (локально — `scripts/docs-guard-local.sh`, он же берёт тело шага и гоняет с флагами runner'а) | D1–D7: битые ссылки, существование путей в живых доках, env-parity (`.env.example` ↔ ENVIRONMENT_VARIABLES), честность SECURITY_CHECKLIST, drift машинных файлов, job-имена branch protection, **D7 — env-имена из кода (`process.env.*`, `config.get(...)`) описаны в `.env.example`** (GAP-41) |
 
 **Эти два tier'а ловят ~80% нарушений из `docs/archive/audit-2026-08-25.md`** (25 найденных багов). Остальные 20% (HMAC на raw body в `main.ts`, конкретные баги в бизнес-логике) требуют **ручного code review** — их ESLint не поймает.
 
@@ -221,6 +221,7 @@ Tier 1 + Tier 2 ловят **синтаксические** и **структу�
 | 2026-08-28 | Tier 2.5: `docs-guard.yml` (D1–D6) + PR-шаблон с docs-чеклистом | AI agent (фаза 3: автопроверка) |
 | 2026-08-28 | PR-0: typecheck-конфиг починен (rootDir/tsconfig.build.json, пакеты → dist), тесты переписаны на vitest (18/18), lint 0 ошибок, `max-lines-per-function` 60→90 (GAP-30) | AI agent (PR-0: ликвидация долга CI) |
 | 2026-09-01 | GAP-25 закрыт: `max-params` error(3) + `complexity` error(10), разобраны 45 + 13 нарушений, §2.1.1 (исключения Nest); GAP-26 закрыт: 72 глубоких относительных импорта → `@/`+`@modules/`, билд через `tsc-alias` | AI agent (GAP-25/26) |
+| 2026-09-03 | GAP-41 закрыт: **Tier 2.5 += D7** (код ↔ `.env.example`) — закрывает слепое пятно D3 (сверяет `.env.example` ↔ §22, но не код); в `.env.example`/ENVIRONMENT_VARIABLES добавлены `GITSLOTPARK_*` (4) и `RUKASSA_API_BASE`; allowlist D7: `NODE_ENV`, `CI`, `*_INTEGRATION`, `E2E_*`, `SMTP_PASS` (до мержа GAP-40). **Попутно:** шаг CI выполняется под `bash -e -o pipefail` — извлечение-в-файл с пустым `grep` убивало guard молча, D3/D6/D7 защищены (`\|\| true`, явный ❌ D6); добавлен `scripts/docs-guard-local.sh` (локальный прогон чеков СВОЕЙ ветки с флагами runner'а, вместо ручной копии в `$HOME`) | AI agent (GAP-41) |
 
 ---
 
