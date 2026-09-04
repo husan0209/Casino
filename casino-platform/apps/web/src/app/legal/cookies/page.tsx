@@ -1,6 +1,6 @@
-import type { Metadata } from 'next'
-
 import { LegalPage } from '@/components/layout/LegalPage'
+
+import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Политика cookie — Casino',
