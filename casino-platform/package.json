@@ -25,6 +25,7 @@
     "format": "prettier --write .",
     "format:check": "prettier . --check",
     "commitlint": "commitlint --edit",
+    "load-test:wallet": "k6 run infra/load-tests/wallet-concurrency.js",
     "prepare": "echo hooks managed via casino-platform/scripts/setup-hooks.sh"
   },
   "devDependencies": {
