@@ -18,14 +18,8 @@ export class ReferralCalcService {
     @Inject(REFERRAL_REPOSITORY) private readonly repo: IReferralRepository,
   ) {}
 
-  // TODO(referrals): split runDaily into accrual + payout steps (<60 lines)
-  // eslint-disable-next-line max-lines-per-function
   async runDaily(dateStr?: string): Promise<{ processed: number; credited: number; date: Date; }> {
-    const date = dateStr ? new Date(dateStr) : new Date(Date.now() - 86400000)
-    const dayStart = new Date(date)
-    dayStart.setUTCHours(0, 0, 0, 0)
-    const dayEnd = new Date(dayStart)
-    dayEnd.setUTCHours(23, 59, 59, 999)
+    const { dayStart, dayEnd } = this.dayBounds(dateStr)
     const rewardRate = new Decimal(process.env['REFERRAL_REWARD_RATE'] || '0.05')
     // get all users with referrer
     const referredUsers = await this.repo.findReferredUsers()
@@ -37,7 +31,7 @@ export class ReferralCalcService {
       }
       const res = await this.processUserRewards({
         referredId: ru.id,
-        referrerId: ru.referredBy!,
+        referrerId: ru.referredBy,
         dayStart,
         dayEnd,
         rewardRate,
@@ -49,6 +43,20 @@ export class ReferralCalcService {
       `Referral daily: processed=${processed} credited=${credited} date=${dayStart.toISOString().slice(0, 10)}`,
     )
     return { processed, credited, date: dayStart }
+  }
+
+  /**
+   * Границы расчётных суток в UTC: `dateStr` → этот день, без аргумента → вчера.
+   * Вынесено из runDaily по критерию GAP-48 — сам runDaily остаётся оркестрацией
+   * (обход реферальных связей + сводка), а не расчётом.
+   */
+  private dayBounds(dateStr?: string): { dayStart: Date; dayEnd: Date } {
+    const date = dateStr ? new Date(dateStr) : new Date(Date.now() - 86400000)
+    const dayStart = new Date(date)
+    dayStart.setUTCHours(0, 0, 0, 0)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setUTCHours(23, 59, 59, 999)
+    return { dayStart, dayEnd }
   }
 
   /** GGR-share за сутки по всем валютам игрока: создаёт referralReward и кредитует награду рефереру. */

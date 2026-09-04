@@ -288,6 +288,28 @@ jobs:
           fi
           echo "✅ G12 OK (branch: $BR)"
 
+      # ──────────────────────────────────────────────────────────────
+      # N. У правила max-lines-per-function больше нет ни одного исключения
+      # Catches: возврат GAP-48. До него inline-`eslint-disable` был единственным
+      #          местом, где формальное error(60) не действовало; без чека такой
+      #          «костыль» заводится молча при первом же длинном методе.
+      # Rule: docs/QUALITY_GATES.md §2.1 (порог) и §2.1.1 (как оформлять исключения)
+      # NOTE: в ветке нумерация идёт после G12; после мержа #60 (G13) при ребейзе
+      #       шаг встаёт между G13 и «Final summary».
+      # ──────────────────────────────────────────────────────────────
+      - name: G14 — no eslint-disable for max-lines-per-function
+        id: g14
+        run: |
+          HITS=$(grep -rnE 'eslint-disable.*max-lines-per-function' apps packages --include='*.ts' 2>/dev/null || true)
+          if [ -n "$HITS" ]; then
+            echo "❌ G14 FAIL: правило max-lines-per-function (error, 60) подавлено в:"
+            echo "$HITS" | sed 's/^/   /'
+            echo '   Длинный метод — сигнал о смешанной ответственности: разбить на приватные хелперы.'
+            echo '   Обоснованные исключения — только overrides в .eslintrc.js с обоснованием (QUALITY_GATES §2.1.1), не inline-disable.'
+            exit 1
+          fi
+          echo "✅ G14 OK (ни одного подавления max-lines-per-function)"
+
       # ── Final summary ─────────────────────────────────────────────
       - name: Summary
         if: always()
@@ -305,3 +327,4 @@ jobs:
           echo "- G10 docker non-root:     ${{ steps.g10.outcome }}"
           echo "- G11 env placeholders:    ${{ steps.g11.outcome }}"
           echo "- G12 branch name:         ${{ steps.g12.outcome }}"
+          echo "- G14 no max-lines escape: ${{ steps.g14.outcome }}"
