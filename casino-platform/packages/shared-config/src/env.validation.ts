@@ -63,7 +63,9 @@ export const envSchema = z.object({
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().optional(),
   SMTP_USER: z.string().optional(),
-  SMTP_PASS: z.string().optional(),
+  // GAP-40: единственное каноническое имя — SMTP_PASSWORD (см. .env.example,
+  // ENVIRONMENT_VARIABLES.md §10, README). Дубликат SMTP_PASS удалён.
+  SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM_EMAIL: z.string().optional(),
   // ─── GAP-29: паритет с ENVIRONMENT_VARIABLES.md §22 (D3) ─────────────
   // Все — optional: код читает их напрямую из process.env с дефолтами;
@@ -87,7 +89,6 @@ export const envSchema = z.object({
   RUKASSA_FAIL_URL: z.string().url().optional(),
   NOWPAYMENTS_WEBHOOK_URL: z.string().url().optional(),
   SMTP_FROM_NAME: z.string().optional(),
-  SMTP_PASSWORD: z.string().optional(),
   KYC_MIN_AGE: z.coerce.number().int().positive().optional(),
   KYC_DOCUMENT_MAX_SIZE_MB: z.coerce.number().int().positive().optional(),
   REFERRAL_ENABLED: z.enum(['true', 'false']).optional(),
@@ -133,6 +134,16 @@ export const envSchema = z.object({
           code: z.ZodIssueCode.custom,
           path: ['DEMO_PROVIDER_ENABLED'],
           message: 'Demo provider must be disabled in production.',
+        })
+      }
+
+      // GAP-40: если в проде задан SMTP-хост с пользователем — пароль обязателен
+      if (env.SMTP_HOST && env.SMTP_USER && !env.SMTP_PASSWORD) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['SMTP_PASSWORD'],
+          message:
+            'SMTP_PASSWORD is required in production when SMTP_HOST and SMTP_USER are set; without it nodemailer cannot authenticate and all transactional emails (verification, password reset, notifications) silently fail.',
         })
       }
 
