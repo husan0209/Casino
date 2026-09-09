@@ -5,6 +5,7 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common'
+import * as Sentry from '@sentry/node'
 import { type Request, type Response } from 'express'
 import { PinoLogger } from 'nestjs-pino'
 
@@ -64,6 +65,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     // Unknown — log server-side only (no full err object: он может нести тела
     // запросов/токены из upstream-ошибок), return generic 500 to client.
+    // GAP-50: необработанное исключение уходит в Sentry (только при заданном
+    // DSN — без него init не вызывался, captureException — дешёвый no-op).
+    Sentry.captureException(exception)
     const isErr = exception instanceof Error
     this.pinoLogger.error(
       {
@@ -88,6 +92,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     requestId: string | undefined,
   ): Response {
     const status = exception.getStatus()
+    // GAP-50 критерий 3: в Sentry — только 5xx; 4xx (валидация, auth-отказы) —
+    // штатные ответы API, не сигнал о поломке.
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      Sentry.captureException(exception)
+    }
     const res = exception.getResponse()
     // NestJS validation pipe returns { message: string | string[], error, statusCode }.
     // For 4xx we surface the message in details so the client knows what to fix.
