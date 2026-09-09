@@ -81,8 +81,7 @@ export function OAuthButtons({ referralCode }: { referralCode?: string }): React
     return () => {
       delete window.onTelegramAuth
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- finishSignIn стабилен (setSession/useRouter из хуков)
-  }, [TELEGRAM_BOT_NAME, referralCode])
+  }, [referralCode])
 
   const startGoogle = async (): Promise<void> => {
     // redirect_uri — текущий origin; API валидирует по allowlist и строит
