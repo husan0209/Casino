@@ -45,12 +45,6 @@ export function OAuthButtons({ referralCode }: { referralCode?: string }): React
   const telegramContainer = useRef<HTMLDivElement>(null)
   const [telegramBusy, setTelegramBusy] = useState(false)
 
-  const finishSignIn = (accessToken: string, user: WebUser): void => {
-    setAccessToken(accessToken)
-    setSession(accessToken, user)
-    router.push('/profile')
-  }
-
   // Telegram Login Widget: скрипт монтируется один раз, колбэк глобальный.
   useEffect((): void => {
     if (!TELEGRAM_BOT_NAME || telegramContainer.current === null) {
@@ -63,7 +57,9 @@ export function OAuthButtons({ referralCode }: { referralCode?: string }): React
         referral_code: referralCode,
       })
         .then((res) => {
-          finishSignIn(res.accessToken, res.user)
+          setAccessToken(res.accessToken)
+          setSession(res.accessToken, res.user)
+          router.push('/profile')
         })
         .catch(() => {
           setTelegramBusy(false)
@@ -81,7 +77,7 @@ export function OAuthButtons({ referralCode }: { referralCode?: string }): React
     return () => {
       delete window.onTelegramAuth
     }
-  }, [referralCode])
+  }, [referralCode, setSession, router])
 
   const startGoogle = async (): Promise<void> => {
     // redirect_uri — текущий origin; API валидирует по allowlist и строит
