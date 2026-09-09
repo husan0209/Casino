@@ -26,6 +26,9 @@ services:
       context: .
       dockerfile: infra/docker/api.prod.Dockerfile
     env_file: [.env.production]
+    # pre-launch hardening A4: воркеры BullMQ при close() ждут активные job'ы;
+    # дефолтный grace 10s перебил бы их SIGKILL'ом. 45s > 30s BullMQ close-timeout.
+    stop_grace_period: 45s
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -39,6 +42,11 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    # pre-launch hardening A3: pino пишет в stdout → docker json-file;
+    # без max-size диск VPS умирает через пару месяцев
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
 
   web:
     build:
@@ -50,6 +58,9 @@ services:
     depends_on: [api]
     restart: unless-stopped
     networks: [casino]
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
 
   admin:
     build:
@@ -59,6 +70,9 @@ services:
     depends_on: [api]
     restart: unless-stopped
     networks: [casino]
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
 
   nginx:
     image: nginx:alpine
@@ -74,6 +88,9 @@ services:
       - ./uploads:/var/www/uploads:ro
     restart: unless-stopped
     networks: [casino]
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
 
 volumes:
   pgdata:

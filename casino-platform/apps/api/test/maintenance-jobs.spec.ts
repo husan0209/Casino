@@ -10,12 +10,14 @@
  *   константы DISPLAY_RUB_RATES (source='static'), задача не роняется;
  * - referral-daily: проксирует runDaily, возвращает сводку.
  */
+import { CleanupSessionsJob } from '../src/modules/maintenance/application/cleanup-sessions.job'
 import { ExpireDepositsJob } from '../src/modules/maintenance/application/expire-deposits.job'
 import { ReferralDailyJob } from '../src/modules/maintenance/application/referral-daily.job'
 import { UpdateRatesJob } from '../src/modules/maintenance/application/update-rates.job'
 import { WithdrawalReminderJob } from '../src/modules/maintenance/application/withdrawal-reminder.job'
 import { MaintenanceScheduler } from '../src/queues/infrastructure/maintenance.scheduler'
 import { DISPLAY_RUB_RATES } from '@casino/shared-config'
+import { MAINTENANCE_JOBS } from '../src/queues/queue.types'
 import type {
   IPaymentMaintenanceRepo,
   IReminderAuditRepo,
@@ -259,6 +261,28 @@ describe('maintenance jobs (GAP-33)', () => {
     })
   })
 
+  describe('CleanupSessionsJob (pre-launch hardening A1)', () => {
+    it('передаёт cutoff = now - 7 дней; сводка возвращает purged от репо', async () => {
+      let got: Date | undefined
+      const repo = {
+        purgeDeadSessions: async (cutoff: Date) => {
+          got = cutoff
+          return 42
+        },
+      }
+      const job = new CleanupSessionsJob(repo)
+      const res = await job.execute(NOW)
+      expect(res).toEqual({ purged: 42 })
+      expect(got?.getTime()).toBe(NOW.getTime() - 7 * 24 * 3_600_000)
+    })
+
+    it('идемпотентен: purged=0 при повторном прогоне — протокол репо', async () => {
+      const repo = { purgeDeadSessions: async () => 0 }
+      const job = new CleanupSessionsJob(repo)
+      await expect(job.execute(NOW)).resolves.toEqual({ purged: 0 })
+    })
+  })
+
   describe('MaintenanceScheduler', () => {
     it('без REDIS_URL (dev) — repeatable не регистрируются, метод безопасен', async () => {
       const scheduler = new MaintenanceScheduler(makeConfig({ REDIS_URL: undefined, NODE_ENV: undefined }))
@@ -278,8 +302,9 @@ describe('maintenance jobs (GAP-33)', () => {
         'update-rates': async () => ({ updated: 0, skipped: 0, source: 'static' }),
         'withdrawal-reminder': async () => ({ reminded: 0, skipped: 0, admins: 0 }),
         'referral-daily': async () => ({ processed: 0, credited: 0 }),
+        'cleanup-sessions': async () => ({ purged: 0 }),
       }
-      for (const name of ['expire-deposits', 'update-rates', 'withdrawal-reminder', 'referral-daily'] as const) {
+      for (const name of MAINTENANCE_JOBS) {
         expect(typeof handlers[name]).toBe('function')
       }
     })

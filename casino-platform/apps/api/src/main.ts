@@ -69,6 +69,16 @@ async function bootstrap(): Promise<void> {
   })
   app.use(cookieParser())
 
+  // pre-launch hardening A4 (2026-09-04): без enableShutdownHooks() SIGTERM
+  // (деплой/рестарт/rollback) обрывал in-flight запросы и Prisma-транзакции
+  // посреди money-операций, а onModuleDestroy-хуки BullMQ-воркеров (закрытие
+  // очередей, дожидание активных job'ов) не вызывались вовсе. С хуками Nest:
+  // 1) перестаёт принимать соединения, 2) дожидается активных запросов,
+  // 3) вызывает onModuleDestroy у воркеров (email/maintenance: worker.close()
+  // с ожиданием текущих job'ов). Пул Prisma закрывается сам при exit.
+  // K8s/compose stop_grace_period должен быть ≥ этого окна (30s default).
+  app.enableShutdownHooks()
+
   const port = process.env['APP_PORT'] || 3001
   await app.listen(port)
   app.get(Logger).log(`API listening on http://localhost:${port}/api/v1`)
