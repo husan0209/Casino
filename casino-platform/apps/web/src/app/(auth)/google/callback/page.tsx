@@ -1,6 +1,6 @@
 'use client'
-import { useEffect, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
 
 import { exchangeGoogleCode } from '@/components/auth/OAuthButtons'
 import { toast } from '@/components/ui/toaster'
