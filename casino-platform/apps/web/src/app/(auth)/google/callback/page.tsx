@@ -2,10 +2,9 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 
-import { toast } from '@/components/ui/toaster'
-import { errText } from '@/lib/api'
 import { exchangeGoogleCode } from '@/components/auth/OAuthButtons'
-import { setAccessToken } from '@/lib/api'
+import { toast } from '@/components/ui/toaster'
+import { errText, setAccessToken } from '@/lib/api'
 import { type AuthState, useAuth } from '@/stores/auth'
 
 /**
