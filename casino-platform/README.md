@@ -38,8 +38,14 @@ Seed admin: superadmin@casino.example.com / dev_superadmin_password_123
 > контура и первый деплой — нужны ключи и VPS), **GAP-40** (SMTP-пароль: мейлер
 > читает `SMTP_PASS`, дока предписывает `SMTP_PASSWORD` → в проде не уходят письма),
 > **GAP-49** (юридика/комплаенс — решение владельца). Подробно — `docs/IMPLEMENTATION_GAPS.md`.
-> Инженерные гейты при этом зелёные: 4 обязательных чека CI + 2 guard'а, docker-образ собирается,
-> 62 unit + 9 E2E проходят.
+> Инженерные гейты при этом зелёные: 5 обязательных чеков CI (включая pnpm audit), 2 guard'а,
+> docker-образ собирается, unit + E2E проходят (см. CI).
+>
+> **Pre-launch hardening (2026-09-04)**: cleanup-sessions cron (мёртвые сессии), индексы
+> game_transactions/ledger_entries (GGR-cron без seq-scan), ротация docker-логов (50m×5),
+> graceful shutdown (enableShutdownHooks + stop_grace_period 45s), throttle админ-логина (5/мин),
+> ErrorBoundary web/admin, security headers + favicon, OAuth-кнопки в UI (Google/Telegram Widget),
+> pnpm-audit в CI + Dependabot.
 - [x] Часть 1 Foundation – ~85% – monorepo, Prisma schema (19 таблиц), shared packages, Docker, Nginx — готово
 - [~] Часть 2 Auth/Users/KYC/RBAC – ~90% – регистрация (сразу сессия, TZ-10)/логин/JWT refresh-rotation/KYC 5000₽: остаток лимита из API на странице KYC и в депозитном флоу, CTA на верификацию при исчерпании (GAP-36 закрыт 2026-09-02); BullMQ email queue. Google OAuth (code-flow) и Telegram Login Widget реализованы – нужны ключи в env (GAP-03/04 закрыты)
 - [~] Часть 3 Wallet & Payments – ~85% – ledger/optimistic locking + Serializable/retry; Rukassa/NOWPayments — реальные HTTP-клиенты и HMAC-verify на raw body (GAP-06/07 закрыты 2026-08-24); runtime — нужны боевые ключи; scheduled jobs на месте (истечение депозитов/курсы/напоминания — GAP-33 закрыт 2026-09-02); курсы из БД/кеша потребляются конвертацией (GAP-34 закрыт 2026-09-02, фиат — политические константы)
