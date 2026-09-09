@@ -14,6 +14,8 @@ const DEFAULTS: Record<MaintenanceJobName, number> = {
   'update-rates': 300_000,
   'withdrawal-reminder': 3_600_000,
   'referral-daily': 86_400_000,
+  // pre-launch hardening A1: мёртвые сессии — раз в час
+  'cleanup-sessions': 3_600_000,
 }
 
 const ENV_KEYS: Record<MaintenanceJobName, string> = {
@@ -21,6 +23,7 @@ const ENV_KEYS: Record<MaintenanceJobName, string> = {
   'update-rates': 'JOB_UPDATE_RATES_EVERY_MS',
   'withdrawal-reminder': 'JOB_WITHDRAWAL_REMINDER_EVERY_MS',
   'referral-daily': 'JOB_REFERRAL_DAILY_EVERY_MS',
+  'cleanup-sessions': 'JOB_CLEANUP_SESSIONS_EVERY_MS',
 }
 
 /**

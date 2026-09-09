@@ -6,6 +6,7 @@ export const MAINTENANCE_JOBS = [
   'update-rates',
   'withdrawal-reminder',
   'referral-daily',
+  'cleanup-sessions',
 ] as const
 
 export type MaintenanceJobName = (typeof MAINTENANCE_JOBS)[number]

@@ -5,6 +5,7 @@ import Redis from 'ioredis'
 import { prisma } from '@casino/database'
 
 import { NOWPaymentsClient } from '../../payments/infrastructure/clients/nowpayments.client'
+import { CleanupSessionsJob } from '../application/cleanup-sessions.job'
 import { ExpireDepositsJob } from '../application/expire-deposits.job'
 import { UpdateRatesJob } from '../application/update-rates.job'
 import { WithdrawalReminderJob } from '../application/withdrawal-reminder.job'
@@ -13,6 +14,7 @@ import {
   type IPaymentMaintenanceRepo,
   type IReminderAuditRepo,
   type IRatesProvider,
+  type ISessionMaintenanceRepo,
   type MaintenanceHandlers,
   type MaintenancePaymentRow,
 } from '../domain/maintenance.ports'
@@ -32,6 +34,7 @@ export class PaymentJobHandlers {
     private readonly expire: ExpireDepositsJob,
     private readonly rates: UpdateRatesJob,
     private readonly reminder: WithdrawalReminderJob,
+    private readonly cleanupSessions: CleanupSessionsJob,
   ) {}
 
   get map(): Omit<MaintenanceHandlers, 'referral-daily'> {
@@ -39,6 +42,7 @@ export class PaymentJobHandlers {
       'expire-deposits': () => this.expire.execute(),
       'update-rates': () => this.rates.execute(),
       'withdrawal-reminder': () => this.reminder.execute(),
+      'cleanup-sessions': () => this.cleanupSessions.execute(),
     }
   }
 }
@@ -159,5 +163,22 @@ export class NowPaymentsRatesProvider implements IRatesProvider {
       return null
     }
     return { rate: res.estimatedAmount, source: res.source }
+  }
+}
+
+/** Очистка мёртвых сессий (pre-launch hardening A1). */
+@Injectable()
+export class PrismaSessionMaintenanceRepo implements ISessionMaintenanceRepo {
+  /** expired или отозванные ДО cutoff. deleteMany идемпотентен. */
+  async purgeDeadSessions(cutoff: Date): Promise<number> {
+    const res = await prisma.session.deleteMany({
+      where: {
+        OR: [
+          { expiresAt: { lt: cutoff } },
+          { revokedAt: { lt: cutoff } },
+        ],
+      },
+    })
+    return res.count
   }
 }
