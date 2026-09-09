@@ -1,4 +1,5 @@
 import { type Options } from '@sentry/node'
+import * as Sentry from '@sentry/node'
 
 import { LOG_REDACT_PATHS } from '../logger/logger.options'
 
@@ -56,6 +57,20 @@ export function scrubPII(value: unknown, depth = 0): unknown {
 }
 
 /**
+ * Инициализация Sentry (вызов из main.ts ДО NestFactory).
+ * Без DSN — полный no-op: init не вызывается, сетевых попыток нет.
+ * Обёртка изолирует main.ts от широких сгенерированных типов Sentry
+ * (no-unsafe-* warnings) — единственный файл, трогающий SDK напрямую,
+ * закрывает их локальными типами.
+ */
+export function initSentry(dsn: string | undefined): void {
+  const options = buildSentryOptions(dsn)
+  if (options !== undefined) {
+    Sentry.init(options)
+  }
+}
+
+/**
  * Собрать Sentry Options из значения SENTRY_DSN.
  * undefined — DSN не задан: init не нужен (no-op для dev/CI/тестов).
  */
@@ -68,12 +83,17 @@ export function buildSentryOptions(dsn: string | undefined): Options | undefined
     // критерий 2: трейсинг выключен
     tracesSampleRate: 0,
     sendDefaultPii: false,
+    // Сгенерированные типы Sentry широкие (no-unsafe-* warnings); сведение
+    // к Record в первой строке закрывает any-канал без конфликтов сигнатур.
     beforeSend: (event) => {
-      if (event.extra !== undefined) {
-        event.extra = scrubPII(event.extra) as Record<string, unknown>
+      const record = event as unknown as Record<string, unknown>
+      const extra = record['extra']
+      if (extra !== undefined) {
+        record['extra'] = scrubPII(extra)
       }
-      if (event.contexts !== undefined) {
-        event.contexts = scrubPII(event.contexts) as typeof event.contexts
+      const contexts = record['contexts']
+      if (contexts !== undefined) {
+        record['contexts'] = scrubPII(contexts)
       }
       return event
     },

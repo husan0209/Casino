@@ -1,14 +1,13 @@
 import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
 import { type NestExpressApplication } from '@nestjs/platform-express'
-import * as Sentry from '@sentry/node'
 import cookieParser from 'cookie-parser'
 import { json, urlencoded, type Request } from 'express'
 import helmet from 'helmet'
 import { Logger } from 'nestjs-pino'
 
 import { AppModule } from './app.module'
-import { buildSentryOptions } from './common/sentry/sentry.options'
+import { initSentry } from './common/sentry/sentry.options'
 
 import type { IncomingMessage, ServerResponse } from 'http'
 
@@ -42,10 +41,7 @@ async function bootstrap(): Promise<void> {
   // GAP-50: Sentry-агрегатор ошибок (вне ТЗ, согласовано владельцем 2026-09-04).
   // DSN опционален: без него init не вызывается — dev/CI не шумят. Инициализация
   // ДО NestFactory, чтобы ловить и ошибки бутстрапа (DI-провалы и пр.).
-  const sentryOptions = buildSentryOptions(process.env['SENTRY_DSN'])
-  if (sentryOptions !== undefined) {
-    Sentry.init(sentryOptions)
-  }
+  initSentry(process.env['SENTRY_DSN'])
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
