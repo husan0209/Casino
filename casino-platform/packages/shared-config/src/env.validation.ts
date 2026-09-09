@@ -77,6 +77,8 @@ export const envSchema = z.object({
   THROTTLE_TTL_MS: z.coerce.number().int().positive().optional(),
   THROTTLE_GLOBAL_LIMIT: z.coerce.number().int().positive().optional(),
   THROTTLE_AUTH_LIMIT: z.coerce.number().int().positive().optional(),
+  // pre-launch hardening B5: лимит попыток логина админки (default 5/окно)
+  THROTTLE_ADMIN_LIMIT: z.coerce.number().int().positive().optional(),
   LOCKOUT_MAX_ATTEMPTS: z.coerce.number().int().positive().optional(),
   LOCKOUT_WINDOW_MS: z.coerce.number().int().positive().optional(),
   LOCKOUT_DURATION_MS: z.coerce.number().int().positive().optional(),
