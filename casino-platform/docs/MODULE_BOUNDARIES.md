@@ -381,7 +381,9 @@ referral_rewards                (period, ggr, reward_amount, status)
 
 - `wallet` (credit для reward)
 - `auth` (получает событие USER_REGISTERED для привязки)
-- `casino` (event из game_transactions для расчёта GGR)
+- `casino` (read-only groupBy по game_transactions для расчёта GGR — ADR GAP-51:
+  принят прямой доступ через общий Prisma-клиент; порт/событие — при выносе
+  casino в отдельный сервис)
 
 ### 9.4. Используется в
 
@@ -438,6 +440,9 @@ email_jobs          (BullMQ internal)
 ### 11.3. Использует
 
 - SMTP provider (отправка email)
+- `users` (read-only email + notification preferences — ADR GAP-51: принят
+  прямой доступ через общий Prisma-клиент; UsersFacade-порт — при выносе
+  users в отдельный сервис)
 
 ### 11.4. Используется в
 
@@ -542,13 +547,14 @@ game-sessions → wallet              (credit/debit при win/bet/rollback)
               → casino              (game config)
 
 referrals     → wallet              (credit для reward)
-              → casino              (event game_transaction для GGR)
+              → casino              (read-only gameTransaction groupBy для GGR — ADR GAP-51)
               → notifications       (email reward notification)
 
 support       → notifications       (notify admin/user)
               → audit
 
-notifications → (standalone — SMTP provider)
+notifications → users (read-only email/settings — ADR GAP-51)
+              → (SMTP provider)
 
 audit         → (standalone — пишет в свою таблицу)
 
