@@ -56,6 +56,8 @@ export const envSchema = z.object({
   JOB_UPDATE_RATES_EVERY_MS: z.coerce.number().int().positive().optional(),
   JOB_WITHDRAWAL_REMINDER_EVERY_MS: z.coerce.number().int().positive().optional(),
   JOB_REFERRAL_DAILY_EVERY_MS: z.coerce.number().int().positive().optional(),
+  // pre-launch hardening A1: очистка мёртвых сессий (default 1ч)
+  JOB_CLEANUP_SESSIONS_EVERY_MS: z.coerce.number().int().positive().optional(),
   DEMO_PROVIDER_ENABLED: z
     .enum(['true', 'false'])
     .default('false')

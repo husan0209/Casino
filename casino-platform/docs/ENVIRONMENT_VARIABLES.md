@@ -85,6 +85,7 @@ export function validateEnv() {
 | `JOB_UPDATE_RATES_EVERY_MS` | int | ❌ | `300000` | Интервал задачи обновления курсов, мс (GAP-33) |
 | `JOB_WITHDRAWAL_REMINDER_EVERY_MS` | int | ❌ | `3600000` | Интервал напоминания о зависших выводах, мс (GAP-33) |
 | `JOB_REFERRAL_DAILY_EVERY_MS` | int | ❌ | `86400000` | Интервал ежедневных реферальных начислений, мс (GAP-32/33) |
+| `JOB_CLEANUP_SESSIONS_EVERY_MS` | int | ❌ | `3600000` | Интервал очистки мёртвых сессий (expired/отозванные >7 дней), мс — pre-launch hardening A1 |
 | `DOMAIN` | string | ✅ | — | `casino.example.com` (без доменной зоны) |
 
 ---
@@ -373,6 +374,7 @@ JOB_EXPIRE_DEPOSITS_EVERY_MS=300000
 JOB_UPDATE_RATES_EVERY_MS=300000
 JOB_WITHDRAWAL_REMINDER_EVERY_MS=3600000
 JOB_REFERRAL_DAILY_EVERY_MS=86400000
+# JOB_CLEANUP_SESSIONS_EVERY_MS=3600000
 
 # ── Database ───────────────────────────────────────────────
 DATABASE_URL=postgresql://casino:casino_dev_password@localhost:5432/casino_dev

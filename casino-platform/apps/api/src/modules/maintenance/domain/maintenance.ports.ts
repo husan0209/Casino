@@ -26,6 +26,12 @@ export interface ReminderResult {
   admins: number
 }
 
+/** Pre-launch hardening (A1, 2026-09-04): сводка очистки мёртвых сессий. */
+export interface SessionCleanupResult {
+  /** удалено строк (expired + давно отозванные) */
+  purged: number
+}
+
 export interface RatesResult {
   updated: number
   skipped: number
@@ -37,6 +43,12 @@ export interface IPaymentMaintenanceRepo {
   listPendingDeposits(): Promise<MaintenancePaymentRow[]>
   listPendingWithdrawals(): Promise<MaintenancePaymentRow[]>
   markExpired(id: string): Promise<void>
+}
+
+/** Очистка мёртвых сессий (A1): expired и отозванные старше grace-периода. */
+export interface ISessionMaintenanceRepo {
+  /** Удалить сессии с expiresAt < cutoff ИЛИ (revokedAt < cutoff). Возвращает число удалённых. */
+  purgeDeadSessions(cutoff: Date): Promise<number>
 }
 
 /** Дедупликация напоминаний — по записям audit_log за окно. */
@@ -67,10 +79,12 @@ export type MaintenanceHandlers = {
   'update-rates': () => Promise<unknown>
   'withdrawal-reminder': () => Promise<unknown>
   'referral-daily': () => Promise<unknown>
+  'cleanup-sessions': () => Promise<unknown>
 }
 
 /** Токены-порты для Nest-DI. */
 export const PAYMENT_MAINTENANCE_REPO = Symbol('PAYMENT_MAINTENANCE_REPO')
+export const SESSION_MAINTENANCE_REPO = Symbol('SESSION_MAINTENANCE_REPO')
 export const REMINDER_AUDIT_REPO = Symbol('REMINDER_AUDIT_REPO')
 export const EXCHANGE_RATE_WRITER = Symbol('EXCHANGE_RATE_WRITER')
 export const RATES_PROVIDER = Symbol('RATES_PROVIDER')

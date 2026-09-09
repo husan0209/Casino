@@ -276,6 +276,7 @@ model LedgerEntry {
   @@index([walletAccountId])
   @@index([createdAt])
   @@index([type])
+  @@index([walletAccountId, createdAt])
   @@map("ledger_entries")
 }
 enum LedgerEntryType {
@@ -531,6 +532,17 @@ model GameTransaction {
   user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   provider    GameProvider  @relation(fields: [providerId], references: [id])
   ledgerEntry LedgerEntry?  @relation(fields: [ledgerEntryId], references: [id])
+
+  // pre-launch hardening A2 (2026-09-04): самая растущая таблица системы была
+  // без единого индекса. Запросы-потребители:
+  // - [userId, type, createdAt] — GGR-cron (groupBy userId/type/createdAt) и
+  //   история игрока; был seq-scan на каждой итерации runDaily;
+  // - [createdAt] — дашборд-агрегаты (findActiveUserIds/sumGameTransactions),
+  //   фид больших выигрышей, админ-пагинация;
+  // - [type, amount] — recentBigWins (type='win' AND amount>=X).
+  @@index([userId, type, createdAt])
+  @@index([createdAt])
+  @@index([type, amount])
   @@unique([providerId, externalTransactionId])
   @@map("game_transactions")
 }

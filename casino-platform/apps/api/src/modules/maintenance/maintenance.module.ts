@@ -1,6 +1,7 @@
 import { Module, type OnApplicationBootstrap } from '@nestjs/common'
 
 import { ReferralsModule } from '../referrals/referrals.module'
+import { CleanupSessionsJob } from './application/cleanup-sessions.job'
 import { ExpireDepositsJob } from './application/expire-deposits.job'
 import { ReferralDailyJob } from './application/referral-daily.job'
 import { UpdateRatesJob } from './application/update-rates.job'
@@ -12,6 +13,7 @@ import {
   PAYMENT_MAINTENANCE_REPO,
   RATES_PROVIDER,
   REMINDER_AUDIT_REPO,
+  SESSION_MAINTENANCE_REPO,
   type MaintenanceHandlers,
 } from './domain/maintenance.ports'
 import {
@@ -20,6 +22,7 @@ import {
   PrismaExchangeRateWriter,
   PrismaMaintenanceRepo,
   PrismaReminderAuditRepo,
+  PrismaSessionMaintenanceRepo,
 } from './infrastructure/maintenance.prisma.repo'
 import { MaintenanceWorker } from './infrastructure/maintenance.worker'
 import { MaintenanceScheduler } from '../../queues/infrastructure/maintenance.scheduler'
@@ -50,8 +53,10 @@ import { NOWPaymentsClient } from '../payments/infrastructure/clients/nowpayment
     UpdateRatesJob,
     WithdrawalReminderJob,
     ReferralDailyJob,
+    CleanupSessionsJob,
     NOWPaymentsClient,
     { provide: PAYMENT_MAINTENANCE_REPO, useClass: PrismaMaintenanceRepo },
+    { provide: SESSION_MAINTENANCE_REPO, useClass: PrismaSessionMaintenanceRepo },
     { provide: REMINDER_AUDIT_REPO, useClass: PrismaReminderAuditRepo },
     { provide: EXCHANGE_RATE_WRITER, useClass: PrismaExchangeRateWriter },
     { provide: RATES_PROVIDER, useClass: NowPaymentsRatesProvider },
