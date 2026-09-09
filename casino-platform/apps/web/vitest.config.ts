@@ -1,15 +1,17 @@
 import { fileURLToPath } from 'node:url'
 
+import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
 /**
  * GAP-44: vitest для apps/web.
  * Алиасы дублируются из tsconfig.json — Vite их из tsconfig не подхватывает.
- * environment: 'node' (по умолчанию) — тестируем только чистые функции
- * (formatAmount, sortWallets, ...). Для React-компонентов нужен jsdom +
- * @testing-library/react — отдельный PR (GAP-44 P3, см. tracker).
+ * environment: 'jsdom' + plugin-react — с GAP-44 stage 2 тестируем
+ * и React-компоненты (DepositSheet CTA, KYC-страница), не только
+ * чистые функции (formatAmount, sortWallets, ...).
  */
 export default defineConfig({
+  plugins: [react()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -23,5 +25,6 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    environment: 'jsdom',
   },
 })
