@@ -22,11 +22,11 @@ import { LOG_REDACT_PATHS } from '../logger/logger.options'
  */
 
 /** Ключи event-объектов Sentry к скраббингу — плоские имена из LOG_REDACT_PATHS. */
-const SENTRY_SCRUB_KEYS = new Set(
+const SENTRY_SCRUB_KEYS: ReadonlySet<string> = new Set(
   LOG_REDACT_PATHS.filter((p) => !p.includes('.') && !p.includes('*')),
 )
 
-const NESTED_SCRUB_KEYS = new Set(
+const NESTED_SCRUB_KEYS: ReadonlySet<string> = new Set(
   LOG_REDACT_PATHS.filter((p) => p.startsWith('*.')),
 )
 
