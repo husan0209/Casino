@@ -46,7 +46,7 @@ export function OAuthButtons({ referralCode }: { referralCode?: string }): React
   const [telegramBusy, setTelegramBusy] = useState(false)
 
   // Telegram Login Widget: скрипт монтируется один раз, колбэк глобальный.
-  useEffect((): void => {
+  useEffect(() => {
     if (!TELEGRAM_BOT_NAME || telegramContainer.current === null) {
       return
     }
