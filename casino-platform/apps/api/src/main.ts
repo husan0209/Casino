@@ -7,6 +7,7 @@ import helmet from 'helmet'
 import { Logger } from 'nestjs-pino'
 
 import { AppModule } from './app.module'
+import { initSentry } from './common/sentry/sentry.options'
 
 import type { IncomingMessage, ServerResponse } from 'http'
 
@@ -37,6 +38,11 @@ function captureRawBody(
 }
 
 async function bootstrap(): Promise<void> {
+  // GAP-50: Sentry-агрегатор ошибок (вне ТЗ, согласовано владельцем 2026-09-04).
+  // DSN опционален: без него init не вызывается — dev/CI не шумят. Инициализация
+  // ДО NestFactory, чтобы ловить и ошибки бутстрапа (DI-провалы и пр.).
+  initSentry(process.env['SENTRY_DSN'])
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
     bodyParser: false, // we wire our own to attach the verify callback

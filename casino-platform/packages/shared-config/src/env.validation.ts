@@ -61,6 +61,8 @@ export const envSchema = z.object({
     .default('false')
     .transform(value => value === 'true'),
   SMTP_HOST: z.string().optional(),
+  // GAP-50: DSN опционален — без него Sentry no-op (dev/CI)
+  SENTRY_DSN: z.string().url().optional(),
   SMTP_PORT: z.coerce.number().int().optional(),
   SMTP_USER: z.string().optional(),
   // GAP-40: единственное каноническое имя — SMTP_PASSWORD (см. .env.example,

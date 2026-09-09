@@ -251,6 +251,7 @@ openssl rand -hex 64
 | `LOG_LEVEL` | enum | ❌ | `info` | `error`, `warn`, `info`, `debug` |
 | `LOG_FORMAT` | enum | ❌ | `json` | `json` или `pretty` (для dev) |
 | `LOG_DIR` | path | ❌ | `/app/logs` | Куда писать логи |
+| `SENTRY_DSN` | url | ❌ | — | GAP-50 (вне ТЗ, согласовано владельцем): DSN проекта Sentry. Пусто/не задано — Sentry не инициализируется (no-op); уходят только необработанные исключения и 5xx |
 
 ---
 
@@ -457,6 +458,7 @@ RATE_LIMIT_AUTH_MAX=10
 LOG_LEVEL=info
 LOG_FORMAT=pretty
 LOG_DIR=/app/logs
+# SENTRY_DSN=
 
 # ── Seeding ────────────────────────────────────────────────
 SEED_ADMIN_EMAIL=superadmin@casino.example.com
