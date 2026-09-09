@@ -1,4 +1,4 @@
-import { type Options } from '@sentry/node'
+import { type NodeOptions } from '@sentry/node'
 import * as Sentry from '@sentry/node'
 
 import { LOG_REDACT_PATHS } from '../logger/logger.options'
@@ -74,7 +74,7 @@ export function initSentry(dsn: string | undefined): void {
  * Собрать Sentry Options из значения SENTRY_DSN.
  * undefined — DSN не задан: init не нужен (no-op для dev/CI/тестов).
  */
-export function buildSentryOptions(dsn: string | undefined): Options | undefined {
+export function buildSentryOptions(dsn: string | undefined): NodeOptions | undefined {
   if (dsn === undefined || dsn === '') {
     return undefined
   }
