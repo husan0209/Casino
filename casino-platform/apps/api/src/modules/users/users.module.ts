@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module'
 import { GetGeoContextUseCase } from './application/use-cases/get-geo-context.use-case'
 import { GetMeUseCase } from './application/use-cases/get-me.use-case'
 import { ListSessionsUseCase } from './application/use-cases/list-sessions.use-case'
+import { RevokeAllSessionsUseCase } from './application/use-cases/revoke-all-sessions.use-case'
 import { RevokeSessionUseCase } from './application/use-cases/revoke-session.use-case'
 import { SelfExclusionUseCase } from './application/use-cases/self-exclusion.use-case'
 import { UpdateAfterDepositUseCase } from './application/use-cases/update-after-deposit.use-case'
@@ -28,6 +29,7 @@ import { UsersController } from './presentation/controllers/users.controller'
     UpdateSettingsUseCase,
     ListSessionsUseCase,
     RevokeSessionUseCase,
+    RevokeAllSessionsUseCase,
     SelfExclusionUseCase,
     UpdateCurrencyPreferenceUseCase,
     GetGeoContextUseCase,

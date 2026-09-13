@@ -39,6 +39,12 @@ export async function apiPatch<T>(url: string, body?: unknown): Promise<T> {
   return res.data.data
 }
 
+/** DELETE c разворачиванием конверта {success,data} → data (GAP-52: сессии) */
+export async function apiDelete<T>(url: string): Promise<T> {
+  const res = await api.delete<ApiResponse<T>>(url)
+  return res.data.data
+}
+
 export function setAccessToken(token: string): void {
   if (token) {
     api.defaults.headers.common.Authorization = `Bearer ${token}`

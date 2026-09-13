@@ -8,5 +8,7 @@ export interface UserSessionDto {
 export interface IUserSessionRepository {
   list(userId: string): Promise<Omit<UserSessionDto, 'isCurrent'>[]>
   revoke(sessionId: string, userId: string): Promise<boolean>
+  /** GAP-52: «Завершить все кроме текущей» — возвращает число отозванных. */
+  revokeAllExceptCurrent(userId: string, currentSessionId: string): Promise<number>
 }
 export const USER_SESSION_REPOSITORY = Symbol('USER_SESSION_REPOSITORY')

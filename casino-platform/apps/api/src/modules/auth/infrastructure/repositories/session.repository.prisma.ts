@@ -48,4 +48,11 @@ export class PrismaSessionRepository implements ISessionRepository {
       data: { revokedAt: new Date() },
     })
   }
+
+  async revokeAllUserSessionsExcept(userId: string, exceptSessionId: string): Promise<void> {
+    await prisma.session.updateMany({
+      where: { userId, revokedAt: null, id: { not: exceptSessionId } },
+      data: { revokedAt: new Date() },
+    })
+  }
 }

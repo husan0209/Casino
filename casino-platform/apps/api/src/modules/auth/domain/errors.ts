@@ -51,6 +51,14 @@ export class WeakPasswordError extends AppError {
   }
 }
 
+export class PasswordNotSetError extends AppError {
+  readonly code = 'PASSWORD_NOT_SET'
+  readonly httpStatus = 409
+  constructor() {
+    super('У аккаунта нет пароля — вход через Google/Telegram')
+  }
+}
+
 export class TokenInvalidError extends AppError {
   readonly code = 'TOKEN_INVALID'
   readonly httpStatus = 400

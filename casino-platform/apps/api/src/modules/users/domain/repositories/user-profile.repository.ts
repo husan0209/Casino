@@ -6,6 +6,8 @@ export interface UserProfileFull {
     role: string
     referralCode: string
     createdAt: Date
+    /** GAP-52: true — есть password_hash (email-аккаунт); false — OAuth-only. Фронт прячет форму смены пароля. */
+    hasPassword: boolean
   }
   profile: {
     firstName: string | null
