@@ -22,6 +22,8 @@ export interface ISessionRepository {
   findByRefreshTokenHash(hash: string): Promise<SessionView | null>
   revoke(id: string): Promise<void>
   revokeAllUserSessions(userId: string): Promise<void>
+  /** GAP-52: смена пароля — отозвать все сессии КРОМЕ текущей (см. ChangePasswordUseCase). */
+  revokeAllUserSessionsExcept(userId: string, exceptSessionId: string): Promise<void>
 }
 
 export const SESSION_REPOSITORY = Symbol('SESSION_REPOSITORY')

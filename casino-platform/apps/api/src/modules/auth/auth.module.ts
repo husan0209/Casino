@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 
 import { QueuesModule } from '../../queues/queues.module'
+import { ChangePasswordUseCase } from './application/use-cases/change-password.use-case'
 import { ForgotPasswordUseCase } from './application/use-cases/forgot-password.use-case'
 import { LoginUseCase } from './application/use-cases/login.use-case'
 import { LogoutUseCase } from './application/use-cases/logout.use-case'
@@ -56,6 +57,7 @@ import { RolesGuard } from './presentation/guards/roles.guard'
     LogoutUseCase,
     ForgotPasswordUseCase,
     ResetPasswordUseCase,
+    ChangePasswordUseCase,
     GoogleOAuthUseCase,
     TelegramLoginUseCase,
     // NB: инжектится GoogleOAuthUseCase/TelegramLoginUseCase; был забыт в providers —

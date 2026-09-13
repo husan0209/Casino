@@ -68,3 +68,12 @@ export interface HistoryDto {
   data: HistoryRowDto[]
   total: number
 }
+
+/** Игра в списке «Продолжить играть» (GET /casino/recent — FavoriteWithGame['game']). */
+export interface RecentGameDto extends GameDto {}
+
+/** Ответ GET /casino/favorites — те же поля игры + provider. */
+export interface FavoritesListDto {
+  data: GameDto[]
+  meta: GamesMetaDto
+}

@@ -1,46 +1,80 @@
 'use client'
-import { useQuery } from '@tanstack/react-query'
-import Link from 'next/link'
-import { useState } from 'react'
 
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
+import { useEffect, useRef, useState } from 'react'
+
+import { GameCard } from '@/components/casino/GameCard'
 import { apiGet } from '@/lib/api'
-import type { GameDto, GamesListDto } from '@/types/casino'
+import type { GameDto, GamesMetaDto } from '@/types/casino'
+
+/**
+ * GAP-52 (ТЗ ч.5 §7): каталог с infinite scroll (IntersectionObserver),
+ * скелетоны загрузки, «повторить» при ошибке, в конце «больше игр нет».
+ * Фильтры: категория/провайдер/поиск; счётчик найденного обязателен.
+ */
+interface CatalogPage {
+  data: GameDto[]
+  meta: GamesMetaDto
+}
 
 export default function CasinoPage(): React.JSX.Element {
   const [category, setCategory] = useState('')
   const [provider, setProvider] = useState('')
   const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
-  const { data, isLoading } = useQuery({
-    queryKey: ['games', category, provider, search, page],
-    queryFn: () =>
-      apiGet<GamesListDto>('/casino/games', {
-        page,
-        per_page: 24,
-        category: category || undefined,
-        provider: provider || undefined,
-        search: search || undefined,
-      }),
-  })
-  const games = data?.data ?? []
-  const meta = data?.meta
+
+  const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery({
+      queryKey: ['games', category, provider, search],
+      queryFn: ({ pageParam }) =>
+        apiGet<CatalogPage>('/casino/games', {
+          page: pageParam,
+          per_page: 24,
+          category: category || undefined,
+          provider: provider || undefined,
+          search: search || undefined,
+        }),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage) => (lastPage.meta.hasNext ? lastPage.meta.page + 1 : undefined),
+    })
+
   const { data: providers } = useQuery({
     queryKey: ['providers'],
     queryFn: () => apiGet<GameDto[] | { data: GameDto[] }>('/casino/providers'),
     staleTime: 5 * 60 * 1000,
   })
   const provList: GameDto[] = Array.isArray(providers) ? providers : (providers?.data ?? [])
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) {
+      return
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          void fetchNextPage()
+        }
+      },
+      { rootMargin: '600px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  const games = data?.pages.flatMap((p) => p.data) ?? []
+  const total = data?.pages[0]?.meta?.total ?? games.length
+
   return (
     <div className="container-1 py-8">
-      <h1 className="text-2xl font-bold mb-4">Каталог игр</h1>
+      <h1 className="mb-4 text-2xl font-bold">Каталог игр</h1>
       <div className="card mb-5 flex flex-wrap gap-3 items-center">
         <select
           value={category}
-          onChange={(e) => {
-            setCategory(e.target.value)
-            setPage(1)
-          }}
+          onChange={(e) => setCategory(e.target.value)}
           className="input w-auto"
+          aria-label="Категория"
         >
           <option value="">Все категории</option>
           <option value="slots">Слоты</option>
@@ -50,11 +84,9 @@ export default function CasinoPage(): React.JSX.Element {
         </select>
         <select
           value={provider}
-          onChange={(e) => {
-            setProvider(e.target.value)
-            setPage(1)
-          }}
+          onChange={(e) => setProvider(e.target.value)}
           className="input w-auto"
+          aria-label="Провайдер"
         >
           <option value="">Все провайдеры</option>
           {provList.map((p) => (
@@ -66,63 +98,50 @@ export default function CasinoPage(): React.JSX.Element {
         <input
           placeholder="Поиск…"
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value)
-            setPage(1)
-          }}
+          onChange={(e) => setSearch(e.target.value)}
           className="input w-56"
+          aria-label="Поиск"
         />
         <div className="text-sm text-muted ml-auto">
-          {isLoading ? 'Загрузка…' : `${meta?.total ?? games.length} игр`}
+          {isLoading ? 'Загрузка…' : `${total} игр`}
         </div>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        {games.map((g) => (
-          <Link
-            key={g.slug}
-            href={`/casino/${g.slug}`}
-            className="card hover:border-brand/30 transition group"
-          >
-            <div className="aspect-[4/5] rounded-xl bg-gradient-to-br from-[#22223a] to-[#111122] flex items-center justify-center text-muted group-hover:text-white text-3xl">
-              🎰
-            </div>
-            <div className="mt-3 text-sm font-medium truncate" title={g.name_ru || g.name}>
-              {g.name_ru || g.name}
-            </div>
-            <div className="text-xs text-muted">
-              {g.provider?.name}
-              {g.rtp ? ` • ${g.rtp}%` : ''}
-            </div>
-            <div className="text-xs mt-1">
-              {g.is_new && <span className="badge">NEW</span>}{' '}
-              {g.is_popular && <span className="badge ml-1">TOP</span>}
-            </div>
+
+      {isLoading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className="card animate-pulse aspect-[4/5]" />
+          ))}
+        </div>
+      ) : isError ? (
+        <div className="py-12 text-center">
+          <p className="mb-3 text-muted text-sm">Не удалось загрузить игры</p>
+          <button type="button" className="btn-ghost" onClick={() => void refetch()}>
+            Повторить
+          </button>
+        </div>
+      ) : games.length === 0 ? (
+        <div className="py-12 text-center text-muted">
+          Ничего не найдено.{' '}
+          <Link href="/casino" className="text-[#6C63FF]">
+            Сбросить фильтры
           </Link>
-        ))}
-      </div>
-      {meta && meta.totalPages > 1 && (
-        <div className="flex gap-2 justify-center mt-6">
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-            className="btn-ghost text-sm disabled:opacity-30"
-          >
-            ← Назад
-          </button>
-          <span className="text-sm text-muted px-3 py-2">
-            {page} / {meta.totalPages}
-          </span>
-          <button
-            disabled={!meta.hasNext}
-            onClick={() => setPage((p) => p + 1)}
-            className="btn-ghost text-sm disabled:opacity-30"
-          >
-            Вперёд →
-          </button>
         </div>
-      )}
-      {!isLoading && games.length === 0 && (
-        <div className="text-muted text-center py-12">Ничего не найдено</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {games.map((g) => (
+              <GameCard key={g.slug} game={g} />
+            ))}
+          </div>
+          <div ref={sentinelRef} className="h-1" />
+          {isFetchingNextPage && (
+            <div className="mt-6 text-center text-sm text-muted">Загрузка…</div>
+          )}
+          {!hasNextPage && games.length > 24 && (
+            <div className="mt-6 text-center text-sm text-muted">Больше игр нет</div>
+          )}
+        </>
       )}
     </div>
   )

@@ -1,12 +1,15 @@
-import { Body, Controller, Get, Post, Query, Req, Res, UsePipes } from '@nestjs/common'
+import { Body, Controller, Get, Post, Query, Req, Res, UseGuards, UsePipes } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { type Request, type Response } from 'express'
 
 import { clearRefreshTokenCookie, setRefreshTokenCookie } from '@/common/cookies/refresh-token-cookie'
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
+import { type UserActor } from '@/common/types/req-user'
 
 import { type UserRole } from '@casino/database'
 
+import { ChangePasswordUseCase } from '../../application/use-cases/change-password.use-case'
 import { ForgotPasswordUseCase } from '../../application/use-cases/forgot-password.use-case'
 import { LoginUseCase } from '../../application/use-cases/login.use-case'
 import { LogoutUseCase } from '../../application/use-cases/logout.use-case'
@@ -18,8 +21,9 @@ import { ResetPasswordUseCase } from '../../application/use-cases/reset-password
 import { VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case'
 import { type LoginDto, LoginSchema } from '../dto/login.dto'
 import { GoogleLoginSchema, TelegramLoginSchema } from '../dto/oauth.dto'
-import { ForgotPasswordSchema, ResetPasswordSchema } from '../dto/password-reset.dto'
+import { ChangePasswordSchema, ForgotPasswordSchema, ResetPasswordSchema } from '../dto/password-reset.dto'
 import { type RegisterDto, RegisterSchema } from '../dto/register.dto'
+import { AuthGuard } from '../guards/auth.guard'
 
 /** Точечное сужение: req.cookies в @types/express — any (GAP-39 stage 10). */
 interface RequestWithCookies {
@@ -43,6 +47,7 @@ export class AuthController {
     private readonly logoutUc: LogoutUseCase,
     private readonly forgotUc: ForgotPasswordUseCase,
     private readonly resetUc: ResetPasswordUseCase,
+    private readonly changePasswordUc: ChangePasswordUseCase,
     private readonly googleUc: GoogleOAuthUseCase,
     private readonly telegramUc: TelegramLoginUseCase,
   ) {}
@@ -119,6 +124,23 @@ export class AuthController {
   @UsePipes(new ZodValidationPipe(ResetPasswordSchema))
   async reset(@Body() body: { token: string; new_password: string }): Promise<{ ok: boolean; }> {
     return this.resetUc.execute(body.token, body.new_password)
+  }
+
+  // GAP-52 (ТЗ ч.5 §9): смена пароля из профиля. AuthGuard обязателен —
+  // в отличие от анонимных forgot/reset, здесь нужен залогиненный пользователь.
+  @Post('change-password')
+  @UseGuards(AuthGuard)
+  @UsePipes(new ZodValidationPipe(ChangePasswordSchema))
+  async changePassword(
+    @CurrentUser() user: UserActor,
+    @Body() body: { current_password: string; new_password: string },
+  ): Promise<{ ok: boolean; }> {
+    return this.changePasswordUc.execute({
+      userId: user.id,
+      currentPassword: body.current_password,
+      newPassword: body.new_password,
+      currentSessionId: user.sessionId,
+    })
   }
 
   // ===== OAuth (TZ part 2) =====

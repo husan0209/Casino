@@ -12,6 +12,8 @@ export interface MeDto {
     role: string
     referralCode: string
     createdAt: string
+    /** GAP-52: false — OAuth-аккаунт, формы смены пароля нет (ТЗ ч.5 §9). */
+    hasPassword: boolean
   }
   profile: {
     firstName: string | null
@@ -29,4 +31,13 @@ export interface MeDto {
     timezone: string
   } | null
   kycStatus: string
+}
+
+/** Ответ GET /users/me/sessions. */
+export interface SessionDto {
+  id: string
+  isCurrent: boolean
+  createdAt: string
+  ipAddress: string | null
+  userAgent: string | null
 }

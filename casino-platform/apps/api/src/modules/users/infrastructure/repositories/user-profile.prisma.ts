@@ -34,6 +34,7 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
         role: user.role,
         referralCode: user.referralCode,
         createdAt: user.createdAt,
+        hasPassword: user.passwordHash !== null,
       },
       profile: user.profile,
       settings: user.settings,

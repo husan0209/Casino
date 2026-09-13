@@ -10,13 +10,14 @@ export const UpdateProfileSchema = z.object({
   city: z.string().min(1).max(64).optional(),
 })
 
-// PATCH /users/me/settings
+// PATCH /users/me/settings (GAP-52: timezone — ТЗ ч.5 §9 «Настройки»; use-case поддерживал, но поле не доходило из-за схемы)
 export const UpdateSettingsSchema = z.object({
   language: z.string().max(8).optional(),
   notifications_email: z.boolean().optional(),
   notifications_sms: z.boolean().optional(),
   notifications_push: z.boolean().optional(),
   two_factor_enabled: z.boolean().optional(),
+  timezone: z.string().min(3).max(64).optional(),
 })
 
 // POST /users/me/self-exclude — 0 = перманентно; контроллер дефолтит на 24,

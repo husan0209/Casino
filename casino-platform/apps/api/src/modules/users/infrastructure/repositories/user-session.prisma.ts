@@ -25,4 +25,12 @@ export class PrismaUserSessionRepository implements IUserSessionRepository {
     })
     return res.count > 0
   }
+
+  async revokeAllExceptCurrent(userId: string, currentSessionId: string): Promise<number> {
+    const res = await prisma.session.updateMany({
+      where: { userId, revokedAt: null, id: { not: currentSessionId } },
+      data: { revokedAt: new Date() },
+    })
+    return res.count
+  }
 }
