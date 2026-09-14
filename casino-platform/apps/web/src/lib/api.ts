@@ -45,6 +45,15 @@ export async function apiDelete<T>(url: string): Promise<T> {
   return res.data.data
 }
 
+/**
+ * POST multipart (FormData) — axios сам выставит Content-Type с boundary.
+ * GAP-53: аватар профиля.
+ */
+export async function apiPostForm<T>(url: string, body: FormData): Promise<T> {
+  const res = await api.post<ApiResponse<T>>(url, body)
+  return res.data.data
+}
+
 export function setAccessToken(token: string): void {
   if (token) {
     api.defaults.headers.common.Authorization = `Bearer ${token}`

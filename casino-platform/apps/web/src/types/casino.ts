@@ -11,6 +11,15 @@ export interface GameProviderDto {
   name: string
 }
 
+/** Ответ GET /casino/providers (snake_case — маппинг в контроллере). */
+export interface ProviderDto {
+  slug: string
+  name: string
+  logo_url: string | null
+  game_count: number
+  type: string
+}
+
 /** Игра в каталоге (поля из Prisma Game + provider). */
 export interface GameDto {
   id: string

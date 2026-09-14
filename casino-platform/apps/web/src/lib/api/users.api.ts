@@ -2,7 +2,7 @@
  * GAP-52 (ТЗ ч.5 §9): API-домен профиля — сессии, настройки, смена пароля.
  * Контракты соответствуют users.controller / auth.controller (snake_case body).
  */
-import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
+import { apiDelete, apiGet, apiPatch, apiPost, apiPostForm } from '@/lib/api'
 import type { SessionDto } from '@/types/user'
 
 export function listSessions(): Promise<SessionDto[]> {
@@ -35,4 +35,14 @@ export function changePassword(input: {
   new_password: string
 }): Promise<{ ok: boolean }> {
   return apiPost<{ ok: boolean }>('/auth/change-password', input)
+}
+
+/**
+ * GAP-53: загрузка аватара — multipart POST /users/me/avatar (поле 'file',
+ * jpeg/png/webp ≤ 5МБ — сервер валидирует magic bytes; повторно валидируем на клиенте).
+ */
+export function uploadAvatar(file: File): Promise<{ avatar_url: string }> {
+  const body = new FormData()
+  body.append('file', file)
+  return apiPostForm<{ avatar_url: string }>('/users/me/avatar', body)
 }

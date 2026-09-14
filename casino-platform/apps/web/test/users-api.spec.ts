@@ -3,7 +3,7 @@
  * и методов против users.controller / auth.controller (не мокаем axios —
  * перехватываем axios-инстанс, как api-errors.spec.ts).
  */
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mockedApi = {
   get: vi.fn(),
@@ -18,12 +18,19 @@ vi.mock('axios', () => ({
   },
 }))
 
-const { listSessions, revokeSession, revokeAllSessions, changePassword, updateSettings } =
+const { listSessions, revokeSession, revokeAllSessions, changePassword, updateSettings, uploadAvatar } =
   await import('../src/lib/api/users.api')
 
 function ok<T>(data: T): { data: { data: T } } {
   return { data: { data } }
 }
+
+beforeEach(() => {
+  mockedApi.get.mockReset()
+  mockedApi.post.mockReset()
+  mockedApi.patch.mockReset()
+  mockedApi.delete.mockReset()
+})
 
 describe('GAP-52 users.api — контракты путей/методов', () => {
   it('listSessions → GET /users/me/sessions', async () => {
@@ -64,5 +71,16 @@ describe('GAP-52 users.api — контракты путей/методов', ()
       timezone: 'Europe/Kiev',
       notifications_email: false,
     })
+  })
+
+  it('uploadAvatar → POST /users/me/avatar multipart с полем file', async () => {
+    mockedApi.post.mockResolvedValueOnce(ok({ avatar_url: '/uploads/avatars/x.png' }))
+    const file = new File(['img'], 'a.png', { type: 'image/png' })
+    const res = await uploadAvatar(file)
+    const [url, body] = mockedApi.post.mock.calls[0] as unknown as [string, FormData]
+    expect(url).toBe('/users/me/avatar')
+    expect(body).toBeInstanceOf(FormData)
+    expect(body.get('file')).toBeInstanceOf(File)
+    expect(res.avatar_url).toBe('/uploads/avatars/x.png')
   })
 })

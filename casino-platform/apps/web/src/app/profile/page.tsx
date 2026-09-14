@@ -1,11 +1,12 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { SecurityTab, SessionsTab, SettingsTab } from '@/components/profile/ProfileTabs'
 import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost, errText } from '@/lib/api'
+import { uploadAvatar } from '@/lib/api/users.api'
 import { useAuth } from '@/stores/auth'
 import type { MeDto } from '@/types/user'
 
@@ -23,9 +24,35 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'settings', label: 'Настройки' },
 ]
 
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024
+const AVATAR_MIME = ['image/jpeg', 'image/png', 'image/webp']
+
 function DataTab({ me, onSaved }: { me: MeDto; onSaved: () => void }): React.JSX.Element {
   const [form, setForm] = useState<Record<string, string>>({})
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const p = me.profile
+
+  /** GAP-53: аватар — клиентская валидация mime/размера ДО отправки (сервер проверяет magic bytes). */
+  const onAvatarPicked = async (file: File | undefined): Promise<void> => {
+    if (!file) {
+      return
+    }
+    if (!AVATAR_MIME.includes(file.type)) {
+      toast.error('Только JPEG, PNG или WebP')
+      return
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      toast.error('Файл больше 5 МБ')
+      return
+    }
+    try {
+      await uploadAvatar(file)
+      toast.success('Аватар обновлён')
+      onSaved()
+    } catch (e: unknown) {
+      toast.error(errText(e) || 'Не удалось загрузить аватар')
+    }
+  }
 
   const save = async (): Promise<void> => {
     try {
@@ -40,6 +67,33 @@ function DataTab({ me, onSaved }: { me: MeDto; onSaved: () => void }): React.JSX
   return (
     <div className="card space-y-3">
       <div className="font-semibold">Личные данные</div>
+      <div className="flex items-center gap-3">
+        {p?.avatarUrl ? (
+          <img src={p.avatarUrl} alt="Аватар" className="h-14 w-14 rounded-full object-cover" />
+        ) : (
+          <div className="grid h-14 w-14 place-items-center rounded-full bg-[#16213E] text-xl">👤</div>
+        )}
+        <div>
+          <button
+            type="button"
+            className="btn-ghost px-3 py-1.5 text-xs"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Сменить аватар
+          </button>
+          <div className="mt-1 text-xs text-muted">JPEG / PNG / WebP, до 5 МБ</div>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            void onAvatarPicked(e.target.files?.[0])
+            e.target.value = ''
+          }}
+        />
+      </div>
       <input
         className="input"
         placeholder="Имя"
@@ -93,7 +147,11 @@ export default function ProfilePage(): React.JSX.Element {
       ) : (
         <>
           <div className="card mb-5 flex flex-wrap items-center gap-4">
-            <div className="grid h-12 w-12 place-items-center rounded-full bg-[#16213E] text-xl">👤</div>
+            {data.profile?.avatarUrl ? (
+              <img src={data.profile.avatarUrl} alt="Аватар" className="h-12 w-12 rounded-full object-cover" />
+            ) : (
+              <div className="grid h-12 w-12 place-items-center rounded-full bg-[#16213E] text-xl">👤</div>
+            )}
             <div className="flex-1">
               <div className="font-medium">{data.user.email || 'Игрок'}</div>
               <div className="text-sm text-muted">
