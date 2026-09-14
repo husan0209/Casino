@@ -9,8 +9,8 @@ import type { GameDto } from '@/types/casino'
 interface GameCardProps {
   game: GameDto
   /** GAP-52: статус избранного от родителя (страница знает список). */
-  isFavorite?: boolean
-  onToggleFavorite?: (game: GameDto) => void
+  isFavorite?: boolean | undefined
+  onToggleFavorite?: ((game: GameDto) => void) | undefined
 }
 
 /**

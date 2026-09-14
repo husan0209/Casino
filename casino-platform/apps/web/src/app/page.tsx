@@ -1,154 +1,101 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import Link from 'next/link'
-import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 
-import { GameCard } from '@/components/casino/GameCard'
+import { GameSection } from '@/components/casino/GameSection'
+import { HomeChips } from '@/components/casino/HomeChips'
+import { ProviderStrip } from '@/components/casino/ProviderStrip'
 import { MobileSearchBar } from '@/components/layout/MobileSearchBar'
-import { toast } from '@/components/ui/toaster'
+import { useFavorites } from '@/hooks/useFavorites'
 import { apiGet } from '@/lib/api'
-import { addFavorite, fetchProviders, removeFavorite } from '@/lib/api/casino.api'
+import { fetchGamesPage, fetchRecentGames } from '@/lib/api/casino.api'
 import { useAuth } from '@/stores/auth'
-import type { GameDto, GamesListDto, RecentGameDto } from '@/types/casino'
+import type { GameDto, GamesListDto } from '@/types/casino'
 
 /**
- * GAP-52 (ТЗ ч.5 §6): витрина slot-first.
- * Своему игроку первым блоком — «Продолжить играть» (last played, до 12);
- * гостю пустой блок не показываем (ТЗ §6.2). Избранное — optimistic update.
+ * GAP-52/55 (ТЗ ч.5 §6): главная — витрина слотов, не портал.
+ * Своему: 1 «Продолжить играть» → 2 чипы → 3 Популярные → 4 промо-слот
+ * (ВЫКЛЮЧЕН: акционного движка нет, ТЗ §2.8/§24 — не обещать бонус) →
+ * 5 Новые → 6 Избранное (если не пустое) → 7 лента провайдеров.
+ * Гостю (§6.2): hero → Популярные → Новые → лента провайдеров; пустые
+ * «Продолжить играть»/«Избранное» не показываем.
  */
 export default function Home(): React.JSX.Element {
   const { user } = useAuth()
-  const queryClient = useQueryClient()
-  const [favoriteSlugs, setFavoriteSlugs] = useState<Set<string>>(new Set())
+  const { favoriteGames, favoriteSlugs, toggleFavorite } = useFavorites()
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['games-home'],
+  const { data: popular, isLoading } = useQuery({
+    queryKey: ['games-home', 'popular'],
     queryFn: () => apiGet<GamesListDto | GameDto[]>('/casino/games?per_page=12&sort=popular'),
     retry: false,
   })
-
+  const { data: fresh } = useQuery({
+    queryKey: ['games-home', 'new'],
+    queryFn: () => fetchGamesPage(1, { category: '', provider: '', sort: 'new', q: '' }),
+    retry: false,
+  })
   const { data: recent } = useQuery({
     queryKey: ['games-recent'],
-    queryFn: () => apiGet<RecentGameDto[]>('/casino/recent'),
+    queryFn: () => fetchRecentGames(),
     enabled: Boolean(user),
     staleTime: 60_000,
   })
 
-  // GAP-53 (ТЗ §6.1 п.7): тонкая лента провайдеров — последний блок главной
-  const { data: providers } = useQuery({
-    queryKey: ['providers-page'],
-    queryFn: () => fetchProviders(),
-    staleTime: 5 * 60 * 1000,
-  })
-
-  // избранные подтягиваем один раз для статуса сердечек в превью
-  const { data: favoritesData } = useQuery({
-    queryKey: ['favorites-ids'],
-    queryFn: () => apiGet<{ data: GameDto[] }>('/casino/favorites?per_page=100'),
-    enabled: Boolean(user),
-    staleTime: 60_000,
-  })
-
-  const favoriteMutation = useMutation({
-    mutationFn: ({ game, next }: { game: GameDto; next: boolean }) =>
-      next ? addFavorite(game.slug) : removeFavorite(game.slug),
-    onMutate: async ({ game, next }) => {
-      setFavoriteSlugs((prev) => {
-        const copy = new Set(prev)
-        if (next) {
-          copy.add(game.slug)
-        } else {
-          copy.delete(game.slug)
-        }
-        return copy
-      })
-      return { previous: favoriteSlugs }
-    },
-    onError: () => {
-      setFavoriteSlugs(new Set(favoritesData?.data.map((g) => g.slug) ?? []))
-      toast.error('Не удалось обновить избранное')
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['favorites-ids'] })
-    },
-  })
-
-  const games: GameDto[] = Array.isArray(data) ? data : (data?.data ?? [])
-  const fallback: GameDto[] = [
-    { id: 'demo-sweet-fruits', slug: 'demo-sweet-fruits', name: 'Sweet Fruits', provider: { id: 'demo', slug: 'demo', name: 'Demo' } },
-    { id: 'demo-lucky-sevens', slug: 'demo-lucky-sevens', name: 'Lucky Sevens', provider: { id: 'demo', slug: 'demo', name: 'Demo' } },
-    { id: 'demo-book-of-demo', slug: 'demo-book-of-demo', name: 'Book of Demo', provider: { id: 'demo', slug: 'demo', name: 'Demo' } },
-  ]
-
-  const list = games.length ? games : fallback
-  const recentList = recent?.slice(0, 12) ?? []
-  const effectiveFavorites = favoriteSlugs.size
-    ? favoriteSlugs
-    : new Set(favoritesData?.data.map((g) => g.slug) ?? [])
-
-  const toggleFavorite = (game: GameDto): void => {
-    favoriteMutation.mutate({ game, next: !effectiveFavorites.has(game.slug) })
-  }
+  const popularList: GameDto[] = Array.isArray(popular)
+    ? popular
+    : (popular?.data ?? [])
 
   return (
     <div className="container-1 py-4">
       <MobileSearchBar />
+
       {!user && (
-        <section className="mb-4 rounded-2xl border border-[#2A2A4A] bg-gradient-to-br from-[#16213E] to-[#1A1A2E] p-4">
+        <section className="mb-5 rounded-2xl border border-[#2A2A4A] bg-gradient-to-br from-[#16213E] to-[#1A1A2E] p-4">
           <h1 className="text-xl font-bold">Слоты онлайн</h1>
           <p className="mt-1 text-sm text-muted">Тап по игре — и в дело</p>
         </section>
       )}
 
-      {user && recentList.length > 0 && (
-        <section className="mb-6">
-          <h2 className="mb-3 text-lg font-semibold">Продолжить играть</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-            {recentList.map((g) => (
-              <GameCard key={g.slug} game={g} isFavorite={effectiveFavorites.has(g.slug)} onToggleFavorite={toggleFavorite} />
-            ))}
-          </div>
-        </section>
+      {user && (
+        <GameSection
+          title="Продолжить играть"
+          games={recent ?? []}
+          variant="row"
+          favoriteSlugs={favoriteSlugs}
+          onToggleFavorite={toggleFavorite}
+        />
       )}
 
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">{user ? 'Популярные' : 'Популярные слоты'}</h2>
-      </div>
+      {user && <HomeChips />}
 
       {isLoading ? (
-        <div className="text-muted py-8 text-center text-sm">Загрузка игр…</div>
+        <div className="py-8 text-center text-sm text-muted">Загрузка игр…</div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {list.slice(0, 12).map((g) => (
-            <GameCard key={g.slug} game={g} isFavorite={effectiveFavorites.has(g.slug)} onToggleFavorite={toggleFavorite} />
-          ))}
-        </div>
+        <GameSection
+          title={user ? 'Популярные' : 'Популярные слоты'}
+          games={popularList}
+          favoriteSlugs={favoriteSlugs}
+          onToggleFavorite={toggleFavorite}
+        />
       )}
 
-      {providers && providers.length > 0 && (
-        <section className="mt-6 mb-4">
-          <h2 className="mb-2 text-sm text-muted">Провайдеры</h2>
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {providers.map((p) => (
-              <Link
-                key={p.slug}
-                href={`/providers/${p.slug}`}
-                className="card flex shrink-0 items-center gap-2 px-3 py-2 text-xs hover:border-[#6C63FF]/40"
-              >
-                {p.logo_url ? (
-                  <img src={p.logo_url} alt={p.name} loading="lazy" className="h-6 w-6 rounded object-contain" />
-                ) : (
-                  <span className="grid h-6 w-6 place-items-center rounded bg-[#22223a] font-bold">
-                    {p.name.slice(0, 1)}
-                  </span>
-                )}
-                <span className="whitespace-nowrap">{p.name}</span>
-              </Link>
-            ))}
-          </div>
-        </section>
+      <GameSection
+        title="Новые"
+        games={fresh?.data ?? []}
+        favoriteSlugs={favoriteSlugs}
+        onToggleFavorite={toggleFavorite}
+      />
+
+      {user && (
+        <GameSection
+          title="Избранное"
+          games={favoriteGames}
+          favoriteSlugs={favoriteSlugs}
+          onToggleFavorite={toggleFavorite}
+        />
       )}
+
+      <ProviderStrip />
     </div>
   )
 }
