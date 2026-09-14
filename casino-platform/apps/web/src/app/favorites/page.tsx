@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 
 import { GameCard } from '@/components/casino/GameCard'
-import { apiGet } from '@/lib/api'
 import { useFavorites } from '@/hooks/useFavorites'
+import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import type { GamesListDto } from '@/types/casino'
 

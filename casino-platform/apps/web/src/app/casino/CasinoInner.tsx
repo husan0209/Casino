@@ -4,8 +4,8 @@ import { useInfiniteQuery } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
-import { GameCard } from '@/components/casino/GameCard'
 import { CatalogFilterBar } from '@/components/casino/CatalogFilterBar'
+import { GameCard } from '@/components/casino/GameCard'
 import { fetchGamesPage } from '@/lib/api/casino.api'
 import { catalogHref, parseFilters, type CatalogFilters } from '@/lib/ui/catalog-filters'
 

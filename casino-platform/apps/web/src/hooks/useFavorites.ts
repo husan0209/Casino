@@ -33,7 +33,10 @@ export function useFavorites(): {
     staleTime: 60_000,
   })
 
-  const favoriteGames = data?.data ?? []
+  // favoriteGames — тоже через useMemo: иначе `data?.data ?? []` создаёт новый
+  // массив каждый рендер и useMemo ниже (и все потребители Set) не стабильны
+  // (react-hooks/exhaustive-deps, найдено CI).
+  const favoriteGames = useMemo(() => data?.data ?? [], [data])
   const favoriteSlugs = useMemo(
     () => new Set(favoriteGames.map((game) => game.slug)),
     [favoriteGames],
