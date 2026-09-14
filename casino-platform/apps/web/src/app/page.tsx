@@ -1,12 +1,13 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import Link from 'next/link'
 import { useState } from 'react'
 
 import { GameCard } from '@/components/casino/GameCard'
 import { toast } from '@/components/ui/toaster'
 import { apiGet } from '@/lib/api'
-import { addFavorite, removeFavorite } from '@/lib/api/casino.api'
+import { addFavorite, fetchProviders, removeFavorite } from '@/lib/api/casino.api'
 import { useAuth } from '@/stores/auth'
 import type { GameDto, GamesListDto, RecentGameDto } from '@/types/casino'
 
@@ -31,6 +32,13 @@ export default function Home(): React.JSX.Element {
     queryFn: () => apiGet<RecentGameDto[]>('/casino/recent'),
     enabled: Boolean(user),
     staleTime: 60_000,
+  })
+
+  // GAP-53 (ТЗ §6.1 п.7): тонкая лента провайдеров — последний блок главной
+  const { data: providers } = useQuery({
+    queryKey: ['providers-page'],
+    queryFn: () => fetchProviders(),
+    staleTime: 5 * 60 * 1000,
   })
 
   // избранные подтягиваем один раз для статуса сердечек в превью
@@ -114,6 +122,30 @@ export default function Home(): React.JSX.Element {
             <GameCard key={g.slug} game={g} isFavorite={effectiveFavorites.has(g.slug)} onToggleFavorite={toggleFavorite} />
           ))}
         </div>
+      )}
+
+      {providers && providers.length > 0 && (
+        <section className="mt-6 mb-4">
+          <h2 className="mb-2 text-sm text-muted">Провайдеры</h2>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {providers.map((p) => (
+              <Link
+                key={p.slug}
+                href={`/providers/${p.slug}`}
+                className="card flex shrink-0 items-center gap-2 px-3 py-2 text-xs hover:border-[#6C63FF]/40"
+              >
+                {p.logo_url ? (
+                  <img src={p.logo_url} alt={p.name} loading="lazy" className="h-6 w-6 rounded object-contain" />
+                ) : (
+                  <span className="grid h-6 w-6 place-items-center rounded bg-[#22223a] font-bold">
+                    {p.name.slice(0, 1)}
+                  </span>
+                )}
+                <span className="whitespace-nowrap">{p.name}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
     </div>
   )

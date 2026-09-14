@@ -3,7 +3,12 @@
  * и favorites (избранное). Мутации избранного — optimistic update на странице.
  */
 import { apiDelete, apiGet, apiPost } from '@/lib/api'
-import type { FavoritesListDto, RecentGameDto } from '@/types/casino'
+import type { FavoritesListDto, ProviderDto, RecentGameDto } from '@/types/casino'
+
+/** Каталог провайдеров (GET /casino/providers). */
+export function fetchProviders(): Promise<ProviderDto[]> {
+  return apiGet<ProviderDto[]>('/casino/providers')
+}
 
 /** Последние сыгранные игры (GET /casino/recent, до 20). */
 export function fetchRecentGames(): Promise<RecentGameDto[]> {
