@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 import { GameCard } from '@/components/casino/GameCard'
+import { MobileSearchBar } from '@/components/layout/MobileSearchBar'
 import { toast } from '@/components/ui/toaster'
 import { apiGet } from '@/lib/api'
 import { addFavorite, fetchProviders, removeFavorite } from '@/lib/api/casino.api'
@@ -92,6 +93,7 @@ export default function Home(): React.JSX.Element {
 
   return (
     <div className="container-1 py-4">
+      <MobileSearchBar />
       {!user && (
         <section className="mb-4 rounded-2xl border border-[#2A2A4A] bg-gradient-to-br from-[#16213E] to-[#1A1A2E] p-4">
           <h1 className="text-xl font-bold">Слоты онлайн</h1>
