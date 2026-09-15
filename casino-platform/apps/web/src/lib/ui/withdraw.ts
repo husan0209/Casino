@@ -51,6 +51,11 @@ const BTC_RE = /^(?:[13][1-9A-HJ-NP-Za-km-z]{24,33}|bc1[a-z0-9]{25,71})$/
  * Бэкенд принимает destination строкой (CreateFiatWithdrawalSchema/CreateCryptoWithdrawalSchema),
  * поэтому номер карты принимаем без пробелов/дефисов (нормализуем на входе).
  */
+const CRYPTO_ADDRESS_RULES: Record<string, { pattern: RegExp; hint: string }> = {
+  USDT_TRC20: { pattern: TRC20_RE, hint: 'Адрес USDT в сети TRC20 начинается с T (34 символа)' },
+  BTC: { pattern: BTC_RE, hint: 'Адрес BTC: 1\u2026 / 3\u2026 / bc1\u2026' },
+}
+
 export function validateDestination(input: {
   currency: string
   method?: WithdrawMethod | undefined
@@ -61,22 +66,28 @@ export function validateDestination(input: {
     return 'Укажите реквизиты'
   }
   if (input.currency === 'RUB') {
-    if (input.method === 'sbp') {
-      return SBP_RE.test(raw) ? null : 'Телефон из 11 цифр, например 79991234567'
-    }
-    const digits = raw.replace(/[\s-]/g, '')
-    if (!/^\d+$/.test(digits)) {
-      return 'Номер карты — только цифры'
-    }
-    return CARD_RE.test(digits) ? null : 'Номер карты — 16–19 цифр'
+    return validateFiatDestination(raw, input.method)
   }
-  if (input.currency === 'USDT_TRC20') {
-    return TRC20_RE.test(raw) ? null : 'Адрес USDT в сети TRC20 начинается с T (34 символа)'
+  return validateCryptoDestination(raw, input.currency)
+}
+
+function validateFiatDestination(raw: string, method?: WithdrawMethod): string | null {
+  if (method === 'sbp') {
+    return SBP_RE.test(raw) ? null : 'Телефон из 11 цифр, например 79991234567'
   }
-  if (input.currency === 'BTC') {
-    return BTC_RE.test(raw) ? null : 'Адрес BTC: 1… / 3… / bc1…'
+  const digits = raw.replace(/[\s-]/g, '')
+  if (!/^\d+$/.test(digits)) {
+    return 'Номер карты — только цифры'
   }
-  return 'Неизвестная валюта'
+  return CARD_RE.test(digits) ? null : 'Номер карты — 16–19 цифр'
+}
+
+function validateCryptoDestination(raw: string, currency: string): string | null {
+  const rule = CRYPTO_ADDRESS_RULES[currency]
+  if (!rule) {
+    return 'Неизвестная валюта'
+  }
+  return rule.pattern.test(raw) ? null : rule.hint
 }
 
 /** Нормализованный destination для API (карта — без пробелов и дефисов). */
@@ -145,14 +156,10 @@ export function resolveWithdrawPrecheck(input: {
     return { kind: 'kyc_required' }
   }
   const active = input.wallets.find((wallet) => wallet.currency === input.activeCurrency)
-  const activePositive = active !== undefined && money.isPositive(active.available)
-  if (activePositive && active) {
+  if (active && money.isPositive(active.available)) {
     return { kind: 'form', currency: active.currency, available: active.available }
   }
-  const funded = input.wallets
-    .filter((wallet) => wallet.currency !== input.activeCurrency && money.isPositive(wallet.available))
-    .sort((a, b) => b.currency.localeCompare(a.currency))
-  const suggestion = funded[0]
+  const suggestion = findFundedAlternative(input.wallets, input.activeCurrency)
   if (suggestion) {
     return {
       kind: 'suggest_currency',
@@ -162,6 +169,17 @@ export function resolveWithdrawPrecheck(input: {
     }
   }
   return { kind: 'nothing_to_withdraw' }
+}
+
+/** Другой кошелёк с деньгами (для §10.3 п.3). Стабильный порядок — по коду валюты. */
+function findFundedAlternative(
+  wallets: WalletLike[],
+  excludeCurrency: string,
+): WalletLike | undefined {
+  return wallets
+    .filter((wallet) => wallet.currency !== excludeCurrency)
+    .filter((wallet) => money.isPositive(wallet.available))
+    .sort((a, b) => b.currency.localeCompare(a.currency))[0]
 }
 
 /** Крипта MVP (§2.2): USDT TRC20 и BTC; сеть задаётся валютой и не меняется. */
