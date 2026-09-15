@@ -6,12 +6,18 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
-import { FavoritesUseCase, type GameHistoryRow } from '@modules/casino/application/use-cases/favorites.use-case'
+import {
+  FavoritesUseCase,
+  type GameHistoryRow,
+  type GameHistoryStatsRow,
+  type HistoryFilterArgs,
+} from '@modules/casino/application/use-cases/favorites.use-case'
 
 import { type GameCategory, type GameType, type GameVolatility, prisma, type Prisma } from '@casino/database'
 
 import { LaunchGameUseCase } from '../../application/use-cases/launch-game.use-case'
 import { ListGamesUseCase } from '../../application/use-cases/list-games.use-case'
+import { ListHistorySchema, type ListHistoryDto } from '../dto/history-query.dto'
 import { LaunchGameSchema } from '../dto/launch.dto'
 
 @Controller('casino')
@@ -164,17 +170,21 @@ export class CasinoController {
 
   @Get('history')
   @UseGuards(AuthGuard)
+  @UsePipes(new ZodValidationPipe(ListHistorySchema))
   async history(
     @CurrentUser() currentUser: { id: string },
-    @Query() queryParams: { page?: string; per_page?: string; game_id?: string },
-  ): Promise<{ data: GameHistoryRow[]; meta: { page: number; per_page: number; total: number; total_pages: number; }; }> {
+    @Query() queryParams: ListHistoryDto,
+  ): Promise<{
+    data: GameHistoryRow[]
+    meta: { page: number; per_page: number; total: number; total_pages: number }
+    stats: GameHistoryStatsRow[]
+  }> {
     const page = parseInt(queryParams.page ?? '1', 10) || 1
-    const perPage = parseInt(queryParams.per_page || '20', 10) || 20
+    const perPage = Math.min(parseInt(queryParams.per_page || '20', 10) || 20, 100)
     const result = await this.favoritesUseCase.history({
-      userId: currentUser.id,
+      ...this.buildHistoryFilter(currentUser.id, queryParams),
       page,
       perPage,
-      ...(queryParams.game_id ? { gameId: queryParams.game_id } : {}),
     })
     return {
       data: result.data,
@@ -184,6 +194,22 @@ export class CasinoController {
         total: result.total,
         total_pages: Math.ceil(result.total / perPage),
       },
+      stats: result.stats,
+    }
+  }
+
+  /**
+   * §12: фильтры игры/провайдера/валюты/периода. Период — сутки целиком
+   * (from 00:00, to 23:59:59.999 UTC); формат дат проверен схемой до попадания сюда.
+   */
+  private buildHistoryFilter(userId: string, query: ListHistoryDto): HistoryFilterArgs {
+    return {
+      userId,
+      ...(query.game_id !== undefined && { gameId: query.game_id }),
+      ...(query.provider !== undefined && { providerSlug: query.provider }),
+      ...(query.currency !== undefined && { currency: query.currency }),
+      ...(query.from !== undefined && { from: new Date(`${query.from}T00:00:00.000Z`) }),
+      ...(query.to !== undefined && { to: new Date(`${query.to}T23:59:59.999Z`) }),
     }
   }
 }

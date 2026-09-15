@@ -5,8 +5,9 @@ import {
   GAME_CATALOG_REPOSITORY,
   GAME_FAVORITES_REPOSITORY,
   type FavoriteWithGame,
-  IGameCatalogRepository,
-  IGameFavoritesRepository,
+  type IGameCatalogRepository,
+  type IGameFavoritesRepository,
+  type RoundHistoryFilter,
 } from '../../domain/repositories/casino.repository'
 
 export interface GameHistoryRow {
@@ -18,6 +19,29 @@ export interface GameHistoryRow {
   profit: string
   status: string
   created_at: Date
+}
+
+/** Итоги по одной валюте (деньги — строки, не number). */
+export interface GameHistoryStatsRow {
+  currency: string
+  rounds: number
+  turnover: string
+  wins: string
+}
+
+/** Фильтр §12 (игра/провайдер/валюта/период) без пагинации — общий для аргументов use-case. */
+export interface HistoryFilterArgs {
+  userId: string
+  gameId?: string | undefined
+  providerSlug?: string | undefined
+  currency?: string | undefined
+  from?: Date | undefined
+  to?: Date | undefined
+}
+
+export interface HistoryArgs extends HistoryFilterArgs {
+  page: number
+  perPage: number
 }
 
 @Injectable()
@@ -61,16 +85,27 @@ export class FavoritesUseCase {
     return sessions.map((s) => s.game)
   }
 
-  async history(args: {
-    userId: string
-    page: number
-    perPage: number
-    gameId?: string
-  }): Promise<{ data: GameHistoryRow[]; total: number }> {
-    const { userId, page, perPage, gameId } = args
-    const [rounds, total] = await Promise.all([
-      this.favorites.findRoundsWithGame({ userId, gameId, skip: (page - 1) * perPage, take: perPage }),
-      this.favorites.countRounds(userId, gameId),
+  async history(args: HistoryArgs): Promise<{
+    data: GameHistoryRow[]
+    total: number
+    stats: GameHistoryStatsRow[]
+  }> {
+    const filter: RoundHistoryFilter = {
+      userId: args.userId,
+      ...(args.gameId !== undefined && { gameId: args.gameId }),
+      ...(args.providerSlug !== undefined && { providerSlug: args.providerSlug }),
+      ...(args.currency !== undefined && { currency: args.currency }),
+      ...(args.from !== undefined && { from: args.from }),
+      ...(args.to !== undefined && { to: args.to }),
+    }
+    const [rounds, total, grouped] = await Promise.all([
+      this.favorites.findRoundsWithGame({
+        ...filter,
+        skip: (args.page - 1) * args.perPage,
+        take: args.perPage,
+      }),
+      this.favorites.countRounds(filter),
+      this.favorites.roundStats(filter),
     ])
     const data = rounds.map((r) => ({
       round_id: r.id,
@@ -82,6 +117,12 @@ export class FavoritesUseCase {
       status: r.status,
       created_at: r.createdAt,
     }))
-    return { data, total }
+    const stats = grouped.map((row) => ({
+      currency: row.currency,
+      rounds: row.rounds,
+      turnover: row.turnover?.toString() ?? '0',
+      wins: row.wins?.toString() ?? '0',
+    }))
+    return { data, total, stats }
   }
 }

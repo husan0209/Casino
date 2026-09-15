@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 
 import { type GameSession, prisma, type Prisma } from '@casino/database'
 
-import { type FavoriteWithGame, type GameCatalogQuery, type GameRow, type GameSessionWithGame, type GameSessionWithUser, type GameTransactionRow, type GameWithProvider, type IGameCatalogRepository, type IGameFavoritesRepository, type IGamePlayRepository, type RecentSessionRow, type RoundHistoryRow } from '../../domain/repositories/casino.repository'
+import { type FavoriteWithGame, type GameCatalogQuery, type GameRow, type GameSessionWithGame, type GameSessionWithUser, type GameTransactionRow, type GameWithProvider, type IGameCatalogRepository, type IGameFavoritesRepository, type IGamePlayRepository, type RecentSessionRow, type RoundHistoryFilter, type RoundHistoryRow, type RoundStatsRow } from '../../domain/repositories/casino.repository'
 
 @Injectable()
 export class PrismaGameCatalogRepository implements IGameCatalogRepository {
@@ -69,15 +69,10 @@ export class PrismaGameFavoritesRepository implements IGameFavoritesRepository {
     })
   }
 
-  findRoundsWithGame(args: {
-    userId: string
-    gameId: string | undefined
-    skip: number
-    take: number
-  }): Promise<RoundHistoryRow[]> {
-    const { userId, gameId, skip, take } = args
+  findRoundsWithGame(args: RoundHistoryFilter & { skip: number; take: number }): Promise<RoundHistoryRow[]> {
+    const { skip, take } = args
     return prisma.gameRound.findMany({
-      where: { userId, ...(gameId ? { gameId } : {}) },
+      where: PrismaGameFavoritesRepository.roundWhere(args),
       skip,
       take,
       orderBy: { createdAt: 'desc' },
@@ -87,8 +82,47 @@ export class PrismaGameFavoritesRepository implements IGameFavoritesRepository {
     })
   }
 
-  countRounds(userId: string, gameId?: string): Promise<number> {
-    return prisma.gameRound.count({ where: { userId, ...(gameId ? { gameId } : {}) } })
+  countRounds(args: RoundHistoryFilter): Promise<number> {
+    return prisma.gameRound.count({ where: PrismaGameFavoritesRepository.roundWhere(args) })
+  }
+
+  roundStats(args: RoundHistoryFilter): Promise<RoundStatsRow[]> {
+    return prisma.gameRound
+      .groupBy({
+        by: ['currency'],
+        where: PrismaGameFavoritesRepository.roundWhere(args),
+        _count: { _all: true },
+        _sum: { totalBet: true, totalWin: true },
+      })
+      .then((grouped) =>
+        grouped.map((row) => ({
+          currency: row.currency,
+          rounds: row._count._all,
+          turnover: row._sum.totalBet,
+          wins: row._sum.totalWin,
+        })),
+      )
+  }
+
+  /**
+   * Один предикат на список, счётчик и агрегаты: иначе «ставок: 124» и список
+   * могли бы считаться по разным строкам (классический расходящийся отчёт).
+   */
+  private static roundWhere(args: RoundHistoryFilter): Prisma.GameRoundWhereInput {
+    return {
+      userId: args.userId,
+      ...(args.gameId !== undefined && { gameId: args.gameId }),
+      ...(args.providerSlug !== undefined && { provider: { slug: args.providerSlug } }),
+      ...(args.currency !== undefined && { currency: args.currency }),
+      ...(args.from !== undefined || args.to !== undefined
+        ? {
+            createdAt: {
+              ...(args.from !== undefined && { gte: args.from }),
+              ...(args.to !== undefined && { lte: args.to }),
+            },
+          }
+        : {}),
+    }
   }
 }
 

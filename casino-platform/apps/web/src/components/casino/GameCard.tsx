@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 
+import { gameBadge, gameDisplayName, gameRtpLabel } from '@/lib/ui/game'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import type { GameDto } from '@/types/casino'
@@ -25,7 +26,9 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
   const { openLogin } = useUIStore()
   const [preview, setPreview] = useState(false)
 
-  const displayName = game.name_ru || game.name
+  const displayName = gameDisplayName(game)
+  const badge = gameBadge(game)
+  const rtp = gameRtpLabel(game.rtp)
   const play = (): void => {
     if (!user) {
       openLogin(game.slug)
@@ -52,13 +55,13 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
       >
         <div className="relative flex aspect-[4/5] items-center justify-center bg-gradient-to-br from-[#22223a] to-[#111122] text-3xl">
           🎰
-          {(game.is_new || game.is_popular) && (
+          {badge && (
             <span
               className={`absolute left-2 top-2 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
-                game.is_new ? 'bg-[#00D2FF]/20 text-[#00D2FF]' : 'bg-[#FF3D71]/20 text-[#FF3D71]'
+                badge === 'NEW' ? 'bg-[#00D2FF]/20 text-[#00D2FF]' : 'bg-[#FF3D71]/20 text-[#FF3D71]'
               }`}
             >
-              {game.is_new ? 'NEW' : 'HOT'}
+              {badge}
             </span>
           )}
         </div>
@@ -80,11 +83,11 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
           <div className="text-muted">
             Провайдер: <span className="text-white">{game.provider?.name || 'Demo'}</span>
           </div>
-          {game.rtp ? (
+          {rtp && (
             <div className="text-muted">
-              RTP: <span className="text-white">{game.rtp}%</span>
+              RTP: <span className="text-white">{rtp}</span>
             </div>
-          ) : null}
+          )}
           <button type="button" onClick={toggleFavorite} className="btn-ghost w-full px-2 py-1.5 text-xs">
             {isFavorite ? '♥ В избранном' : '♡ В избранное'}
           </button>
