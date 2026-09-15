@@ -1,8 +1,10 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
 
 import { apiGet } from '@/lib/api'
-import { currencyLabel } from '@/lib/format/currency'
+import { currencyLabel, formatAmount } from '@/lib/format/currency'
+import { amountDirection, formatTxAmount, txTypeLabel } from '@/lib/ui/history-filters'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
@@ -22,9 +24,12 @@ export default function WalletPage(): React.JSX.Element {
     enabled: Boolean(user),
     refetchInterval: 10000,
   })
+  // §10.1: на странице кошелька — последние 5 операций активного кошелька,
+  // полная история с фильтрами — на /wallet/transactions (§11)
   const { data: tx } = useQuery({
-    queryKey: ['wallet', 'tx'],
-    queryFn: () => apiGet<WalletTxListDto>('/wallet/transactions?per_page=20'),
+    queryKey: ['wallet', 'tx', activeCurrency],
+    queryFn: () =>
+      apiGet<WalletTxListDto>('/wallet/transactions', { per_page: 5, currency: activeCurrency }),
     enabled: Boolean(user),
   })
   if (!user) {
@@ -78,7 +83,12 @@ export default function WalletPage(): React.JSX.Element {
           <div className="text-muted">Нет активных балансов</div>
         )}
       </div>
-      <h2 className="font-semibold mb-3">История транзакций</h2>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="font-semibold">Последние операции</h2>
+        <Link href="/wallet/transactions" className="text-sm text-[#6C63FF]">
+          Смотреть все
+        </Link>
+      </div>
       <div className="card overflow-x-auto">
         <table className="table">
           <thead>
@@ -95,16 +105,21 @@ export default function WalletPage(): React.JSX.Element {
               <tr key={t.id}>
                 <td>{new Date(t.created_at).toLocaleString('ru')}</td>
                 <td>
-                  <span className="badge">{t.type}</span>
+                  <span className="badge">{txTypeLabel(t.type)}</span>
                 </td>
+                {/* §11: сумма всегда с валютой; знак — из самой суммы (ledger пишет списания «−») */}
                 <td
                   className={
-                    money.isGreaterOrEqual(t.amount, '0') ? 'text-emerald-400' : 'text-red-400'
+                    amountDirection(t.amount) === 'in'
+                      ? 'text-[#00C853]'
+                      : amountDirection(t.amount) === 'out'
+                        ? 'text-[#FF3D71]'
+                        : 'text-muted'
                   }
                 >
-                  {t.amount} {t.currency}
+                  {formatTxAmount(t.amount, t.currency)}
                 </td>
-                <td>{t.balance_after}</td>
+                <td>{formatAmount(t.balance_after, t.currency)}</td>
                 <td className="text-muted">{t.description}</td>
               </tr>
             ))}

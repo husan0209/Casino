@@ -9,7 +9,7 @@ const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001/api
 
 interface GameApiShape {
   name?: string
-  name_ru?: string | null
+  nameRu?: string | null
   provider?: { name?: string } | null
   thumbnailUrl?: string | null
 }
@@ -33,7 +33,7 @@ export async function generateMetadata({
   params: { slug: string }
 }): Promise<Metadata> {
   const game = await fetchGameMeta(params.slug)
-  const title = game ? (game.name_ru || game.name) : 'Игра'
+  const title = game ? (game.nameRu || game.name) : 'Игра'
   const provider = game?.provider?.name ? ` — ${game.provider.name}` : ''
   return {
     title: `${title}${provider} — играть онлайн | Casino`,

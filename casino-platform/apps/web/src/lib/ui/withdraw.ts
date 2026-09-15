@@ -182,21 +182,11 @@ function findFundedAlternative(
     .sort((a, b) => b.currency.localeCompare(a.currency))[0]
 }
 
-/** Крипта MVP (§2.2): USDT TRC20 и BTC; сеть задаётся валютой и не меняется. */
-export function isCryptoCurrency(currency: string): boolean {
-  return currency === 'USDT_TRC20' || currency === 'BTC'
-}
-
-/** Название сети для подписи (§2.7 «сеть видна всегда»). */
-export function networkLabel(currency: string): string {
-  if (currency === 'USDT_TRC20') {
-    return 'TRC20'
-  }
-  if (currency === 'BTC') {
-    return 'Bitcoin'
-  }
-  return currency
-}
+/**
+ * Отображение валюты/сети — в lib/format/currency.ts (единый источник);
+ * реэкспорт здесь сохраняет стабильный импорт для существующих потребителей.
+ */
+export { isCryptoCurrency, networkLabel } from '@/lib/format/currency'
 
 /** Подпись способа фиатского вывода (значения совпадают с enum CreateFiatWithdrawalSchema). */
 export function fiatMethodLabel(method: WithdrawMethod): string {

@@ -67,4 +67,20 @@ export function currencyLabel(currency: string): string {
   return FIAT_SYMBOLS[currency] ?? currency
 }
 
+/** Крипта MVP (§2.2): USDT TRC20 и BTC; сеть задаётся валютой и не меняется. */
+export function isCryptoCurrency(currency: string): boolean {
+  return currency === 'USDT_TRC20' || currency === 'BTC'
+}
+
+/** Название сети для подписи (§2.7 «сеть видна всегда»). */
+export function networkLabel(currency: string): string {
+  if (currency === 'USDT_TRC20') {
+    return 'TRC20'
+  }
+  if (currency === 'BTC') {
+    return 'Bitcoin'
+  }
+  return currency
+}
+
 export type { FiatCurrency }

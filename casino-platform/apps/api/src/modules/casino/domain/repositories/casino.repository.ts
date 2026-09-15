@@ -58,6 +58,28 @@ export interface RoundHistoryRow {
   game: { slug: string; name: string; provider: { name: string } }
 }
 
+/**
+ * Фильтр истории ставок (GAP-55 (д), ТЗ ч.5 §12): игра, провайдер, валюта, период.
+ * Общая форма для списка, счётчика и агрегатов — чтобы выборки не разъезжались
+ * (три метода должны считать ОДНИ И ТЕ ЖЕ строки).
+ */
+export interface RoundHistoryFilter {
+  userId: string
+  gameId?: string | undefined
+  providerSlug?: string | undefined
+  currency?: string | undefined
+  from?: Date | undefined
+  to?: Date | undefined
+}
+
+/** Агрегат по ОДНОЙ валюте (§12: смешанный период не суммируем). null — в выборке нет строк */
+export interface RoundStatsRow {
+  currency: string
+  rounds: number
+  turnover: Prisma.Decimal | null
+  wins: Prisma.Decimal | null
+}
+
 /** Избранное и история игрока. */
 export interface IGameFavoritesRepository {
   upsert(userId: string, gameId: string): Promise<void>
@@ -66,13 +88,10 @@ export interface IGameFavoritesRepository {
   countFavorites(userId: string): Promise<number>
   /** Последние уникальные игры игрока (distinct по gameId, только реальные сессии). */
   findRecentSessions(userId: string, take: number): Promise<RecentSessionRow[]>
-  findRoundsWithGame(args: {
-    userId: string
-    gameId: string | undefined
-    skip: number
-    take: number
-  }): Promise<RoundHistoryRow[]>
-  countRounds(userId: string, gameId?: string): Promise<number>
+  findRoundsWithGame(args: RoundHistoryFilter & { skip: number; take: number }): Promise<RoundHistoryRow[]>
+  countRounds(args: RoundHistoryFilter): Promise<number>
+  /** Оборот/выигрыши по валютам в пределах того же фильтра. */
+  roundStats(args: RoundHistoryFilter): Promise<RoundStatsRow[]>
 }
 
 export const GAME_FAVORITES_REPOSITORY = Symbol('GAME_FAVORITES_REPOSITORY')

@@ -12,6 +12,8 @@ export interface WalletTxDto {
   balance_before: string
   balance_after: string
   description: string | null
+  /** provider/external_id/locked_amount — что реально записано при проводке (GAP-55). */
+  metadata: unknown
   created_at: string
 }
 

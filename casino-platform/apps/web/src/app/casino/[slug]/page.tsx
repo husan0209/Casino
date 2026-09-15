@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 
 import { LaunchErrorScreen } from '@/components/game/LaunchErrorScreen'
 import { apiGet, apiPost, errCode, errIsNetwork, errStatus } from '@/lib/api'
+import { gameDisplayName, gameHasDemo, gameRtpLabel } from '@/lib/ui/game'
 import { describeLaunchError, type LaunchErrorAction, type LaunchErrorView } from '@/lib/ui/launch-error'
 import { useAuth } from '@/stores/auth'
 import { useGeoStore } from '@/stores/geo'
@@ -92,12 +93,12 @@ export default function GamePage(): React.JSX.Element {
   return (
     <div className="container-1 py-6">
       <div className="mb-2 text-sm text-muted">
-        <Link href="/casino">Каталог</Link> / {game.name_ru || game.name}
+        <Link href="/casino">Каталог</Link> / {gameDisplayName(game)}
       </div>
       <div className="card space-y-3">
-        <h1 className="text-xl font-bold">{game.name_ru || game.name}</h1>
+        <h1 className="text-xl font-bold">{gameDisplayName(game)}</h1>
         <div className="text-sm text-muted">{game.provider?.name}</div>
-        {game.rtp && <div className="text-sm">RTP {game.rtp}%</div>}
+        {gameRtpLabel(game.rtp) && <div className="text-sm">RTP {gameRtpLabel(game.rtp)}</div>}
         {user ? (
           <button
             disabled={launch.isPending}
@@ -111,7 +112,7 @@ export default function GamePage(): React.JSX.Element {
             Войти чтобы играть
           </button>
         )}
-        {game.has_demo && (
+        {gameHasDemo(game.hasDemo) && (
           <button
             type="button"
             className="btn-ghost w-full"
