@@ -29,3 +29,23 @@ export function pollDepositStatus(
     `/payments/deposit/${id}/status`,
   )
 }
+
+/**
+ * GAP-55 (з): заявка на вывод. destination — СТРОКА (CreateFiatWithdrawalSchema /
+ * CreateCryptoWithdrawalSchema): старая страница /withdraw слала объект и ловила 422.
+ */
+export function createFiatWithdrawal(input: {
+  amount: string
+  method: 'card' | 'sbp'
+  destination: string
+}): Promise<{ payment_request_id: string }> {
+  return apiPost<{ payment_request_id: string }>('/payments/withdrawal/fiat', input)
+}
+
+export function createCryptoWithdrawal(input: {
+  amount: string
+  currency: string
+  destination: string
+}): Promise<{ payment_request_id: string }> {
+  return apiPost<{ payment_request_id: string }>('/payments/withdrawal/crypto', input)
+}

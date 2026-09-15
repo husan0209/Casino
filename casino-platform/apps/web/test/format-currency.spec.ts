@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest'
  *   - нечисловая строка → new Decimal() БРОСАЕТ DecimalError (не фолбэк);
  *   - NaN → isFinite false → String(amount).
  */
-import { formatAmount, formatBalance } from '../src/lib/format/currency'
+import { currencyLabel, formatAmount, formatBalance } from '../src/lib/format/currency'
 
 describe('GAP-44 formatAmount', () => {
   describe('fiat currencies (RUB/UAH/BYN/KZT/UZS)', () => {
@@ -84,5 +84,23 @@ describe('GAP-44 formatBalance', () => {
     expect(formatBalance('0.12345678', 'BTC')).toBe('0.1235 BTC')
     // USDT compact сохраняет 2 знака (см. контракт выше)
     expect(formatBalance('1500', 'USDT_TRC20')).toBe('1 500.00 USDT')
+  })
+})
+
+
+describe('GAP-55: currencyLabel — единый источник подписи валюты (ТЗ §2.5)', () => {
+  it('фиат — символ, а не ISO-код (в шапке и кассе игроку виден символ)', () => {
+    expect(currencyLabel('RUB')).toBe('\u20bd')
+    expect(currencyLabel('KZT')).toBe('\u20b8')
+    expect(currencyLabel('UZS')).toBe('so\u02bbm')
+  })
+
+  it('крипта — короткое имя, сеть отдельно не выдумываем', () => {
+    expect(currencyLabel('USDT_TRC20')).toBe('USDT')
+    expect(currencyLabel('BTC')).toBe('BTC')
+  })
+
+  it('неизвестный код отдаётся как есть (не пустая строка и не undefined)', () => {
+    expect(currencyLabel('ETH')).toBe('ETH')
   })
 })

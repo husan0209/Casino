@@ -1,5 +1,6 @@
 'use client'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 
 import { formatBalance } from '@/lib/format/currency'
 import { useUIStore } from '@/stores/ui'
@@ -12,6 +13,16 @@ export default function GamePlayPage(): React.JSX.Element {
   const { getActiveWallet, activeCurrency, refreshActive } = useWalletStore()
   const { openDeposit } = useUIStore()
   const wallet = getActiveWallet()
+
+  // GAP-55 (§8.3/§2.1): баланс на планке живой — refetch по возврату фокуса
+  // (Socket.IO в релизе запрещён, polling по фокусу — предписан ТЗ)
+  useEffect(() => {
+    const onFocus = (): void => {
+      void refreshActive()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [refreshActive])
 
   if (!url) {
     return <div className="container-1 py-8 text-muted">Игра не найдена</div>

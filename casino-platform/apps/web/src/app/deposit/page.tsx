@@ -1,141 +1,41 @@
 'use client'
-import { useState } from 'react'
 
-import { toast } from '@/components/ui/toaster'
-import { apiPost, errText } from '@/lib/api'
-import { useAuth } from '@/stores/auth'
+import Link from 'next/link'
+import { useEffect } from 'react'
 
-export default function DepositPage(): React.JSX.Element {
-  const { user } = useAuth()
-  const [tab, setTab] = useState<'fiat' | 'crypto'>('fiat')
-  const [amount, setAmount] = useState('1000')
-  const [currency, setCurrency] = useState('USDT_TRC20')
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<{
-    payment_request_id?: string
-    payment_url?: string
-    pay_address?: string
-    pay_amount?: string
-    pay_currency?: string
-    expires_at?: string
-  } | null>(null)
-  if (!user) {
-    return <div className="container-1 py-8">Войдите в аккаунт</div>
-  }
+import { useUIStore } from '@/stores/ui'
 
-  const submitFiat = async (): Promise<void> => {
-    setLoading(true)
-    try {
-      const r = await apiPost<{ payment_request_id: string; payment_url: string }>('/payments/deposit/fiat', { amount, method: 'card' })
-      setResult(r)
-      toast.success('Платёж создан')
-    } catch (e: unknown) {
-      toast.error(errText(e) || 'Ошибка')
-    } finally {
-      setLoading(false)
-    }
-  }
-  const submitCrypto = async (): Promise<void> => {
-    setLoading(true)
-    try {
-      const r = await apiPost<{ payment_request_id: string; pay_address: string; pay_amount: string; pay_currency: string }>('/payments/deposit/crypto', { amount, currency })
-      setResult(r)
-      toast.success('Адрес для оплаты получен')
-    } catch (e: unknown) {
-      toast.error(errText(e) || 'Ошибка')
-    } finally {
-      setLoading(false)
-    }
-  }
+/**
+ * GAP-55 (§2.9/§10): касса пополнения живёт в глобальном DepositSheet
+ * (методы по гео, пресеты, KYC-остаток, крипта с сетью), отдельная страница
+ * по ТЗ не нужна. Маршрут — хост: прямая ссылка открывает лист, а не
+ * вторую реализацию кассы (в ней раньше, в частности, предлагались TON/TRX/LTC,
+ * запрещённые релизом §24).
+ */
+export default function DepositHostPage(): React.JSX.Element {
+  const { depositSheet, openDeposit, closeDeposit } = useUIStore()
+
+  useEffect(() => {
+    openDeposit()
+    return () => closeDeposit()
+  }, [openDeposit, closeDeposit])
 
   return (
-    <div className="container-1 py-8 max-w-lg">
-      <h1 className="text-2xl font-bold mb-6">Пополнение</h1>
-      <div className="card space-y-4">
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              setTab('fiat')
-              setResult(null)
-            }}
-            className={tab === 'fiat' ? 'btn text-sm' : 'btn-ghost text-sm'}
-          >
-            Фиат RUB
-          </button>
-          <button
-            onClick={() => {
-              setTab('crypto')
-              setResult(null)
-            }}
-            className={tab === 'crypto' ? 'btn text-sm' : 'btn-ghost text-sm'}
-          >
-            Крипто
-          </button>
+    <div className="container-1 max-w-lg py-8">
+      {!depositSheet && (
+        <div className="card space-y-3 text-center">
+          <h1 className="text-xl font-bold">Пополнение</h1>
+          <p className="text-sm text-muted">Лист закрыт.</p>
+          <div className="flex justify-center gap-2">
+            <button type="button" className="btn-money" onClick={() => openDeposit()}>
+              Открыть заново
+            </button>
+            <Link href="/wallet" className="btn-ghost">
+              В кошелёк
+            </Link>
+          </div>
         </div>
-        {tab === 'fiat' ? (
-          <>
-            <input
-              className="input"
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Сумма RUB"
-            />
-            <div className="text-xs text-muted">Мин. 100 ₽, макс. 500 000 ₽. KYC лимит 5000 ₽.</div>
-            <button disabled={loading} onClick={submitFiat} className="btn w-full">
-              {loading ? '…' : 'Создать платёж (Rukassa)'}
-            </button>
-            {result?.payment_url && (
-              <a
-                href={result.payment_url}
-                target="_blank"
-                className="btn-ghost w-full text-center block"
-              >
-                Перейти к оплате →
-              </a>
-            )}
-          </>
-        ) : (
-          <>
-            <select
-              className="input"
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-            >
-              <option value="USDT_TRC20">USDT TRC20</option>
-              <option value="BTC">BTC</option>
-              <option value="TON">TON</option>
-              <option value="TRX">TRX</option>
-              <option value="LTC">LTC</option>
-            </select>
-            <input
-              className="input"
-              type="number"
-              step="0.00000001"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Сумма"
-            />
-            <button disabled={loading} onClick={submitCrypto} className="btn w-full">
-              {loading ? '…' : 'Получить адрес (NOWPayments)'}
-            </button>
-            {result?.pay_address && (
-              <div className="bg-black/30 rounded-xl p-3 text-sm break-all">
-                <div className="text-muted">
-                  Отправьте {result.pay_amount} {result.pay_currency?.toUpperCase()} на адрес:
-                </div>
-                <div className="font-mono mt-1">{result.pay_address}</div>
-                <div className="text-xs text-muted mt-2">
-                  Истекает:{' '}
-                  {result.expires_at
-                    ? new Date(result.expires_at).toLocaleString('ru')
-                    : '—'}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      )}
     </div>
   )
 }

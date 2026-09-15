@@ -12,6 +12,7 @@ import { DepositReturnHandler } from '@/components/wallet/DepositReturnHandler'
 import { DepositSheet } from '@/components/wallet/DepositSheet'
 import { LaunchCurrencySheet } from '@/components/wallet/LaunchCurrencySheet'
 import { WalletSwitcher } from '@/components/wallet/WalletSwitcher'
+import { WithdrawSheet } from '@/components/wallet/WithdrawSheet'
 import { isAuthPath, isSearchShortcut } from '@/lib/ui/desktop-nav'
 
 /** §4.5: состояние pin панели переживает reload. */
@@ -70,6 +71,7 @@ export function MainShell({ children }: { children: React.ReactNode }): React.JS
         <main className="min-h-screen">{children}</main>
         <LoginSheet />
         <DepositSheet />
+        <WithdrawSheet />
         <WalletSwitcher />
         <LaunchCurrencySheet />
         <DepositReturnHandler />
@@ -92,6 +94,7 @@ export function MainShell({ children }: { children: React.ReactNode }): React.JS
       <BottomNav />
       <LoginSheet />
       <DepositSheet />
+      <WithdrawSheet />
       <WalletSwitcher />
       <LaunchCurrencySheet />
       <DepositReturnHandler />

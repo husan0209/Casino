@@ -77,3 +77,23 @@ export function errText(e: unknown): string {
     ((e as Error).message || 'Ошибка')
   )
 }
+
+/** HTTP-статус ответа (для маппинга ошибок запуска в экраны, ТЗ §8.4). */
+export function errStatus(e: unknown): number | undefined {
+  return (e as AxiosError<ApiResponse<unknown>> | null)?.response?.status
+}
+
+/**
+ * Ответ не пришёл вовсе (timeout/DNS/CORS/офлайн) — у axios тогда нет response.
+ * Отличаем от «нет error-объекта»: undefined возвращаем только у не-AxiosError.
+ */
+export function errIsNetwork(e: unknown): boolean {
+  const ax = e as AxiosError<ApiResponse<unknown>> | null
+  if (ax === null || typeof ax !== 'object') {
+    return false
+  }
+  if (ax.response !== undefined) {
+    return false
+  }
+  return ax.isAxiosError === true
+}

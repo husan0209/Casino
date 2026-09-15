@@ -1,72 +1,40 @@
 'use client'
-import { useState } from 'react'
 
-import { toast } from '@/components/ui/toaster'
-import { apiPost, errText } from '@/lib/api'
-import { useAuth } from '@/stores/auth'
+import Link from 'next/link'
+import { useEffect } from 'react'
 
-export default function WithdrawPage(): React.JSX.Element {
-  const { user } = useAuth()
-  const [amount, setAmount] = useState('500')
-  const [currency, setCurrency] = useState('RUB')
-  const [address, setAddress] = useState('')
-  const submit = async (e: React.FormEvent): Promise<void> => {
-    e.preventDefault()
-    try {
-      const url = currency === 'RUB' ? '/payments/withdrawal/fiat' : '/payments/withdrawal/crypto'
-      const body =
-        currency === 'RUB'
-          ? {
-              amount,
-              method: 'card',
-              destination: { card_number: address, card_holder: 'IVAN PETROV' },
-            }
-          : { amount, currency, destination: { wallet_address: address } }
-      await apiPost<unknown>(url, body)
-      toast.success('Заявка создана, средства заблокированы')
-      setAmount('')
-      setAddress('')
-    } catch (err: unknown) {
-      toast.error(errText(err) || 'Ошибка вывода')
-    }
-  }
-  if (!user) {
-    return <div className="container-1 py-8">Войдите в аккаунт</div>
-  }
+import { useUIStore } from '@/stores/ui'
+
+/**
+ * GAP-55 (§2.9/§10.3): вывод живёт в глобальном WithdrawSheet, отдельной
+ * страницы по ТЗ не нужно. Маршрут оставлен как хост: прямая ссылка/закладка
+ * открывает лист, а не 404 и не дублирующую форму (старая страница к тому же
+ * ломалась: слала destination объектом, а API ждёт строку → 422).
+ */
+export default function WithdrawHostPage(): React.JSX.Element {
+  const { withdrawSheet, openWithdraw, closeWithdraw } = useUIStore()
+
+  useEffect(() => {
+    openWithdraw()
+    return () => closeWithdraw()
+  }, [openWithdraw, closeWithdraw])
+
   return (
-    <div className="container-1 py-8 max-w-lg">
-      <h1 className="text-2xl font-bold mb-2">Вывод средств</h1>
-      <div className="text-sm text-amber-400/80 mb-4 bg-amber-500/5 border border-amber-500/10 rounded-xl px-3 py-2">
-        Вывод требует KYC верификации.
-      </div>
-      <form onSubmit={submit} className="card space-y-3">
-        <select className="input" value={currency} onChange={(e) => setCurrency(e.target.value)}>
-          <option value="RUB">RUB — карта</option>
-          <option value="USDT_TRC20">USDT TRC20</option>
-          <option value="BTC">BTC</option>
-          <option value="TON">TON</option>
-          <option value="TRX">TRX</option>
-          <option value="LTC">LTC</option>
-        </select>
-        <input
-          className="input"
-          placeholder="Сумма"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          required
-        />
-        <input
-          className="input"
-          placeholder={currency === 'RUB' ? 'Номер карты' : 'Адрес кошелька'}
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          required
-        />
-        <button className="btn w-full">Создать заявку</button>
-        <div className="text-xs text-muted">
-          Мин. вывод: 500 RUB / эквивалент. Средства блокируются до одобрения администратором.
+    <div className="container-1 max-w-lg py-8">
+      {!withdrawSheet && (
+        <div className="card space-y-3 text-center">
+          <h1 className="text-xl font-bold">Вывод средств</h1>
+          <p className="text-sm text-muted">Лист закрыт.</p>
+          <div className="flex justify-center gap-2">
+            <button type="button" className="btn" onClick={() => openWithdraw()}>
+              Открыть заново
+            </button>
+            <Link href="/wallet" className="btn-ghost">
+              В кошелёк
+            </Link>
+          </div>
         </div>
-      </form>
+      )}
     </div>
   )
 }
