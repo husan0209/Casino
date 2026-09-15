@@ -7,6 +7,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { apiGet } from '@/lib/api'
 import { fetchProviders } from '@/lib/api/casino.api'
 import { currencyLabel, formatAmount } from '@/lib/format/currency'
+import { gameDisplayName } from '@/lib/ui/game'
 import {
   betApiParams,
   betHref,
@@ -18,7 +19,6 @@ import {
   type BetFilter,
   type BetStatsRow,
 } from '@/lib/ui/history-filters'
-import { gameDisplayName } from '@/lib/ui/game'
 import { useAuth } from '@/stores/auth'
 import { useGeoStore } from '@/stores/geo'
 import type { GameDto, HistoryDto, HistoryRowDto } from '@/types/casino'

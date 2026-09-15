@@ -20,7 +20,17 @@ import subprocess
 import sys
 
 RANK_OF = {'ext': 0, 'at': 1, 'modules': 2, 'casino': 3, 'rel': 4}
-IMPORT_RE = re.compile(r"^import\s+(?:type\s+)?(?:[\w*{},$\s]+from\s+)?'([^']+)'")
+FROM_RE = re.compile(r"from\s+'([^']+)'")
+BARE_RE = re.compile(r"^import\s+'([^']+)'")
+
+
+def _specifier(line):
+    """Путь из строки import: `from '...'` (в т.ч. конец многострочного) или side-effect `import '...'`."""
+    match = FROM_RE.search(line)
+    if match:
+        return match.group(1)
+    match = BARE_RE.match(line)
+    return match.group(1) if match else None
 
 
 def rank(path):
@@ -56,23 +66,38 @@ def check_file(absolute):
     saw_blank = False
     with open(absolute, encoding='utf-8') as handle:
         lines = handle.read().split('\n')
+    pending = None  # накопитель для многострочных import {\n ... \n} from '...'
     for number, raw in enumerate(lines, 1):
         line = raw.strip()
+        if pending is not None:
+            spec = _specifier(line)
+            if spec is None:
+                continue
+            group, path = rank(spec)
+            imports.append((pending[0], group, path, pending[1]))
+            pending = None
+            saw_blank = False
+            continue
         if line == '':
-            if imports:
+            if imports or pending is not None:
                 saw_blank = True
             continue
         # Комментарий между импортами (в т.ч. док-блок ТЗ) — нейтрален:
-        # пустая строка до него сохраняется, иначе чекер врёт.
+        # пустая строка до него сохраняется, иначе чекер врёт (проверено CI #85).
         if line.startswith('//') or line.startswith('/*') or line.startswith('*'):
             continue
-        match = IMPORT_RE.match(line)
-        if not match:
+        if not line.startswith('import'):
             saw_blank = False
             continue
-        group, spec = rank(match.group(1))
-        imports.append((number, group, spec, saw_blank))
-        saw_blank = False
+        spec = _specifier(line)
+        if spec is not None:
+            group, path = rank(spec)
+            imports.append((number, group, path, saw_blank))
+            saw_blank = False
+        else:
+            # начало многострочного импорта — ждём строку с from '...'
+            pending = (number, saw_blank)
+            saw_blank = False
     for index in range(1, len(imports)):
         number, group, spec, blank = imports[index]
         _, previous_group, previous_spec, _ = imports[index - 1]
