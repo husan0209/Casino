@@ -62,6 +62,10 @@ def check_file(absolute):
             if imports:
                 saw_blank = True
             continue
+        # Комментарий между импортами (в т.ч. док-блок ТЗ) — нейтрален:
+        # пустая строка до него сохраняется, иначе чекер врёт.
+        if line.startswith('//') or line.startswith('/*') or line.startswith('*'):
+            continue
         match = IMPORT_RE.match(line)
         if not match:
             saw_blank = False

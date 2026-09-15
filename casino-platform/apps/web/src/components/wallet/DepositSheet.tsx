@@ -8,7 +8,7 @@ import { saveDepositContext } from '@/components/wallet/DepositReturnHandler'
 import { errText } from '@/lib/api'
 import { getKycStatus } from '@/lib/api/kyc.api'
 import { createFiatDeposit } from '@/lib/api/wallet.api'
-import { formatAmount } from '@/lib/format/currency'
+import { currencyLabel, formatAmount } from '@/lib/format/currency'
 import { useAuth } from '@/stores/auth'
 import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
@@ -69,8 +69,6 @@ export function DepositSheet(): React.JSX.Element | null {
   const limitRemaining = kyc?.limit_remaining
   const limitExhausted = kycNotApproved && limitRemaining !== undefined && Number(limitRemaining) <= 0
 
-  const currencyLabel = formatAmount(0, payCurrency).replace(/^0\s?/, '').trim() || payCurrency
-
   const pay = async (): Promise<void> => {
     if (!amount || !method) {
       return
@@ -107,7 +105,7 @@ export function DepositSheet(): React.JSX.Element | null {
       <div className="sheet-backdrop" onClick={closeDeposit} />
       <div className="sheet-panel">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Пополнить {currencyLabel}</h2>
+          <h2 className="text-lg font-semibold">Пополнить {currencyLabel(payCurrency)}</h2>
           <button type="button" onClick={closeDeposit} className="text-muted">
             ✕
           </button>

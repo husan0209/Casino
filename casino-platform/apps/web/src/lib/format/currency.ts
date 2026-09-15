@@ -47,4 +47,24 @@ export function formatBalance(amount: string, currency: string): string {
   return formatAmount(amount, currency, true)
 }
 
+const CRYPTO_LABELS: Record<string, string> = {
+  USDT_TRC20: 'USDT',
+  BTC: 'BTC',
+}
+
+/**
+ * Короткое человекочитаемое имя валюты для UI (ТЗ ч.5 §2.5): «₽ / ₸ / soʻm» для
+ * фиата, «USDT / BTC» для крипты, неизвестный код — как есть.
+ *
+ * Единственный источник: раньше это вычисляли в четырёх местах инлайном
+ * (`formatAmount(0, cur).replace(/^0\s?/, '')`) — GAP-55.
+ */
+export function currencyLabel(currency: string): string {
+  const crypto = CRYPTO_LABELS[currency]
+  if (crypto !== undefined) {
+    return crypto
+  }
+  return FIAT_SYMBOLS[currency] ?? currency
+}
+
 export type { FiatCurrency }

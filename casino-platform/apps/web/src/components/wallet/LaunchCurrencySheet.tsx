@@ -1,5 +1,5 @@
 'use client'
-import { formatBalance, formatAmount } from '@/lib/format/currency'
+import { currencyLabel, formatBalance } from '@/lib/format/currency'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
@@ -31,18 +31,18 @@ export function LaunchCurrencySheet(): React.JSX.Element | null {
       <div className="sheet-backdrop" onClick={closeLaunchCurrency} />
       <div className="sheet-panel">
         <h2 className="text-lg font-semibold">
-          В {formatAmount(0, activeCurrency).replace(/^0\s?/, '').trim() || activeCurrency} пусто
+          В {currencyLabel(activeCurrency)} пусто
         </h2>
         <p className="mt-2 text-sm text-muted">
           Играть с {formatBalance(targetAmount, targetCurrency)}?
         </p>
         <div className="mt-5 flex flex-col gap-2">
           <button type="button" className="btn w-full" onClick={playInTarget}>
-            Играть в {targetCurrency === 'USDT_TRC20' ? 'USDT' : targetCurrency}
+            Играть в {currencyLabel(targetCurrency)}
           </button>
           <button type="button" className="btn-money w-full" onClick={topUp}>
             Пополнить{' '}
-            {formatAmount(0, activeCurrency).replace(/^0\s?/, '').trim() || activeCurrency}
+            {currencyLabel(activeCurrency)}
           </button>
         </div>
         {slug && <p className="mt-3 text-center text-xs text-muted">Игра: {slug}</p>}

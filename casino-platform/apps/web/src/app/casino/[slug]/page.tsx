@@ -1,25 +1,33 @@
 'use client'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
-import { useParams, useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
-import { toast } from '@/components/ui/toaster'
-import { apiGet, apiPost, errCode, errText } from '@/lib/api'
+import { LaunchErrorScreen } from '@/components/game/LaunchErrorScreen'
+import { apiGet, apiPost, errCode, errIsNetwork, errStatus } from '@/lib/api'
+import { describeLaunchError, type LaunchErrorAction, type LaunchErrorView } from '@/lib/ui/launch-error'
 import { useAuth } from '@/stores/auth'
 import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 import type { GameDetailsDto, GameLaunchDto } from '@/types/casino'
 
+/**
+ * GAP-55 (в) (ТЗ §8.4): ошибки запуска — экран с следующим шагом, а не toast.
+ * INSUFFICIENT_FUNDS исключением не является, но это не ошибка, а флоу (§8.2.4:
+ * «все кошельки пусты → DepositSheet»), поэтому он ведёт в кассу сразу.
+ */
 export default function GamePage(): React.JSX.Element {
   const { slug } = useParams() as { slug: string }
+  const router = useRouter()
   const search = useSearchParams()
   const shouldLaunch = search.get('launch') === '1'
   const { user } = useAuth()
-  const { openLogin, openDeposit } = useUIStore()
+  const { openLogin, openDeposit, openWalletSwitcher } = useUIStore()
   const { activeCurrency, fetchWallets, setLastPlayed } = useWalletStore()
   const { config, load } = useGeoStore()
+  const [failure, setFailure] = useState<{ view: LaunchErrorView; code?: string } | null>(null)
 
   const currency = config?.activeCurrency ?? activeCurrency
 
@@ -44,11 +52,10 @@ export default function GamePage(): React.JSX.Element {
         openDeposit(currency)
         return
       }
-      if (code === 'CURRENCY_NOT_SUPPORTED') {
-        toast.error('Эта игра не поддерживает выбранную валюту')
-        return
-      }
-      toast.error(errText(e))
+      setFailure({
+        view: describeLaunchError({ code, status: errStatus(e), network: errIsNetwork(e) }),
+        ...(code !== undefined ? { code } : {}),
+      })
     },
   })
 
@@ -58,6 +65,12 @@ export default function GamePage(): React.JSX.Element {
       void fetchWallets()
     }
   }, [user, load, fetchWallets])
+
+  // Сменили игру или кошелёк — прошлая ошибка больше не актуальна (§8.2 п.7: повторный
+  // заход в ту же игру идёт сразу, без повтора ошибки)
+  useEffect(() => {
+    setFailure(null)
+  }, [slug, currency])
 
   useEffect(() => {
     if (!user) {
@@ -113,6 +126,32 @@ export default function GamePage(): React.JSX.Element {
           </button>
         )}
       </div>
+
+      {failure && (
+        <div className="mt-4">
+          <LaunchErrorScreen
+            view={failure.view}
+            code={failure.code}
+            onAction={(action: LaunchErrorAction) => {
+              if (action === 'retry') {
+                setFailure(null)
+                launch.mutate()
+                return
+              }
+              if (action === 'deposit') {
+                openDeposit(currency)
+                return
+              }
+              if (action === 'switch_currency') {
+                openWalletSwitcher()
+                return
+              }
+              setFailure(null)
+              router.push(action === 'support' ? '/support' : '/casino')
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

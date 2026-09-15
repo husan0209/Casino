@@ -1,9 +1,11 @@
 'use client'
 import { useQuery } from '@tanstack/react-query'
-import Link from 'next/link'
 
 import { apiGet } from '@/lib/api'
+import { currencyLabel } from '@/lib/format/currency'
 import { useAuth } from '@/stores/auth'
+import { useUIStore } from '@/stores/ui'
+import { useWalletStore } from '@/stores/wallet'
 import type { WalletBalance } from '@/types/wallet'
 import type { WalletTxListDto } from '@/types/wallet-tx'
 
@@ -12,6 +14,8 @@ import { money } from '@casino/shared-utils'
 
 export default function WalletPage(): React.JSX.Element {
   const { user } = useAuth()
+  const { activeCurrency, setActiveCurrency } = useWalletStore()
+  const { openDeposit, openWithdraw } = useUIStore()
   const { data: balances } = useQuery({
     queryKey: ['wallet', 'balances'],
     queryFn: () => apiGet<WalletBalance[]>('/wallet/balances'),
@@ -31,22 +35,43 @@ export default function WalletPage(): React.JSX.Element {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Кошелёк</h1>
         <div className="flex gap-2">
-          <Link href="/deposit" className="btn text-sm">
+          {/* GAP-55 (§2.9/§10): касса живёт в глобальных sheets, не на отдельных страницах */}
+          <button type="button" className="btn text-sm" onClick={() => openDeposit(activeCurrency)}>
             Пополнить
-          </Link>
-          <Link href="/withdraw" className="btn-ghost text-sm">
+          </button>
+          <button type="button" className="btn-ghost text-sm" onClick={() => openWithdraw(activeCurrency)}>
             Вывести
-          </Link>
+          </button>
         </div>
       </div>
       <div className="grid md:grid-cols-3 gap-4 mb-8">
         {(balances ?? []).map((b) => (
           <div key={b.currency} className="card">
-            <div className="text-muted text-sm">{b.currency}</div>
+            <div className="text-muted text-sm">{currencyLabel(b.currency)}</div>
             <div className="text-2xl font-bold">{money.toDisplay(b.available, b.currency as Currency)}</div>
             <div className="text-xs text-muted">
               Заблокировано: {money.toDisplay(b.locked, b.currency as Currency)}
             </div>
+            {/* §10.1: ненулевой — сделать активным; нулевой — активировать и открыть кассу этой валюты */}
+            {money.isPositive(b.available) ? (
+              <button
+                type="button"
+                className="btn-ghost mt-3 w-full text-xs"
+                onClick={() => {
+                  void setActiveCurrency(b.currency)
+                }}
+              >
+                {b.currency === activeCurrency ? 'Активен' : 'Открыть'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn-money mt-3 w-full text-xs"
+                onClick={() => openDeposit(b.currency)}
+              >
+                Пополнить
+              </button>
+            )}
           </div>
         ))}
         {(!balances || balances.length === 0) && (
