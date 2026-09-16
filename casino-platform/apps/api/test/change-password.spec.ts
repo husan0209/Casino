@@ -7,13 +7,13 @@
  *   3) неверный текущий пароль → InvalidCredentialsError;
  *   4) happy path: хеш обновлён, сессии отозваны КРОМЕ текущей.
  */
+import { ChangePasswordUseCase } from '../src/modules/auth/application/use-cases/change-password.use-case'
+import { User, type UserProps } from '../src/modules/auth/domain/entities/user.entity'
 import {
   InvalidCredentialsError,
   PasswordNotSetError,
   WeakPasswordError,
 } from '../src/modules/auth/domain/errors'
-import { User, type UserProps } from '../src/modules/auth/domain/entities/user.entity'
-import { ChangePasswordUseCase } from '../src/modules/auth/application/use-cases/change-password.use-case'
 import type { ISessionRepository } from '../src/modules/auth/domain/repositories/session.repository'
 import type { IUserRepository } from '../src/modules/auth/domain/repositories/user.repository'
 import type { PasswordHasher } from '../src/modules/auth/infrastructure/services/password-hasher.service'
@@ -94,7 +94,8 @@ describe('GAP-52 ChangePasswordUseCase', () => {
     const result = await useCase.execute(input)
     expect(result).toEqual({ ok: true })
     expect(users.update).toHaveBeenCalledTimes(1)
-    expect((users.update as ReturnType<typeof vi.fn>).mock.calls[0][0].passwordHash).toBe('new-hash')
+    const updatedUser = (users.update as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as User
+    expect(updatedUser.passwordHash).toBe('new-hash')
     expect(sessions.revokeAllUserSessionsExcept).toHaveBeenCalledWith('u1', 's-current')
     expect(sessions.revokeAllUserSessions).not.toHaveBeenCalled()
   })
