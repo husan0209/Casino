@@ -1,20 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import type { Currency, MoneyAmount } from '@casino/shared-types'
-
 import {
   IWalletLedger,
   WALLET_LEDGER,
   type CreditResult,
+  type WithdrawalOpArgs,
 } from '../../domain/repositories/wallet.repository'
 
-/** Вход use-case разблокировки средств (отмена/отказ выплаты). */
-export interface UnlockFundsInput {
-  userId: string
-  currency: Currency
-  amount: MoneyAmount
-  idempotencyKey: string
-}
+/**
+ * GAP-55: UnlockFundsInput — форма та же, что у доменных аргументов вывода
+ * (WithdrawalOpArgs): дублировать её в трёх use-case означало бы три точки
+ * синхронизации при каждом новом поле (например metadata для ссылки на заявку).
+ */
+export type UnlockFundsInput = WithdrawalOpArgs
 
 /**
  * UC-WAL-04: разблокировка ранее заблокированных средств.

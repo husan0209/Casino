@@ -60,4 +60,10 @@ export interface TransactionRow {
    */
   metadata: Prisma.JsonValue
   created_at: Date
+  /**
+   * GAP-55 (§11 «статус»): статус payment_request, к которому относится проводка
+   * (заморозка/списание/разблокировка вывода). null — проводка не заявочная
+   * (депозит, ставка, выигрыш) либо ссылка не записана (строки до GAP-55).
+   */
+  payment_status: string | null
 }

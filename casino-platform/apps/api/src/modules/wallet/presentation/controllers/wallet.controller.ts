@@ -6,7 +6,7 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 import { type WalletBalanceView, WalletFacade } from '@modules/wallet/application/wallet.facade'
 
-import { prisma, type Prisma } from '@casino/database'
+import { type LedgerEntryType, prisma, type Prisma } from '@casino/database'
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
@@ -64,18 +64,10 @@ export class WalletController {
       prisma.ledgerEntry.count({ where }),
     ])
 
-    const data = items.map((entry) => ({
-      id: entry.id,
-      transaction_id: entry.transactionId,
-      type: entry.type,
-      amount: entry.amount.toString(),
-      currency: entry.walletAccount.currency,
-      balance_before: entry.balanceBefore.toString(),
-      balance_after: entry.balanceAfter.toString(),
-      description: entry.description,
-      metadata: entry.metadata,
-      created_at: entry.createdAt,
-    }))
+    const data = await this.attachPaymentStatuses(
+      currentUser.id,
+      items.map((entry) => WalletController.toRow(entry)),
+    )
 
     return {
       data,
@@ -88,6 +80,60 @@ export class WalletController {
         hasPrev: page > 1,
       },
     }
+  }
+
+  /** Строка ответа из записи ledger (деньги — строки, Decimal → string). */
+  private static toRow(entry: {
+    id: string
+    transactionId: string
+    type: LedgerEntryType
+    amount: Prisma.Decimal
+    balanceBefore: Prisma.Decimal
+    balanceAfter: Prisma.Decimal
+    description: string | null
+    metadata: Prisma.JsonValue
+    createdAt: Date
+    walletAccount: { currency: string }
+  }): TransactionRow {
+    return {
+      id: entry.id,
+      transaction_id: entry.transactionId,
+      type: entry.type,
+      amount: entry.amount.toString(),
+      currency: entry.walletAccount.currency,
+      balance_before: entry.balanceBefore.toString(),
+      balance_after: entry.balanceAfter.toString(),
+      description: entry.description,
+      metadata: entry.metadata,
+      created_at: entry.createdAt,
+      payment_status: null,
+    }
+  }
+
+  /**
+   * GAP-55 (§11 «статус»): статус заявки для заморозки/списания/разблокировки
+   * вывода. одним запросом (не N+1) и только для своего пользователя (IDOR).
+   * Проводки без ссылки (депозит/ставка/выигрыш, а также строки, записанные
+   * до GAP-55) остаются с payment_status: null — не выдумываем статус.
+   */
+  private async attachPaymentStatuses(
+    userId: string,
+    rows: TransactionRow[],
+  ): Promise<TransactionRow[]> {
+    const references = rows.map((row) => paymentRequestIdOf(row.metadata))
+    const ids = [...new Set(references.filter((id): id is string => id !== null))]
+    if (ids.length === 0) {
+      return rows
+    }
+    const requests = await prisma.paymentRequest.findMany({
+      where: { userId, id: { in: ids } },
+      select: { id: true, status: true },
+    })
+    const statusById = new Map(requests.map((request) => [request.id, request.status]))
+    return rows.map((row, index) => ({
+      ...row,
+      payment_status: statusById.get(references[index] ?? '') ?? null,
+    }))
   }
 
   /**
@@ -105,4 +151,16 @@ export class WalletController {
       },
     }
   }
+}
+
+/**
+ * Ссылка на payment_request из метаданных проводки (GAP-55). Значение могло
+ * приходить и как число-строка, и как число — нормализуем к строке uuid.
+ */
+function paymentRequestIdOf(metadata: Prisma.JsonValue): string | null {
+  if (typeof metadata !== 'object' || metadata === null || Array.isArray(metadata)) {
+    return null
+  }
+  const value = metadata['payment_request_id']
+  return typeof value === 'string' && value.length > 0 ? value : null
 }

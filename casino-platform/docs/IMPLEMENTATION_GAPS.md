@@ -60,7 +60,7 @@
 | GAP-23 | H6 | ~~Pino + redact вместо Nest Logger (пароли/токены могут попасть в логи)~~ | `apps/api/src/common/logger/logger.options.ts` | ✅ P1 закрыт 2026-08-30: `nestjs-pino` + pino-http по всему Nest (`useLogger`); redact-пути `password/token/authorization/cookie/set-cookie` на 3 уровнях вложенности + `req.body.*`; кастомный req-сериализатор (body в логах — но с redact); `GlobalExceptionFilter` больше не логирует `err` целиком (только type/message/stack через PinoLogger); корреляция request-id между pino и RequestIdMiddleware через общий `resolveRequestId`; env `LOG_LEVEL`/`LOG_FORMAT` подключены (pretty в dev, json в prod). Тесты `test/logger-redact.spec.ts` — секреты физически отсутствуют в выводе лога |
 | GAP-24 | A5, A6 | ~~Покрытие тестами: минимум — money flow + idempotency~~ | `apps/api` | ✅ P2 закрыт 2026-08-31: `money-flow.spec.ts` (11), `ledger.integration.spec.ts` (6 на реальном Postgres, в CI `prisma db push` + `LEDGER_INTEGRATION=1` — откат tx при сбое и idempotency проверены на Serializable-БД), `nowpayments-ipn.spec.ts` (13), `kyc-file-sniffer.spec.ts` (8), `account-lockout.spec.ts` (5), `logger-redact.spec.ts` (3), **E2E (GAP-05) — `player-lifecycle.e2e.spec.ts` (9, CI-шаг с собранным сервером)** |
 | GAP-25 | A7 | ~~Довести ESLint до обещанного в QUALITY_GATES §2.1: `max-params` warn(4)→error(3), `complexity` warn(10)→error(10)~~ | `.eslintrc.js:70,74` | ✅ P2 закрыт 2026-09-01: пороги подняты, разобраны **45 `max-params` + 13 `complexity`** в `apps/api/src` (0 errors). Бизнес-методы переведены на input-объекты вместе с вызовами (`wallet` lock/unlock/confirm → `WithdrawalOpArgs`, `kyc.setStatus`, `support` createTicket/listUserTickets/addMessage, `referrals` sumTransactions/findReward/processUserRewards, `casino` findRoundsWithGame/findOrCreateRound/creditWin, `notifications.list`, `payment-request.listUser`, `favorites.history`, webhook `execute` → `Process*WebhookInput`); complexity — на приватные методы/таблицы (`sniffDocumentMime`, `GlobalExceptionFilter`, `syncGames`, `provider-callback.handle`, GitSlotPark verify/parse, Rukassa/NOWPayments webhook). Исключения только framework-imposed и описаны: `overrides` `max-params: off` для `**/*.controller.ts` + `src/main.ts` (сигнатуру задают декораторы/express-verify) и inline-disable для 10 DI-конструкторов — см. QUALITY_GATES §2.1.1 |
-| GAP-26 | C4 | ~~Относительные импорты `../../../../` → path aliases~~ | `apps/api/src/modules/**` | ✅ P3 закрыт 2026-09-01: **72 импорта** (все с ≥3 `../`) переведены на `@modules/<mod>/…` (кросс-модульные) и `@/<seg>/…` (общий код); внутримодульные `../` оставлены. Rантайм-резолвер не понадобился: `build` = `nest build && tsc-alias -p tsconfig.build.json` — алиасы переписываются в относительные пути в `dist`, `node dist/main.js` (prod/Docker) работает без `tsconfig-paths`. `baseUrl`+`paths` объявлены в `apps/api/tsconfig.json` (иначе `pnpm typecheck` резолвил `./src/*` от `packages/tsconfig`); алиасы продублированы в `vitest.config.ts`. Доказательство рантайма — CI-шаг E2E (`pnpm build` → `node apps/api/dist/main.js` → 9/9). Правила — CONVENTIONS §3.1 |
+| GAP-26 | C4 | ~~Относительные импорты `../../../../` → path aliases~~ | `apps/api/src/modules/**` | ✅ P3 закрыт 2026-09-01: **72 импорта** (все с ≥3 `../`) переведены на `@modules/<mod>/…` (кросс-модульные) и `@/<seg>/…` (общий код); внутримодульные `../` оставлены. Рантайм-резолвер не понадобился: `build` = `nest build && tsc-alias -p tsconfig.build.json` — алиасы переписываются в относительные пути в `dist`, `node dist/main.js` (prod/Docker) работает без `tsconfig-paths`. `baseUrl`+`paths` объявлены в `apps/api/tsconfig.json` (иначе `pnpm typecheck` резолвил `./src/*` от `packages/tsconfig`); алиасы продублированы в `vitest.config.ts`. Доказательство рантайма — CI-шаг E2E (`pnpm build` → `node apps/api/dist/main.js` → 9/9). Правила — CONVENTIONS §3.1 |
 | GAP-27 | NEW | ~~argon2 без явных параметров~~ | `password-hasher.service.ts:7` | ✅ P1 закрыт 2026-08-30: `PasswordHasher.hash` → `argon2.hash(plain, {type: argon2id, memoryCost: 65536, timeCost: 3, parallelism: 4})` (совпадает с SECURITY_BASELINE §2.1 и admin-хэшером `admin-users.service.ts:28`) |
 | GAP-28 | H4 | ~~Идемпотентность депозита: `deposit_${pr.id}` — добавить защиту и по `external_id`~~ | `process-rukassa-webhook.use-case.ts`, `process-nowpayments-webhook.use-case.ts` | ✅ P3 закрыт 2026-09-01: ключ проводки депозита — **`deposit_${provider}_${externalId}`** (был `deposit_${pr.id}`, который защищал только уникальность НАШЕЙ платёжки). Повторный коллбэк по тому же внешнему платежу, смэпившийся на другую платёжку (рассинхрон маппинга), больше не зачислит дважды — уникальный индекс `ledger.idempotencyKey` отсекает на уровне БД. Первый уровень защиты сохранён: `pr.status === 'completed'` → `duplicate` до wallet.credit. Регресс-тесты `test/deposit-idempotency.spec.ts` (4): NP/Rukassa — ключ от external_id, повторная доставка той же платёжки — без credit, отсутствие external_id — без зачисления |
 | GAP-29 | NEW (docs-guard D3) | ~~env.validation.ts валидирует не все ключи `.env.example`~~ | `packages/shared-config/src/env.validation.ts` | ✅ Закрыт 2026-08-30: все 39 ключей §22 в Zod-схеме (coerce/url/enum, все optional — поведение кода не меняется); D3 молчит |
@@ -303,24 +303,39 @@
   - **Тесты (е):** `thumbnail.spec.ts` — 8 кейсов; vitest web unit **135 → 143** локально
     (в CI с DOM — 149); `tsc` web 0; `scripts/check-import-order.py` — 0 нарушений;
     длины/сложность функций в норме; CJK-мусора 0.
-  - **НУЖНО РЕШЕНИЕ ВЛАДЕЛЬЦА — не закрываю молча (AGENTS.md «когда спросить»):**
-    1) **(ж) капча после 5 неудачных входов (§5.2).** Нужно: выбрать провайдера
-    (Cloudflare Turnstile / hCaptcha / reCAPTCHA v3 — разные цена, приватность и
-    доступность в СНГ), получить site/secret-ключи, и решить связь с lockout GAP-18
-    (порог 5 для капчи против 10 для блокировки) плюс поведение при недоступности
-    провайдера: fail-open (впускать без капчи — хуже против ботам) или fail-closed
-    (впускать нельзя — хуже легитимным игрокам при сбое Turnstile). Без ключей это
-    непроверяемо end-to-end, а трекер требует «работает», а не «код написан».
-    Как скажете — делаю use-case + виджет + тесты за один PR, работа механическая.
-    2) **(г-остаток) статус заявки на вывод в истории транзакций (§11 «статус»).**
-    Сейчас проводка не связана с payment_request: `create-withdrawal.use-case.ts` сначала
-    делает `wallet.lock(idempotencyKey = wd_lock_<random>)`, потом создаёт заявку —
-    id заявки в момент блокировки неизвестен, присоединять нечего. Чистое решение меняет
-    порядок в money-пути: генерировать id заявки ДО блокировки
-    (`lock(metadata: { payment_request_id }, ключ wd_lock_<prId>)` → затем
-    `create({ id })`); при отказе блокировки заявка не создаётся, семантика
-    «одна блокировка = одна заявка» сохраняется. Это правка идемпотентности денежного
-    контура — по правилам проекта (AI_DEVELOPMENT_RULES §2, §7) делаю только по явному «ок». |
+  - **(г-остаток) §11 «статус» — ЗАКРЫТО 2026-09-16 (PR #87), принято как ADR владельцем
+    делегировано агенту: «сделай как тебе удобно»).** Проблема была не в UI, а в данных:
+    проводка ledger не была присоединима к payment_request, поэтому показать статус
+    было нечем. Решение (порядок money-пути сохранён, добавлен только предсказуемый id):
+    1) `create-withdrawal.use-case.ts` генерирует `paymentRequestId` ДО блокировки и
+       передаёт в `lock({ idempotencyKey: wd_lock_<prId>, metadata: { payment_request_id } })`,
+       затем `create({ id: paymentRequestId, idempotencyKey: wd_<prId> })`. Порядок
+       «сначала lock, потом заявка» НЕ менялся: при отказе блокировки заявки нет
+       (тест), pending-сирот не появляется. Уникальность ключей та же (uuid), но
+       детерминированная от id заявки — повтор по той же заявке теперь видим дедупликации
+       (было: `wd_lock_<random>`, теряющий связь).
+    2) `unlock` (отмена) и `confirmWithdrawal` (выплата) несут ту же ссылку; их ключи
+       `wd_unlock_<prId>`/`wd_confirm_<prId>` (последний был детерминирован и раньше).
+    3) `GET /wallet/transactions` добирает статусы ОДНИМ запросом
+       (`findMany({ userId, id: { in } })`, не N+1) с обязательным scope по
+       пользователю (IDOR), и отдаёт `payment_status`.
+    4) UI показывает «Статус заявки» в деталях строки; **строки, записанные до этого
+       PR, остаются с `payment_status: null`** — статус не выдумывается и не подгоняется
+       эвристикой по сумме/дате (это был бы расходящийся отчёт). Маппинг
+       `PaymentStatus` → человеческий статус и цвета — в `lib/ui/history-filters.ts`, 4 теста.
+    Условие пересмотра: если ledger и payment_requests когда-нибудь разъедутся по
+    сервисам (см. ADR GAP-51), ссылка становится внешним ключом и потребует события,
+    а не join.
+    Тесты: api `withdrawal-link.spec.ts` — 5 (общий id в lock и create; разные id между
+    заявками; отказ lock ⇒ нет заявки; KYC до мутации баланса; amount остаётся строкой).
+  - **(ж) капча §5.2 — ОТКРЫТО, ждёт одного решения владельца (код-часть не пишу вслепую):**
+    нужно выбрать провайдера (рекомендация — Cloudflare Turnstile: бесплатно, без
+    картинок-головоломок, работает в СНГ) и получить site/secret-ключи; плюс политика
+    при недоступности провайдера (рекомендация — fail-open: капча второй слой, основной
+    барьер уже сделан lockout'ом GAP-18 на 10 неудач/15 мин) и порог (ТЗ §5.2 — 5 неудач,
+    то есть раньше lockout — это осмысленно: капча до блокировки). Без ключей проверка
+    end-to-end невозможна, а трекер (§ «формат обязателен») запрещает отмечать «готово»
+    без работающего флоу. Как только ключи появятся — use-case + виджет + тесты за один PR.
 
 ### Что НЕ является гэпом — не переделывать (проверено 2026-09-02)
 

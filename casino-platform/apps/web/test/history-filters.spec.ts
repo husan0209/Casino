@@ -17,6 +17,8 @@ import {
   lockedAmountOf,
   metadataField,
   networkOf,
+  paymentStatusClass,
+  paymentStatusLabel,
   parseBetFilter,
   parseTxFilter,
   readDateRange,
@@ -134,5 +136,28 @@ describe('GAP-55 агрегаты: не смешивать валюты (§12)',
     expect(statsForCurrency(stats, '')).toBeNull()
     expect(statsForCurrency(stats, 'RUB')?.turnover).toBe('12000')
     expect(statsForCurrency(stats, 'KZT')).toBeNull()
+  })
+})
+
+describe('GAP-55 §11: статус заявки', () => {
+  it(' enum PaymentStatus с бэка → человеческий статус', () => {
+    expect(paymentStatusLabel('pending')).toBe('на рассмотрении')
+    expect(paymentStatusLabel('completed')).toBe('одобрено')
+    expect(paymentStatusLabel('cancelled')).toBe('отменено')
+  })
+
+  it('null — не выдумываем статус (незаявочная проводка или строка до GAP-55)', () => {
+    expect(paymentStatusLabel(null)).toBeNull()
+    expect(paymentStatusClass(null)).toBe('text-muted')
+  })
+
+  it('неизвестный статус проходит как есть, а не превращается в пустоту', () => {
+    expect(paymentStatusLabel('refunded')).toBe('refunded')
+  })
+
+  it('цвет: успех зелёный, ожидание янтарное, отказ красный', () => {
+    expect(paymentStatusClass('completed')).toBe('text-[#00C853]')
+    expect(paymentStatusClass('pending')).toBe('text-[#FFB300]')
+    expect(paymentStatusClass('failed')).toBe('text-[#FF3D71]')
   })
 })

@@ -19,6 +19,8 @@ import {
   txHref,
   txTypeLabel,
   TX_TYPE_LABELS,
+  paymentStatusClass,
+  paymentStatusLabel,
   type TxFilter,
 } from '@/lib/ui/history-filters'
 import { useAuth } from '@/stores/auth'
@@ -193,6 +195,7 @@ function TxRow({
   const provider = metadataField(row.metadata, 'provider')
   const externalId = metadataField(row.metadata, 'external_id')
   const locked = lockedAmountOf(row.metadata)
+  const statusLabel = paymentStatusLabel(row.payment_status)
 
   return (
     <li className="card px-4 py-3">
@@ -209,6 +212,12 @@ function TxRow({
       {expanded && (
         <div className="mt-3 space-y-1 border-t border-[#2A2A4A] pt-3 text-xs text-muted">
           <Line label="Баланс после" value={formatAmount(row.balance_after, row.currency)} />
+          {statusLabel && (
+            <div className="flex items-center justify-between gap-3">
+              <span>Статус заявки</span>
+              <span className={paymentStatusClass(row.payment_status)}>{statusLabel}</span>
+            </div>
+          )}
           {network && <Line label="Сеть" value={network} />}
           {locked && <Line label="Заморожено" value={formatAmount(locked, row.currency)} />}
           {provider && <Line label="Провайдер" value={provider} />}
