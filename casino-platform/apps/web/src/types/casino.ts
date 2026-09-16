@@ -45,13 +45,6 @@ export interface GameDto {
   provider?: GameProviderDto | null
 }
 
-/** Ответ GET /casino/categories — категория с числом игр (пустые не показываем, ТЗ §7). */
-export interface CatalogCategoryDto {
-  slug: string
-  name: string
-  game_count: number
-}
-
 /** Пагинация листинга игр (ListGamesUseCase meta). */
 export interface GamesMetaDto {
   page: number

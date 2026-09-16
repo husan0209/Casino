@@ -51,3 +51,14 @@ body {
 .sheet-panel {
   @apply fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-2xl border border-[#2A2A4A] bg-[#1A1A2E] p-4 pb-8;
 }
+
+/*
+ * GAP-55 (е) / ТЗ §22 «виртуализация длинных сеток на телефоне»: без новой
+ * зависимости и без risk-anных ручных windowing-хаков — браузер сам пропускает
+ * отрисовку карточек вне вьюпорта. contain-intrinsic-size задаёт примерную
+ * высоту, чтобы скролл не прыгал.
+ */
+.virtual-cell {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 260px;
+}
