@@ -154,6 +154,8 @@ export class AdminFinanceController {
       currency: wd.currency as Currency,
       amount: wd.amount.toString(),
       idempotencyKey: `wd_confirm_${wd.id}`,
+      // GAP-55 (§11): списание по выводу тоже несёт ссылку на заявку
+      metadata: { payment_request_id: wd.id },
     })
     await this.payments.updateStatus(id, 'completed', { completedAt: new Date() })
     await this.audit.log({

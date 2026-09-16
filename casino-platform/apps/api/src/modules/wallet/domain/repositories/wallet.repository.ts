@@ -54,6 +54,12 @@ export interface WithdrawalOpArgs {
   currency: Currency
   amount: MoneyAmount
   idempotencyKey: string
+  /**
+   * GAP-55 (§11 «статус»): ссылка на payment_request, чтобы проводка
+   * заморозки/выплаты была присоединима к заявке. Опционально — существующие
+   * вызовы не меняются.
+   */
+  metadata?: Prisma.InputJsonValue
 }
 export interface IWalletLedger {
   credit(input: CreditInput): Promise<CreditResult>

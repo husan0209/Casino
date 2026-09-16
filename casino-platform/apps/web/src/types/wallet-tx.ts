@@ -14,6 +14,8 @@ export interface WalletTxDto {
   description: string | null
   /** provider/external_id/locked_amount — что реально записано при проводке (GAP-55). */
   metadata: unknown
+  /** GAP-55 (§11): статус заявки для заморозки/списания проводок вывода; null — не заявочная строка. */
+  payment_status: string | null
   created_at: string
 }
 

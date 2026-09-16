@@ -22,6 +22,19 @@ function toMoney(v: Prisma.Decimal | number | bigint | string): MoneyAmount {
   return v.toString()
 }
 
+/**
+ * GAP-55 (§11): ссылка на payment_request в метаданных проводки заморозки/
+ * разблокировки/выплаты. Без неё строка истории не присоединима к заявке и
+ * «статус» показать нечем (join по amount+дате — гадание, не данные).
+ */
+function withdrawalMetadata(args: WithdrawalOpArgs): Prisma.InputJsonObject {
+  const metadata = args.metadata
+  if (metadata === undefined || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return {}
+  }
+  return metadata as Prisma.InputJsonObject
+}
+
 @Injectable()
 export class PrismaWalletRepository implements IWalletRepository {
   async getBalance(userId: string, currency: Currency): Promise<WalletAccount | null> {
@@ -255,7 +268,7 @@ export class PrismaWalletLedger implements IWalletLedger {
         balanceAfter: balance,
         idempotencyKey,
         description: 'Withdrawal lock',
-        metadata: { locked_amount: amount },
+        metadata: { locked_amount: amount, ...withdrawalMetadata(args) },
       })
       return { balanceBefore: balance, balanceAfter: balance, ledgerEntryId: ledger.id, duplicate: false }
     })
@@ -292,7 +305,7 @@ export class PrismaWalletLedger implements IWalletLedger {
         balanceAfter: balance,
         idempotencyKey,
         description: 'Withdrawal unlock',
-        metadata: { unlocked_amount: amount },
+        metadata: { unlocked_amount: amount, ...withdrawalMetadata(args) },
       })
       return { balanceBefore: balance, balanceAfter: balance, ledgerEntryId: ledger.id, duplicate: false }
     })
@@ -332,6 +345,7 @@ export class PrismaWalletLedger implements IWalletLedger {
         balanceAfter,
         idempotencyKey,
         description: 'Withdrawal confirmed',
+        metadata: withdrawalMetadata(args),
       })
       return { balanceBefore, balanceAfter, ledgerEntryId: ledger.id, duplicate: false }
     })

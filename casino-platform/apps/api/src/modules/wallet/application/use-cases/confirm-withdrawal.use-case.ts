@@ -1,20 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import type { Currency, MoneyAmount } from '@casino/shared-types'
-
 import {
   IWalletLedger,
   WALLET_LEDGER,
   type CreditResult,
+  type WithdrawalOpArgs,
 } from '../../domain/repositories/wallet.repository'
 
-/** Вход use-case выплаты: debit + unlock атомарно. */
-export interface ConfirmWithdrawalInput {
-  userId: string
-  currency: Currency
-  amount: MoneyAmount
-  idempotencyKey: string
-}
+/**
+ * GAP-55: ConfirmWithdrawalInput — форма та же, что у доменных аргументов вывода
+ * (WithdrawalOpArgs): дублировать её в трёх use-case означало бы три точки
+ * синхронизации при каждом новом поле (например metadata для ссылки на заявку).
+ */
+export type ConfirmWithdrawalInput = WithdrawalOpArgs
 
 /**
  * UC-WAL-05: подтверждение выплаты — списание баланса и снятие блокировки

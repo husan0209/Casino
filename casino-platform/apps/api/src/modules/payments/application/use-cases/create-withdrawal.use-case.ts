@@ -35,14 +35,22 @@ export class CreateWithdrawalUseCase {
     if (!amt.isFinite()) {
       throw new AmountTooSmallError('0')
     }
+    // GAP-55 (§11 «статус»): id заявки генерируется ДО блокировки, чтобы
+    // проводка WITHDRAWAL_LOCK несла ссылку на payment_request — иначе строку
+    // истории нечем присоединить к заявке и показать её статус. Порядок
+    // «сначала lock, потом заявка» сохранён: при отказе блокировки (нехватка
+    // средств) заявка не создаётся, как и раньше.
+    const paymentRequestId = randomUUID()
     // lock funds
     await this.wallet.lock({
       userId,
       currency: input.currency as Currency,
       amount: input.amount,
-      idempotencyKey: `wd_lock_${randomUUID()}`,
+      idempotencyKey: `wd_lock_${paymentRequestId}`,
+      metadata: { payment_request_id: paymentRequestId },
     })
     const pr = await this.repo.create({
+      id: paymentRequestId,
       userId,
       type: 'withdrawal',
       status: 'pending',
@@ -51,7 +59,9 @@ export class CreateWithdrawalUseCase {
       currency: input.currency,
       amount: input.amount,
       destination: input.destination,
-      idempotencyKey: `wd_${randomUUID()}`,
+      // GAP-55: ключ заявки тоже выводится из её id — уникальность та же (uuid),
+      // но повтор запроса по той же заявке перестаёт быть невидимым для дедупликации.
+      idempotencyKey: `wd_${paymentRequestId}`,
     })
     return { payment_request_id: pr.id }
   }

@@ -154,6 +154,42 @@ export function lockedAmountOf(metadata: unknown): string | null {
   return metadataField(metadata, 'locked_amount')
 }
 
+/**
+ * §11 «статус»: человекочитаемый статус заявки (enum PaymentStatus на бэке).
+ * null — не заявочная проводка (депозит/ставка/выигрыш) либо строка записана
+ * до GAP-55, когда ссылка на payment_request в метаданных не проставлялась:
+ * статус не выдумываем.
+ */
+export const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pending: 'на рассмотрении',
+  processing: 'обрабатывается',
+  completed: 'одобрено',
+  failed: 'ошибка',
+  cancelled: 'отменено',
+  expired: 'истекло',
+}
+
+export function paymentStatusLabel(status: string | null): string | null {
+  if (status === null) {
+    return null
+  }
+  return PAYMENT_STATUS_LABELS[status] ?? status
+}
+
+/** Цвет статуса: ожидающий — нейтральный, успех — зелёный, остальное — красным. */
+export function paymentStatusClass(status: string | null): string {
+  if (status === 'completed') {
+    return 'text-[#00C853]'
+  }
+  if (status === 'pending' || status === 'processing') {
+    return 'text-[#FFB300]'
+  }
+  if (status === null) {
+    return 'text-muted'
+  }
+  return 'text-[#FF3D71]'
+}
+
 /** Сеть для крипто-проводки; для фиата — null (показывать «сеть ₽» бессмысленно). */
 export function networkOf(currency: string): string | null {
   return currency === 'RUB' ? null : networkLabel(currency)
