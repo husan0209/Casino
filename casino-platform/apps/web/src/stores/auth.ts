@@ -21,7 +21,7 @@ export interface AuthState {
   /** P1 #11: попытка восстановления сессии уже была (после reload) */
   hydrated: boolean
   /** login возвращает {accessToken, user}; refresh-token живёт в httpOnly-cookie на API */
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string, captchaToken?: string) => Promise<void>
   setSession: (token: string, user: WebUser) => void
   setAuth: (user: WebUser, token: string) => void
   register: (email: string, password: string, referralCode?: string) => Promise<void>
@@ -38,8 +38,14 @@ export const useAuth = create<AuthState>()((set, get) => ({
   token: null,
   user: null,
   hydrated: false,
-  login: async (email, password) => {
-    const res = await apiPost<AuthResponse>('/auth/login', { email, password })
+  login: async (email, password, captchaToken) => {
+    // GAP-55 (ж): captcha_token добавляется только когда бэк его попросил
+    // (CAPTCHA_REQUIRED) — обычный запрос остаётся прежним.
+    const res = await apiPost<AuthResponse>('/auth/login', {
+      email,
+      password,
+      ...(captchaToken !== undefined && captchaToken.length > 0 ? { captcha_token: captchaToken } : {}),
+    })
     set({ token: res.accessToken, user: res.user })
   },
   setSession: (token, user) => set({ token, user }),

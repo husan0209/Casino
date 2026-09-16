@@ -3,24 +3,38 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
+import { CaptchaField } from '@/components/auth/CaptchaField'
 import { toast } from '@/components/ui/toaster'
-import { errText } from '@/lib/api'
+import { errCode, errText } from '@/lib/api'
 import { type AuthState, useAuth } from '@/stores/auth'
 
 export default function LoginPage(): React.JSX.Element {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  // GAP-55 (ж) §5.2: капча появляется только после CAPTCHA_REQUIRED от бэка
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaRequired, setCaptchaRequired] = useState(false)
   const login = useAuth((s: AuthState) => s.login)
   const router = useRouter()
   const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     setLoading(true)
     try {
-      await login(email, password)
+      await login(email, password, captchaRequired ? captchaToken : undefined)
       toast.success('Вход выполнен')
       router.push('/profile')
     } catch (err: unknown) {
+      if (errCode(err) === 'CAPTCHA_REQUIRED') {
+        setCaptchaRequired(true)
+        toast.error('Слишком много попыток — подтвердите, что вы не робот')
+        return
+      }
+      if (errCode(err) === 'CAPTCHA_FAILED') {
+        setCaptchaToken('')
+        toast.error('Капча не пройдена, попробуйте ещё раз')
+        return
+      }
       toast.error(errText(err) || 'Ошибка входа')
     } finally {
       setLoading(false)
@@ -47,6 +61,9 @@ export default function LoginPage(): React.JSX.Element {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
+          {captchaRequired && (
+            <CaptchaField onToken={setCaptchaToken} />
+          )}
           <button className="btn w-full" disabled={loading}>
             {loading ? '...' : 'Войти'}
           </button>

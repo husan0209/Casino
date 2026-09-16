@@ -291,6 +291,10 @@ Frontend env доступны после `NEXT_PUBLIC_` prefix. Все оста�
 | `NEXT_PUBLIC_DOMAIN` | string | ✅ | — | `casino.example.com` (для cookies) |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | string | ✅ | — | Google OAuth |
 | `NEXT_PUBLIC_TELEGRAM_BOT_NAME` | string | ✅ | — | Telegram widget |
+| `TURNSTILE_SECRET_KEY` | string | ⬜ | — | GAP-55 (ж): секрет Cloudflare Turnstile; пусто ⇒ капча выключена (fail-open по умолчанию) |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | string | ⬜ | — | GAP-55 (ж): публичный ключ виджета |
+| `CAPTCHA_AFTER_FAILED_ATTEMPTS` | number | ⬜ | 5 | GAP-55 (ж): после скольких неудач требовать капчу (§5.2) |
+
 | `NEXT_PUBLIC_IMAGE_HOSTS` | CSV | ⬜ | пусто | GAP-55 §22: allowlist CDN-хостов обложек для next/image (пусто → обычный `<img>`) |
 
 ---
@@ -478,6 +482,11 @@ NEXT_PUBLIC_DOMAIN=localhost
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_dev_client_id
 NEXT_PUBLIC_TELEGRAM_BOT_NAME=your_dev_bot
 NEXT_PUBLIC_IMAGE_HOSTS=
+
+# ── Captcha (GAP-55) ─────────────────────────────────────────
+TURNSTILE_SECRET_KEY=
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+CAPTCHA_AFTER_FAILED_ATTEMPTS=
 
 # ── CORS ───────────────────────────────────────────────────
 CORS_ORIGINS=http://localhost:3000,http://localhost:3002
