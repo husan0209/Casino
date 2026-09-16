@@ -51,6 +51,22 @@ export class WeakPasswordError extends AppError {
   }
 }
 
+export class CaptchaRequiredError extends AppError {
+  readonly code = 'CAPTCHA_REQUIRED'
+  readonly httpStatus = 422
+  constructor() {
+    super('Подтвердите, что вы не робот')
+  }
+}
+
+export class CaptchaFailedError extends AppError {
+  readonly code = 'CAPTCHA_FAILED'
+  readonly httpStatus = 422
+  constructor(public readonly reason: string) {
+    super('Капча не пройдена, попробуйте ещё раз', { reason })
+  }
+}
+
 export class PasswordNotSetError extends AppError {
   readonly code = 'PASSWORD_NOT_SET'
   readonly httpStatus = 409

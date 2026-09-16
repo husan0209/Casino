@@ -85,6 +85,7 @@ export class AuthController {
       password: body.password,
       ip: req.ip,
       userAgent: req.headers['user-agent'],
+      ...(body.captcha_token !== undefined && { captchaToken: body.captcha_token }),
     })
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user }

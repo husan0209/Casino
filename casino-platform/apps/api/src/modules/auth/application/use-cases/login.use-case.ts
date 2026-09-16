@@ -5,6 +5,7 @@ import { AccountBlockedError, AccountLockedError, InvalidCredentialsError, SelfE
 import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
 import { IUserSettingsRepository, USER_SETTINGS_REPOSITORY } from '../../domain/repositories/user-settings.repository'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { CaptchaService } from '../../infrastructure/services/captcha.service'
 import { JwtTokenService } from '../../infrastructure/services/jwt.service'
 import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
 
@@ -24,18 +25,29 @@ export class LoginUseCase {
     @Inject(USER_SETTINGS_REPOSITORY) private userSettings: IUserSettingsRepository,
     private hasher: PasswordHasher,
     private jwt: JwtTokenService,
+    private captcha: CaptchaService,
   ) {}
   async execute(input: {
     email: string
     password: string
     ip?: string | undefined
     userAgent?: string | undefined
+    captchaToken?: string | undefined
   }): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string | null; role: UserRole; }; }> {
     const now = new Date()
     const user = await this.users.findByEmail(input.email.toLowerCase().trim())
     if (!user?.passwordHash) {
       throw new InvalidCredentialsError()
     }
+
+    // GAP-55 (ж) §5.2: после 5 неудач — капча. Проверка ДО argon2: у бот-волны
+    // не должно быть шанса прогонять хеширование. unknown-email сюда не доходит
+    // (сверху InvalidCredentials) — счётчик неудач не раскрывает существование
+    // аккаунта раньше, чем он сам себя выдал неверным паролем.
+    if (this.captcha.isRequiredFor(user.props.failedLoginAttempts)) {
+      await this.captcha.verify(input.captchaToken)
+    }
+
     const ok = await this.hasher.verify(user.passwordHash, input.password)
 
     // Проверка блокировки ПОСЛЕ verify, чтобы не раскрывать существование аккаунта:

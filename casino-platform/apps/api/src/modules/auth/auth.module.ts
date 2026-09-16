@@ -28,6 +28,7 @@ import {
   PrismaEmailVerificationRepository,
   PrismaPasswordResetRepository,
 } from './infrastructure/repositories/verification.repository.prisma'
+import { CaptchaService } from './infrastructure/services/captcha.service'
 import { EmailQueueService } from './infrastructure/services/email-queue.service'
 import { JwtTokenService } from './infrastructure/services/jwt.service'
 import { PasswordHasher } from './infrastructure/services/password-hasher.service'
@@ -41,6 +42,7 @@ import { RolesGuard } from './presentation/guards/roles.guard'
   providers: [
     PasswordHasher,
     JwtTokenService,
+    CaptchaService,
     EmailQueueService,
     AuthGuard,
     RolesGuard,
