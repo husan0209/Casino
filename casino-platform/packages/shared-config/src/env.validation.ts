@@ -108,6 +108,7 @@ export const envSchema = z.object({
   NEXT_PUBLIC_DOMAIN: z.string().optional(),
   NEXT_PUBLIC_GOOGLE_CLIENT_ID: z.string().optional(),
   NEXT_PUBLIC_TELEGRAM_BOT_NAME: z.string().optional(),
+  NEXT_PUBLIC_IMAGE_HOSTS: z.string().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).optional(),
   LOG_FORMAT: z.enum(['json', 'pretty']).optional(),
   LOG_DIR: z.string().optional(),

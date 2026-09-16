@@ -43,6 +43,10 @@ export function CatalogFilterBar({
   })
 
   const [draft, setDraft] = useState(filters.q)
+  const [sheet, setSheet] = useState(false)
+  const activeCount = [filters.sort, filters.provider, filters.category, filters.q].filter(
+    (value) => value.length > 0,
+  ).length
 
   // URL — источник истины: при сбросе/переходе по ссылке подтягиваем поле
   useEffect(() => {
@@ -87,39 +91,54 @@ export function CatalogFilterBar({
         ))}
       </div>
 
+      {/* §7: на телефоне фильтры — чипы категорий + bottom-sheet «Фильтры» */}
       <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={filters.sort}
-          onChange={(e) => onChange({ sort: e.target.value })}
-          className="input w-auto"
-          aria-label="Сортировка"
+        <button
+          type="button"
+          className="btn-ghost px-3 py-1.5 text-xs md:hidden"
+          onClick={() => setSheet(true)}
         >
-          {SORT_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filters.provider}
-          onChange={(e) => onChange({ provider: e.target.value })}
-          className="input w-auto"
-          aria-label="Провайдер"
-        >
-          <option value="">Все провайдеры</option>
-          {(providers ?? []).map((provider) => (
-            <option key={provider.slug} value={provider.slug}>
-              {provider.name}
-            </option>
-          ))}
-        </select>
+          Фильтры{activeCount > 0 ? ` · ${String(activeCount)}` : ''}
+        </button>
+
+        {/* поиск — доступен и на телефоне, и на десктопе */}
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Поиск…"
-          className="input w-56"
+          className="input w-56 flex-1 md:flex-none"
           aria-label="Поиск по каталогу"
         />
+
+        {/* на десктопе сортировка и провайдер — прямо в панели фильтров */}
+        <div className="hidden flex-wrap items-center gap-3 md:flex">
+          <select
+            value={filters.sort}
+            onChange={(e) => onChange({ sort: e.target.value })}
+            className="input w-auto"
+            aria-label="Сортировка"
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filters.provider}
+            onChange={(e) => onChange({ provider: e.target.value })}
+            className="input w-auto"
+            aria-label="Провайдер"
+          >
+            <option value="">Все провайдеры</option>
+            {(providers ?? []).map((provider) => (
+              <option key={provider.slug} value={provider.slug}>
+                {provider.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {hasActiveFilters(filters) && (
           <button
             type="button"
@@ -133,6 +152,52 @@ export function CatalogFilterBar({
           {loading ? 'Загрузка…' : `${total} игр`}
         </div>
       </div>
+
+      {sheet && (
+        <>
+          <div className="sheet-backdrop" onClick={() => setSheet(false)} />
+          <div className="sheet-panel space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Фильтры</h2>
+              <button type="button" onClick={() => setSheet(false)} aria-label="Закрыть" className="text-muted">
+                ✕
+              </button>
+            </div>
+            <label className="block space-y-1 text-sm">
+              <span className="text-muted">Сортировка</span>
+              <select
+                value={filters.sort}
+                onChange={(e) => onChange({ sort: e.target.value })}
+                className="input"
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block space-y-1 text-sm">
+              <span className="text-muted">Провайдер</span>
+              <select
+                value={filters.provider}
+                onChange={(e) => onChange({ provider: e.target.value })}
+                className="input"
+              >
+                <option value="">Все провайдеры</option>
+                {(providers ?? []).map((provider) => (
+                  <option key={provider.slug} value={provider.slug}>
+                    {provider.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className="btn w-full" onClick={() => setSheet(false)}>
+              Готово
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -1,7 +1,9 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
+import { GameThumb } from '@/components/casino/GameThumb'
 import { gameBadge, gameDisplayName, gameRtpLabel } from '@/lib/ui/game'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
@@ -24,6 +26,7 @@ interface GameCardProps {
 export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps): React.JSX.Element {
   const { user } = useAuth()
   const { openLogin } = useUIStore()
+  const router = useRouter()
   const [preview, setPreview] = useState(false)
 
   const displayName = gameDisplayName(game)
@@ -34,7 +37,13 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
       openLogin(game.slug)
       return
     }
-    window.location.href = `/casino/${game.slug}?launch=1`
+    router.push(`/casino/${game.slug}?launch=1`)
+  }
+
+  // §22: prefetch меты игры при наведении — страница открывается быстрее,
+  // а клик по карточке на телефоне остаётся запуском (§6.4)
+  const prefetch = (): void => {
+    router.prefetch(`/casino/${game.slug}`)
   }
 
   const toggleFavorite = (): void => {
@@ -46,15 +55,17 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
   }
 
   return (
-    <div className="card group relative overflow-hidden p-0">
+    <div className="card virtual-cell group relative overflow-hidden p-0">
       <button
         type="button"
         onClick={play}
+        onPointerEnter={prefetch}
+        onFocus={prefetch}
         aria-label={`Играть в ${displayName}`}
         className="block w-full text-left"
       >
-        <div className="relative flex aspect-[4/5] items-center justify-center bg-gradient-to-br from-[#22223a] to-[#111122] text-3xl">
-          🎰
+        <div className="relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-t-2xl bg-gradient-to-br from-[#22223a] to-[#111122] text-3xl">
+          <GameThumb src={game.thumbnailUrl} alt={displayName} />
           {badge && (
             <span
               className={`absolute left-2 top-2 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${

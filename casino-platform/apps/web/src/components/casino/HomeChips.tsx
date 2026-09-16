@@ -1,24 +1,17 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 
-import { fetchCategories } from '@/lib/api/casino.api'
-import { buildHomeChips } from '@/lib/ui/catalog-filters'
+import { buildHomeChips, type CatalogCategory } from '@/lib/ui/catalog-filters'
 
 /**
- * GAP-55 (ТЗ ч.5 §6.1 п.2): чипы под шапкой на главной — категории из API
- * (пустые отсекаются по game_count, §7) + «Популярные»/«Новые».
- * Каждый чип ведёт в каталог с фильтром в URL, т.е. ссылка копибельна (§7).
+ * GAP-55 (б/е) (ТЗ ч.5 §6.1 п.2): чипы под шапкой главной — категории из API
+ * с отсечением пустых по game_count (§7) + «Популярные»/«Новые».
+ * Данные приходят сервером (ISR главной, §22), отдельного клиентского запроса нет.
+ * Каждая ссылка ведёт в каталог с фильтром в URL (§7) — ссылка копибельна.
  */
-export function HomeChips(): React.JSX.Element | null {
-  const { data: categories } = useQuery({
-    queryKey: ['casino-categories'],
-    queryFn: () => fetchCategories(),
-    staleTime: 5 * 60 * 1000,
-  })
-
-  const chips = buildHomeChips(categories ?? [])
+export function HomeChips({ categories }: { categories: CatalogCategory[] }): React.JSX.Element | null {
+  const chips = buildHomeChips(categories)
   if (chips.length === 0) {
     return null
   }

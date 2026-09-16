@@ -61,11 +61,13 @@ describe('GAP-55 history (§12): один фильтр на список/счё�
       to,
     })
 
-    const listFilter = spy.findRoundsWithGame.mock.calls[0][0]
-    const countFilter = spy.countRounds.mock.calls[0][0]
-    const statsFilter = spy.roundStats.mock.calls[0][0]
+    const listFilter = spy.findRoundsWithGame.mock.calls[0]?.[0]
+    const countFilter = spy.countRounds.mock.calls[0]?.[0]
+    const statsFilter = spy.roundStats.mock.calls[0]?.[0]
     // Один и тот же WHERE для всех трёх выборок; у списка — плюс пагинация
     expect(statsFilter).toEqual(countFilter)
+    expect(listFilter).toBeDefined()
+    expect(countFilter).toBeDefined()
     expect(listFilter).toEqual({ ...countFilter, skip: 20, take: 20 })
     expect(countFilter).toMatchObject({
       userId: 'u1',
@@ -79,8 +81,8 @@ describe('GAP-55 history (§12): один фильтр на список/счё�
   it('пагинация не уезжает в счётчик и агрегаты (иначе total считается по всей истории)', async () => {
     const { useCase, spy } = harness()
     await useCase.history({ userId: 'u1', page: 3, perPage: 10 })
-    expect(spy.countRounds.mock.calls[0][0]).not.toHaveProperty('skip')
-    expect(spy.roundStats.mock.calls[0][0]).not.toHaveProperty('take')
+    expect(spy.countRounds.mock.calls[0]?.[0]).not.toHaveProperty('skip')
+    expect(spy.roundStats.mock.calls[0]?.[0]).not.toHaveProperty('take')
   })
 
   it('пустые суммы groupBy → строка "0": деньги в API всегда string', async () => {
@@ -92,7 +94,7 @@ describe('GAP-55 history (§12): один фильтр на список/счё�
   it('без фильтров уходят только userId/skip/take — пустые опции не проттекают ключами', async () => {
     const { useCase, spy } = harness()
     await useCase.history({ userId: 'u1', page: 1, perPage: 20 })
-    expect(Object.keys(spy.findRoundsWithGame.mock.calls[0][0]).sort()).toEqual([
+    expect(Object.keys(spy.findRoundsWithGame.mock.calls[0]?.[0] ?? {}).sort()).toEqual([
       'skip',
       'take',
       'userId',

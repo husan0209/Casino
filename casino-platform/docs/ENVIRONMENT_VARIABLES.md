@@ -291,6 +291,7 @@ Frontend env доступны после `NEXT_PUBLIC_` prefix. Все оста�
 | `NEXT_PUBLIC_DOMAIN` | string | ✅ | — | `casino.example.com` (для cookies) |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | string | ✅ | — | Google OAuth |
 | `NEXT_PUBLIC_TELEGRAM_BOT_NAME` | string | ✅ | — | Telegram widget |
+| `NEXT_PUBLIC_IMAGE_HOSTS` | CSV | ⬜ | пусто | GAP-55 §22: allowlist CDN-хостов обложек для next/image (пусто → обычный `<img>`) |
 
 ---
 
@@ -476,6 +477,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
 NEXT_PUBLIC_DOMAIN=localhost
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_dev_client_id
 NEXT_PUBLIC_TELEGRAM_BOT_NAME=your_dev_bot
+NEXT_PUBLIC_IMAGE_HOSTS=
 
 # ── CORS ───────────────────────────────────────────────────
 CORS_ORIGINS=http://localhost:3000,http://localhost:3002

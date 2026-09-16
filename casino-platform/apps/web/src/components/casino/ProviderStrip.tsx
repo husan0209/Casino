@@ -1,23 +1,20 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 
-import { fetchProviders } from '@/lib/api/casino.api'
+import type { ProviderDto } from '@/types/casino'
 
 /**
  * GAP-53/GAP-55 (ТЗ ч.5 §6.1 п.7): тонкая лента логотипов провайдеров —
- * последний блок главной, тап ведёт на /providers/[slug].
+ * последний блок главной; тап ведёт на /providers/[slug]. Данные приходят
+ * сервером вместе с ISR-рендером главной (§22), клиентского запроса нет.
  */
-export function ProviderStrip(): React.JSX.Element | null {
-  const { data: providers } = useQuery({
-    queryKey: ['providers-page'],
-    queryFn: () => fetchProviders(),
-    staleTime: 5 * 60 * 1000,
-  })
-
-  const list = providers ?? []
-  if (list.length === 0) {
+export function ProviderStrip({
+  providers,
+}: {
+  providers: ProviderDto[]
+}): React.JSX.Element | null {
+  if (providers.length === 0) {
     return null
   }
 
@@ -25,7 +22,7 @@ export function ProviderStrip(): React.JSX.Element | null {
     <section className="mb-4">
       <h2 className="mb-2 text-sm text-muted">Провайдеры</h2>
       <div className="flex gap-2 overflow-x-auto pb-2">
-        {list.map((provider) => (
+        {providers.map((provider) => (
           <Link
             key={provider.slug}
             href={`/providers/${provider.slug}`}

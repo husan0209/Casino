@@ -3,12 +3,12 @@
  * и favorites (избранное). Мутации избранного — optimistic update на странице.
  */
 import { apiDelete, apiGet, apiPost } from '@/lib/api'
-import { filtersToApiParams, type CatalogFilters } from '@/lib/ui/catalog-filters'
-import type { CatalogCategoryDto, FavoritesListDto, GamesListDto, ProviderDto, RecentGameDto } from '@/types/casino'
+import { type CatalogCategory, filtersToApiParams, type CatalogFilters } from '@/lib/ui/catalog-filters'
+import type { FavoritesListDto, GamesListDto, ProviderDto, RecentGameDto } from '@/types/casino'
 
 /** Категории с наполнением (§7: пустые разделы не показываем). */
-export function fetchCategories(): Promise<CatalogCategoryDto[]> {
-  return apiGet<CatalogCategoryDto[]>('/casino/categories')
+export function fetchCategories(): Promise<CatalogCategory[]> {
+  return apiGet<CatalogCategory[]>('/casino/categories')
 }
 
 /** Страница каталога по фильтрам из URL (§7). */
