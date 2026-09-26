@@ -52,11 +52,12 @@ function buildWithdrawMessage(agentID, userID, amount, transactionID, roundID) {
 function signHex(message, secret) {
   // k6/crypto использует тот же HMAC-SHA256, что и node:crypto.
   // Результат — lowercase hex; конвертируем в UPPERCASE для соответствия адаптеру.
-  return crypto
-    .createHMAC('sha256', secret)
-    .update(message, 'utf-8')
-    .digest('hex')
-    .toUpperCase()
+  // ВАЖНО (найдено первым прогоном GAP-47 2026-09-27): в k6/crypto update() НЕ
+  // возвращает hasher — чейнинг как в node:crypto даёт «Cannot read property
+  // 'digest' of undefined» и прогон с 0 HTTP-запросов. Только раздельные вызовы.
+  const hasher = crypto.createHMAC('sha256', secret)
+  hasher.update(message, 'utf-8')
+  return hasher.digest('hex').toUpperCase()
 }
 
 export const options = {
