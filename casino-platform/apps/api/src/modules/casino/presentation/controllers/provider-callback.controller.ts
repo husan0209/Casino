@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, Param, Post, Res, HttpCode } from '@nestjs/common'
+import { Body, Controller, Headers, Logger, Param, Post, Res, HttpCode } from '@nestjs/common'
 import { SkipThrottle } from '@nestjs/throttler'
 import { type Response } from 'express'
 
@@ -24,6 +24,8 @@ const CALLBACK_ERROR_CODES: Record<string, string> = {
 // душатся глобальным лимитом; их аутентификация — подпись/HMAC в сервисе.
 @SkipThrottle()
 export class ProviderCallbackController {
+  private readonly logger = new Logger(ProviderCallbackController.name)
+
   constructor(
     private adapters: ProviderAdapterFactory,
     private cb: GameCallbackService,
@@ -66,7 +68,10 @@ export class ProviderCallbackController {
       }
       return await this.dispatch(adapter, parsed, provider.id, res)
     } catch (e) {
-      return res.status(200).json({ success: false, error: errorMessage(e) })
+      // GAP-57: наружу — только нейтральное тело; полный текст (Prisma, пути
+      // машины) остаётся в серверном логе.
+      this.logger.error(`provider-callback handle error: ${errorMessage(e)}`)
+      return res.status(200).json({ success: false, error: 'INTERNAL_ERROR' })
     }
   }
 
@@ -105,7 +110,15 @@ export class ProviderCallbackController {
       }
     } catch (e) {
       const msg = errorMessage(e) || 'INTERNAL_ERROR'
-      const code = CALLBACK_ERROR_CODES[msg] ?? 'INTERNAL_ERROR'
+      const code = CALLBACK_ERROR_CODES[msg]
+      // GAP-57 (найдено прогоном GAP-47, 2026-09-27): наружу — только известные
+      // доменные коды; всё остальное (текст Prisma-инвокаций, пути машины)
+      // остаётся в серверном логе, а провайдеру уходит нейтральный
+      // INTERNAL_ERROR. Раньше текст сырой Prisma-ошибки утекал провайдеру.
+      if (!code) {
+        this.logger.error(`provider-callback internal error: ${msg}`)
+        return res.json(adapter.formatErrorResponse('INTERNAL_ERROR', 'INTERNAL_ERROR'))
+      }
       return res.json(adapter.formatErrorResponse(code, msg))
     }
   }
