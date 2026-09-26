@@ -1,7 +1,7 @@
 # Implementation Gaps — честный аудит ТЗ vs код
 
 > Дата аудита: 2026-08-23, ревизия 2026-08-24. Цель: зафиксировать расхождения между ТЗ (`docs/tz-part-*.md`) и фактическим кодом.
-> Последняя ревизия: **2026-09-16 — GAP-55 ЗАКРЫТ ЦЕЛИКОМ: все остатки ТЗ ч.5 (а)–(з) закрыты PR #83–88 (строка ниже), счётчики тестов сведены (api 203 unit/integration + 9 E2E, web 157, admin 6 — прогон локально); живая проверка капчи (siteverify + виджет) — в GAP-46**. Предыдущая: 2026-09-03 — GAP-39 ЗАКРЫТ ПОЛНОСТЬЮ (PR #36–55, stages 1–10): 0 warnings repo-wide — api 1171→**0**, web ~680→**0**, admin ~530→**0** (`eslint src --ext .ts` / `next lint` чисты; `no-explicit-any: error` во всех трёх apps; CI main зелёный: lint/typecheck/test 117+E2E 9/build/deploy)**; аудит #2 GAP-39…GAP-50 от 2026-09-02 (после закрытия GAP-31…38
+> Последняя ревизия: **2026-09-27 — GAP-56 ЗАКРЫТ: преддеплойный дрейф инфраструктуры — 9 дефектов compose/nginx/scripts/env-док, каждый из которых уронил бы первый деплой (строка ниже)**. Предыдущая: 2026-09-16 — GAP-55 ЗАКРЫТ ЦЕЛИКОМ: все остатки ТЗ ч.5 (а)–(з) закрыты PR #83–88 (строка ниже), счётчики тестов сведены (api 203 unit/integration + 9 E2E, web 157, admin 6 — прогон локально); живая проверка капчи (siteverify + виджет) — в GAP-46. Ещё ранее: 2026-09-03 — GAP-39 ЗАКРЫТ ПОЛНОСТЬЮ (PR #36–55, stages 1–10): 0 warnings repo-wide — api 1171→**0**, web ~680→**0**, admin ~530→**0** (`eslint src --ext .ts` / `next lint` чисты; `no-explicit-any: error` во всех трёх apps; CI main зелёный: lint/typecheck/test 117+E2E 9/build/deploy)**; аудит #2 GAP-39…GAP-50 от 2026-09-02 (после закрытия GAP-31…38
 > задан вопрос «проект готов?»: код MVP готов, приёмка — нет). GAP-31…38 и GAP-30 закрыты 2026-09-02.
 > Этот файл — точка правды по статусу. Не отмечать пункт «готов», пока не работает end-to-end.
 
@@ -357,6 +357,33 @@
     **Что остаётся непроверенным здесь и переносится в GAP-46:** живой `siteverify`
     с настоящими ключами и реальный виджет в браузере (нужен публичный HTTPS-домен).
     Код-часть гэпа на этом закрыта — открытых пунктов ТЗ ч.5 в GAP-55 не остаётся.
+
+## 🔎 АУДИТ ПРЕДДЕПЛОЙНОЙ ИНФРАСТРУКТУРЫ — 2026-09-27 (GAP-56)
+
+> Повод: планирование запуска (GAP-46) при отсутствии VPS/ключей — машинная сверка
+> `docker-compose.prod.yml` ↔ `.env.example` ↔ `docs/ENVIRONMENT_VARIABLES.md` ↔
+> `infra/scripts/*` ↔ `infra/nginx/*`. Найдено 9 дефектов; каждый из них уронил бы
+> первый деплой, ежедневный бэкап или мониторинг с первого дня. Найдены и закрыты
+> одним PR (ветка `fix/gap56-infra-drift`), runtime-проверка всего контура — при
+> первом деплое (GAP-46 п.6).
+
+| # | Дефект | Фикс (2026-09-27) |
+|---|--------|-------------------|
+| 1 | `DB_USER`/`DB_PASSWORD`/`DB_NAME` читает compose (контейнер postgres + healthcheck), но **0 упоминаний** в `.env.example`/ENVIRONMENT_VARIABLES — слепая зона D7 (код TS их не читает). Оператор, поднимающий прод по доке, получил бы падающий compose | ✅ описаны в §3 + §22 + `.env.example` с требованием согласованности с `DATABASE_URL` |
+| 2 | `infra/nginx/snippets/` **не смонтирован** в nginx-сервис → `include /etc/nginx/snippets/ssl.conf` падает `[emerg]` на первом старте nginx | ✅ `./infra/nginx/snippets:/etc/nginx/snippets:ro` |
+| 3 | Тома `certbot_certs`/`certbot_www` compose именует с префиксом проекта (`casino-platform_certbot_certs`), а `ssl_init.sh` и renew-cron монтируют `docker -v certbot_certs:...` буквально → сертификаты оседают в томе, которого nginx не видит | ✅ томам заданы фиксированные `name:` в compose |
+| 4 | Домены захардкожены: `server_name`/пути сертификатов ×4 в nginx conf, build-arg `NEXT_PUBLIC_API_URL` в compose, `DOMAINS=` в ssl_init.sh — под свой домен оператору пришлось бы править 3 файла в репо | ✅ nginx conf → envsubst-шаблон `infra/nginx/templates/casino.conf.template` (конвенция official-образа; nginx-переменные `$host` и пр. не задеты), compose передаёт `DOMAIN`/`ADMIN_DOMAIN` в nginx-сервис, ssl_init.sh читает их из `.env` (fail-closed без них); `SSL_EMAIL` опционален (дефолт `admin@$DOMAIN`) |
+| 5 | `restore.sh` ссылался на несуществующие контейнер `casino-db`, пользователя `postgres`, каталог `/var/backups/casino`, содержал невалидный `DROP DATABASE x (FORCE)` (синтаксическая ошибка — правильно `WITH (FORCE)`), и **никогда не запускался** (блокер GAP-46 п.7 — учебное восстановление до приёма денег) | ✅ переписан: контейнер через `docker compose ps -q postgres`, имена из `DB_USER`/`DB_NAME` (source `.env`), `--dry-run`, `gunzip -t` до изменений, `psql -v ON_ERROR_STOP=1`, миграции и проба `/health/ready` после заливки |
+| 6 | `postgres-backup.sh` (cron 02:00) — молчаливые дефолты `${DB_USER:-casino}`/`${DB_NAME:-casino_prod}` могли разойтись с реальными именами БД → ночной бэкап падал или снимал пустую БД | ✅ `source .env` + fail-closed без `DB_USER`/`DB_NAME` |
+| 7 | `health-check.sh` и `resource-check.sh` пробуют `http://localhost:3001` **с хоста** — порт api не публикуется (наружу только nginx 80/443) → проба падала всегда, `resource-check` ALERT'ил бы каждые 5 минут с первого дня | ✅ проба перенесена внутрь контейнера api (`compose exec api wget`, wget есть в образе — им же работает healthcheck compose) |
+| 8 | `rollback.sh` звал `pm2 reload` и `pnpm build` — на VPS их нет, деплой идёт docker-образами | ✅ приведён к `docker compose build api web admin` + `up -d` + health-check по DEPLOY.md § Rollback |
+| 9 | Считалка `QA_CHECKLIST.md` (33 пункта / 7 частичных / 17 автопокрытие) разошлась с фактом: Auth фактически 9 пунктов (3 частично), итог 35/9/19; перечень спеков отставал (22 при фактических 26) | ✅ сведена с фактом (35/10/9/16, автопокрытие 19 из 35, 26 спеков) |
+
+**Гейты PR:** `bash -n` по всем скриптам; docs-guard локально (D1–D7); commitlint;
+typecheck/lint/tests не задеты (нет TS-изменений). Побочные проверки envsubst-механики
+(nginx official image: `/etc/nginx/templates/*.template` → `/etc/nginx/conf.d/`,
+envsubst только по определённым env-именам) — задокументированы в шаблоне и compose;
+живая проверка — на первом деплое.
 
 ### Что НЕ является гэпом — не переделывать (проверено 2026-09-02)
 

@@ -27,8 +27,11 @@ cd /opt
 git clone https://github.com/your/casino-platform.git /opt/casino-platform
 cd /opt/casino-platform
 cp .env.example .env.production
-# edit .env.production – set all secrets, JWT >=64 chars, DB_PASSWORD, REDIS_PASSWORD, RUKASSA_*, NOWPAYMENTS_*, SMTP_*, etc.
 nano .env.production
+# edit .env.production — обязательно:
+#   все секреты, JWT >=64 chars, REDIS_PASSWORD, RUKASSA_*, NOWPAYMENTS_*, SMTP_*
+#   DOMAIN + ADMIN_DOMAIN (nginx-шаблон и ssl_init.sh, GAP-56; опц. SSL_EMAIL)
+#   DB_USER / DB_PASSWORD / DB_NAME — согласованы с DATABASE_URL (контейнер postgres, GAP-56)
 ln -sf .env.production .env
 
 # SSL first
@@ -74,6 +77,7 @@ Cron: `0 2 * * * /opt/casino-platform/infra/scripts/postgres-backup.sh`
 Keeps 14 days in `/opt/casino-backups`, optionally sync to S3.
 
 ## Rollback
+Кода-откат: `bash infra/scripts/rollback.sh` (= `git checkout HEAD~1` → rebuild api/web/admin → up → health-check; GAP-56 — docker compose, без pm2), или вручную:
 ```bash
 cd /opt/casino-platform
 git checkout <prev-tag>
@@ -81,4 +85,5 @@ docker compose -f docker-compose.prod.yml build api web admin
 docker compose -f docker-compose.prod.yml up -d
 ```
 DB rollback: restore from `/opt/casino-backups/casino_YYYY-MM-DD_HHMM.sql.gz`
-(скрипт восстановления — `infra/scripts/restore.sh`).
+(скрипт восстановления — `infra/scripts/restore.sh`; сначала `--dry-run`, GAP-56).
+⚠️ GAP-46 п.7: учебное восстановление из бэкапа обязано быть прогнано до приёма реальных денег.
