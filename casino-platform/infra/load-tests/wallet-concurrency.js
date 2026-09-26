@@ -87,7 +87,9 @@ export const options = {
     http_req_failed: ['rate<0.01'],
   },
   // Уменьшаем дефолтный noVUs=1 — ramping-vus управляет сам.
-  discardResponseBodies: true,
+  // discardResponseBodies выключен (найдено первым прогоном GAP-47 2026-09-27):
+  // при true res.body === null, проверки «status: 0 или 6» и счётчик status=11
+  // мертвы — порог http_req_failed проходит фиктивно, хотя тело приходит всегда.
 }
 
 /**
