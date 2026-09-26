@@ -1,16 +1,20 @@
 # HTTP -> HTTPS redirect
+# GAP-56: шаблон для envsubst (официальный образ nginx: /etc/nginx/templates/*.template
+# → /etc/nginx/conf.d/*.conf на старте контейнера). Подставляются ТОЛЬКО определённые
+# env-имена (DOMAIN, ADMIN_DOMAIN — см. nginx-сервис в docker-compose.prod.yml);
+# nginx-переменные $host/$request_uri/$remote_addr не задеты — их нет в окружении.
 server {
   listen 80;
-  server_name casino.example.com admin.casino.example.com;
+  server_name ${DOMAIN} ${ADMIN_DOMAIN};
   location /.well-known/acme-challenge/ { root /var/www/certbot; }
   location / { return 301 https://$host$request_uri; }
 }
-# --- casino.example.com (web) ---
+# --- ${DOMAIN} (web) ---
 server {
   listen 443 ssl http2;
-  server_name casino.example.com;
-  ssl_certificate /etc/letsencrypt/live/casino.example.com/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/casino.example.com/privkey.pem;
+  server_name ${DOMAIN};
+  ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
   include /etc/nginx/snippets/ssl.conf;
 
   # security headers
@@ -72,12 +76,12 @@ server {
     proxy_set_header X-Forwarded-Proto https;
   }
 }
-# --- admin.casino.example.com ---
+# --- ${ADMIN_DOMAIN} ---
 server {
   listen 443 ssl http2;
-  server_name admin.casino.example.com;
-  ssl_certificate /etc/letsencrypt/live/admin.casino.example.com/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/admin.casino.example.com/privkey.pem;
+  server_name ${ADMIN_DOMAIN};
+  ssl_certificate /etc/letsencrypt/live/${ADMIN_DOMAIN}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/${ADMIN_DOMAIN}/privkey.pem;
   include /etc/nginx/snippets/ssl.conf;
   add_header X-Frame-Options "DENY" always;
   add_header X-Content-Type-Options "nosniff" always;
