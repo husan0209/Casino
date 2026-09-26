@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 
 import { EMAIL_QUEUE_PORT, EmailQueuePort } from '@/queues/queue.types'
+import { renderNotificationEmail } from '@/queues/templates'
 
 import {
   NOTIFICATION_REPOSITORY,
@@ -48,11 +49,13 @@ export class NotificationService {
           )
         } else {
           // UC-NOTIF-01: постановка в очередь; sentAt проставит EmailWorker после фактической отправки
+          // GAP-02 post-MVP: html — брендированный шаблон (раньше в html уходил сырой text)
+          const mail = renderNotificationEmail({ title: input.title, message: input.message })
           await this.emailQueue.enqueue({
             to: email,
-            subject: input.title,
-            text: input.message,
-            html: input.message,
+            subject: mail.subject,
+            text: mail.text,
+            html: mail.html,
             notificationId: n.id,
           })
         }

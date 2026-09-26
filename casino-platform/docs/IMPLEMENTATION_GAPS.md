@@ -27,7 +27,8 @@
 - Подключены producers: auth (`EmailQueueService` → verify/reset письма с HTML), notifications (UC-NOTIF-01, проверка `user_settings.notificationsEmail`)
 - env: добавлены опциональные `SMTP_PORT/SMTP_USER/SMTP_PASS`
 - **Проверка:** tsc 0 ошибок. Runtime (реальная отправка) требует Redis+SMTP на Linux-FS среде.
-- Осталось после MVP: вынос воркера в отдельный процесс, rich HTML-шаблоны (`templates/index.ts` — пока plain text).
+- Rich HTML-шаблоны — ✅ закрыто 2026-09-27 (ветка `feat/email-html-templates`): `apps/api/src/queues/templates/index.ts` — брендированный 600px table-layout (inline-стили, без внешних CSS/картинок/шрифтов) + билдеры всех 4 писем (email-верификация, сброс пароля, withdrawal-reminder, generic notification из notifications) с сохранённым дословно plain-text fallback; продюсеры (auth/notifications/maintenance) передают `html` в очередь, SmtpMailer отдаёт его в nodemailer. Спек: `apps/api/test/email-html-templates.spec.ts`. Старый стаб `modules/notifications/templates/index.ts` (plain text, нигде не импортируется) не тронут.
+- Осталось после MVP: вынос воркера в отдельный процесс.
 
 ## 🟠 HIGH — фичи заявлены, но не работают
 
