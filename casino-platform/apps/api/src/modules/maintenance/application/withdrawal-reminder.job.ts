@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 
 import { errorMessage } from '@/common/utils/error-message'
+import { renderWithdrawalReminderEmail } from '@/queues/templates'
 
 import {
   MAINTENANCE_EMAIL_PORT,
@@ -34,7 +35,11 @@ export class WithdrawalReminderJob {
   constructor(
     @Inject(PAYMENT_MAINTENANCE_REPO) private readonly repo: IPaymentMaintenanceRepo,
     @Inject(REMINDER_AUDIT_REPO) private readonly audit: IReminderAuditRepo,
-    @Inject(MAINTENANCE_EMAIL_PORT) private readonly emailQueue: { enqueue(job: { to: string; subject: string; text: string }): Promise<string> },
+    @Inject(MAINTENANCE_EMAIL_PORT)
+    // GAP-02 post-MVP: html? добавлен аддитивно (реальный порт — EmailQueuePort с EmailJobData)
+    private readonly emailQueue: {
+      enqueue(job: { to: string; subject: string; text: string; html?: string }): Promise<string>
+    },
   ) {}
 
   async execute(now = new Date()): Promise<ReminderResult> {
@@ -61,12 +66,16 @@ export class WithdrawalReminderJob {
       const hoursPending = Math.floor((now.getTime() - w.createdAt.getTime()) / 3_600_000)
       const amount = w.amount ?? '?'
       const currency = w.currency ?? ''
-      const subject = `[Casino] Вывод ${currency} ${amount} в pending ${hoursPending}ч`
-      const text = `Заявка на вывод ${w.id} (${currency} ${amount}) от пользователя ${hoursPending} ч назад\nвсе ещё в статусе pending. Проверьте Admin → Finance → Withdrawals.`
+      const mail = renderWithdrawalReminderEmail({
+        withdrawalId: w.id,
+        amount,
+        currency,
+        hoursPending,
+      })
       let sent = 0
       for (const to of admins) {
         try {
-          await this.emailQueue.enqueue({ to, subject, text })
+          await this.emailQueue.enqueue({ to, subject: mail.subject, text: mail.text, html: mail.html })
           sent++
         } catch (e) {
           // Письмо — side-effect: сбои фиксируем в сводке, не роняем задачу
