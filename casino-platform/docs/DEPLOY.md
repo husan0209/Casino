@@ -70,6 +70,7 @@ SEED_ADMIN_PASSWORD=<сгенерированный пароль>
 - UptimeRobot → `https://casino.example.com/api/v1/health/ready` (честный readiness: БД 503
   при недоступности, Redis → degraded — GAP-35).
 - Logs: `docker compose logs -f api`
+- Email-воркер: консьюмер очереди `email` — отдельный сервис `worker` (тот же образ, что api, `apps/api/src/worker.ts`), логи `docker compose logs -f worker`; в процессе API он отключён флагом `EMAIL_WORKER_IN_PROCESS=false`
 - DB: `SELECT * FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 10;`
 
 ## Backup

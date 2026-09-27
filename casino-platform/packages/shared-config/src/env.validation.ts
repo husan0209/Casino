@@ -71,6 +71,10 @@ export const envSchema = z.object({
   // ENVIRONMENT_VARIABLES.md §10, README). Дубликат SMTP_PASS удалён.
   SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM_EMAIL: z.string().optional(),
+  // GAP-02 post-MVP: вынос email-консьюмера в отдельный процесс (apps/api/src/worker.ts,
+  // сервис `worker` в docker-compose.prod.yml). Optional: дефолт 'true' в коде —
+  // консьюмер в процессе API (dev); prod compose переопределяет на сервисах.
+  EMAIL_WORKER_IN_PROCESS: z.enum(['true', 'false']).optional(),
   // ─── GAP-29: паритет с ENVIRONMENT_VARIABLES.md §22 (D3) ─────────────
   // Все — optional: код читает их напрямую из process.env с дефолтами;
   // валидация фиксирует тип/формат, не меняя поведение.
