@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UsePipes } from '@nestjs/common'
+import { Body, Controller, Post, UnauthorizedException, UsePipes } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -29,13 +29,14 @@ export class AdminAuthController {
   ) {}
   @Post('login')
   @UsePipes(new ZodValidationPipe(AdminLoginSchema))
-  async login(@Body() body: { email: string; password: string }): Promise<{ success: boolean; error: { code: string; message: string; }; accessToken?: never; admin?: never; } | { accessToken: string; admin: { id: string; email: string; role: AdminRole; }; success?: never; error?: never; }> {
+  async login(@Body() body: { email: string; password: string }): Promise<{ accessToken: string; admin: { id: string; email: string; role: AdminRole; }; }> {
     const admin = await this.auth.validate(body.email, body.password)
     if (!admin) {
-      return {
-        success: false,
-        error: { code: 'INVALID_CREDENTIALS', message: 'Неверный email или пароль' },
-      }
+      // Аудит контрактов 2026-09-26: раньше возвращалось {success:false, error}
+      // с HTTP 200 (interceptor пропускал объект с ключом success) — клиент
+      // получал data:undefined и «успешный» вход без токена. 401 + стандартный
+      // error-конверт из GlobalExceptionFilter — как у всех остальных эндпоинтов.
+      throw new UnauthorizedException('Неверный email или пароль')
     }
     await prisma.adminUser.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } })
     await this.audit.log({ actorType: 'admin', actorId: admin.id, action: 'admin.login' })

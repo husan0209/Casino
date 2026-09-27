@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
+import { Body, Controller, ForbiddenException, Get, Param, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
 import { type Request } from 'express'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -27,9 +27,11 @@ export class AdminAdminsController {
   }
   @Post()
   @UsePipes(new ZodValidationPipe(CreateAdminSchema))
-  async create(@Body() body: Record<string, unknown>, @Req() req: Request): Promise<AdminUserRow | { success: boolean; error: { code: string; message: string; }; }> {
+  async create(@Body() body: Record<string, unknown>, @Req() req: Request): Promise<AdminUserRow> {
+    // Аудит контрактов 2026-09-26: раньше {success:false, error} с HTTP 200 —
+    // клиент уходил в onSuccess и рапортовал об успехе. 403 + error-конверт.
     if (!isSuper(req)) {
-      return { success: false, error: { code: 'FORBIDDEN', message: 'superadmin only' } }
+      throw new ForbiddenException('superadmin only')
     }
     const admin = await this.svc.create(
       body as unknown as Parameters<typeof this.svc.create>[0],
@@ -45,9 +47,9 @@ export class AdminAdminsController {
     return admin
   }
   @Post(':id/deactivate')
-  async deactivate(@Param('id') id: string, @Req() req: Request): Promise<{ success: boolean; error: { code: string; message: string; }; ok?: never; } | { ok: boolean; success?: never; error?: never; }> {
+  async deactivate(@Param('id') id: string, @Req() req: Request): Promise<{ ok: boolean; }> {
     if (!isSuper(req)) {
-      return { success: false, error: { code: 'FORBIDDEN', message: 'superadmin only' } }
+      throw new ForbiddenException('superadmin only')
     }
     await this.svc.block(id)
     await this.audit.log({
