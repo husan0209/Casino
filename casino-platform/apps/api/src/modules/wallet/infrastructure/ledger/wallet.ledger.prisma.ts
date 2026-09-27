@@ -195,7 +195,13 @@ export class PrismaWalletLedger implements IWalletLedger {
       try {
         return await prisma.$transaction(txBody, { isolationLevel: 'Serializable' })
       } catch (e) {
-        if (e instanceof OptimisticLockError && attempt < 3) {
+        // GAP-57 (найдено прогоном GAP-47, 2026-09-27): конфликт Serializable на
+        // уровне Postgres приходит как Prisma P2034 (write conflict) — транзакция
+        // откатывается СУБД ДО app-кода, OptimisticLockError не бросается. Без
+        // ретрая профиль «много ставок/сек на один кошелёк» падал на первом же
+        // конфликте: 28 из 30 параллельных bets завершались ошибкой.
+        const code = (e as { code?: string } | null)?.code
+        if ((e instanceof OptimisticLockError || code === 'P2034') && attempt < 3) {
           await new Promise((r) => setTimeout(r, 50 * attempt * attempt))
           continue
         }
