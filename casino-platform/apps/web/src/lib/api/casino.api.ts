@@ -4,7 +4,13 @@
  */
 import { apiDelete, apiGet, apiPost } from '@/lib/api'
 import { type CatalogCategory, filtersToApiParams, type CatalogFilters } from '@/lib/ui/catalog-filters'
-import type { FavoritesListDto, GamesListDto, ProviderDto, RecentGameDto } from '@/types/casino'
+import type {
+  FavoritesListDto,
+  GamesListDto,
+  ProviderDto,
+  RecentGameDto,
+  RecentGamesListDto,
+} from '@/types/casino'
 
 /** Категории с наполнением (§7: пустые разделы не показываем). */
 export function fetchCategories(): Promise<CatalogCategory[]> {
@@ -29,9 +35,9 @@ export function fetchProviders(): Promise<ProviderDto[]> {
   return apiGet<ProviderDto[]>('/casino/providers')
 }
 
-/** Последние сыгранные игры (GET /casino/recent, до 20). */
+/** Последние сыгранные игры (GET /casino/recent, до 20). Разворачивает { data: [...] } контроллера. */
 export function fetchRecentGames(): Promise<RecentGameDto[]> {
-  return apiGet<RecentGameDto[]>('/casino/recent')
+  return apiGet<RecentGamesListDto>('/casino/recent').then(res => res.data)
 }
 
 export function fetchFavoriteGames(page = 1, perPage = 24): Promise<FavoritesListDto> {

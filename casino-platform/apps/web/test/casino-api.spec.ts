@@ -43,10 +43,14 @@ describe('GAP-53 casino.api — контракты путей/методов', (
     expect(res[0]?.game_count).toBe(12)
   })
 
-  it('fetchRecentGames → GET /casino/recent', async () => {
-    mockedApi.get.mockResolvedValueOnce(ok([]))
-    await fetchRecentGames()
+  it('fetchRecentGames → GET /casino/recent и разворачивает { data: [...] } контроллера', async () => {
+    // Контракт контроллера: ApiResponse.data = { data: Game[] } (двойная вложенность).
+    // Найдено локальным прогоном 2026-09-27: без разворота главная падала
+    // «games.slice is not a function» у залогиненного игрока.
+    mockedApi.get.mockResolvedValueOnce(ok({ data: [{ slug: 'demo-sweet-fruits' }] }))
+    const res = await fetchRecentGames()
     expect(mockedApi.get).toHaveBeenCalledWith('/casino/recent', { params: undefined })
+    expect(res[0]?.slug).toBe('demo-sweet-fruits')
   })
 
   it('fetchFavoriteGames → GET /casino/favorites с per_page', async () => {

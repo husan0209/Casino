@@ -16,6 +16,24 @@ export function middleware(request: NextRequest): NextResponse {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
   const isDev = process.env['NODE_ENV'] !== 'production'
 
+  // В dev API кросс-доменный (NEXT_PUBLIC_API_URL=http://localhost:3001), и
+  // `connect-src 'self' https:` резал браузерные запросы к нему до прихода на
+  // API («Network Error»). В проде API same-origin за nginx — 'self' покрывает,
+  // поэтому origin API добавляется только когда он реально другой.
+  const apiUrl = process.env['NEXT_PUBLIC_API_URL']
+  let apiOrigin = ''
+  if (apiUrl) {
+    try {
+      apiOrigin = new URL(apiUrl).origin
+    } catch {
+      apiOrigin = ''
+    }
+  }
+  const connectSrc =
+    apiOrigin && apiOrigin !== request.nextUrl.origin
+      ? `'self' ${apiOrigin} https:`
+      : `'self' https:`
+
   const cspHeader = [
     `default-src 'self'`,
     // 'unsafe-inline' в script-src — совместимость со старыми браузерами;
@@ -25,7 +43,7 @@ export function middleware(request: NextRequest): NextResponse {
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' blob: data: https:`,
     `font-src 'self'`,
-    `connect-src 'self' https:`,
+    `connect-src ${connectSrc}`,
     // iframe игр и виджетов (Telegram/Google)
     `frame-src 'self' https:`,
     `object-src 'none'`,
