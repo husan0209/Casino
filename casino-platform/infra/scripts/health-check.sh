@@ -1,27 +1,28 @@
 #!/usr/bin/env bash
 set -e
 
-API_URL="http://localhost:3001/api/v1/health"
+# GAP-56: порт api не публикуется на хост (наружу только nginx 80/443) — прежний
+# curl http://localhost:3001 с хоста падал всегда. Проба выполняется изнутри
+# контейнера api (wget есть в образе — им же работает healthcheck compose).
+
 MAX_ATTEMPTS=5
 SLEEP_TIME=5
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)/../.."
+cd "$REPO_ROOT"
+compose() { docker compose -f docker-compose.prod.yml "$@"; }
 
-echo "Checking health at $API_URL..."
+echo "Checking health (inside api container)..."
 
 for (( i=1; i<=$MAX_ATTEMPTS; i++ ))
 do
-  STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL" || true)
-  if [ "$STATUS_CODE" == "200" ]; then
+  RESPONSE=$(compose exec -T api wget -qO- http://localhost:3001/api/v1/health 2>/dev/null || true)
+  if echo "$RESPONSE" | grep -q '"status":"ok"'; then
     echo "Health check passed!"
-    
-    # Optionally verify DB connectivity from the health endpoint output
-    RESPONSE=$(curl -s "$API_URL")
-    if echo "$RESPONSE" | grep -q '"status":"ok"'; then
-       echo "Database is connected."
-       exit 0
-    fi
+    echo "Database is connected."
+    exit 0
   fi
-  
-  echo "Attempt $i failed (Status: $STATUS_CODE). Retrying in $SLEEP_TIME seconds..."
+
+  echo "Attempt $i failed. Retrying in $SLEEP_TIME seconds..."
   sleep $SLEEP_TIME
 done
 

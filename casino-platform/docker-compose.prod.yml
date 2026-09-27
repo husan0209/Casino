@@ -53,7 +53,10 @@ services:
       context: .
       dockerfile: infra/docker/web.prod.Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=https://casino.example.com/api/v1
+        # GAP-56: интерполируется из .env (симлинк .env.production); дефолт —
+        # исторический плейсхолдер. Build-arg запекается в бандл: сменив домен,
+        # не забудь `docker compose build web`.
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://casino.example.com/api/v1}
     env_file: [.env.production]
     depends_on: [api]
     restart: unless-stopped
@@ -80,12 +83,26 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    # GAP-56: DOMAIN/ADMIN_DOMAIN подставляются envsubst'ом в шаблон
+    # (infra/nginx/templates/casino.conf.template → /etc/nginx/conf.d/casino.conf).
+    # envsubst заменяет только эти имена — nginx-переменные ($host и пр.) не задеты,
+    # т.к. их нет в окружении контейнера.
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN задай в .env.production (симлинк .env), см. ENVIRONMENT_VARIABLES §2}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:?ADMIN_DOMAIN задай в .env.production, см. ENVIRONMENT_VARIABLES §2}
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./infra/nginx/templates:/etc/nginx/templates:ro
+      # GAP-56: snippets раньше не монтировался — include /etc/nginx/snippets/ssl.conf
+      # ронял nginx на первом старте (nginx: [emerg] open() ... failed)
+      - ./infra/nginx/snippets:/etc/nginx/snippets:ro
       - certbot_certs:/etc/letsencrypt:ro
       - certbot_www:/var/www/certbot:ro
       - ./uploads:/var/www/uploads:ro
+    # GAP-56: дефолтный default.conf образа слушает :80 и отдаёт welcome-страницу
+    # по прямому IP; убираем до старта nginx (envsubst-скрипты entrypoint к этому
+    # моменту уже сгенерировали conf.d/casino.conf из шаблона).
+    command: ["sh", "-c", "rm -f /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]
     restart: unless-stopped
     networks: [casino]
     logging:
@@ -95,8 +112,12 @@ services:
 volumes:
   pgdata:
   redisdata:
-  certbot_certs:
-  certbot_www:
+  # GAP-56: фиксированные имена (без префикса проекта) — infra/scripts/ssl_init.sh
+  # и renew-cron монтируют docker -v certbot_certs:... / certbot_www:... буквально;
+  # без name: compose создал бы casino-platform_certbot_certs, и сертификаты
+  # осели бы в томе, который nginx не видит.
+  certbot_certs: { name: certbot_certs }
+  certbot_www: { name: certbot_www }
 
 networks:
   casino:

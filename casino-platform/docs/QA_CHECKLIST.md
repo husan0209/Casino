@@ -60,12 +60,12 @@
 
 | Раздел | всего | `[x]` auto | `[x*]` частично | `[ ]` manual |
 |---|---|---|---|---|
-| Auth | 7 | 0 | 1 | 6 |
+| Auth | 9 | 0 | 3 | 6 |
 | Wallet / Payments | 8 | 3 | 4 | 1 |
 | Casino | 7 | 4 | 1 | 2 |
 | Support / Referrals | 5 | 2 | 0 | 3 |
 | Admin | 6 | 1 | 1 | 4 |
-| **Итого** | **33** | **10** | **7** | **16** |
+| **Итого** | **35** | **10** | **9** | **16** |
 
-**Автопокрытие в сумме: 17 из 33** (10 полных + 7 частичных). Пропорция отвечает фактическому состоянию: весь money-путь и роль-гейт закрыты спеками, внешний контур (SMTP/PSP/OAuth/домен) — осознанный ручной остаток GAP-46.
-**Куда идти за деталями:** автопокрытие — `apps/api/test/` (21 файл в корне + 1 в `e2e/` = 22 спецификации: money-flow, ledger.integration, deposit-idempotency, nowpayments-ipn, roles-guard, account-lockout, logger-redact, seed-guard, health-ready, exchange-rates, kyc-limit-rates.integration, kyc-file-sniffer, env-validation, game-round.integration, referral-payout.integration, maintenance-jobs, provider-stubs, gitslotpark-adapter, smtp-mailer, change-password, history-filters, withdrawal-link, captcha + e2e/player-lifecycle); ручной остаток — GAP-46 в [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) (пп. 1–9), session-expire при нагрузке — GAP-47.
+**Автопокрытие в сумме: 19 из 35** (10 полных + 9 частичных; GAP-56 2026-09-27 — считалка сведена с фактом: ранее Auth считался 7 пунктами при фактических 9, итог занижался до 33/17). Пропорция отвечает фактическому состоянию: весь money-путь и роль-гейт закрыты спеками, внешний контур (SMTP/PSP/OAuth/домен) — осознанный ручной остаток GAP-46.
+**Куда идти за деталями:** автопокрытие — `apps/api/test/` (25 файлов в корне + 1 в `e2e/` = 26 спецификаций: account-lockout, captcha, change-password, deposit-idempotency, env-validation, exchange-rates, game-round.integration, gitslotpark-adapter, health-ready, history-filters, kyc-file-sniffer, kyc-limit-rates.integration, ledger.integration, logger-redact, maintenance-jobs, money-flow, nowpayments-ipn, oauth-verify, provider-stubs, referral-payout.integration, roles-guard, seed-guard, sentry-options, smtp-mailer, withdrawal-link + e2e/player-lifecycle); ручной остаток — GAP-46 в [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) (пп. 1–9), session-expire при нагрузке — GAP-47.

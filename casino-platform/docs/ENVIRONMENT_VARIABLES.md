@@ -88,6 +88,8 @@ export function validateEnv() {
 | `JOB_REFERRAL_DAILY_EVERY_MS` | int | ❌ | `86400000` | Интервал ежедневных реферальных начислений, мс (GAP-32/33) |
 | `JOB_CLEANUP_SESSIONS_EVERY_MS` | int | ❌ | `3600000` | Интервал очистки мёртвых сессий (expired/отозванные >7 дней), мс — pre-launch hardening A1 |
 | `DOMAIN` | string | ✅ | — | `casino.example.com` (без доменной зоны) |
+| `ADMIN_DOMAIN` | string | ✅ (compose) | — | Домен админки `admin.casino.example.com`. Читают compose (envsubst nginx-шаблона, сервис nginx) и `infra/scripts/ssl_init.sh`; код приложения — нет (GAP-56) |
+| `SSL_EMAIL` | email | ❌ | `admin@<DOMAIN>` | Email для выпуска Let's Encrypt в `infra/scripts/ssl_init.sh` (GAP-56) |
 
 ---
 
@@ -96,6 +98,9 @@ export function validateEnv() {
 | Variable | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `DATABASE_URL` | URL | ✅ | — | `postgresql://user:pass@host:5432/db` |
+| `DB_USER` | string | ✅ (compose) | — | Пользователь БД. Читает `docker-compose.prod.yml` (контейнер postgres + интерполяция) и `infra/scripts/postgres-backup.sh`/`restore.sh`; код приложения — нет (GAP-56) |
+| `DB_PASSWORD` | string | ✅ (compose) | — | Пароль БД; обязан совпадать с паролем в `DATABASE_URL` |
+| `DB_NAME` | string | ✅ (compose) | — | Имя БД; обязано совпадать с путём в `DATABASE_URL` |
 | `DB_POOL_SIZE` | int | ❌ | `10` | Prisma connection pool |
 | `DB_LOG_QUERIES` | bool | ❌ | `false` | Логировать все SQL запросы (только dev) |
 
@@ -364,6 +369,8 @@ APP_PORT=3001
 APP_URL=http://localhost:3000
 ADMIN_URL=http://localhost:3002
 DOMAIN=localhost
+ADMIN_DOMAIN=localhost
+# SSL_EMAIL=admin@example.com  # опционально: email для certbot, дефолт admin@$DOMAIN
 
 # ── Rate limiting (GAP-19) ─────────────────────────────────
 THROTTLE_TTL_MS=60000
@@ -385,6 +392,9 @@ JOB_REFERRAL_DAILY_EVERY_MS=86400000
 
 # ── Database ───────────────────────────────────────────────
 DATABASE_URL=postgresql://casino:casino_dev_password@localhost:5432/casino_dev
+DB_USER=casino
+DB_PASSWORD=casino_dev_password
+DB_NAME=casino_dev
 DB_POOL_SIZE=10
 DB_LOG_QUERIES=false
 

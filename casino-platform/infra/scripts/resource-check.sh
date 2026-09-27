@@ -19,11 +19,19 @@ if [ "$DISK_USAGE" -gt 85 ]; then
     echo "ALERT: High disk usage: ${DISK_USAGE}%"
 fi
 
-# Состояние стеков и readiness (если запущено вне контейнера)
+# Состояние стеков и readiness. GAP-56: порт api не публикуется на хост — прежний
+# curl http://localhost:3001 с хоста падал всегда; проба выполняется изнутри
+# контейнера api (wget есть в образе). /health/ready отдаёт 200 при живой БД
+# (degraded:true при недоступном Redis — это норма, GAP-35) и 503 при падении БД.
 if command -v docker >/dev/null 2>&1; then
     docker ps --format '{{.Names}}: {{.Status}}' | grep -E 'casino|api|web|admin' || true
-    curl -fsS --max-time 5 http://localhost:3001/api/v1/health/ready >/dev/null 2>&1 \
-        || echo "ALERT: API /health/ready недоступен"
+    REPO_ROOT="$(cd "$(dirname "$0")" && pwd)/../.."
+    if docker compose -f "$REPO_ROOT/docker-compose.prod.yml" exec -T api \
+        wget -qO- http://localhost:3001/api/v1/health/ready 2>/dev/null | grep -q '"status":"ok"'; then
+        echo "API /health/ready: OK"
+    else
+        echo "ALERT: API /health/ready недоступен"
+    fi
 fi
 
 exit 0
