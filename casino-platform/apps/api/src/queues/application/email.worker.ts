@@ -20,7 +20,15 @@ export class EmailWorker implements OnModuleDestroy {
   ) {
     const hasRedis = Boolean(config.get<string>('REDIS_URL'))
     const isTest = config.get<string>('NODE_ENV') === 'test'
-    if (!hasRedis || isTest) {
+    // GAP-02 post-MVP: консьюмер можно вынести в отдельный процесс (worker.ts +
+    // сервис `worker` в docker-compose.prod.yml). Флаг читается каждым процессом:
+    // unset/'true' — как раньше, консьюмер в процессе API (dev-удобство);
+    // 'false' — API только ставит письма в очередь, разбирает их процесс worker.
+    const inProcess = config.get<string>('EMAIL_WORKER_IN_PROCESS', 'true') !== 'false'
+    if (!hasRedis || isTest || !inProcess) {
+      if (hasRedis && !isTest && !inProcess) {
+        this.logger.log('Email consumer disabled in this process (EMAIL_WORKER_IN_PROCESS=false)')
+      }
       return
     }
     this.worker = new Worker<EmailJobData>(QUEUES.EMAIL, async (job) => this.handle(job.data), {

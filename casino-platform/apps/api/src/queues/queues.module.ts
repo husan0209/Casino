@@ -10,7 +10,9 @@ import { EMAIL_QUEUE_PORT, MAILER_PORT, type EmailQueuePort } from './queue.type
 /**
  * BullMQ-очереди (TZ part 6 §11, IMPLEMENTATION_GAPS GAP-02):
  * - очередь `email`: продюсеры (auth, notifications) через EMAIL_QUEUE_PORT;
- * - EmailWorker — консьюмер в том же процессе (MVP; вынос в отдельный процесс — после MVP);
+ * - EmailWorker — консьюмер очереди `email`. По умолчанию в процессе API (dev);
+ *   EMAIL_WORKER_IN_PROCESS=false отключает его здесь — тогда очередь разбирает
+ *   отдельный процесс `apps/api/src/worker.ts` (сервис `worker` в docker-compose.prod.yml);
  * - MAILER_PORT — фактическая отправка: SMTP_HOST → SmtpMailer, иначе DevLogMailer (dev only).
  * Без REDIS_URL (dev) продюсер = DevLogEmailQueue; в production Redis и SMTP обязательны.
  */

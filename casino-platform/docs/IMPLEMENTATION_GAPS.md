@@ -28,7 +28,7 @@
 - env: добавлены опциональные `SMTP_PORT/SMTP_USER/SMTP_PASS`
 - **Проверка:** tsc 0 ошибок. Runtime (реальная отправка) требует Redis+SMTP на Linux-FS среде.
 - Rich HTML-шаблоны — ✅ закрыто 2026-09-27 (ветка `feat/email-html-templates`): `apps/api/src/queues/templates/index.ts` — брендированный 600px table-layout (inline-стили, без внешних CSS/картинок/шрифтов) + билдеры всех 4 писем (email-верификация, сброс пароля, withdrawal-reminder, generic notification из notifications) с сохранённым дословно plain-text fallback; продюсеры (auth/notifications/maintenance) передают `html` в очередь, SmtpMailer отдаёт его в nodemailer. Спек: `apps/api/test/email-html-templates.spec.ts`. Старый стаб `modules/notifications/templates/index.ts` (plain text, нигде не импортируется) не тронут.
-- Осталось после MVP: вынос воркера в отдельный процесс.
+- Вынос воркера в отдельный процесс — ✅ закрыто 2026-09-27 (ветка `feat/email-worker-process`, пристроена поверх `feat/email-html-templates`): консьюмер очереди `email` управляется env-флагом `EMAIL_WORKER_IN_PROCESS` (дефолт `true` — в процессе API, dev-удобство; `false` — API только ставит письма в очередь); новый entrypoint `apps/api/src/worker.ts` — Nest ApplicationContext без HTTP (ConfigModule + pino + QueuesModule; Prisma — напрямую через @casino/database), SIGTERM → `worker.close()` (grace 45s); сервис `worker` в `docker-compose.prod.yml` — тот же образ, что api (`node apps/api/dist/worker.js`, флаг `true`, без healthcheck — от него никто не зависит), у api флаг `false`. Maintenance-воркер (GAP-33) остался в процессе API — сознательно, вне скоупа.
 
 ## 🟠 HIGH — фичи заявлены, но не работают
 
