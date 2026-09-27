@@ -105,6 +105,16 @@ export interface HistoryDto {
 /** Игра в списке «Продолжить играть» (GET /casino/recent — FavoriteWithGame['game']). */
 export interface RecentGameDto extends GameDto {}
 
+/**
+ * Ответ GET /casino/recent: контроллер возвращает `{ data: Game[] }` внутри
+ * ApiResponse (формат зеркален спискам с meta). Найдено локальным прогоном
+ * 2026-09-27: без разворота `.data` главная/SearchInner падали
+ * «games.slice is not a function» у каждого залогиненного игрока.
+ */
+export interface RecentGamesListDto {
+  data: RecentGameDto[]
+}
+
 /** Ответ GET /casino/favorites — те же поля игры + provider. */
 export interface FavoritesListDto {
   data: GameDto[]
