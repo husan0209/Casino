@@ -199,8 +199,8 @@ export default function KycPage(): React.JSX.Element {
         >
           {status}
         </b>
-        {data?.rejection_reason && (
-          <div className="text-red-400 text-sm mt-2">Причина: {data.rejection_reason}</div>
+        {data?.rejectionReason && (
+          <div className="text-red-400 text-sm mt-2">Причина: {data.rejectionReason}</div>
         )}
         {data?.documents && data.documents.length > 0 && (
           <div className="text-xs text-muted mt-2">

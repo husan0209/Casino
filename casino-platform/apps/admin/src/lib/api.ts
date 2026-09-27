@@ -34,13 +34,44 @@ export async function apiGet<T>(url: string, params?: Record<string, unknown>): 
   return res.data.data
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * Разворачивает конверт списка контроллеров /admin/* в {rows, meta}.
+ * Аудит контрактов 2026-09-26: листинги админки не имеют единой формы —
+ *   {items, meta}      (admin/users, /withdrawals, /payment-requests,
+ *                       /transactions, /audit-logs, /games)
+ *   {items, total}     (admin/kyc — total без page/perPage)
+ *   {data: rows, meta} (admin/support/tickets, admin/referrals)
+ * — а страницы читают результат как массив + meta.total. Без нормализации
+ * data.data.map() падал («… is not a function»), а pager всегда показывал 0.
+ * Незнакомые payload (деталка тикета, plain-массив) проходят как есть.
+ */
+function unwrapListPayload(payload: unknown): { rows: unknown; meta: ApiMeta | undefined } {
+  if (isRecord(payload) && Array.isArray(payload['items'])) {
+    const meta = isRecord(payload['meta'])
+      ? (payload['meta'] as ApiMeta)
+      : typeof payload['total'] === 'number'
+        ? { total: payload['total'] }
+        : undefined
+    return { rows: payload['items'], meta }
+  }
+  if (isRecord(payload) && Array.isArray(payload['data']) && isRecord(payload['meta'])) {
+    return { rows: payload['data'], meta: payload['meta'] as ApiMeta }
+  }
+  return { rows: payload, meta: undefined }
+}
+
 /** GET c полным конвертом (когда нужна meta пагинации) */
 export async function apiGetFull<T>(
   url: string,
   params?: Record<string, unknown>,
 ): Promise<{ data: T; meta?: ApiMeta | undefined }> {
-  const res = await api.get<ApiResponse<T> & { meta?: ApiMeta }>(url, { params })
-  return { data: res.data.data, meta: res.data.meta }
+  const res = await api.get<ApiResponse<unknown> & { meta?: ApiMeta }>(url, { params })
+  const { rows, meta } = unwrapListPayload(res.data.data)
+  return { data: rows as T, meta: meta ?? res.data.meta }
 }
 
 /** POST c разворачиванием конверта {success,data} → data */

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { toast } from '@/components/ui/toaster'
 import { apiGet } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
-import type { ReferralInfoDto, ReferralRewardsDto } from '@/types/referral'
+import type { ReferralInfoDto, ReferralRewardsDto, ReferralsListDto } from '@/types/referral'
 
 export default function ReferralPage(): React.JSX.Element {
   const { user } = useAuth()
@@ -15,7 +15,7 @@ export default function ReferralPage(): React.JSX.Element {
   })
   const { data: list } = useQuery({
     queryKey: ['ref-list'],
-    queryFn: () => apiGet<{ data: { id: string; status: string; created_at: string }[] }>('/referrals/list'),
+    queryFn: () => apiGet<ReferralsListDto>('/referrals/list'),
     enabled: Boolean(user),
   })
   void list
