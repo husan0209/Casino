@@ -25,7 +25,16 @@ services:
     build:
       context: .
       dockerfile: infra/docker/api.prod.Dockerfile
+    # Явный тег: сервис worker ниже переиспользует этот же образ (build только здесь).
+    image: casino-platform-api
+    # CMD образа — тот же main.js (fallback для docker run); здесь запуск
+    # зафиксирован явно, чтобы сервис worker переиспользовал образ с другой точкой входа.
+    command: ["node", "apps/api/dist/main.js"]
     env_file: [.env.production]
+    # GAP-02 post-MVP: консьюмер очереди `email` живёт в отдельном сервисе worker —
+    # в процессе API он отключён (по умолчанию флаг 'true' — dev-удобство).
+    environment:
+      EMAIL_WORKER_IN_PROCESS: "false"
     # pre-launch hardening A4: воркеры BullMQ при close() ждут активные job'ы;
     # дефолтный grace 10s перебил бы их SIGKILL'ом. 45s > 30s BullMQ close-timeout.
     stop_grace_period: 45s
@@ -44,6 +53,28 @@ services:
       retries: 3
     # pre-launch hardening A3: pino пишет в stdout → docker json-file;
     # без max-size диск VPS умирает через пару месяцев
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "5" }
+
+  # GAP-02 post-MVP: отдельный процесс-консьюмер очереди `email` (apps/api/src/worker.ts).
+  # Тот же образ, что у api (build только у api), другая команда; HTTP-сервера нет —
+  # healthcheck не нужен и никто от него не зависит. Останавливается позже api
+  # (grace 45s) — письма доразбираются до SIGKILL.
+  worker:
+    image: casino-platform-api
+    command: ["node", "apps/api/dist/worker.js"]
+    env_file: [.env.production]
+    environment:
+      EMAIL_WORKER_IN_PROCESS: "true"
+    stop_grace_period: 45s
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+    networks: [casino]
+    volumes:
+      - ./logs:/app/logs
     logging:
       driver: json-file
       options: { max-size: "50m", max-file: "5" }

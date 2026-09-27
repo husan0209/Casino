@@ -197,6 +197,7 @@ openssl rand -hex 64
 | `SMTP_PASSWORD` | string | ✅ | — | API key от Resend |
 | `SMTP_FROM_EMAIL` | email | ✅ | — | `noreply@casino.example.com` |
 | `SMTP_FROM_NAME` | string | ❌ | `Casino Support` | Display name |
+| `EMAIL_WORKER_IN_PROCESS` | bool | ❌ | `true` | GAP-02 post-MVP: консьюмер BullMQ-очереди `email` в процессе API. `false` — очередь разбирает отдельный процесс `apps/api/src/worker.ts` (сервис `worker` в docker-compose.prod.yml); в compose флаг переопределён на обоих сервисах |
 
 **Провайдеры:**
 
@@ -442,6 +443,7 @@ SMTP_USER=resend
 SMTP_PASSWORD=re_xxxxxxxxxxxxx
 SMTP_FROM_EMAIL=noreply@casino.example.com
 SMTP_FROM_NAME=Casino Support
+EMAIL_WORKER_IN_PROCESS=true
 
 # ── KYC ────────────────────────────────────────────────────
 KYC_DEPOSIT_LIMIT_RUB=5000
