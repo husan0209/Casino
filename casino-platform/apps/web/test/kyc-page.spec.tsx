@@ -102,4 +102,22 @@ describe('GAP-36/44: страница KYC — лимит из API', () => {
     await waitFor(() => expect(screen.getByText(/Лимит снят/i)).toBeTruthy())
     expect(screen.queryByText(/Лимит пополнений исчерпан/i)).toBeNull()
   })
+
+  /**
+   * Аудит контрактов 2026-09-26: GetKycStatusUseCase отдаёт причину отказа в
+   * поле rejectionReason (spread строки репозитория). Раньше страница читала
+   * rejection_reason — такого ключа API не отдаёт, и причина не показывалась.
+   */
+  it('rejected: причина отказа показывается из API-поля rejectionReason', async () => {
+    kycMock.mockResolvedValue({
+      status: 'rejected',
+      rejectionReason: 'Документ нечитаем',
+      limit_remaining: '5000',
+      limit_currency: 'RUB',
+      deposit_limit_rub: '5000',
+    })
+    renderPage()
+    const reason = await screen.findByText(/Причина:/, undefined, { timeout: 3000 })
+    expect(reason.textContent).toContain('Документ нечитаем')
+  })
 })

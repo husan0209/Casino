@@ -2,6 +2,7 @@
 import { create } from 'zustand'
 
 import { apiGet, apiPost } from '@/lib/api'
+import { type MeDto } from '@/types/user'
 
 export interface WebUser {
   id: string
@@ -76,8 +77,12 @@ export const useAuth = create<AuthState>()((set, get) => ({
         throw new Error('no access token')
       }
       set({ token: res.accessToken })
-      const me = await apiGet<WebUser>('/users/me')
-      set({ user: me, hydrated: true })
+      // GET /users/me отдаёт {user, profile, settings, kycStatus} (GetMeUseCase ->
+      // UserProfileFull) внутри конверта — пользователем является только поле user.
+      // Найдено аудитом контрактов 2026-09-26: раньше весь объект уходил в store,
+      // и у «пользователя» после перезагрузки страницы не было id/email/role.
+      const me = await apiGet<MeDto>('/users/me')
+      set({ user: me.user, hydrated: true })
     } catch {
       set({ token: null, user: null, hydrated: true })
     }
