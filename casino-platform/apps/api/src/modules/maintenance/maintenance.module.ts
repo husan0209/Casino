@@ -1,5 +1,6 @@
 import { Module, type OnApplicationBootstrap } from '@nestjs/common'
 
+import { AdminModule } from '../admin/admin.module'
 import { ReferralsModule } from '../referrals/referrals.module'
 import { CleanupSessionsJob } from './application/cleanup-sessions.job'
 import { ExpireDepositsJob } from './application/expire-deposits.job'
@@ -25,6 +26,7 @@ import {
   PrismaSessionMaintenanceRepo,
 } from './infrastructure/maintenance.prisma.repo'
 import { MaintenanceWorker } from './infrastructure/maintenance.worker'
+import { MaintenanceAdminController } from './presentation/maintenance-admin.controller'
 import { MaintenanceScheduler } from '../../queues/infrastructure/maintenance.scheduler'
 import { EMAIL_QUEUE_PORT } from '../../queues/queue.types'
 import { QueuesModule } from '../../queues/queues.module'
@@ -37,15 +39,19 @@ import { NOWPaymentsClient } from '../payments/infrastructure/clients/nowpayment
  * - update-rates (5 мин): курсы RUB → exchange_rates + Redis TTL 5 мин (потребители — GAP-34);
  * - withdrawal-reminder (1ч): письмо активным админам о выводах в pending >24ч (дедуп 24ч);
  * - referral-daily (24ч): запуск ReferralCalcService.runDaily (GAP-32; дедуп внутри).
- * Ручной триггер начислений — POST /admin/referrals/run-daily (superadmin, audit-log).
+ * Ручной триггер начислений — POST /admin/referrals/run-daily (superadmin, audit-log):
+ * presentation-слой этого модуля (MaintenanceAdminController, решение В2; путь
+ * сохранён после переезда из referrals).
  *
  * Зависимости: NOWPaymentsClient (для курсов) предоставляется локально,
- * ReferralsModule — ReferralCalcService; EMAIL_QUEUE_PORT — из QueuesModule.
- * AdminModule (AuditLogService) не нужен: дедуп/трейл напоминаний пишутся
+ * ReferralsModule — ReferralCalcService; AdminModule — AuditLogService (audit-log
+ * ручного триггера); EMAIL_QUEUE_PORT — из QueuesModule.
+ * AdminModule/AuditLogService для напоминаний не нужен: дедуп/трейл пишутся
  * напрямую PrismaReminderAuditRepo (audit_logs).
  */
 @Module({
-  imports: [ReferralsModule, QueuesModule],
+  imports: [AdminModule, ReferralsModule, QueuesModule],
+  controllers: [MaintenanceAdminController],
   providers: [
     MaintenanceScheduler,
     MaintenanceWorker,
