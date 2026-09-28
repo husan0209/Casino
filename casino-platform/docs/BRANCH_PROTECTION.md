@@ -18,6 +18,7 @@
    - [x] **Require status checks to pass before merging**
      - Search and add: `secrets-scan` (gitleaks, job в корневом `.github/workflows/ci.yml`)
      - Search and add: `commitlint` (job в корневом `.github/workflows/ci.yml`)
+     - Search and add: `audit` (pnpm audit, job в корневом `.github/workflows/ci.yml`)
      - Search and add: `lint-typecheck-test` (job в корневом `.github/workflows/ci.yml`)
      - Search and add: `docker-build` (job в корневом `.github/workflows/ci.yml`, только main)
      - Search and add: `Architecture guards` (job `guards` в корневом `.github/workflows/architecture-guards.yml`)
@@ -25,7 +26,7 @@
 
    ⚠️ Workflows живут в КОРНЕ репо (`.github/workflows/`), а не в `casino-platform/.github/` — GitHub Actions читает только корневой каталог. Все run-шаги через `defaults.working-directory: casino-platform`.
 
-   Правило имён required check: чек-ран = значение `name:` job'а, а если оно не задано — job id. В списке выше 5 job'ов намеренно БЕЗ `name:` (чек = job id) и один с ним (`Architecture guards`). Если добавишь job с `name:` — добавляй в список display-name, иначе ruleset вечно будет ждать «Expected». Нарушение ловит docs-guard D6.
+   Правило имён required check: чек-ран = значение `name:` job'а, а если оно не задано — job id. В списке выше 6 job'ов намеренно БЕЗ `name:` (чек = job id) и один с ним (`Architecture guards`). Если добавишь job с `name:` — добавляй в список display-name, иначе ruleset вечно будет ждать «Expected». Нарушение ловит docs-guard D6.
    - [x] **Do not allow bypassing the above settings**
    - [x] **Require linear history** (no merge commits)
 4. Repeat for `dev` branch if used.
@@ -47,11 +48,11 @@ Create `.github/CODEOWNERS`:
 * @husan0209
 
 # Critical paths require extra review
-/apps/api/src/modules/payments/ @husan0209
-/apps/api/src/modules/wallet/   @husan0209
-/apps/api/src/modules/auth/     @husan0209
-/infra/                         @husan0209
-/packages/database/prisma/      @husan0209
+/casino-platform/apps/api/src/modules/payments/   @husan0209
+/casino-platform/apps/api/src/modules/wallet/     @husan0209
+/casino-platform/apps/api/src/modules/auth/       @husan0209
+/casino-platform/infra/                           @husan0209
+/casino-platform/packages/database/prisma/        @husan0209
 ```
 
 ## Verify

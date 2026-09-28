@@ -1,7 +1,8 @@
 # Docs Guard — автопроверка документации (Фаза 3)
 # D1 markdown-ссылки · D2 пути в живых доках · D3 env-parity
 # D4 честность SECURITY_CHECKLIST · D5 drift машинных файлов · D6 job-имена branch protection
-# D7 env-имена из кода описаны в .env.example
+# D7 env-имена из кода описаны в .env.example · D8 версия NestJS доки↔package.json
+# D9 источник successResponse в AGENTS.md · D10 пути CODEOWNERS существуют
 #
 # Замороженная спека (docs/tz-part-*) и immutable-снапшоты (docs/archive/)
 # исключены из D2/D3 по design: их пути — историческая фиксация v1.0
@@ -151,6 +152,43 @@ jobs:
           D7_MISSING=$(comm -23 "$TMPD/d7_code.txt" "$TMPD/d7_ex.txt" | grep -vE "$D7_ALLOW" | paste -sd' ' - || true)
           [ -n "$D7_MISSING" ] && fail "D7: код читает, а .env.example не описывает: $D7_MISSING — добавь в .env.example + ENVIRONMENT_VARIABLES (см. GAP-41)"
 
+          # ── D8: версия NestJS в доках = версия в package.json ────
+          # История: STACK/README/AGENT_INSTRUCTIONS писали «NestJS 11» при
+          # реальном ^10.4.1 — агент читал доку и писал код под 11-ю.
+          echo "D8: NestJS version consistency…"
+          PKG_VER=$(grep -oE '"@nestjs/core": *"\^?[0-9]+' apps/api/package.json | grep -oE '[0-9]+$' || true)
+          for DOC in docs/STACK.md README.md docs/AGENT_INSTRUCTIONS.md; do
+            DOC_VER=$(grep -oE 'NestJS [0-9]+' "$DOC" 2>/dev/null | head -1 | grep -oE '[0-9]+' || true)
+            [ -n "$DOC_VER" ] || continue
+            [ "$DOC_VER" = "$PKG_VER" ] ||
+              fail "D8: $DOC says NestJS $DOC_VER, but apps/api/package.json uses NestJS $PKG_VER"
+          done
+
+          # ── D9: AGENTS.md не врёт про источник api-response хелперов ──
+          # Функции (successResponse/successPaginatedResponse/errorResponse)
+          # живут в @casino/shared-utils, типы — в @casino/shared-types.
+          echo "D9: api-response helper imports…"
+          if grep -q 'successResponse' AGENTS.md 2>/dev/null; then
+            grep -q '@casino/shared-utils' AGENTS.md ||
+              fail "D9: AGENTS.md упоминает successResponse, но не @casino/shared-utils (функции — в shared-utils, не в shared-types)"
+          fi
+
+          # ── D10: пути в CODEOWNERS существуют в репо ─────────────
+          # История: 4 из 5 критических путей были без префикса casino-platform/
+          # и GitHub молча их игнорировал — «двойное ревью» существовало на бумаге.
+          echo "D10: CODEOWNERS path validation…"
+          WS="${GITHUB_WORKSPACE:-..}" # в Actions — корень репо; локально — родитель casino-platform
+          if [ -f "$WS/.github/CODEOWNERS" ]; then
+            while IFS= read -r line; do
+              case "$line" in '#'*|''|' '*) continue ;; esac
+              COPATH=$(printf '%s\n' "$line" | awk '{print $1}')
+              case "$COPATH" in '*'|'!'*) continue ;; esac
+              [ -n "$COPATH" ] || continue
+              RESOLVED=${COPATH#/}
+              [ -e "$WS/$RESOLVED" ] || fail "D10: CODEOWNERS путь не существует (GitHub его молча игнорирует): $COPATH"
+            done < "$WS/.github/CODEOWNERS"
+          fi
+
           # ── итог ─────────────────────────────────────────────────
           if [ -s "$ERR" ]; then
             echo
@@ -158,4 +196,4 @@ jobs:
             cat "$ERR"
             exit 1
           fi
-          echo "✅ Docs guard: D1–D7 OK"
+          echo "✅ Docs guard: D1–D10 OK"

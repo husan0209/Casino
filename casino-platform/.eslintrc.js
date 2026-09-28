@@ -124,25 +124,55 @@ module.exports = {
       },
     },
     {
-      // ── Module layering: domain/application must NOT import prisma directly ──
-      // Catches AUDIT_REPORT §A3, A4, H5: use cases reaching into prisma.* without
-      // going through a Repository interface or a Facade. Violates
-      // .cursorrules §"Cross-module communication" and AI_DEVELOPMENT_RULES §3.2.
-      files: [
-        'apps/api/src/modules/**/domain/**/*.ts',
-        'apps/api/src/modules/**/application/**/*.ts',
-      ],
+      // ── DOMAIN layer: no RUNTIME coupling to Nest/Prisma ──
+      // Domain не знает ни о Nest, ни о БД в рантайме. Type-only импорты из
+      // '@prisma/client' разрешены конвенцией репо (casino.repository.ts):
+      // они стираются при компиляции и не создают рантайм-зависимости —
+      // рантайм-импорты ловит guard G1 (в т.ч. import()).
+      // Rule: docs/AI_DEVELOPMENT_RULES.md §3.2, docs/ARCHITECTURE.md §2.
+      files: ['apps/api/src/modules/**/domain/**/*.ts'],
       rules: {
-        // TODO(audit A3/A4/H5): promote back to 'error' after extracting
-        // XxxRepository per module (phase-2 wallet/payments refactor)
         'no-restricted-imports': [
-          'warn',
+          'error',
+          {
+            patterns: [
+              {
+                group: ['@nestjs/*'],
+                message:
+                  'Domain layer MUST be framework-agnostic — no NestJS in domain. See docs/AI_DEVELOPMENT_RULES.md §3.2.',
+              },
+              {
+                group: ['@casino/database', '**/node_modules/.prisma/**', '**/.prisma/client/**'],
+                message:
+                  'Domain layer MUST NOT depend on the database client at runtime. Use repository interfaces (type-only @prisma/client imports are allowed). See docs/AI_DEVELOPMENT_RULES.md §3.2.',
+              },
+              {
+                group: ['**/infrastructure/**', '**/application/**', '**/presentation/**'],
+                message:
+                  'Domain cannot import from other layers. See docs/AI_DEVELOPMENT_RULES.md §3.2.',
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // ── APPLICATION layer: use-cases go through repository interfaces ──
+      // Рантайм-запрет на клиент БД. Последнее нарушение (динамический
+      // import('@casino/database') в maintenance/update-rates.job.ts) устранено
+      // через порт IExchangeRateWriter — warn поднят до error,
+      // TODO(audit A3/A4/H5) закрыт минуя phase-2. Type-only импорты из
+      // '@prisma/client' разрешены конвенцией (casino.repository.ts).
+      files: ['apps/api/src/modules/**/application/**/*.ts'],
+      rules: {
+        'no-restricted-imports': [
+          'error',
           {
             patterns: [
               {
                 group: ['@casino/database', '**/node_modules/.prisma/**', '**/.prisma/client/**'],
                 message:
-                  'Direct prisma import in domain/application is FORBIDDEN. Use a repository interface (IXxxRepository) or another module\'s Facade. See docs/AI_DEVELOPMENT_RULES.md §3.2 and .cursorrules §"Cross-module communication".',
+                  'Application layer MUST NOT import the database client at runtime. Use a repository interface (IXxxRepository) or another module\'s Facade (type-only @prisma/client imports are allowed). See docs/AI_DEVELOPMENT_RULES.md §3.2.',
               },
             ],
           },

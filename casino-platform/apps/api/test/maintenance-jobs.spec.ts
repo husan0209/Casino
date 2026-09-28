@@ -186,6 +186,7 @@ describe('maintenance jobs (GAP-33)', () => {
     function makeWriter() {
       const saved: Array<{ currencyFrom: string; currencyTo: string; rate: string; source: string }> = []
       const cached: Array<Record<string, string>> = []
+      const pruned: Array<Date> = []
       const writer: IExchangeRateWriter = {
         saveRate: async (input) => {
           saved.push(input)
@@ -193,8 +194,11 @@ describe('maintenance jobs (GAP-33)', () => {
         cacheRates: async (rates) => {
           cached.push(rates)
         },
+        pruneHistory: async (olderThan) => {
+          pruned.push(olderThan)
+        },
       }
-      return { saved, cached, writer }
+      return { saved, cached, pruned, writer }
     }
 
     it('провайдер вернул курс → пишется с source провайдера; остальные валюты — fallback констант', async () => {

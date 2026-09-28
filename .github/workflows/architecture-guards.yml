@@ -51,11 +51,33 @@ jobs:
       - name: G1 — no direct prisma in domain/application
         id: g1
         run: |
-          if grep -rnE "from ['\"]@casino/database['\"]" \
-              apps/api/src/modules/*/domain apps/api/src/modules/*/application 2>/dev/null; then
-            echo "❌ G1 FAIL: prisma imported directly in domain/application."
+          # import('@casino/database') тоже ловим: динамический импорт не видит
+          # ESLint no-restricted-imports (история: maintenance/update-rates.job.ts).
+          # Рантайм-импорт '@prisma/client' в domain/application запрещён так же;
+          # type-only импорты разрешены конвенцией (casino.repository.ts) — awk
+          # вырезает import type {...} (в т.ч. многострочные) до проверки.
+          HITS=""
+          for F in $(find apps/api/src/modules/*/domain apps/api/src/modules/*/application \
+                        -name '*.ts' ! -name '*.spec.ts' ! -name '*.test.ts' 2>/dev/null); do
+            M=$(awk 'intype{if($0~/from /)intype=0;next}
+                     /^[[:space:]]*import type/{if($0!~/from /)intype=1;next}
+                     /^[[:space:]]*import \{[^}]*\} from /{
+                       s=$0; sub(/^[^{]*\{/,"",s); sub(/\}.*/,"",s)
+                       n=split(s,p,","); ok=(n>0)
+                       for(i=1;i<=n;i++){t=p[i];gsub(/^[ \t]+|[ \t]+$/,"",t); if(t!~/^type[ \t]/)ok=0}
+                       if(ok)next
+                     }
+                     {print}' "$F" |
+                  grep -E "(from |import\()['\"](@casino/database|@prisma/client)['\"]" || true)
+            [ -n "$M" ] && HITS="$HITS$F:$M
+          "
+          done
+          if [ -n "$HITS" ]; then
+            echo "❌ G1 FAIL: prisma imported at runtime in domain/application:"
+            echo "$HITS" | sed 's/^/   /'
             echo "   See docs/archive/audit-2026-08-25.md §A3, A4, H5."
             echo "   Use a Repository interface (IXxxRepository) or a Facade."
+            echo "   Type-only '@prisma/client' imports are allowed (see casino.repository.ts)."
             exit 1
           fi
           echo "✅ G1 OK"
@@ -167,11 +189,14 @@ jobs:
       - name: G7 — wallet ops use Serializable + retry
         id: g7
         run: |
-          FILE="apps/api/src/modules/wallet/infrastructure/repositories/wallet.prisma.ts"
+          # Реальный код леджера: infrastructure/ledger/ (repositories/wallet.prisma.ts
+          # не существует — до 2026-09 гард молча но-op'ил). Паттерн в ОДИНАРНЫХ
+          # кавычках: в двойных bash съедает \$ и grep всегда возвращал 0.
+          FILE="apps/api/src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma.ts"
           if [ -f "$FILE" ]; then
-            # Count $transaction( occurrences and Serializable occurrences in same file
-            TXNS=$(grep -c "prisma.\$transaction" "$FILE" 2>/dev/null || echo 0)
-            SERIALS=$(grep -c "isolationLevel.*Serializable" "$FILE" 2>/dev/null || echo 0)
+            TXNS=$(grep -c 'prisma\.\$transaction' "$FILE" 2>/dev/null || true)
+            SERIALS=$(grep -c 'isolationLevel.*Serializable' "$FILE" 2>/dev/null || true)
+            TXNS=${TXNS:-0}; SERIALS=${SERIALS:-0}
             if [ "$TXNS" -gt "$SERIALS" ]; then
               echo "❌ G7 FAIL: $FILE has $TXNS \$transaction calls but only $SERIALS use Serializable."
               echo "   See docs/archive/audit-2026-08-25.md §H1."
@@ -330,6 +355,55 @@ jobs:
           fi
           echo "✅ G14 OK (ни одного подавления max-lines-per-function)"
 
+      # ──────────────────────────────────────────────────────────────
+      # O. Domain layer — framework-agnostic (жёсткий гард: нарушений 0)
+      # Rule: docs/AI_DEVELOPMENT_RULES.md §3.2, docs/ARCHITECTURE.md §2
+      # Дублирует ESLint-override (domain, error) как вторая линия обороны.
+      # ──────────────────────────────────────────────────────────────
+      - name: G15 — domain layer is framework-agnostic
+        id: g15
+        run: |
+          HITS=$(grep -rnE "from ['\"]@nestjs" \
+            apps/api/src/modules/*/domain --include="*.ts" 2>/dev/null || true)
+          if [ -n "$HITS" ]; then
+            echo "❌ G15 FAIL: NestJS imports in domain layer:"
+            echo "$HITS" | sed 's/^/   /'
+            echo "   Domain must be pure TypeScript. See docs/AI_DEVELOPMENT_RULES.md §3.2."
+            exit 1
+          fi
+          echo "✅ G15 OK (no NestJS in domain)"
+
+      # ──────────────────────────────────────────────────────────────
+      # P. Ratchet-гарды техдолга (G16–G21): правило в error, но СУЩЕСТВУЮЩИЙ
+      #    долг заморожен в tech-debt/<name>.txt. FAIL — только при росте;
+      #    WARN — если долг погашен и базлайн можно ужать. Детектор один —
+      #    scripts/bin/tech-debt (правь его, не здесь).
+      #    Реестр и план погашения: docs/TECH_DEBT.md
+      # ──────────────────────────────────────────────────────────────
+      - name: G16 — cross-module deep imports (ratchet)
+        id: g16
+        run: sh scripts/bin/tech-debt check cross-module-imports
+
+      - name: G17 — no raw new Error() in api (ratchet)
+        id: g17
+        run: sh scripts/bin/tech-debt check raw-error
+
+      - name: G18 — no NestJS built-in exceptions (ratchet)
+        id: g18
+        run: sh scripts/bin/tech-debt check nest-exceptions
+
+      - name: G19 — eslint-disable burn-down (ratchet)
+        id: g19
+        run: sh scripts/bin/tech-debt check eslint-disable
+
+      - name: G20 — money fields are never number (ratchet)
+        id: g20
+        run: sh scripts/bin/tech-debt check money-number
+
+      - name: G21 — use-cases have tests (ratchet)
+        id: g21
+        run: sh scripts/bin/tech-debt check use-case-specs
+
       # ── Final summary ─────────────────────────────────────────────
       - name: Summary
         if: always()
@@ -349,3 +423,10 @@ jobs:
           echo "- G12 branch name:         ${{ steps.g12.outcome }}"
           echo "- G13 zero-warnings gate:  ${{ steps.g13.outcome }}"
           echo "- G14 no max-lines escape: ${{ steps.g14.outcome }}"
+          echo "- G15 domain framework-free: ${{ steps.g15.outcome }}"
+          echo "- G16 cross-module ratchet: ${{ steps.g16.outcome }}"
+          echo "- G17 raw Error ratchet:   ${{ steps.g17.outcome }}"
+          echo "- G18 nest-exceptions rat.: ${{ steps.g18.outcome }}"
+          echo "- G19 eslint-disable rat.:  ${{ steps.g19.outcome }}"
+          echo "- G20 money-number ratchet: ${{ steps.g20.outcome }}"
+          echo "- G21 use-case specs rat.:  ${{ steps.g21.outcome }}"

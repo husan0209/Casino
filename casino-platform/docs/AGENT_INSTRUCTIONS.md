@@ -28,7 +28,7 @@ last_updated: 2026-08-28
 
 # ── Project context ────────────────────────────────────────
 You are working on casino-platform — an online casino for the CIS market (Russian language only on MVP).
-Stack: TypeScript + NestJS 11 (modular monolith) + Prisma + PostgreSQL + Redis + BullMQ + Next.js 14.
+Stack: TypeScript + NestJS 10 (modular monolith) + Prisma + PostgreSQL + Redis + BullMQ + Next.js 14.
 Architecture: Monorepo (pnpm workspaces), 4-layer modules (domain / application / infrastructure / presentation).
 
 # ── Project structure ──────────────────────────────────────
@@ -109,9 +109,10 @@ Format: see AI_DEVELOPMENT_RULES.md §2.3.
 Use UNIQUE constraint on ledger_entries.idempotency_key.
 
 # ── API responses — ALWAYS wrapper ─────────────────────────
-Return ONLY through helpers from @casino/shared-types:
+Types live in @casino/shared-types, functions in @casino/shared-utils.
+Return ONLY through helpers from @casino/shared-utils:
     successResponse(data)
-    successResponse(data, paginationMeta)
+    successPaginatedResponse(data, paginationMeta)
     errorResponse(code, message, details?)
 
 NEVER return raw objects from controllers.
@@ -149,7 +150,7 @@ Check:
 -   NEVER do prisma.walletAccount.update() directly — use WalletFacade
 
 # ── Stack specifics ────────────────────────────────────────
-Backend:    NestJS 11 (NOT Express standalone)
+Backend:    NestJS 10 (NOT Express standalone)
 ORM:        Prisma 5.x
 Validation: Zod (own) + class-validator (NestJS DTOs)
 Logging:    Pino with structured JSON + redact for secrets
@@ -220,7 +221,7 @@ Online casino платформа для рынка СНГ. MVP на русско
 2.  **Идемпотентность** — каждая финансовая операция требует `idempotencyKey` с проверкой дубликата ДО выполнения.
 3.  **Структура модуля** — 4 слоя. Бизнес-логика ТОЛЬКО в `application/use-cases/`. HTTP ТОЛЬКО в `presentation/controllers/`. БД ТОЛЬКО в `infrastructure/repositories/`.
 4.  **Межмодульное общение** — только через Facade другого модуля. Никогда не импортируй `Repository` одного модуля в другой.
-5.  **API ответы** — всегда через `successResponse()` / `errorResponse()` из `@casino/shared-types`. Никогда сырой объект.
+5.  **API ответы** — всегда через `successResponse()` / `errorResponse()` из `@casino/shared-utils` (типы — из `@casino/shared-types`). Никогда сырой объект.
 6.  **Ошибки** — всегда кастомный класс, расширяющий `AppError`. Код ошибки стабильный (например `INSUFFICIENT_FUNDS`), есть `httpStatus`.
 7.  **Безопасность** — не логируй пароли, токены, номера карт, документы. Валидируй через Zod. Проверяй права в Guard.
 8.  **Транзакции БД** — все финансовые multi-table операции в `prisma.$transaction()`. Optimistic locking retry до 3 раз.

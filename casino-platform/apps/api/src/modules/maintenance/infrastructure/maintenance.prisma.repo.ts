@@ -130,6 +130,11 @@ export class PrismaExchangeRateWriter implements IExchangeRateWriter {
     await prisma.exchangeRate.create({ data: input })
   }
 
+  /** Таблица чистится от записей старше cutoff: тики каждые 5 мин — иначе бесконечный рост. */
+  async pruneHistory(olderThan: Date): Promise<void> {
+    await prisma.exchangeRate.deleteMany({ where: { fetchedAt: { lt: olderThan } } })
+  }
+
   /** Без Redis_URL (dev) кеш пропускается молча; сбой Redis — исключение наверх (job логирует warn). */
   async cacheRates(rates: Record<string, string>): Promise<void> {
     if (Object.keys(rates).length === 0) {

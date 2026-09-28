@@ -29,7 +29,7 @@ last_updated: 2026-06-19
 - Go — отличный, но менее выразительный для AI-генерации
 - Python — медленнее для high-frequency use cases
 
-### Framework: NestJS 11
+### Framework: NestJS 10
 
 **Почему NestJS:**
 

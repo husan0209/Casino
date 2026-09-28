@@ -63,6 +63,8 @@ export interface IExchangeRateWriter {
   saveRate(input: { currencyFrom: string; currencyTo: string; rate: string; source: string }): Promise<void>
   /** best-effort Redis-кеш: сбой не роняет задачу */
   cacheRates(rates: Record<string, string>): Promise<void>
+  /** Очистка истории курсов старше cutoff (deleteMany идемпотентен) */
+  pruneHistory(olderThan: Date): Promise<void>
 }
 
 /** Источник курсов: NOWPayments /estimate (или dev-stub по константам). */
