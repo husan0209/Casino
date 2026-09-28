@@ -1,13 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common'
 
+import { CAPTCHA_SERVICE, ICaptchaService, IPasswordHasher, IJwtTokenService, PASSWORD_HASHER, JWT_TOKEN_SERVICE } from '../../domain/auth.ports'
 import { type LockoutConfig, type UserRole } from '../../domain/entities/user.entity'
 import { AccountBlockedError, AccountLockedError, InvalidCredentialsError, SelfExcludedError } from '../../domain/errors'
 import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
 import { IUserSettingsRepository, USER_SETTINGS_REPOSITORY } from '../../domain/repositories/user-settings.repository'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
-import { CaptchaService } from '../../infrastructure/services/captcha.service'
-import { JwtTokenService } from '../../infrastructure/services/jwt.service'
-import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
 
 @Injectable()
 export class LoginUseCase {
@@ -23,9 +21,9 @@ export class LoginUseCase {
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,
     @Inject(USER_SETTINGS_REPOSITORY) private userSettings: IUserSettingsRepository,
-    private hasher: PasswordHasher,
-    private jwt: JwtTokenService,
-    private captcha: CaptchaService,
+    @Inject(PASSWORD_HASHER) private hasher: IPasswordHasher,
+    @Inject(JWT_TOKEN_SERVICE) private jwt: IJwtTokenService,
+    @Inject(CAPTCHA_SERVICE) private captcha: ICaptchaService,
   ) {}
   async execute(input: {
     email: string

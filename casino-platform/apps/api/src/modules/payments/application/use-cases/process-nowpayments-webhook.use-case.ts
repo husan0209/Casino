@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 
 import { errorMessage } from '@/common/utils/error-message'
 
@@ -7,8 +7,12 @@ import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 
 import type { Currency } from '@casino/shared-types'
 
-import { NOWPaymentsClient } from '../../infrastructure/clients/nowpayments.client'
-import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
+import {
+  INowPaymentsClient,
+  IPaymentRequestRepository,
+  NOWPAYMENTS_CLIENT,
+  PAYMENT_REQUEST_REPOSITORY,
+} from '../../domain/payments.ports'
 
 /** IPN-запрос провайдера: заголовки, разобранный JSON, оригинальные байты тела и IP. */
 export interface ProcessNowPaymentsWebhookInput {
@@ -23,12 +27,12 @@ export class ProcessNOWPaymentsWebhookUseCase {
   private logger = new Logger(ProcessNOWPaymentsWebhookUseCase.name)
   // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
-    private repo: PaymentRequestRepository,
-    private np: NOWPaymentsClient,
+    @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
+    @Inject(NOWPAYMENTS_CLIENT) private readonly np: INowPaymentsClient,
     private wallet: WalletFacade,
     private users: UsersFacade,
   ) {}
-  async execute(input: ProcessNowPaymentsWebhookInput): Promise<{ ok: boolean; }> {
+  async execute(input: ProcessNowPaymentsWebhookInput): Promise<{ ok: boolean }> {
     const { rawHeaders, body, rawBody, ip } = input
     const signature = rawHeaders['x-nowpayments-sig'] || ''
     // Store the exact raw body bytes for forensics and re-verification.
@@ -68,7 +72,13 @@ export class ProcessNOWPaymentsWebhookUseCase {
 
   /** finished/confirmed -> зачисление; failed/expired/refunded -> closed-статусы; прочее -> processing. */
   private async applyPaymentStatus(
-    pr: { id: string; userId: string; status: string; currency: string; amount: { toString(): string } },
+    pr: {
+      id: string
+      userId: string
+      status: string
+      currency: string
+      amount: { toString(): string }
+    },
     paymentStatus: string,
     body: Record<string, unknown>,
   ): Promise<void> {

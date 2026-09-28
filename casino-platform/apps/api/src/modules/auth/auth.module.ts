@@ -12,6 +12,12 @@ import { RefreshUseCase } from './application/use-cases/refresh.use-case'
 import { RegisterUseCase } from './application/use-cases/register.use-case'
 import { ResetPasswordUseCase } from './application/use-cases/reset-password.use-case'
 import { VerifyEmailUseCase } from './application/use-cases/verify-email.use-case'
+import {
+  CAPTCHA_SERVICE,
+  EMAIL_QUEUE_SERVICE,
+  JWT_TOKEN_SERVICE,
+  PASSWORD_HASHER,
+} from './domain/auth.ports'
 import { AUTH_PROVIDER_REPOSITORY } from './domain/repositories/auth-provider.repository'
 import { SESSION_REPOSITORY } from './domain/repositories/session.repository'
 import { USER_SETTINGS_REPOSITORY } from './domain/repositories/user-settings.repository'
@@ -40,12 +46,22 @@ import { RolesGuard } from './presentation/guards/roles.guard'
   imports: [QueuesModule],
   controllers: [AuthController],
   providers: [
+    // Класс-токены остаются: presentation (auth.guard) и внешний
+    // common/guards/optional-auth.guard внедряют JwtTokenService напрямую,
+    // а сам он — в exports модуля (MODULE_BOUNDARIES §2.5).
     PasswordHasher,
     JwtTokenService,
     CaptchaService,
     EmailQueueService,
     AuthGuard,
     RolesGuard,
+    // В5: application-слой получает infrastructure только через порты
+    // (DI-токены). useExisting — тот же экземпляр, что и у класс-токена
+    // (образец: payments.module.ts).
+    { provide: PASSWORD_HASHER, useExisting: PasswordHasher },
+    { provide: JWT_TOKEN_SERVICE, useExisting: JwtTokenService },
+    { provide: CAPTCHA_SERVICE, useExisting: CaptchaService },
+    { provide: EMAIL_QUEUE_SERVICE, useExisting: EmailQueueService },
     { provide: USER_REPOSITORY, useClass: PrismaUserRepository },
     { provide: AUTH_PROVIDER_REPOSITORY, useClass: PrismaAuthProviderRepository },
     { provide: SESSION_REPOSITORY, useClass: PrismaSessionRepository },

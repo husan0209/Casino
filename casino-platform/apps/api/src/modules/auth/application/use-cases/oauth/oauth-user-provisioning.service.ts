@@ -2,10 +2,10 @@ import { randomBytes } from 'node:crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 
+import { IJwtTokenService, JWT_TOKEN_SERVICE } from '@modules/auth/domain/auth.ports'
 import { AUTH_PROVIDER_REPOSITORY, type AuthProviderKind, IAuthProviderRepository } from '@modules/auth/domain/repositories/auth-provider.repository'
 import { ISessionRepository, SESSION_REPOSITORY } from '@modules/auth/domain/repositories/session.repository'
 import { IUserRepository, USER_REPOSITORY } from '@modules/auth/domain/repositories/user.repository'
-import { JwtTokenService } from '@modules/auth/infrastructure/services/jwt.service'
 
 import { type User } from '../../../domain/entities/user.entity'
 
@@ -42,7 +42,7 @@ export class OAuthUserProvisioningService {
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(AUTH_PROVIDER_REPOSITORY) private authProviders: IAuthProviderRepository,
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,
-    private jwt: JwtTokenService,
+    @Inject(JWT_TOKEN_SERVICE) private jwt: IJwtTokenService,
   ) {}
 
   private async generateReferralCode(): Promise<string> {

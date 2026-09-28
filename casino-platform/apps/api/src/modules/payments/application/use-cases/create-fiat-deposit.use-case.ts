@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
@@ -13,8 +13,12 @@ import type { DisplayCurrency } from '@casino/shared-config'
 import { money } from '@casino/shared-utils'
 
 import { AmountTooLargeError, AmountTooSmallError, PaymentProviderError } from '../../domain/errors'
-import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
-import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
+import {
+  IRukassaClient,
+  IPaymentRequestRepository,
+  PAYMENT_REQUEST_REPOSITORY,
+  RUKASSA_CLIENT,
+} from '../../domain/payments.ports'
 
 export interface CreateFiatDepositInput {
   amount: string
@@ -26,8 +30,8 @@ export interface CreateFiatDepositInput {
 export class CreateFiatDepositUseCase {
   // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
-    private repo: PaymentRequestRepository,
-    private rukassa: RukassaClient,
+    @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
+    @Inject(RUKASSA_CLIENT) private readonly rukassa: IRukassaClient,
     private kycCheck: KycCheckService,
     private config: ConfigService,
     private geo: GeoFacade,
@@ -71,7 +75,8 @@ export class CreateFiatDepositUseCase {
       'http://localhost:3001/api/v1/payments/webhooks/rukassa'
     const successUrl =
       this.config.get<string>('RUKASSA_SUCCESS_URL') || 'http://localhost:3000/?deposit=success'
-    const failUrl = this.config.get<string>('RUKASSA_FAIL_URL') || 'http://localhost:3000/?deposit=failed'
+    const failUrl =
+      this.config.get<string>('RUKASSA_FAIL_URL') || 'http://localhost:3000/?deposit=failed'
 
     try {
       const res = await this.rukassa.createPayment({

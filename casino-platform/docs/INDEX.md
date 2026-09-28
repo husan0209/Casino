@@ -17,52 +17,53 @@ last_updated: 2026-08-28
 
 ### Обязательно прочитать при старте сессии
 
-| Документ | Зачем | Обязательность |
-|----------|-------|----------------|
-| [README.md](../README.md) | Общая картина проекта | 📌 Обязательно |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Архитектурные решения | 📌 Обязательно |
-| [STACK.md](./STACK.md) | Технологии и обоснование | 📌 Обязательно |
-| [API_CONVENTIONS.md](./API_CONVENTIONS.md) | REST API standards | 📌 Обязательно |
-| [CONVENTIONS.md](./CONVENTIONS.md) | Code conventions | 📌 Обязательно |
-| [AI_DEVELOPMENT_RULES.md](./AI_DEVELOPMENT_RULES.md) | Правила AI-агента | 🚨 КРИТИЧНО |
+| Документ                                             | Зачем                    | Обязательность |
+| ---------------------------------------------------- | ------------------------ | -------------- |
+| [README.md](../README.md)                            | Общая картина проекта    | 📌 Обязательно |
+| [ARCHITECTURE.md](./ARCHITECTURE.md)                 | Архитектурные решения    | 📌 Обязательно |
+| [STACK.md](./STACK.md)                               | Технологии и обоснование | 📌 Обязательно |
+| [API_CONVENTIONS.md](./API_CONVENTIONS.md)           | REST API standards       | 📌 Обязательно |
+| [CONVENTIONS.md](./CONVENTIONS.md)                   | Code conventions         | 📌 Обязательно |
+| [AI_DEVELOPMENT_RULES.md](./AI_DEVELOPMENT_RULES.md) | Правила AI-агента        | 🚨 КРИТИЧНО    |
 
 ### Для AI IDE / Agent (machine-readable правила)
 
-| Документ | Зачем |
-|----------|-------|
+| Документ                                         | Зачем                                                                         |
+| ------------------------------------------------ | ----------------------------------------------------------------------------- |
 | [AGENT_INSTRUCTIONS.md](./AGENT_INSTRUCTIONS.md) | Шаблоны `.cursorrules` / `CLAUDE.md` для Cursor, Windsurf, Cline, Claude Code |
-| [MODULE_TEMPLATE.md](./MODULE_TEMPLATE.md) | Пошаговый чеклист создания нового backend модуля |
+| [MODULE_TEMPLATE.md](./MODULE_TEMPLATE.md)       | Пошаговый чеклист создания нового backend модуля                              |
 
 ### Перед конкретными задачами
 
-| Если работаешь с… | Дополнительно прочитай |
-|--------------------|------------------------|
-| **Новый модуль** | [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md) + [MODULE_TEMPLATE.md](./MODULE_TEMPLATE.md) |
-| **Настройкой AI IDE** | [AGENT_INSTRUCTIONS.md](./AGENT_INSTRUCTIONS.md) |
-| **Payments / wallet** | [PAYMENT_OVERVIEW.md](./PAYMENT_OVERVIEW.md) + [USER_FLOW_FIRST_90_SECONDS.md](./USER_FLOW_FIRST_90_SECONDS.md) §Backend |
-| **Security / auth** | [SECURITY_BASELINE.md](./SECURITY_BASELINE.md) |
-| **Casino providers** | [PROVIDER_INTEGRATION_STRATEGY.md](./PROVIDER_INTEGRATION_STRATEGY.md) |
-| **Frontend web / витрина** | [tz-part-5-frontend-web.md](./tz-part-5-frontend-web.md) + [USER_FLOW_FIRST_90_SECONDS.md](./USER_FLOW_FIRST_90_SECONDS.md) |
-| **Env-переменные** | [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md) |
+| Если работаешь с…          | Дополнительно прочитай                                                                                                                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Новый модуль**           | [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md) + [MODULE_TEMPLATE.md](./MODULE_TEMPLATE.md)                                                                                                      |
+| **Настройкой AI IDE**      | [AGENT_INSTRUCTIONS.md](./AGENT_INSTRUCTIONS.md)                                                                                                                                                 |
+| **Payments / wallet**      | [PAYMENT_OVERVIEW.md](./PAYMENT_OVERVIEW.md) + [USER_FLOW_FIRST_90_SECONDS.md](./USER_FLOW_FIRST_90_SECONDS.md) §Backend                                                                         |
+| **Security / auth**        | [SECURITY_BASELINE.md](./SECURITY_BASELINE.md)                                                                                                                                                   |
+| **Casino providers**       | [PROVIDER_INTEGRATION_STRATEGY.md](./PROVIDER_INTEGRATION_STRATEGY.md)                                                                                                                           |
+| **Frontend web / витрина** | [tz-part-5-frontend-web.md](./tz-part-5-frontend-web.md) + [tz-part-5.1-frontend-design.md](./tz-part-5.1-frontend-design.md) + [USER_FLOW_FIRST_90_SECONDS.md](./USER_FLOW_FIRST_90_SECONDS.md) |
+| **Env-переменные**         | [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md)                                                                                                                                           |
 
 ---
 
 ## 2. Техническое задание (7 частей)
 
-| # | Часть | Документ | Описание |
-|---|-------|----------|----------|
-| 1 | Foundation | [tz-part-1-foundation.md](./tz-part-1-foundation.md) | Monorepo, стек, architecture, conventions |
-| 2 | Backend Core | [tz-part-2-auth-users-kyc-rbac.md](./tz-part-2-auth-users-kyc-rbac.md) | Auth, Users, KYC, RBAC |
-| 3 | Wallet & Payments | [tz-part-3-payments-wallet.md](./tz-part-3-payments-wallet.md) | Wallet ledger, Rukassa, NOWPayments |
-| 4 | Casino Providers | [tz-part-4-casino-providers.md](./tz-part-4-casino-providers.md) | Seamless Wallet, providers, Demo |
-| 5 | Frontend Web | [tz-part-5-frontend-web.md](./tz-part-5-frontend-web.md) | Next.js: mobile-first витрина, касса, geo, мультивалютный UI |
-| 6 | Admin & Support | [tz-part-6-admin-support-referrals.md](./tz-part-6-admin-support-referrals.md) | Admin panel, support, referrals |
-| 7 | DevOps | [tz-part-7-devops-security-qa.md](./tz-part-7-devops-security-qa.md) | VPS, Docker, CI/CD, security, QA |
+| #   | Часть             | Документ                                                                       | Описание                                                                         |
+| --- | ----------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| 1   | Foundation        | [tz-part-1-foundation.md](./tz-part-1-foundation.md)                           | Monorepo, стек, architecture, conventions                                        |
+| 2   | Backend Core      | [tz-part-2-auth-users-kyc-rbac.md](./tz-part-2-auth-users-kyc-rbac.md)         | Auth, Users, KYC, RBAC                                                           |
+| 3   | Wallet & Payments | [tz-part-3-payments-wallet.md](./tz-part-3-payments-wallet.md)                 | Wallet ledger, Rukassa, NOWPayments                                              |
+| 4   | Casino Providers  | [tz-part-4-casino-providers.md](./tz-part-4-casino-providers.md)               | Seamless Wallet, providers, Demo                                                 |
+| 5   | Frontend Web      | [tz-part-5-frontend-web.md](./tz-part-5-frontend-web.md)                       | Next.js: mobile-first витрина, касса, geo, мультивалютный UI                     |
+| 5.1 | Frontend Design   | [tz-part-5.1-frontend-design.md](./tz-part-5.1-frontend-design.md)             | **Дополнение к Части 5:** гибридный UI, визуальные решения, GameDeck, тон голоса |
+| 6   | Admin & Support   | [tz-part-6-admin-support-referrals.md](./tz-part-6-admin-support-referrals.md) | Admin panel, support, referrals                                                  |
+| 7   | DevOps            | [tz-part-7-devops-security-qa.md](./tz-part-7-devops-security-qa.md)           | VPS, Docker, CI/CD, security, QA                                                 |
 
 ### Продуктовый user-flow (не часть ТЗ, но контракт приёмки)
 
-| Документ | Зачем |
-|----------|-------|
+| Документ                                                         | Зачем                                                                   |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | [USER_FLOW_FIRST_90_SECONDS.md](./USER_FLOW_FIRST_90_SECONDS.md) | Путь игрока 0–90 сек: слот → вход → касса. Связан с Part 3 §15 и Part 5 |
 
 ---
@@ -100,33 +101,43 @@ last_updated: 2026-08-28
 ## 4. Что где искать
 
 ### «Хочу понять общую архитектуру»
+
 → [README.md](../README.md) → [ARCHITECTURE.md](./ARCHITECTURE.md)
 
 ### «Хочу создать новый endpoint»
+
 → [API_CONVENTIONS.md](./API_CONVENTIONS.md) → [CONVENTIONS.md](./CONVENTIONS.md) → [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md)
 
 ### «Хочу понять как работают деньги»
+
 → [PAYMENT_OVERVIEW.md](./PAYMENT_OVERVIEW.md) + [CONVENTIONS.md](./CONVENTIONS.md) (раздел 5)
 
 ### «Хочу добавить новый платёжный провайдер»
+
 → [PAYMENT_OVERVIEW.md](./PAYMENT_OVERVIEW.md) → раздел 10 «Добавление нового провайдера»
 
 ### «Хочу добавить новый game-провайдер»
+
 → [PROVIDER_INTEGRATION_STRATEGY.md](./PROVIDER_INTEGRATION_STRATEGY.md) → раздел 9
 
 ### «Хочу настроить окружение»
+
 → [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md)
 
 ### «Хочу понять настройки безопасности»
+
 → [SECURITY_BASELINE.md](./SECURITY_BASELINE.md)
 
 ### «Пишу код — какие правила соблюдать?»
+
 → [AI_DEVELOPMENT_RULES.md](./AI_DEVELOPMENT_RULES.md) — обязательно к прочтению
 
 ### «Я использую Cursor/Claude Code — как дать инструкции агенту?»
+
 → [AGENT_INSTRUCTIONS.md](./AGENT_INSTRUCTIONS.md) — готовые `.cursorrules` / `CLAUDE.md` шаблоны
 
 ### «Хочу создать новый backend модуль с нуля»
+
 → [MODULE_TEMPLATE.md](./MODULE_TEMPLATE.md) — 10 шагов от README до PR-чеклиста
 
 ---
@@ -178,17 +189,17 @@ last_updated: 2026-08-28
 
 ### 6.1. Владельцы тем (правило меняется только у владельца)
 
-| Тема | Владелец (полная версия) | Сводки/ссылки в |
-|------|--------------------------|------------------|
-| Статус проекта и задач | **IMPLEMENTATION_GAPS.md** (GAP-трекер) | README, INDEX, SECURITY_CHECKLIST |
-| Деньги: типы и helpers | **CONVENTIONS.md §5** (реализация) | AI_DEVELOPMENT_RULES §1 (правило), AGENTS.md, .cursorrules |
-| Слои модуля и фасады | **ARCHITECTURE.md §4–6** | AI_DEVELOPMENT_RULES §3, MODULE_TEMPLATE, AGENTS.md |
-| Процедура создания модуля | **MODULE_TEMPLATE.md** (10 шагов) | AGENTS.md, MODULE_BOUNDARIES §17 |
-| API-контракты и ошибки | **API_CONVENTIONS.md** | AI_DEVELOPMENT_RULES §4–5, AGENTS.md |
-| Безопасность | **SECURITY_BASELINE.md** | AI_DEVELOPMENT_RULES §6, SECURITY_CHECKLIST (статус), AGENTS.md |
-| Env-переменные | **ENVIRONMENT_VARIABLES.md** ↔ `env.validation.ts` | README, DEPLOY |
-| Карта модулей | **MODULE_BOUNDARIES.md** | ARCHITECTURE §4, AGENTS.md |
-| Порядок bootstrap-чтения | **AGENTS.md «Обязательный bootstrap»** (машинный, самый свежий) | INDEX §1 (тематическая карта), AI_DEVELOPMENT_RULES §0 |
+| Тема                      | Владелец (полная версия)                                        | Сводки/ссылки в                                                 |
+| ------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------- |
+| Статус проекта и задач    | **IMPLEMENTATION_GAPS.md** (GAP-трекер)                         | README, INDEX, SECURITY_CHECKLIST                               |
+| Деньги: типы и helpers    | **CONVENTIONS.md §5** (реализация)                              | AI_DEVELOPMENT_RULES §1 (правило), AGENTS.md, .cursorrules      |
+| Слои модуля и фасады      | **ARCHITECTURE.md §4–6**                                        | AI_DEVELOPMENT_RULES §3, MODULE_TEMPLATE, AGENTS.md             |
+| Процедура создания модуля | **MODULE_TEMPLATE.md** (10 шагов)                               | AGENTS.md, MODULE_BOUNDARIES §17                                |
+| API-контракты и ошибки    | **API_CONVENTIONS.md**                                          | AI_DEVELOPMENT_RULES §4–5, AGENTS.md                            |
+| Безопасность              | **SECURITY_BASELINE.md**                                        | AI_DEVELOPMENT_RULES §6, SECURITY_CHECKLIST (статус), AGENTS.md |
+| Env-переменные            | **ENVIRONMENT_VARIABLES.md** ↔ `env.validation.ts`              | README, DEPLOY                                                  |
+| Карта модулей             | **MODULE_BOUNDARIES.md**                                        | ARCHITECTURE §4, AGENTS.md                                      |
+| Порядок bootstrap-чтения  | **AGENTS.md «Обязательный bootstrap»** (машинный, самый свежий) | INDEX §1 (тематическая карта), AI_DEVELOPMENT_RULES §0          |
 
 ### 6.2. Приоритет при противоречиях (сверху вниз)
 

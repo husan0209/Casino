@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { Decimal } from 'decimal.js'
 
 import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
@@ -9,19 +9,19 @@ import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 import { type Currency } from '@casino/shared-types'
 
 import { AmountTooLargeError, AmountTooSmallError } from '../../domain/errors'
-import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
+import { IPaymentRequestRepository, PAYMENT_REQUEST_REPOSITORY } from '../../domain/payments.ports'
 
 @Injectable()
 export class CreateWithdrawalUseCase {
   constructor(
-    private repo: PaymentRequestRepository,
+    @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     private wallet: WalletFacade,
     private kyc: KycCheckService,
   ) {}
   async execute(
     userId: string,
     input: { amount: string; currency: string; method?: string; destination: string },
-  ): Promise<{ payment_request_id: string; }> {
+  ): Promise<{ payment_request_id: string }> {
     await this.kyc.assertCanWithdraw(userId)
     const amt = new Decimal(input.amount)
     const min = input.currency === 'RUB' ? '500' : '0.001'
