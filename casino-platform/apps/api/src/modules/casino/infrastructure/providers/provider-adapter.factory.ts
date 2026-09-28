@@ -3,11 +3,12 @@ import { ConfigService } from '@nestjs/config'
 
 import { DemoProviderAdapter } from './demo/demo-provider.adapter'
 import { GitslotparkProviderAdapter } from './gitslotpark/gitslotpark.adapter'
+import { type IProviderAdapterFactory } from '../../domain/casino.ports'
 import { ProviderNotSupportedError } from '../../domain/errors'
 import { type GameProviderAdapter } from '../../domain/provider-adapter.interface'
 
 @Injectable()
-export class ProviderAdapterFactory {
+export class ProviderAdapterFactory implements IProviderAdapterFactory {
   private readonly logger = new Logger(ProviderAdapterFactory.name)
 
   constructor(private config: ConfigService) {}

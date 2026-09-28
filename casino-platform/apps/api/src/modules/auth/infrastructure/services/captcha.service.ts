@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import {
+  type CaptchaTransport,
+  type CaptchaVerifyResponse,
+  type ICaptchaService,
+} from '../../domain/auth.ports'
 import { CaptchaFailedError, CaptchaRequiredError } from '../../domain/errors'
 
 /**
@@ -23,15 +28,11 @@ import { CaptchaFailedError, CaptchaRequiredError } from '../../domain/errors'
 const VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 const VERIFY_TIMEOUT_MS = 5_000
 
-export interface CaptchaVerifyResponse {
-  success: boolean
-  'error-codes'?: string[]
-}
-
-export type CaptchaTransport = (url: string, init: RequestInit) => Promise<CaptchaVerifyResponse>
+// Типы CaptchaVerifyResponse/CaptchaTransport — контракт капчи, живут в
+// domain/auth.ports.ts (В5); класс реализует ICaptchaService.
 
 @Injectable()
-export class CaptchaService {
+export class CaptchaService implements ICaptchaService {
   private readonly logger = new Logger(CaptchaService.name)
 
   /** Подменяется в тестах, чтобы не бить по сети. */

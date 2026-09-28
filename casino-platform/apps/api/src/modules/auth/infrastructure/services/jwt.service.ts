@@ -3,6 +3,8 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto'
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import { type IJwtTokenService } from '../../domain/auth.ports'
+
 const b64url = (buf: Buffer): string => buf.toString('base64url')
 
 function expiresToSeconds(v: string | undefined, fallback: number): number {
@@ -32,7 +34,7 @@ interface AccessPayload {
  * Реализация на node:crypto — без внешних зависимостей.
  */
 @Injectable()
-export class JwtTokenService {
+export class JwtTokenService implements IJwtTokenService {
   constructor(private config: ConfigService) {}
 
   private accessSecret(): string {

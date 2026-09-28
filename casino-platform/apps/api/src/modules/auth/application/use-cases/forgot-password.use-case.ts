@@ -2,19 +2,19 @@ import { randomBytes } from 'crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 
+import { EMAIL_QUEUE_SERVICE, IEmailQueueService } from '../../domain/auth.ports'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 import {
   IPasswordResetRepository,
   PASSWORD_RESET_REPOSITORY,
 } from '../../domain/repositories/verification-token.repository'
-import { EmailQueueService } from '../../infrastructure/services/email-queue.service'
 
 @Injectable()
 export class ForgotPasswordUseCase {
   constructor(
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(PASSWORD_RESET_REPOSITORY) private resets: IPasswordResetRepository,
-    private email: EmailQueueService,
+    @Inject(EMAIL_QUEUE_SERVICE) private email: IEmailQueueService,
   ) {}
   async execute(emailInput: string): Promise<{ message: string; }> {
     const user = await this.users.findByEmail(emailInput.toLowerCase().trim())

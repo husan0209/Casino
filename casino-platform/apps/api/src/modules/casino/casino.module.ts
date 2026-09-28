@@ -8,6 +8,7 @@ import { GameCallbackService } from './application/services/game-callback.servic
 import { FavoritesUseCase } from './application/use-cases/favorites.use-case'
 import { LaunchGameUseCase } from './application/use-cases/launch-game.use-case'
 import { ListGamesUseCase } from './application/use-cases/list-games.use-case'
+import { PROVIDER_ADAPTER_FACTORY } from './domain/casino.ports'
 import {
   GAME_CATALOG_REPOSITORY,
   GAME_FAVORITES_REPOSITORY,
@@ -28,8 +29,14 @@ import { ProviderCallbackController } from './presentation/controllers/provider-
   imports: [ConfigModule, AuthModule, WalletModule, AdminModule],
   controllers: [CasinoController, ProviderCallbackController, CasinoAdminController],
   providers: [
+    // Класс-токен остаётся: presentation-контроллеры (casino-admin,
+    // provider-callback) и exports модуля пока внедряют фабрику напрямую.
     ProviderAdapterFactory,
     DemoProviderAdapter,
+    // В5: application-слой получает infrastructure только через порты
+    // (DI-токены). useExisting — тот же экземпляр, что и у класс-токена
+    // (образец: payments.module.ts).
+    { provide: PROVIDER_ADAPTER_FACTORY, useExisting: ProviderAdapterFactory },
     { provide: GAME_CATALOG_REPOSITORY, useClass: PrismaGameCatalogRepository },
     { provide: GAME_FAVORITES_REPOSITORY, useClass: PrismaGameFavoritesRepository },
     { provide: GAME_PLAY_REPOSITORY, useClass: PrismaGamePlayRepository },

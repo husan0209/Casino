@@ -2,14 +2,12 @@ import { randomBytes } from 'crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 
+import { EMAIL_QUEUE_SERVICE, IEmailQueueService, IPasswordHasher, IJwtTokenService, PASSWORD_HASHER, JWT_TOKEN_SERVICE } from '../../domain/auth.ports'
 import { type UserRole } from '../../domain/entities/user.entity'
 import { EmailAlreadyExistsError, WeakPasswordError } from '../../domain/errors'
 import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 import { EMAIL_VERIFICATION_REPOSITORY, IEmailVerificationRepository } from '../../domain/repositories/verification-token.repository'
-import { EmailQueueService } from '../../infrastructure/services/email-queue.service'
-import { JwtTokenService } from '../../infrastructure/services/jwt.service'
-import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const CODE_LENGTH = 8
@@ -21,9 +19,9 @@ export class RegisterUseCase {
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,
     @Inject(EMAIL_VERIFICATION_REPOSITORY) private verif: IEmailVerificationRepository,
-    private hasher: PasswordHasher,
-    private email: EmailQueueService,
-    private jwt: JwtTokenService,
+    @Inject(PASSWORD_HASHER) private hasher: IPasswordHasher,
+    @Inject(EMAIL_QUEUE_SERVICE) private email: IEmailQueueService,
+    @Inject(JWT_TOKEN_SERVICE) private jwt: IJwtTokenService,
   ) {}
 
   private async generateReferralCode(): Promise<string> {
