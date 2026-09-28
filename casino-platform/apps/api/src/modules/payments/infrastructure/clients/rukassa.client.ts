@@ -38,8 +38,7 @@ const TIMEOUT_MS = 30_000 // TZ part 3 §5.3
  * код не меняется. Dev без ключей работает на лог-стабе (флоу проверяем без PSP).
  */
 /** Rukassa отдаёт разные имена полей в зависимости от версии API. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- external PSP payload (Rukassa), defensive parsing of unknown JSON shape
-function pickPaymentFields(data: Record<string, any>): {
+function pickPaymentFields(data: Record<string, unknown>): {
   paymentId: string
   paymentUrl: string
 } {
@@ -100,8 +99,8 @@ export class RukassaClient {
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- external PSP payload (Rukassa /order/create), defensive parsing
-      const data = (await res.json()) as Record<string, any>
+      // external PSP payload — defensive parsing неизвестной формы
+      const data = (await res.json()) as Record<string, unknown>
       const { paymentId, paymentUrl } = pickPaymentFields(data)
       if (!paymentId || !paymentUrl) {
         throw new Error(`unexpected response shape: ${JSON.stringify(data).slice(0, 200)}`)
@@ -127,8 +126,8 @@ export class RukassaClient {
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`)
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- external PSP payload (Rukassa status), defensive parsing
-    const d = (await res.json()) as Record<string, any>
+    // external PSP payload — defensive parsing неизвестной формы
+    const d = (await res.json()) as Record<string, unknown>
     return {
       status: String(d.status ?? d.payment_status ?? 'unknown'),
       amount: String(d.amount ?? '0'),

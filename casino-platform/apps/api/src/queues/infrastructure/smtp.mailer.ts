@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module'
+
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
@@ -41,8 +43,13 @@ export class SmtpMailer implements MailerPort {
     }
     let nodemailer: { createTransport: (opts: SmtpOptions) => SmtpTransport }
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-unsafe-assignment -- ленивый require optional-peer (GAP-01): тип сужен локальной аннотацией
-      nodemailer = require('nodemailer') as typeof nodemailer
+      // Ленивая загрузка optional-peer (GAP-01): createRequire вместо литерального
+      // require (no-var-requires), результат через unknown → сужение, без any.
+      const mod: unknown = createRequire(__filename)('nodemailer')
+      if (typeof mod !== 'object' || mod === null || !('createTransport' in mod)) {
+        throw new EmailNotConfiguredError()
+      }
+      nodemailer = mod as { createTransport: (opts: SmtpOptions) => SmtpTransport }
     } catch {
       throw new EmailNotConfiguredError()
     }

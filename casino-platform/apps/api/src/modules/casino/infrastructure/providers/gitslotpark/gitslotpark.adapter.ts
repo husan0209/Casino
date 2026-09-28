@@ -142,8 +142,8 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
     if (!res.ok) {
       throw new Error(`userAuth HTTP ${res.status}`)
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- external PSP payload (GitSlotPark), defensive parsing of unknown JSON shape
-    const d = (await res.json()) as Record<string, any>
+    // external PSP payload — defensive parsing неизвестной формы
+    const d = (await res.json()) as Record<string, unknown>
     // ответ: {status:0, game_url|url|launch_url} — парсим defensively
     const url = String(d.game_url ?? d.url ?? d.launch_url ?? '')
     if (String(d.status ?? '0') !== '0' || !url) {

@@ -2,7 +2,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { LaunchErrorScreen } from '@/components/game/LaunchErrorScreen'
 import { apiGet, apiPost, errCode, errIsNetwork, errStatus } from '@/lib/api'
@@ -29,6 +29,10 @@ export default function GamePage(): React.JSX.Element {
   const { activeCurrency, fetchWallets, setLastPlayed } = useWalletStore()
   const { config, load } = useGeoStore()
   const [failure, setFailure] = useState<{ view: LaunchErrorView; code?: string } | null>(null)
+  // Ключ последней попытки запуска (slug:currency): после ошибки эффект не должен
+  // перезапускать mutate на каждом рендере — ранее `launch` исключали из deps,
+  // теперь это делает ref-страж (§8.2 п.7).
+  const launchedKeyRef = useRef<string | null>(null)
 
   const currency = config?.activeCurrency ?? activeCurrency
 
@@ -68,9 +72,10 @@ export default function GamePage(): React.JSX.Element {
   }, [user, load, fetchWallets])
 
   // Сменили игру или кошелёк — прошлая ошибка больше не актуальна (§8.2 п.7: повторный
-  // заход в ту же игру идёт сразу, без повтора ошибки)
+  // заход в ту же игру идёт сразу, без повтора ошибки); сбрасываем и попытку запуска
   useEffect(() => {
     setFailure(null)
+    launchedKeyRef.current = null
   }, [slug, currency])
 
   useEffect(() => {
@@ -81,10 +86,13 @@ export default function GamePage(): React.JSX.Element {
       return
     }
     if (shouldLaunch && game && !launch.isPending && !launch.isSuccess) {
-      launch.mutate()
+      const key = `${slug}:${currency}`
+      if (launchedKeyRef.current !== key) {
+        launchedKeyRef.current = key
+        launch.mutate()
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `launch` исключён намеренно: его изменение вызывало бы повторные mutate после ошибки
-  }, [user, shouldLaunch, game, slug, openLogin])
+  }, [user, shouldLaunch, game, slug, currency, openLogin, launch])
 
   if (!game) {
     return <div className="container-1 py-8 text-muted">Загрузка…</div>
