@@ -7,21 +7,16 @@ import { errorMessage } from '@/common/utils/error-message'
 
 import { AppError } from '@casino/shared-utils'
 
+import { type IRukassaClient, type RukassaCreatePayment } from '../../domain/payments.ports'
+
+export type { RukassaCreatePayment }
+
 export class PaymentProviderNotConfiguredError extends AppError {
   readonly code = 'PAYMENT_PROVIDER_NOT_CONFIGURED'
   readonly httpStatus = 503
   constructor(provider: string, keys: string) {
     super(`${provider}: отсутствуют обязательные ключи (${keys})`, { provider })
   }
-}
-
-export interface RukassaCreatePayment {
-  amount: string
-  orderId: string
-  method?: string
-  webhookUrl: string
-  successUrl: string
-  failUrl: string
 }
 
 const TIMEOUT_MS = 30_000 // TZ part 3 §5.3
@@ -49,7 +44,7 @@ function pickPaymentFields(data: Record<string, unknown>): {
 }
 
 @Injectable()
-export class RukassaClient {
+export class RukassaClient implements IRukassaClient {
   private readonly logger = new Logger(RukassaClient.name)
   constructor(private config: ConfigService) {}
 

@@ -1,11 +1,20 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma, type Prisma, type PaymentCallback, type PaymentProvider, type PaymentRequest, type PaymentStatus } from '@casino/database'
+import {
+  prisma,
+  type Prisma,
+  type PaymentCallback,
+  type PaymentProvider,
+  type PaymentRequest,
+  type PaymentStatus,
+} from '@casino/database'
+
+import type { IPaymentRequestRepository } from '../../domain/payments.ports'
 
 export type { PaymentRequest, PaymentProvider, PaymentStatus, PaymentType } from '@casino/database'
 
 @Injectable()
-export class PaymentRequestRepository {
+export class PaymentRequestRepository implements IPaymentRequestRepository {
   create(data: Prisma.PaymentRequestUncheckedCreateInput): Promise<PaymentRequest> {
     return prisma.paymentRequest.create({ data })
   }
@@ -13,7 +22,9 @@ export class PaymentRequestRepository {
     return prisma.paymentRequest.findUnique({ where: { id } })
   }
   findByExternalId(externalId: string, provider: string): Promise<PaymentRequest | null> {
-    return prisma.paymentRequest.findFirst({ where: { externalId, provider: provider as PaymentProvider } })
+    return prisma.paymentRequest.findFirst({
+      where: { externalId, provider: provider as PaymentProvider },
+    })
   }
   updateStatus(
     id: string,
