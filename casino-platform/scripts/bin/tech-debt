@@ -1,0 +1,153 @@
+#!/bin/sh
+# Храповик техдолга (ratchet): правила архитектуры включены в error, но
+# СУЩЕСТВУЮЩИЙ долг заморожен в базлайнах tech-debt/<name>.txt.
+#
+#   tech-debt check <name>...  — FAIL, если долг вырос относительно базлайна
+#                                (новый файл или рост числа нарушений в файле);
+#                                WARN, если базлайн можно ужать (долг погашен).
+#   tech-debt gen   <name>...  — перезаписать базлайн текущим состоянием
+#                                (только осознанно: после разбора части долга
+#                                или при добавлении нового правила).
+#   tech-debt list             — имена всех правил.
+#
+# Формат базлайна: `путь<TAB>количество` (для use-case-specs — просто путь
+# на строку). Путь — от корня casino-platform, слэши всегда «/».
+# Один и тот же детектор используется и в gen, и в check — правь его здесь,
+# а не в workflow. CI вызывает `sh scripts/bin/tech-debt check <name>`.
+
+set -u
+
+cd "$(git rev-parse --show-toplevel 2>/dev/null)/casino-platform" 2>/dev/null ||
+  cd "$(dirname "$0")/../.."
+DIR=tech-debt
+
+# ── Детекторы: на stdout — текущее состояние долга в формате базлайна ──
+detect() {
+  case "$1" in
+    # Сырой new Error() вместо AppError-подклассов (AI_DEVELOPMENT_RULES §5)
+    raw-error)
+      grep -rnE 'new Error\(' apps/api/src --include='*.ts' 2>/dev/null |
+        grep -vE '\.spec\.ts:|\.test\.ts:' |
+        cut -d: -f1 | sed 's|\\|/|g' | sort | uniq -c |
+        awk '{print $2 "\t" $1}' | sort
+      ;;
+    # NestJS built-in exceptions вместо AppError (AI_DEVELOPMENT_RULES §5)
+    nest-exceptions)
+      grep -rnE 'new (HttpException|BadRequestException|NotFoundException|UnauthorizedException|ForbiddenException)\(' \
+        apps/api/src --include='*.ts' 2>/dev/null |
+        grep -vE '\.spec\.ts:|\.test\.ts:' |
+        cut -d: -f1 | sed 's|\\|/|g' | sort | uniq -c |
+        awk '{print $2 "\t" $1}' | sort
+      ;;
+    # Подавления правил в продакшн-коде (burn-down: каждое — либо чинить,
+    # либо переносить в overrides .eslintrc.js с обоснованием, QUALITY_GATES §2.1.1)
+    eslint-disable)
+      grep -rn 'eslint-disable' apps/api/src apps/web/src apps/admin/src packages/*/src \
+        --include='*.ts' --include='*.tsx' 2>/dev/null |
+        grep -vE '\.spec\.ts:|\.test\.ts:' |
+        cut -d: -f1 | sed 's|\\|/|g' | sort | uniq -c |
+        awk '{print $2 "\t" $1}' | sort
+      ;;
+    # Денежные поля, типизированные как number (AI_DEVELOPMENT_RULES §1).
+    # `total` НЕ проверяется: в пагинации это счётчик записей, не деньги.
+    money-number)
+      grep -rnE '(balance|amount|price|fee|profit|reward|lockedBalance|availableBalance)[[:space:]]*\??:[[:space:]]*number' \
+        apps/api/src packages/*/src --include='*.ts' 2>/dev/null |
+        grep -vE '\.spec\.ts:' |
+        cut -d: -f1 | sed 's|\\|/|g' | sort | uniq -c |
+        awk '{print $2 "\t" $1}' | sort
+      ;;
+    # Use-case без соседнего .spec.ts (CONVENTIONS §11)
+    use-case-specs)
+      find apps/api/src/modules -name '*.use-case.ts' ! -name '*.spec.ts' 2>/dev/null |
+        sed 's|\\|/|g' | sort |
+        while IFS= read -r uc; do
+          [ -f "${uc%.ts}.spec.ts" ] || printf '%s\n' "$uc"
+        done
+      ;;
+    # Кросс-модульные deep-импорты мимо Facade (MODULE_BOUNDARIES.md).
+    # Разрешено: импорт *.facade (публичный API модуля). queues/, common/ и
+    # прочее вне src/modules модулями не считаются.
+    cross-module-imports)
+      MODS=$(ls -1 apps/api/src/modules | tr '\n' '|' | sed 's/|$//')
+      grep -rnoE "from '[^']+'" apps/api/src/modules --include='*.ts' 2>/dev/null |
+        grep -vE '\.spec\.ts:' |
+        awk -F"'" -v mods="$MODS" '
+          {
+            imp = $2
+            f1 = $1; sub(/from$/, "", f1); sub(/[ ]$/, "", f1)
+            split(f1, p, ":"); file = p[1]; gsub(/\\/, "/", file)
+            if (imp !~ ("/(" mods ")/(domain|application|infrastructure|presentation)(/|$)")) next
+            if (imp ~ /\.facade$/) next
+            match(file, /modules\/[a-z-]+\//); A = substr(file, RSTART + 8, RLENGTH - 9)
+            B = ""
+            if (match(imp, /@modules\/[a-z-]+\//)) {
+              B = substr(imp, RSTART + 9, RLENGTH - 10)
+            } else if (match(imp, ("/(" mods ")/(domain|application|infrastructure|presentation)"))) {
+              s = substr(imp, RSTART + 1, RLENGTH - 1); split(s, parts, "/"); B = parts[1]
+            }
+            if (B != "" && B != A) print file
+          }' | sort | uniq -c | awk '{print $2 "\t" $1}' | sort
+      ;;
+    *)
+      echo "tech-debt: неизвестное правило '$1' (см. tech-debt list)" >&2
+      return 2
+      ;;
+  esac
+}
+
+NAMES='raw-error nest-exceptions eslint-disable money-number use-case-specs cross-module-imports'
+
+case "${1:-}" in
+  list)
+    echo "$NAMES"
+    ;;
+  gen)
+    shift
+    [ "${1:-}" = "all" ] && set -- $NAMES
+    [ $# -gt 0 ] || { echo "usage: tech-debt gen <name>...|all" >&2; exit 2; }
+    mkdir -p "$DIR"
+    for name in "$@"; do
+      detect "$name" > "$DIR/$name.txt" || exit 2
+      printf '%-22s %s записей(ь) в %s\n' "$name" \
+        "$(wc -l < "$DIR/$name.txt" | tr -d ' ')" "$DIR/$name.txt"
+    done
+    ;;
+  check)
+    shift
+    [ "${1:-}" = "all" ] && set -- $NAMES
+    [ $# -gt 0 ] || { echo "usage: tech-debt check <name>...|all" >&2; exit 2; }
+    RC=0
+    for name in "$@"; do
+      BL="$DIR/$name.txt"
+      if [ ! -f "$BL" ]; then
+        echo "❌ tech-debt [$name]: нет базлайна $BL — сгенерируй: sh scripts/bin/tech-debt gen $name"
+        RC=2
+        continue
+      fi
+      TMPD=$(mktemp -d) || exit 2
+      trap 'rm -rf "$TMPD"' EXIT
+      detect "$name" > "$TMPD/cur" || exit 2
+      sort "$BL" > "$TMPD/bl"
+      BAD=$(comm -23 "$TMPD/cur" "$TMPD/bl")
+      STALE=$(comm -13 "$TMPD/cur" "$TMPD/bl")
+      if [ -n "$BAD" ]; then
+        echo "❌ tech-debt [$name]: долг ВЫРОС относительно $BL:"
+        printf '%s\n' "$BAD" | sed 's/^/   /'
+        echo "   Новых нарушений допускать нельзя — почини или обоснуй в PR."
+        RC=1
+      fi
+      if [ -n "$STALE" ]; then
+        echo "⚠️  tech-debt [$name]: часть базлайна погашена — ужми $BL (sh scripts/bin/tech-debt gen $name):"
+        printf '%s\n' "$STALE" | sed 's/^/   /'
+      fi
+      [ -n "$BAD" ] || [ -n "$STALE" ] ||
+        echo "✅ tech-debt [$name]: OK ($(wc -l < "$TMPD/cur" | tr -d ' ') записей = базлайну)"
+    done
+    exit $RC
+    ;;
+  *)
+    echo "usage: tech-debt gen|check <name>...|all; tech-debt list" >&2
+    exit 2
+    ;;
+esac

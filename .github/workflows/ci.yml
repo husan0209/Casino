@@ -82,6 +82,30 @@ jobs:
             pnpm exec commitlint --from "${FROM}" --to HEAD
           fi
 
+  # README обещает pnpm audit среди обязательных чеков — теперь он тут.
+  # Без name: (чек = job id), как у остальных required-джоб (см. D6).
+  # Режим — храповик (docs/TECH_DEBT.md): текущие 3 critical / 22 high в
+  # prod-дереве заморожены в tech-debt/pnpm-audit.txt; job краснеет только
+  # если какой-то severity ВЫРОС (новый CVE или неудачный апгрейд).
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: casino-platform/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: pnpm audit (prod) — ratchet
+        run: |
+          pnpm audit --prod --json > /tmp/audit.json || true
+          node scripts/audit-ratchet.mjs --check /tmp/audit.json
+
   lint-typecheck-test:
     runs-on: ubuntu-latest
     services:
