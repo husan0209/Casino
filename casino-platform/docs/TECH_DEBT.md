@@ -62,6 +62,8 @@
 | В7 | **MODULE_BOUNDARIES не соответствует коду**: нет секции maintenance; секции Game-Sessions (§8) и Audit (§12) не существуют как модули в `apps/api/src/modules/` | docs/INDEX.md §6.2: приоритет кода; AGENTS.md: сверяйся с MODULE_BOUNDARIES | 1 отсутствующая + 2 лишних секции | Дописать секцию maintenance (cron-модуль, порты, BullMQ-repeatable); сверить Game-Sessions/Audit с фактическим размещением (casino/admin?) и поправить карту | docs-guard D10-стиль проверка вручную; можно добавить гард «каждый модуль из ls описан в доке» |
 | В8 | **Canary-тесты архитектуры** (4 слоя, ровно 1 фасад, чистота domain) из пакета аудита | Пакет аудита, блок H | Заблокировано В1–В2 | Ввести после В1/В2 как vitest-спеку; AST-проверки импортов не нужны — их закрывают G1/G16 и depcruise, если решим взять | Новый spec в `apps/api/test/` |
 | В9 | **Pre-commit hook неп usable для части файлов**: lint-staged гоняет eslint из корня монорепо — `@/*`-алиасы api не резолвятся (`import/no-unresolved`), а `apps/api/test/**` даёт ~150 type-aware warning'ов (обычный `pnpm lint` их не видит — api-lint смотрит только `src/`) | Конвенция репо: hooks обязательны, `--no-verify` — исключение | Выявлено 2026-09-27 при пересборке коммитов | Настроить per-package контекст в lint-staged (запуск `pnpm --filter <pkg> exec eslint` или project-ссылки в import/resolver) и решить, линтится ли `apps/api/test/**` (включить в api-lint или исключить из lint-staged) | `git commit` с тестами в staged проходит без `--no-verify` |
+| В10 | **Шимы типов multer вместо @types/multer**: `apps/api/src/types/multer.d.ts` (Express.Multer.File + аугментации Request) и `multer-ambient.d.ts`; колбэки StorageEngineOptions типизированы `unknown` | Комментарий шимов: «pnpm add -D @types/multer и удалить» | 2 шим-файла; diskStorage не используется (только memoryStorage) | Переезд нетривиален: в реальных типах `file.buffer` опционален (kyc/users используют `file.buffer` — нужны guards), а `@types/multer` тянет `@types/express`, с которым конфликтует аугментация `Express.Request.cookies` (GAP-39). План: поставить типы, оградить buffer, разрешить конфликт cookies (или вынести его в отдельный d.ts) | `pnpm add -D @types/multer` + typecheck зелёный без шимов |
+| В11 | **`price_amount: Number(params.priceAmount)` в запросе createPayment к NOWPayments** — деньги уходят провайдеру числом (замечание агента при G20-fix) | AI_DEVELOPMENT_RULES §1 (деньги — string) | 1 место + number-арифметика в dev-stub курса | Сверить контракт NOWPayments: если JSON-схема провайдера требует число — узаконить с комментарием в коде и note в PAYMENT_OVERVIEW; если принимает строку — слать string | Контракт сверен, решение задокументировано |
 
 Осознанные отклонения от пакетов аудита (НЕ долг, решения приняты):
 
@@ -103,4 +105,6 @@
 
 | Дата | Гард | Было → Стало | PR |
 |------|------|--------------|-----|
-| 2026-09-27 | все | базлайны заведены (58/19/25/1/40/29) | этот |
+| 2026-09-27 | все | базлайны заведены (58/19/25/1/40/29) | #97 |
+| 2026-09-28 | G20 | money-number: 1 → 0 | Волна 1 |
+| 2026-09-28 | G19 | eslint-disable: 25 → 13 (остались только max-params DI-конструкторов) | Волна 1 |

@@ -5,15 +5,9 @@ apps/api/src/modules/auth/application/use-cases/register.use-case.ts	1
 apps/api/src/modules/auth/application/use-cases/reset-password.use-case.ts	1
 apps/api/src/modules/auth/application/use-cases/verify-email.use-case.ts	1
 apps/api/src/modules/casino/application/use-cases/launch-game.use-case.ts	1
-apps/api/src/modules/casino/infrastructure/providers/gitslotpark/gitslotpark.adapter.ts	1
 apps/api/src/modules/maintenance/infrastructure/maintenance.prisma.repo.ts	1
 apps/api/src/modules/payments/application/use-cases/create-crypto-deposit.use-case.ts	1
 apps/api/src/modules/payments/application/use-cases/create-fiat-deposit.use-case.ts	1
 apps/api/src/modules/payments/application/use-cases/process-nowpayments-webhook.use-case.ts	1
 apps/api/src/modules/payments/application/use-cases/process-rukassa-webhook.use-case.ts	1
-apps/api/src/modules/payments/infrastructure/clients/nowpayments.client.ts	4
-apps/api/src/modules/payments/infrastructure/clients/rukassa.client.ts	3
 apps/api/src/modules/wallet/application/wallet.facade.ts	1
-apps/api/src/queues/infrastructure/smtp.mailer.ts	1
-apps/api/src/types/multer-ambient.d.ts	2
-apps/web/src/app/casino/[slug]/page.tsx	1

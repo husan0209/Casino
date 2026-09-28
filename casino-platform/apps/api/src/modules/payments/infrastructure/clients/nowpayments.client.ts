@@ -20,10 +20,45 @@ const MAP: Record<string, string> = {
 
 const TIMEOUT_MS = 30_000
 
+/**
+ * Ответы NOWPayments — внешние PSP-данные, НЕ trusted (AI_DEVELOPMENT_RULES §6.1):
+ * реальная форма может отличаться по версиям API, поэтому поля типизированы
+ * unknown и читаются через String()/Number() с fallback'ом; деньги переводятся
+ * в string сразу на границе парсинга (String(...), без parseFloat — §1).
+ */
+
+/** POST /payment — создание платежа. */
+interface NOWPaymentsCreatePaymentResponse {
+  payment_id?: unknown
+  pay_address?: unknown
+  pay_amount?: unknown
+  pay_currency?: unknown
+  expiration_estimate_date?: unknown
+}
+
+/** GET /payment/{id} — статус платежа. */
+interface NOWPaymentsPaymentStatusResponse {
+  payment_status?: unknown
+  actually_paid?: unknown
+  outcome_amount?: unknown
+}
+
+/** GET /estimate — оценка курса. */
+interface NOWPaymentsEstimateResponse {
+  estimated_amount?: unknown
+}
+
+/**
+ * Сужение недоверенного JSON до объекта ответа PSP: null/массив/примитив
+ * трактуем как пустой объект — поля считаются отсутствующими, сработают fallback'и.
+ */
+function asPspResponse<T extends object>(json: unknown): T {
+  return json !== null && typeof json === 'object' && !Array.isArray(json) ? (json as T) : ({} as T)
+}
+
 /** Ответ /payment: имена поля могут отличаться по версиям API. */
 function parseCreateResponse(json: unknown): { paymentId: string; payAddress: string } {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- external PSP payload (NOWPayments), defensive parsing
-  const d = (json ?? {}) as Record<string, any>
+  const d = asPspResponse<NOWPaymentsCreatePaymentResponse>(json)
   return {
     paymentId: String(d.payment_id ?? ''),
     payAddress: String(d.pay_address ?? ''),
@@ -119,8 +154,7 @@ export class NOWPaymentsClient {
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- external PSP payload (NOWPayments /payment), defensive parsing
-      const d = (await res.json()) as Record<string, any>
+      const d = asPspResponse<NOWPaymentsCreatePaymentResponse>(await res.json())
       const { paymentId, payAddress } = parseCreateResponse(d)
       if (!paymentId || !payAddress) {
         throw new Error(`unexpected shape: ${JSON.stringify({ paymentId, payAddress }).slice(0, 200)}`)
@@ -152,8 +186,7 @@ export class NOWPaymentsClient {
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`)
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- external PSP payload (NOWPayments /payment/{id}), defensive parsing
-    const d = (await res.json()) as Record<string, any>
+    const d = asPspResponse<NOWPaymentsPaymentStatusResponse>(await res.json())
     return {
       paymentStatus: String(d.payment_status ?? 'unknown'),
       actuallyPaid: String(d.actually_paid ?? '0'),
@@ -193,8 +226,7 @@ export class NOWPaymentsClient {
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`)
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- external PSP payload (NOWPayments /estimate), defensive parsing
-      const d = (await res.json()) as Record<string, any>
+      const d = asPspResponse<NOWPaymentsEstimateResponse>(await res.json())
       const v = Number(d.estimated_amount)
       if (!Number.isFinite(v) || v <= 0) {
         throw new Error(`bad estimate shape: ${JSON.stringify(d).slice(0, 120)}`)
@@ -243,7 +275,7 @@ export class NOWPaymentsClient {
     if (!res.ok) {
       throw new Error(`estimate HTTP ${res.status}`)
     }
-    const d = (await res.json()) as { estimated_amount?: number | string }
+    const d = asPspResponse<NOWPaymentsEstimateResponse>(await res.json())
     return { estimatedAmount: String(d.estimated_amount ?? params.amount) }
   }
 

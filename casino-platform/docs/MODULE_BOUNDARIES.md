@@ -2,7 +2,7 @@
 title: Module Boundaries
 description: Границы между модулями backend casino-platform
 status: living document
-last_updated: 2026-06-19
+last_updated: 2026-09-28
 ---
 
 # Module Boundaries
@@ -13,27 +13,34 @@ last_updated: 2026-06-19
 
 ## 1. Карта модулей
 
+Фактические каталоги — `apps/api/src/modules/`: **13 модулей** — admin, auth,
+casino, geo, health, kyc, maintenance, notifications, payments, referrals,
+support, users, wallet. Game-sessions — часть casino (§8), audit-log — часть
+admin (§12); отдельных каталогов под них нет.
+
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                        Backend                                │
-│                                                               │
-│   ┌─────┐  ┌──────┐  ┌─────┐  ┌─────────┐  ┌──────────┐  ┌─────┐ │
-│   │auth │  │users │  │ kyc │  │  wallet │  │ payments │  │ geo │ │
-│   └──┬──┘  └──┬───┘  └──┬──┘  └────┬────┘  └─────┬────┘     │
-│      │        │        │          │             │            │
-│      ▼        ▼        ▼          ▼             ▼            │
-│   ┌─────┐                ┌──────────┐  ┌──────────────────┐ │
-│   │audit│                │ referrals│  │     casino       │ │
-│   └─────┘                └──────────┘  │  + game-sessions │ │
-│                                        └──────────────────┘ │
-│   ┌───────────┐  ┌──────────────────┐                       │
-│   │ support   │  │  notifications   │                       │
-│   └───────────┘  └──────────────────┘                       │
-│                                                               │
-│   ┌────────┐  ┌──────┐                                       │
-│   │ health │  │ admin│                                       │
-│   └────────┘  └──────┘                                       │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                          Backend                                  │
+│                                                                   │
+│   ┌──────┐ ┌───────┐ ┌─────┐ ┌────────┐ ┌──────────┐ ┌─────┐   │
+│   │ auth │ │ users │ │ kyc │ │ wallet │ │ payments │ │ geo │   │
+│   └──────┘ └───────┘ └─────┘ └────────┘ └──────────┘ └─────┘   │
+│                                                                   │
+│   ┌──────────────────────────┐ ┌───────────┐ ┌─────────┐        │
+│   │ casino (+ game-sessions) │ │ referrals │ │ support │        │
+│   └──────────────────────────┘ └───────────┘ └─────────┘        │
+│                                                                   │
+│   ┌───────────────┐ ┌─────────────────┐                          │
+│   │ notifications │ │ admin (+ audit) │                          │
+│   └───────────────┘ └─────────────────┘                          │
+│                                                                   │
+│   ┌────────┐ ┌─────────────┐                                     │
+│   │ health │ │ maintenance │                                     │
+│   └────────┘ └─────────────┘                                     │
+│                                                                   │
+│   BullMQ-очереди (не модули): email, maintenance                  │
+│   (планировщик/воркер maintenance — §18)                          │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -62,23 +69,23 @@ last_updated: 2026-06-19
 | UC-AUTH-07 | Telegram login |
 | UC-AUTH-08 | Forgot password |
 | UC-AUTH-09 | Reset password |
+| UC-AUTH-10 | Change password |
 
 ### 2.3. Использует
 
-- `users` (создание User entity)
-- `notifications` (отправка verification email)
-- `referrals` (генерация referral code + привязка)
+- `queues` (EMAIL_QUEUE_PORT — постановка verification/reset писем в BullMQ-очередь `email`; отправка — EmailWorker)
+- Referral code при регистрации генерируется в самом `register.use-case` (собственный `IUserRepository`); модули `users`/`notifications`/`referrals` auth НЕ импортирует
 
 ### 2.4. Используется в
 
-- `users` (для контекста текущего пользователя)
-- ВСЕ модули (для RequireAuth guard)
+- Почти все модули импортируют `AuthModule` ради `AuthGuard`/`RolesGuard` (users, geo, kyc, wallet, payments, casino, referrals, support, notifications)
+- `admin` — НЕ использует auth (отдельный admin-JWT flow, см. §13)
 
 ### 2.5. Экспортирует
 
-- `AuthFacade` — login/register используется извне
-- `JwtAuthGuard`, `OptionalJwtAuthGuard` — NestJS providers
-- `CurrentUser` decorator
+- `AuthGuard`, `RolesGuard` (+ декоратор `Roles`) — `auth/presentation/guards/`
+- `JwtTokenService` — выпуск/верификация access+refresh (exports из `auth.module.ts`)
+- NB: `CurrentUser` decorator живёт вне модуля — `apps/api/src/common/decorators/current-user.decorator.ts`
 
 ---
 
@@ -106,12 +113,14 @@ sessions             (refresh tokens hashed)
 
 ### 3.4. Используется в
 
-- Все модули должны знать о User (id, email, status)
+- `geo` (UsersFacade.getGeoContext)
+- `payments` (UsersFacade — контекст пользователя, onDepositCompleted)
 
 ### 3.5. Экспортирует
 
-- `UsersFacade` (getGeoContext, updateCurrencyPreference, onDepositCompleted)
-- `UserEntity` (read-only DTO для других модулей)
+- `UsersFacade` (getGeoContext, updateCurrencyPreference, onDepositCompleted) — `users/facade/users.facade.ts`
+- `SelfExclusionUseCase` (самоисключение игрока)
+- NB: таблица `sessions` общая с auth — чтение/отзыв сессий здесь через `USER_SESSION_REPOSITORY`, выпуск refresh-токенов — в auth (`SESSION_REPOSITORY`)
 
 ---
 
@@ -142,7 +151,8 @@ sessions             (refresh tokens hashed)
 
 ### 3a.5. Экспортирует
 
-- `GeoFacade`
+- `GeoFacade` (convertRubToDisplay и др.) — `geo/facade/geo.facade.ts`
+- `ExchangeRatesService` — чтение `exchange_rates` (таблицу пишет maintenance-джоба `update-rates`, §18)
 
 ---
 
@@ -164,19 +174,18 @@ kyc_documents        (документы — front/back/selfie)
 
 ### 4.3. Использует
 
-- `users` (для user context)
-- `notifications` (уведомление о смене статуса)
-- `audit` (логирует KYC status changes)
+- `geo` (GeoFacade.convertRubToDisplay — display limit_remaining в KYC UI)
+- `admin` (AdminAuthGuard — для admin-review endpoints) и `auth` (AuthGuard/RolesGuard)
+- NB: `notifications` и `audit` kyc-модуль НЕ импортирует (письма о смене статуса и audit-лог в коде не вызываются)
 
 ### 4.4. Используется в
 
-- `payments` (проверка лимита при deposit)
-- `payments` (блокировка withdraw без approved)
-- `admin` (KYC review)
+- `payments` (KycCheckService.assertCanDeposit / assertCanWithdraw)
+- Admin-API review — `KycAdminController` живёт внутри kyc-модуля (пути `admin/kyc/...`), а не в admin-модуле
 
 ### 4.5. Экспортирует
 
-- `KycFacade` — `isVerified(userId)`, `getStatus(userId)`, `checkDepositLimit(userId, amount)`
+- `KycCheckService` — `assertCanDeposit(userId, amountRub)`, `assertCanWithdraw(userId)`
 
 ---
 
@@ -188,24 +197,26 @@ kyc_documents        (документы — front/back/selfie)
 - Operations: credit, debit, lock, unlock, confirmWithdrawal
 - Optimistic locking через `version` field
 - Ledger (append-only) для всех операций
-- Currency conversion (через exchange_rates)
+- `runInTransaction` — атомарные проводки в одном Prisma-tx (используется casino при bet/win)
+- NB: display-конвертация валют — НЕ здесь: курсы `exchange_rates` пишет maintenance (§18), читает `geo` (ExchangeRatesService)
 
 ### 5.2. Ключевые таблицы
 
 ```
 wallet_accounts      (userId × currency — balance, locked, version)
 ledger_entries       (append-only — каждая операция)
-exchange_rates       (RUB ↔ crypto курсы, обновляются cron)
 ```
+
+`exchange_rates` — отдельная таблица: запись — `maintenance` (§18), чтение — `geo`.
 
 ### 5.3. Использует
 
-- `users` (проверка user существует)
+- Ничего из модулей (импортирует только `AuthModule` ради guard) — foundational module
 
 ### 5.4. Используется в
 
 - `payments` (credit при deposit, debit при withdrawal)
-- `casino` (debit при bet, credit при win, rollback)
+- `casino` (debit при bet, credit при win, rollback — включая game-sessions callbacks, §8)
 - `referrals` (credit при reward)
 - `admin` (manual credit/debit)
 
@@ -219,6 +230,9 @@ exchange_rates       (RUB ↔ crypto курсы, обновляются cron)
 - `confirmWithdrawal({userId, currency, amount, withdrawalRequestId})`
 - `getBalance(userId, currency)`
 - `getBalances(userId)`
+- `runInTransaction(fn)` — групповые проводки (casino bet/win)
+
+Класс — `wallet/application/wallet.facade.ts`.
 
 ### 5.6. КРИТИЧНО
 
@@ -256,10 +270,12 @@ Wallet facade — **ЕДИНСТВЕННЫЙ СПОСОБ** изменить б�
 ### 6.2. Providers
 
 ```
-RukassaAdapter       — фиат (RUB через карты, СБП, P2P)
-NowPaymentsAdapter   — крипто (USDT/BTC/TON/TRX/LTC)
-ManualAdapter        — admin manual credit (через admin endpoint)
+RukassaClient         — фиат (RUB через карты, СБП, P2P)
+NOWPaymentsClient     — крипто (USDT/BTC/TON/TRX/LTC); клиент переиспользует maintenance (§18)
 ```
+
+Manual-кредита как отдельного адаптера нет: ручное начисление — через admin
+(`AdminFinanceController` → `WalletFacade.credit`, §13).
 
 ### 6.3. Ключевые таблицы
 
@@ -270,10 +286,11 @@ payment_callbacks    (raw callbacks от провайдеров)
 
 ### 6.4. Использует
 
-- `wallet` (credit/debit при confirm payments)
-- `kyc` (проверка лимитов и статуса)
-- `users` (контекст пользователя)
-- `audit` (логирует все payment events)
+- `wallet` (WalletFacade — credit/debit/lock при confirm payments)
+- `kyc` (KycCheckService.assertCanDeposit / assertCanWithdraw)
+- `users` (UsersFacade — контекст, onDepositCompleted)
+- `geo` (GeoFacade)
+- NB: `audit` и `notifications` payments-модуль НЕ импортирует
 
 ### 6.5. Используется в
 
@@ -282,8 +299,11 @@ payment_callbacks    (raw callbacks от провайдеров)
 
 ### 6.6. Экспортирует
 
-- `PaymentsFacade` — `createDeposit`, `createWithdrawal`, `getStatus`
-- `PaymentProvider` interface (для admin testing)
+- Ничего (в `payments.module.ts` нет `exports`) — потребители работают через
+  собственные контроллеры/use-cases модуля
+- NB: `PaymentProvider` — это Prisma-enum из `@casino/database`, а не interface
+  модуля; admin читает `payment_requests` напрямую (`PaymentRequestRepository`
+  провайдится в `admin.module.ts`)
 
 ---
 
@@ -311,52 +331,74 @@ payment_callbacks    (raw callbacks от провайдеров)
 
 ### 7.3. Использует
 
-- `wallet` (определение активного кошелька пользователя)
+- `wallet` (WalletFacade — активный кошелёк при launch; debit/credit в callbacks)
+- `auth` (AuthGuard/RolesGuard, в т.ч. на admin-endpoints каталога)
+- NB: `casino.module.ts` импортирует также `AdminModule`, но его экспорты
+  (AuditLogService/AdminAuth*) внутри модуля не инжектятся
 
 ### 7.4. Используется в
 
-- `game-sessions` (сессии создаются на каждый launch)
+- Provider callbacks (bet/win/rollback) приходят на `POST /provider-callback/...` —
+  обработка game-sessions живёт в этом же модуле (§8)
+- `referrals` (read-only groupBy по `game_transactions` для GGR — ADR GAP-51,
+  прямой доступ через общий Prisma-клиент)
 
 ---
 
-## 8. Game-Sessions Module
+## 8. Game-Sessions (часть Casino Module)
+
+> Отдельного каталога `modules/game-sessions/` НЕТ: весь код сессий живёт
+> внутри `apps/api/src/modules/casino/`. Нумерация секций сохранена исторически.
 
 ### 8.1. Ответственность
 
-- Безаутентификационная сессия с провайдером
-- URL generation для iframe
-- Обработка provider callbacks (authenticate, balance, bet, win, rollback, refund)
+- Сессия игрока у провайдера (создаётся при каждом launch, `sessionToken` = randomBytes(32).hex)
+- URL generation для iframe (через `ProviderAdapterFactory`)
+- Обработка provider callbacks (authenticate, balance, bet, win, rollback)
 
-### 8.2. Ключевые таблицы
+### 8.2. Где лежит
 
 ```
-game_sessions        (active sessions — userId, gameId, currency, openedAt)
-game_rounds          (отдельные rounds внутри сессии)
-game_transactions    (bet/win/rollback events)
+apps/api/src/modules/casino/application/services/game-callback.service.ts   (authenticate/balance/bet/win/rollback)
+apps/api/src/modules/casino/application/use-cases/launch-game.use-case.ts   (создание сессии)
+apps/api/src/modules/casino/presentation/controllers/provider-callback.controller.ts
+apps/api/src/modules/casino/infrastructure/repositories/casino.prisma.repository.ts (PrismaGamePlayRepository)
 ```
 
-### 8.3. Ключевые Use Cases
+### 8.3. Ключевые таблицы
+
+```
+game_sessions        (модель GameSession — userId, gameId, currency, status, sessionToken)
+game_rounds          (модель GameRound — rounds внутри сессии)
+game_transactions    (модель GameTransaction — bet/win/rollback events)
+```
+
+### 8.4. Ключевые Use Cases
 
 | UC | Описание |
 |----|----------|
-| UC-GS-01 | Создать game session |
-| UC-GS-02 | Authenticate provider callback |
+| UC-GS-01 | Создать game session (внутри launch-game.use-case) |
+| UC-GS-02 | Authenticate provider callback (по sessionToken) |
 | UC-GS-03 | Balance callback (возврат текущего баланса) |
 | UC-GS-04 | Process bet |
 | UC-GS-05 | Process win |
 | UC-GS-06 | Process rollback |
-| UC-GS-07 | Process refund |
-| UC-GS-08 | Close session |
 
-### 8.4. Использует
+NB: refund из протокола провайдера в MVP не реализован (метода в
+`GameCallbackService` нет).
 
-- `wallet` (credit/debit при win/bet/rollback через WalletFacade)
-- `casino` (получить game config)
+### 8.5. Использует
 
-### 8.5. Используется в
+- `wallet` (WalletFacade.credit/debit + WalletFacade.runInTransaction — bet/win/rollback атомарно)
+- Таблицы игр/провайдеров того же casino-модуля (GAME_PLAY_REPOSITORY и др.)
 
-- Provider callbacks приходят на `POST /provider-callback/...`
-- `admin` (просмотр сессий)
+### 8.6. Используется в
+
+- Provider callbacks приходят на `POST /provider-callback/:providerSlug/:op`
+  (`ProviderCallbackController`)
+- `admin` — просмотр сессий/транзакций: `GET /admin/game-sessions`,
+  `GET /admin/game-sessions/:id`, `GET /admin/game-transactions`
+  (`CasinoAdminController`)
 
 ---
 
@@ -379,16 +421,19 @@ referral_rewards                (period, ggr, reward_amount, status)
 
 ### 9.3. Использует
 
-- `wallet` (credit для reward)
-- `auth` (получает событие USER_REGISTERED для привязки)
-- `casino` (read-only groupBy по game_transactions для расчёта GGR — ADR GAP-51:
-  принят прямой доступ через общий Prisma-клиент; порт/событие — при выносе
-  casino в отдельный сервис)
+- `wallet` (WalletFacade.credit для reward)
+- `auth` (только AuthGuard; событие USER_REGISTERED не используется — referral
+  code и привязка `referred_by` выполняются в самом `register.use-case` /
+  `oauth-user-provisioning.service`)
+- read-only groupBy по `game_transactions` для расчёта GGR — ADR GAP-51:
+  принят прямой доступ через общий Prisma-клиент (`prisma.gameTransaction.groupBy`);
+  порт/событие — при выносе casino в отдельный сервис
 
 ### 9.4. Используется в
 
 - Frontend (реферальный кабинет)
-- `admin` (статистика)
+- `admin` (`ReferralsAdminController` — `POST /admin/referrals/run-daily`, audit-log)
+- `maintenance` (job `referral-daily` запускает `ReferralCalcService.runDaily`, §18)
 
 ---
 
@@ -411,13 +456,13 @@ support_messages    (ticket, sender_type, message, attachments, is_internal)
 
 ### 10.3. Использует
 
-- `notifications` (email при reply)
-- `audit` (admin actions)
+- Только `auth` (AuthGuard/RolesGuard). NB: `notifications` и `audit`
+  support-модуль НЕ импортирует (email при reply в коде не отправляется)
 
 ### 10.4. Используется в
 
 - Frontend (user-кабинет)
-- `admin` (admin context)
+- Admin-API — `SupportAdminController` живёт в самом support-модуле (пути `admin/support/...`)
 
 ---
 
@@ -425,61 +470,80 @@ support_messages    (ticket, sender_type, message, attachments, is_internal)
 
 ### 11.1. Ответственность
 
-- Email queue (BullMQ)
-- Internal notifications (in-app)
-- Шаблоны для всех типов
-- User notification preferences
+- In-app уведомления (внутренние, таблица notifications)
+- Email-канал: проверка user-настройки `notificationsEmail` + постановка
+  письма в BullMQ-очередь `email` (отправку делает EmailWorker из queues)
+- HTML-шаблоны писем (рендер перед постановкой в очередь)
 
 ### 11.2. Ключевые таблицы
 
 ```
 notifications       (userId, type, channel, title, message, read/unread)
-email_jobs          (BullMQ internal)
 ```
+
+Email-джобов отдельной таблицы НЕТ: очередь `email` живёт в BullMQ (Redis) —
+`apps/api/src/queues/queue.types.ts`; HTML-шаблоны писем — `apps/api/src/queues/templates/`.
 
 ### 11.3. Использует
 
-- SMTP provider (отправка email)
-- `users` (read-only email + notification preferences — ADR GAP-51: принят
-  прямой доступ через общий Prisma-клиент; UsersFacade-порт — при выносе
-  users в отдельный сервис)
+- `queues` (EMAIL_QUEUE_PORT — постановка email-джоб; отправка — EmailWorker → SMTP-майлер)
+- `auth` (AuthGuard/RolesGuard)
+- Read-only `user_settings.notificationsEmail` + email пользователя — прямой
+  доступ через собственный репозиторий (аналог ADR GAP-51)
 
 ### 11.4. Используется в
 
-- `auth` (verification emails)
-- `users` (profile updates)
-- `payments` (deposit/withdrawal status)
-- `kyc` (status changes)
-- `support` (reply notifications)
-- `referrals` (reward notifications)
+- Никем: `NotificationsModule` импортируется только в `app.module.ts` (in-app
+  API `/notifications` — контроллер самого модуля)
+- Письма о событиях (verification, reset, withdrawal-reminder) шлют `auth` и
+  `maintenance` напрямую через EMAIL_QUEUE_PORT, минуя notifications-модуль
 
 ### 11.5. Экспортирует
 
-- `NotificationsFacade.send({userId, type, channel, title, message, data})`
+- `NotificationService` (send/list/markRead/unreadCount) — но внешних
+  потребителей у экспорта сейчас нет
 
 ---
 
-## 12. Audit Module
+## 12. Audit Log (часть Admin Module)
+
+> Отдельного каталога `modules/audit/` НЕТ: audit-log — application-сервис
+> внутри admin-модуля. Нумерация секций сохранена исторически.
 
 ### 12.1. Ответственность
 
-- Логирование всех admin actions
-- Логирование критичных user actions (block, kyc approve)
-- Read-only через admin endpoints
+- Логирование admin actions (manual credit/debit, управление админами,
+  admin-auth события)
+- Логирование admin-триггеров из других модулей (`ReferralsAdminController` —
+  ручной запуск начислений)
+- Read-only выдача через `GET /admin/audit-logs`
 
-### 12.2. Ключевая таблица
+### 12.2. Где лежит
 
 ```
-audit_logs          (actor_id, actor_type, action, entity_type, entity_id, data, created_at)
+apps/api/src/modules/admin/application/audit-log.service.ts          (AuditLogService.log(input))
+apps/api/src/modules/admin/domain/admin.repository.ts                (порт AUDIT_LOG_REPOSITORY)
+apps/api/src/modules/admin/infrastructure/repositories/admin.prisma.repository.ts (PrismaAuditLogRepository)
+apps/api/src/modules/admin/presentation/controllers/admin-audit.controller.ts
 ```
 
-### 12.3. Используется в
+### 12.3. Ключевая таблица
 
-- ВСЕ модули логируют через `AuditLogService.log(...)`
+```
+audit_logs          (actor_type, actor_id, action, target_type, target_id, payload, ip_address, created_at)
+```
 
-### 12.4. Не использует
+### 12.4. Используется в
 
-- Audit **никогда** не зависит от других модулей (только пишет в свою таблицу)
+- Контроллеры admin-модуля (`AdminAuditController`, `AdminFinanceController` и др.)
+- `referrals` (`ReferralsAdminController` — импортирует `AuditLogService`)
+- `maintenance` (job `withdrawal-reminder` пишет трейл напоминаний в
+  `audit_logs` напрямую через собственный порт `PrismaReminderAuditRepo`,
+  минуя AuditLogService, §18)
+
+### 12.5. Не использует
+
+- Audit-log **никогда** не зависит от других модулей (только пишет в свою таблицу)
 
 ---
 
@@ -487,18 +551,24 @@ audit_logs          (actor_id, actor_type, action, entity_type, entity_id, data,
 
 ### 13.1. Ответственность
 
-- Отдельный JWT auth flow
-- Endpoints для admin-действий:
-  - Users list / block / unblock
-  - KYC review
-  - Withdrawal approval/rejection
-  - Manual wallet credit/debit
-  - Dashboard metrics
-  - Settings
+- Отдельный admin-JWT auth flow (`AdminAuthService` + `AdminAuthGuard`, таблица admin_users)
+- Endpoints для admin-действий (все под `admin/...`):
+  - Users list / block / unblock (`AdminUsersController`)
+  - Finance: payment requests, withdrawals approval/rejection, manual credit/debit (`AdminFinanceController`)
+  - Admin management (`AdminAdminsController`)
+  - Audit-logs read-only (`AdminAuditController`, см. §12)
+  - Dashboard metrics (`AdminDashboardController`)
+  - Settings: контроллер в коде есть (`AdminSettingsController`), но в
+    `admin.module.ts` пока не зарегистрирован
+- NB: KYC review и referral run-daily админ-API живут в соответствующих
+  модулях (`KycAdminController` в kyc, `ReferralsAdminController` в referrals)
 
 ### 13.2. Использует
 
-- Все остальные модули через их Facade и Use Cases
+- `wallet` (WalletFacade — manual credit/debit)
+- Собственные репозитории к admin_users, audit_logs, dashboard, payment_requests
+  (`PaymentRequestRepository` провайдится локально — прямой доступ к таблице payments)
+- Экспортирует наружу: `AuditLogService`, `AdminAuthGuard`, `AdminAuthService`
 
 ---
 
@@ -506,8 +576,9 @@ audit_logs          (actor_id, actor_type, action, entity_type, entity_id, data,
 
 ### 14.1. Ответственность
 
-- `GET /health` — basic liveness
-- `GET /health/details` — internals (DB, Redis, queues)
+- `GET /health` — basic status
+- `GET /health/live` — liveness
+- `GET /health/ready` — readiness (checks: DB, Redis)
 
 ### 14.2. Не использует другие модули
 
@@ -515,52 +586,58 @@ audit_logs          (actor_id, actor_type, action, entity_type, entity_id, data,
 
 ## 15. Dependency Graph
 
-```
-auth          → users (create user)
-              → notifications (verification email)
-              → referrals (generate code, link referrer)
+Фактические зависимости — по импортам Nest-модулей (сверено с кодом):
 
-users         → (standalone, базовые операции)
-              exports UsersFacade
+```
+auth          → queues              (EMAIL_QUEUE_PORT: verification/reset письма)
+              (referral code генерируется самим register.use-case; users/
+               notifications/referrals auth НЕ импортирует)
+
+users         → auth                (AuthGuard)
+              exports UsersFacade, SelfExclusionUseCase
 
 geo           → users               (UsersFacade.getGeoContext)
+              (читает exchange_rates — пишет их maintenance, §18)
 
-kyc           → users
-              → geo                 (GeoFacade — limit display)
-              → notifications
-              → audit
+kyc           → geo                 (GeoFacade.convertRubToDisplay)
+              → admin               (AdminAuthGuard для admin-review)
+              exports KycCheckService
 
-wallet        → users               (UserFacade.findById)
-              ↛ NOTHING ELSE       (это foundational module)
+wallet        → auth                (AuthGuard)
+              ↛ NOTHING ELSE        (foundational module)
+              exports WalletFacade
 
-payments      → wallet              (WalletFacade)
-              → kyc                 (KycFacade.checkLimit / isVerified)
+payments      → wallet              (WalletFacade.credit/debit/lock)
+              → kyc                 (KycCheckService.assertCanDeposit/assertCanWithdraw)
               → users               (UsersFacade)
               → geo                 (GeoFacade)
-              → audit
-              → notifications
+              exports НИЧЕГО (п.6.6)
 
-casino        → wallet              (get active currency balance)
-              → (read-only таблицы игр/провайдеров)
+casino        → wallet              (WalletFacade: launch + bet/win/rollback)
+              → auth                (guards)
+              (+ game-sessions — часть этого же модуля, §8)
 
-game-sessions → wallet              (credit/debit при win/bet/rollback)
-              → casino              (game config)
+referrals     → wallet              (WalletFacade.credit для reward)
+              → admin               (AuditLogService в referrals-admin)
+              (read-only prisma.gameTransaction.groupBy для GGR — ADR GAP-51)
 
-referrals     → wallet              (credit для reward)
-              → casino              (read-only gameTransaction groupBy для GGR — ADR GAP-51)
-              → notifications       (email reward notification)
+support       → auth                (guards) — больше ничего
 
-support       → notifications       (notify admin/user)
-              → audit
+notifications → queues              (EMAIL_QUEUE_PORT)
+              → auth                (guards)
+              (никем не импортируется; письма auth/maintenance шлют напрямую)
 
-notifications → users (read-only email/settings — ADR GAP-51)
-              → (SMTP provider)
+admin         → wallet              (WalletFacade — manual credit/debit)
+              (+ audit-log — часть admin, §12; собственные репозитории к
+               admin_users, audit_logs, dashboard, payment_requests)
 
-audit         → (standalone — пишет в свою таблицу)
+health        → (standalone: readiness проверяет db/redis)
 
-admin         → ВСЕ модули через их Facade
-
-health        → (standalone)
+maintenance   → referrals           (ReferralCalcService.runDaily — job referral-daily)
+              → queues              (BullMQ-очередь `maintenance`: scheduler + worker; EMAIL_QUEUE_PORT)
+              → payments            (NOWPaymentsClient — импорт клиента курсов)
+              (пишет напрямую: payment_requests, exchange_rates, sessions,
+               audit_logs, admin_users — §18)
 ```
 
 ---
@@ -578,7 +655,11 @@ health        → (standalone)
 
 - Только через **Facade** другого модуля
 - Только через **DI** (не импорт напрямую)
-- В DiContainer одна module регистрирует свой Facade как Provider, другие модули его импортируют
+- «Facade» на практике = exported Nest-provider модуля: `UsersFacade`,
+  `WalletFacade`, `GeoFacade`, а также сервисы-фасады без суффикса
+  (`KycCheckService`, `ReferralCalcService`, `AuditLogService`,
+  `NotificationService`, `ProviderAdapterFactory`)
+- В Nest-DI экспорт модуля регистрирует провайдер, импортирующий модуль инжектит его (отдельного DiContainer-файла в коде нет)
 
 ### 16.3. Запрещено
 
@@ -617,3 +698,75 @@ health        → (standalone)
 6. [ ] Реализовать Facade для общения извне
 7. [ ] Написать unit-тесты
 8. [ ] Обновить этот файл — добавить модуль в карту
+
+---
+
+## 18. Maintenance Module
+
+### 18.1. Ответственность
+
+Фоновые обслуживающие задачи (GAP-33, ТЗ ч.3 §13): BullMQ-очередь `maintenance`
+(`QUEUES.MAINTENANCE` в `apps/api/src/queues/queue.types.ts`) с repeatable-джобами.
+Регистрация — `MaintenanceScheduler` (`apps/api/src/queues/infrastructure/maintenance.scheduler.ts`,
+BullMQ Job Schedulers `upsertJobScheduler`), вызывается из
+`MaintenanceModule.onApplicationBootstrap`. Интервалы — из env `JOB_*_EVERY_MS`
+(дефолты в scheduler; без REDIS_URL / в test — no-op).
+
+| Job (application) | Дефолт | Что делает |
+|----|----|----|
+| `expire-deposits` | 5 мин | pending-депозиты → `expired`: крипто — по `expires_at` провайдера, фиат — через 2ч после `created_at`; идемпотентен (условный update) |
+| `update-rates` | 5 мин | курсы RUB display-валют → `exchange_rates` + Redis-кеш TTL 5 мин: крипто — NOWPayments /estimate (dev-stub без ключа), фиат — константы `DISPLAY_RUB_RATES` из `@casino/shared-config` (source='static') |
+| `withdrawal-reminder` | 1 ч | письмо активным админам о выводах в pending >24ч; дедуп 24ч через запись в `audit_logs` (`maintenance.withdrawal_reminder`) |
+| `referral-daily` | 24 ч | ежедневный запуск `ReferralCalcService.runDaily` (GGR-share начисления, GAP-32; дедуп внутри) |
+| `cleanup-sessions` | 1 ч | удаление мёртвых auth-сессий из `sessions` (expired / отозванные старше grace 7 дней; pre-launch hardening A1) |
+
+### 18.2. Ключевые файлы
+
+```
+apps/api/src/modules/maintenance/application/            (5 job-классов: *.job.ts)
+apps/api/src/modules/maintenance/domain/maintenance.ports.ts
+apps/api/src/modules/maintenance/infrastructure/maintenance.prisma.repo.ts
+apps/api/src/modules/maintenance/infrastructure/maintenance.worker.ts
+apps/api/src/queues/infrastructure/maintenance.scheduler.ts
+apps/api/src/modules/maintenance/maintenance.module.ts
+```
+
+### 18.3. Архитектура
+
+- Джобы — application-классы без I/O-зависимостей в конструкторе: БД/письма/курсы —
+  через порты из `maintenance.ports.ts` (`PAYMENT_MAINTENANCE_REPO`,
+  `SESSION_MAINTENANCE_REPO`, `REMINDER_AUDIT_REPO`, `EXCHANGE_RATE_WRITER`,
+  `RATES_PROVIDER`, `MAINTENANCE_EMAIL_PORT`), каждая джоба тестируема in-memory
+- `MaintenanceWorker` (infrastructure) — BullMQ Worker очереди `maintenance`,
+  диспетчеризация по map `MAINTENANCE_HANDLERS` (job.name → хендлер)
+- Дедуп/трейл напоминаний пишутся напрямую в `audit_logs` через
+  `PrismaReminderAuditRepo` (AdminModule/AuditLogService не используется)
+
+### 18.4. Использует
+
+- `referrals` (ReferralCalcService — job `referral-daily`)
+- `queues` (BullMQ-планирование; EMAIL_QUEUE_PORT — письмо админам)
+- `payments` (NOWPaymentsClient — источник курсов; прямой импорт клиента
+  из `payments/infrastructure/clients/`)
+
+### 18.5. Используется в
+
+- Никем: самостоятельный cron-слой (регистрируется в `app.module.ts`)
+
+### 18.6. Таблицы (прямой доступ через порты)
+
+```
+payment_requests     (listPendingDeposits / listPendingWithdrawals / markExpired)
+exchange_rates       (запись курсов + prune истории старше 7 дней)
+sessions             (purgeDeadSessions)
+audit_logs           (дедуп + трейл напоминаний)
+admin_users          (email активных админов)
+```
+
+### 18.7. КРИТИЧНО
+
+- Ручной триггер реферальных начислений — `POST /admin/referrals/run-daily`
+  (superadmin; audit-log через `AuditLogService`), job `referral-daily` —
+  его же автоматический запуск
+- Все джобы идемпотентны: повторный тик не создаёт дублей (условные update,
+  дедуп-окна, deleteMany по условию)
