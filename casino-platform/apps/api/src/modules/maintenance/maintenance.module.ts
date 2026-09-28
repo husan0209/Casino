@@ -1,6 +1,7 @@
 import { Module, type OnApplicationBootstrap } from '@nestjs/common'
 
 import { AdminModule } from '../admin/admin.module'
+import { AuthModule } from '../auth/auth.module'
 import { ReferralsModule } from '../referrals/referrals.module'
 import { CleanupSessionsJob } from './application/cleanup-sessions.job'
 import { ExpireDepositsJob } from './application/expire-deposits.job'
@@ -50,7 +51,7 @@ import { NOWPaymentsClient } from '../payments/infrastructure/clients/nowpayment
  * напрямую PrismaReminderAuditRepo (audit_logs).
  */
 @Module({
-  imports: [AdminModule, ReferralsModule, QueuesModule],
+  imports: [AuthModule, AdminModule, ReferralsModule, QueuesModule],
   controllers: [MaintenanceAdminController],
   providers: [
     MaintenanceScheduler,
