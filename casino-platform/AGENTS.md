@@ -1,6 +1,6 @@
 # casino-platform — Agent Instructions (opencode / Claude Code / Cline)
 
-> Источник: `docs/AGENT_INSTRUCTIONS.md` §2. Синхронизировано 2026-08-28.
+> Источник: `docs/AGENT_INSTRUCTIONS.md` §2. Синхронизировано 2026-09-27.
 > **Производный файл (derived):** правила менять в источнике (§2) и копировать сюда — прямые правки приведут к расхождению.
 > Для Cursor/Windsurf см. `.cursorrules` в корне.
 
@@ -31,7 +31,7 @@ Online casino платформа для рынка СНГ. MVP на русско
 2. **Идемпотентность** — каждая финансовая операция требует `idempotencyKey` с проверкой дубликата ДО выполнения.
 3. **Структура модуля** — 4 слоя. Бизнес-логика ТОЛЬКО в `application/use-cases/`. HTTP ТОЛЬКО в `presentation/controllers/`. БД ТОЛЬКО в `infrastructure/repositories/`.
 4. **Межмодульное общение** — только через Facade другого модуля. Никогда не импортируй `Repository` одного модуля в другой.
-5. **API ответы** — всегда через `successResponse()` / `errorResponse()` из `@casino/shared-types`. Никогда сырой объект.
+5. **API ответы** — всегда через `successResponse()` / `errorResponse()` из `@casino/shared-utils` (типы — из `@casino/shared-types`). Никогда сырой объект.
 6. **Ошибки** — всегда кастомный класс, расширяющий `AppError`. Код ошибки стабильный (например `INSUFFICIENT_FUNDS`), есть `httpStatus`.
 7. **Безопасность** — не логируй пароли, токены, номера карт, документы. Валидируй через Zod. Проверяй права в Guard.
 8. **Транзакции БД** — все финансовые multi-table операции в `prisma.$transaction()`. Optimistic locking retry до 3 раз.
