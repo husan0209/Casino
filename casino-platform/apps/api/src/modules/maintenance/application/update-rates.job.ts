@@ -75,11 +75,10 @@ export class UpdateRatesJob {
     return { updated, skipped, source }
   }
 
-  /** Таблица чистится от записей старше недели (тики каждые 5 мин — иначе бесконечный рост). */
+  /** История старше TTL чистится писателем (порты, не прямой prisma — см. G1). */
   private async pruneHistory(now: Date): Promise<void> {
-    const { prisma } = await import('@casino/database')
-    await prisma.exchangeRate
-      .deleteMany({ where: { fetchedAt: { lt: new Date(now.getTime() - HISTORY_TTL_MS) } } })
-      .catch(() => this.logger.warn('update-rates: history prune failed (non-fatal)'))
+    await this.writer
+      .pruneHistory(new Date(now.getTime() - HISTORY_TTL_MS))
+      .catch((e: Error) => this.logger.warn(`update-rates: history prune failed (non-fatal): ${e.message}`))
   }
 }
