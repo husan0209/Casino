@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
+import { type ConfigService } from '@nestjs/config'
+import Redis from 'ioredis'
 
 import { type IHealthProbe, type ProbeName, type ProbeStatus } from '../../domain/health.ports'
 
@@ -22,7 +23,6 @@ export class RedisHealthProbe implements IHealthProbe {
       return false
     }
     try {
-      const Redis = (await import('ioredis')).default
       const client = new Redis(url, {
         lazyConnect: true,
         connectTimeout: REDIS_CONNECT_TIMEOUT_MS,

@@ -7,7 +7,7 @@
     // остаётся пустым без ошибки (проверено локально: 12:52 build → пустой dist).
     // Для билда это не потеря: он и так полный (workspace + Docker layer cache).
     "incremental": false,
-    "baseUrl": "./",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@/*": ["./src/*"],
       "@modules/*": ["./src/modules/*"],

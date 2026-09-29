@@ -31,13 +31,15 @@
   "devDependencies": {
     "@commitlint/cli": "^19.6.0",
     "@commitlint/config-conventional": "^19.6.0",
-    "@typescript-eslint/eslint-plugin": "7.2.0",
-    "@typescript-eslint/parser": "7.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.71.0",
+    "@typescript-eslint/parser": "^8.71.0",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "eslint-import-resolver-typescript": "^3.6.1",
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-react-hooks": "^4.6.2",
     "lint-staged": "^15.2.0",
-    "prettier": "^3.4.0"
+    "prettier": "^3.4.0",
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs}": [
