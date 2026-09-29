@@ -28,7 +28,7 @@ const MENU_ITEMS: MenuItem[] = [
 
 export function UserMenu({
   email,
-  avatarUrl,
+  avatarUrl = null,
 }: {
   email: string | null
   avatarUrl?: string | null

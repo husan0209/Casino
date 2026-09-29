@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 
+import { UserAvatar } from '@/components/layout/UserAvatar'
 import { SecurityTab, SessionsTab, SettingsTab } from '@/components/profile/ProfileTabs'
 import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost, errText } from '@/lib/api'
@@ -68,11 +69,7 @@ function DataTab({ me, onSaved }: { me: MeDto; onSaved: () => void }): React.JSX
     <div className="card space-y-3">
       <div className="font-semibold">Личные данные</div>
       <div className="flex items-center gap-3">
-        {p?.avatarUrl ? (
-          <img src={p.avatarUrl} alt="Аватар" className="h-14 w-14 rounded-full object-cover" />
-        ) : (
-          <div className="grid h-14 w-14 place-items-center rounded-full bg-[#16213E] text-xl">👤</div>
-        )}
+        <UserAvatar email={me.user.email} avatarUrl={p?.avatarUrl ?? null} size={56} />
         <div>
           <button
             type="button"
@@ -147,11 +144,11 @@ export default function ProfilePage(): React.JSX.Element {
       ) : (
         <>
           <div className="card mb-5 flex flex-wrap items-center gap-4">
-            {data.profile?.avatarUrl ? (
-              <img src={data.profile.avatarUrl} alt="Аватар" className="h-12 w-12 rounded-full object-cover" />
-            ) : (
-              <div className="grid h-12 w-12 place-items-center rounded-full bg-[#16213E] text-xl">👤</div>
-            )}
+            <UserAvatar
+              email={data.user.email}
+              avatarUrl={data.profile?.avatarUrl ?? null}
+              size={48}
+            />
             <div className="flex-1">
               <div className="font-medium">{data.user.email || 'Игрок'}</div>
               <div className="text-sm text-muted">
