@@ -2,14 +2,18 @@ import { Inject, Injectable } from '@nestjs/common'
 
 import { TicketNotFoundError, ForbiddenTicketError } from '../../domain/errors'
 import {
-  ISupportRepository,
+  type ISupportRepository,
   SUPPORT_REPOSITORY,
 } from '../../domain/repositories/support.repository'
 
 @Injectable()
 export class CloseTicketUseCase {
   constructor(@Inject(SUPPORT_REPOSITORY) private repo: ISupportRepository) {}
-  async execute(ticketId: string, closedBy: 'user' | 'admin', userId?: string): Promise<{ ok: boolean; }> {
+  async execute(
+    ticketId: string,
+    closedBy: 'user' | 'admin',
+    userId?: string,
+  ): Promise<{ ok: boolean }> {
     const t = await this.repo.getAdmin(ticketId)
     if (!t) {
       throw new TicketNotFoundError()

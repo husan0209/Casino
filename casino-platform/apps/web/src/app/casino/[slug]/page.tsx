@@ -227,7 +227,7 @@ export default function GamePage(): React.JSX.Element {
                 <button
                   disabled={launch.isPending}
                   onClick={() => launch.mutate()}
-                  className="btn-money flex-1 py-3.5 text-base font-bold"
+                  className="btn flex-1 py-3.5 text-base font-bold"
                 >
                   <Play size={18} className="fill-current" />
                   {launch.isPending ? 'Запуск игры…' : 'Играть на деньги'}
@@ -235,7 +235,7 @@ export default function GamePage(): React.JSX.Element {
               ) : (
                 <button
                   type="button"
-                  className="btn-money flex-1 py-3.5 text-base font-bold"
+                  className="btn flex-1 py-3.5 text-base font-bold"
                   onClick={() => openLogin(slug)}
                 >
                   Войти, чтобы играть

@@ -1,4 +1,4 @@
-import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common'
+import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@nestjs/common'
 import { type Request } from 'express'
 
 import { JwtTokenService } from '../../modules/auth/infrastructure/services/jwt.service'
@@ -6,7 +6,7 @@ import { JwtTokenService } from '../../modules/auth/infrastructure/services/jwt.
 /** Sets req.user when Bearer token is valid; does not fail for guests. */
 @Injectable()
 export class OptionalAuthGuard implements CanActivate {
-  constructor(private jwt: JwtTokenService) {}
+  constructor(@Inject(JwtTokenService) private jwt: JwtTokenService) {}
 
   canActivate(ctx: ExecutionContext): boolean {
     const req = ctx.switchToHttp().getRequest<Request>()

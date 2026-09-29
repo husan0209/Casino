@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto'
 
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { type IJwtTokenService } from '../../domain/auth.ports'
@@ -35,7 +35,7 @@ interface AccessPayload {
  */
 @Injectable()
 export class JwtTokenService implements IJwtTokenService {
-  constructor(private config: ConfigService) {}
+  constructor(@Inject(ConfigService) private config: ConfigService) {}
 
   private accessSecret(): string {
     const secret = this.config.get<string>('JWT_ACCESS_SECRET')

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 
 import type { DisplayCurrency, LegalCountry, PaymentMethodDef } from '@casino/shared-config'
 
@@ -19,8 +19,8 @@ import {
 @Injectable()
 export class GeoFacade {
   constructor(
-    private getGeoConfig: GetGeoConfigUseCase,
-    private rates: ExchangeRatesService,
+    @Inject(GetGeoConfigUseCase) private getGeoConfig: GetGeoConfigUseCase,
+    @Inject(ExchangeRatesService) private rates: ExchangeRatesService,
   ) {}
 
   resolveConfig(input: ResolveGeoInput): Promise<GeoConfigResult> {

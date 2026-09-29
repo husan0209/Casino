@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
@@ -11,8 +11,10 @@ import {
   OAuthExchangeError,
 } from '@modules/auth/domain/errors'
 
-import { OAuthUserProvisioningService,
-  type OAuthSignInResult,} from './oauth-user-provisioning.service'
+import {
+  OAuthUserProvisioningService,
+  type OAuthSignInResult,
+} from './oauth-user-provisioning.service'
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
@@ -30,11 +32,11 @@ interface StatePayload {
 @Injectable()
 export class GoogleOAuthUseCase {
   constructor(
-    private config: ConfigService,
-    private provisioning: OAuthUserProvisioningService,
+    @Inject(ConfigService) private config: ConfigService,
+    @Inject(OAuthUserProvisioningService) private provisioning: OAuthUserProvisioningService,
   ) {}
 
-  private credentials(): { clientId: string; clientSecret: string; } {
+  private credentials(): { clientId: string; clientSecret: string } {
     const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')
     const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET')
     if (!clientId || !clientSecret) {

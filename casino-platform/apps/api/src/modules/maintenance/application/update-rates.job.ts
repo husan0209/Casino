@@ -7,8 +7,8 @@ import { DISPLAY_RUB_RATES } from '@casino/shared-config'
 import {
   EXCHANGE_RATE_WRITER,
   RATES_PROVIDER,
-  IExchangeRateWriter,
-  IRatesProvider,
+  type IExchangeRateWriter,
+  type IRatesProvider,
   type RatesResult,
 } from '../domain/maintenance.ports'
 
@@ -48,7 +48,10 @@ export class UpdateRatesJob {
       const rate =
         live && Number.isFinite(Number(live.rate)) && Number(live.rate) > 0
           ? live
-          : { rate: DISPLAY_RUB_RATES[currency as keyof typeof DISPLAY_RUB_RATES], source: 'static' }
+          : {
+              rate: DISPLAY_RUB_RATES[currency as keyof typeof DISPLAY_RUB_RATES],
+              source: 'static',
+            }
       if (rate.source !== 'static') {
         source = rate.source
       }
@@ -68,9 +71,9 @@ export class UpdateRatesJob {
     }
 
     await this.pruneHistory(now)
-    await this.writer.cacheRates(cached).catch((e: Error) =>
-      this.logger.warn(`update-rates: redis cache skipped: ${e.message}`),
-    )
+    await this.writer
+      .cacheRates(cached)
+      .catch((e: Error) => this.logger.warn(`update-rates: redis cache skipped: ${e.message}`))
     this.logger.log(`update-rates: updated=${updated} skipped=${skipped} source=${source}`)
     return { updated, skipped, source }
   }
@@ -79,6 +82,8 @@ export class UpdateRatesJob {
   private async pruneHistory(now: Date): Promise<void> {
     await this.writer
       .pruneHistory(new Date(now.getTime() - HISTORY_TTL_MS))
-      .catch((e: Error) => this.logger.warn(`update-rates: history prune failed (non-fatal): ${e.message}`))
+      .catch((e: Error) =>
+        this.logger.warn(`update-rates: history prune failed (non-fatal): ${e.message}`),
+      )
   }
 }

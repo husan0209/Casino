@@ -1,10 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { Decimal } from 'decimal.js'
 
-import {
-  DASHBOARD_REPOSITORY,
-  IDashboardRepository,
-} from '../domain/admin.repository'
+import { DASHBOARD_REPOSITORY, type IDashboardRepository } from '../domain/admin.repository'
 
 export type DashPeriod = 'today' | '7d' | '30d' | '90d'
 
@@ -49,7 +46,20 @@ export class DashboardService {
   constructor(@Inject(DASHBOARD_REPOSITORY) private readonly repo: IDashboardRepository) {}
 
   // UC-ADMIN-DASH-01
-  async metrics(period: DashPeriod = 'today'): Promise<{ period: DashPeriod; users: { total: number; new_in_period: number; active_today: number; }; finance: { deposits: string; withdrawals: string; ggr: string; deposits_total: string; withdrawals_total: string; }; pending: { withdrawals: number; kyc: number; tickets: number; }; }> {
+  async metrics(
+    period: DashPeriod = 'today',
+  ): Promise<{
+    period: DashPeriod
+    users: { total: number; new_in_period: number; active_today: number }
+    finance: {
+      deposits: string
+      withdrawals: string
+      ggr: string
+      deposits_total: string
+      withdrawals_total: string
+    }
+    pending: { withdrawals: number; kyc: number; tickets: number }
+  }> {
     const since = periodStartDate(period)
     const todayStart = startOfUtcDay()
 
@@ -98,7 +108,24 @@ export class DashboardService {
   }
 
   // UC-ADMIN-DASH-02
-  async charts(period: DashPeriod = '7d', type: 'revenue' | 'registrations' = 'revenue'): Promise<{ labels: string[]; datasets: { registrations: number[]; deposits?: never; withdrawals?: never; ggr?: never; }; } | { labels: string[]; datasets: { deposits: string[]; withdrawals: string[]; ggr: string[]; registrations?: never; }; }> {
+  async charts(
+    period: DashPeriod = '7d',
+    type: 'revenue' | 'registrations' = 'revenue',
+  ): Promise<
+    | {
+        labels: string[]
+        datasets: { registrations: number[]; deposits?: never; withdrawals?: never; ggr?: never }
+      }
+    | {
+        labels: string[]
+        datasets: {
+          deposits: string[]
+          withdrawals: string[]
+          ggr: string[]
+          registrations?: never
+        }
+      }
+  > {
     const since = periodStartDate(period)
     const labels = dayLabels(since, daysBetween(since))
 
@@ -107,10 +134,12 @@ export class DashboardService {
       return { labels, datasets: { registrations: labels.map((l) => rows.get(l)?.count ?? 0) } }
     }
 
-    const [payRows, ggrRows] = await Promise.all([
-      byDay(await this.repo.paymentsPerDay(since)),
-      byDay(await this.repo.ggrPerDay(since)),
+    const [payData, ggrData] = await Promise.all([
+      this.repo.paymentsPerDay(since),
+      this.repo.ggrPerDay(since),
     ])
+    const payRows = byDay(payData)
+    const ggrRows = byDay(ggrData)
 
     return {
       labels,
@@ -125,7 +154,7 @@ export class DashboardService {
   }
 
   // UC-ADMIN-DASH-03
-  async events(limit = 10): Promise<{ at: Date; type: string; detail: string; }[]> {
+  async events(limit = 10): Promise<{ at: Date; type: string; detail: string }[]> {
     const capped = Math.min(Math.max(limit, 1), 50)
     const [payments, kycs, bigWins, signups, tickets] = await Promise.all([
       this.repo.recentPayments(capped),

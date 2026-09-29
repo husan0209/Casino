@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import {
@@ -38,7 +38,7 @@ export class CaptchaService implements ICaptchaService {
   /** Подменяется в тестах, чтобы не бить по сети. */
   transport: CaptchaTransport = defaultTransport
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(@Inject(ConfigService) private readonly config: ConfigService) {}
 
   get siteKey(): string {
     return this.config.get<string>('NEXT_PUBLIC_TURNSTILE_SITE_KEY') ?? ''

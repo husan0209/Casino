@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
-import { EMAIL_QUEUE_PORT, EmailQueuePort, type EnqueueResult } from '@/queues/queue.types'
+import { EMAIL_QUEUE_PORT, type EmailQueuePort, type EnqueueResult } from '@/queues/queue.types'
 import { renderPasswordResetEmail, renderVerificationEmail } from '@/queues/templates'
 
 import { type IEmailQueueService } from '../../domain/auth.ports'
@@ -15,7 +15,7 @@ import { type IEmailQueueService } from '../../domain/auth.ports'
 @Injectable()
 export class EmailQueueService implements IEmailQueueService {
   constructor(
-    private config: ConfigService,
+    @Inject(ConfigService) private config: ConfigService,
     @Inject(EMAIL_QUEUE_PORT) private readonly emailQueue: EmailQueuePort,
   ) {}
 

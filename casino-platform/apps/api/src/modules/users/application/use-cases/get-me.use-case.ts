@@ -1,6 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { IUserProfileRepository, USER_PROFILE_REPOSITORY, type UserProfileFull } from '../../domain/repositories/user-profile.repository'
+import {
+  type IUserProfileRepository,
+  USER_PROFILE_REPOSITORY,
+  type UserProfileFull,
+} from '../../domain/repositories/user-profile.repository'
 
 @Injectable()
 export class GetMeUseCase {

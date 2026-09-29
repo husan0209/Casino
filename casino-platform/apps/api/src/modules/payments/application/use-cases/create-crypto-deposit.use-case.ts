@@ -9,8 +9,8 @@ import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.se
 
 import { PaymentProviderError } from '../../domain/errors'
 import {
-  INowPaymentsClient,
-  IPaymentRequestRepository,
+  type INowPaymentsClient,
+  type IPaymentRequestRepository,
   NOWPAYMENTS_CLIENT,
   PAYMENT_REQUEST_REPOSITORY,
 } from '../../domain/payments.ports'
@@ -21,10 +21,20 @@ export class CreateCryptoDepositUseCase {
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(NOWPAYMENTS_CLIENT) private readonly np: INowPaymentsClient,
-    private kycCheck: KycCheckService,
-    private config: ConfigService,
+    @Inject(KycCheckService) private kycCheck: KycCheckService,
+    @Inject(ConfigService) private config: ConfigService,
   ) {}
-  async execute(userId: string, amount: string, currency: string): Promise<{ payment_request_id: string; pay_address: string; pay_amount: string; pay_currency: string; expires_at: string; }> {
+  async execute(
+    userId: string,
+    amount: string,
+    currency: string,
+  ): Promise<{
+    payment_request_id: string
+    pay_address: string
+    pay_amount: string
+    pay_currency: string
+    expires_at: string
+  }> {
     const allowed = ['USDT_TRC20', 'BTC', 'TON', 'TRX', 'LTC']
     if (!allowed.includes(currency)) {
       throw new Error('INVALID_CURRENCY')

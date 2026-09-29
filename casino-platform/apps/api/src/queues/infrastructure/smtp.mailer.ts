@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
 
 import { Injectable, Logger } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
+import { type ConfigService } from '@nestjs/config'
 
 import { AppError } from '@casino/shared-utils'
 
@@ -66,7 +66,8 @@ export class SmtpMailer implements MailerPort {
       host,
       port: Number(this.config.get<string>('SMTP_PORT') || 587),
       secure: Number(this.config.get<string>('SMTP_PORT')) === 465,
-      ...(smtpUser !== undefined && smtpPassword !== undefined && { auth: { user: smtpUser, pass: smtpPassword } }),
+      ...(smtpUser !== undefined &&
+        smtpPassword !== undefined && { auth: { user: smtpUser, pass: smtpPassword } }),
     })
     return this.transport
   }
