@@ -8,8 +8,8 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
 
 import { PaymentRequestRepository } from '@modules/payments/infrastructure/repositories/payment-request.repository'
-import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
+import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import { type LedgerEntryType, type PaymentProvider, type PaymentStatus, type PaymentType, prisma, type Prisma } from '@casino/database'
 import { type Currency } from '@casino/shared-types'
