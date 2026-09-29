@@ -149,3 +149,57 @@ export class SelfExcludedError extends AppError {
     )
   }
 }
+
+// ── JWT-верификация (Волна 3в, G17): message = прежний код строки —
+// обработчики разбирают текст, поэтому он сохранён 1-в-1.
+export type JwtTokenErrorCode =
+  | 'BAD_TOKEN'
+  | 'BAD_ALGORITHM'
+  | 'BAD_SIGNATURE'
+  | 'BAD_ISSUER'
+  | 'BAD_AUDIENCE'
+  | 'TOKEN_EXPIRED'
+
+export class JwtTokenError extends AppError {
+  readonly code: string
+  readonly httpStatus = 401
+  constructor(code: JwtTokenErrorCode) {
+    super(code)
+    this.code = code
+  }
+}
+export class JwtSecretWeakError extends AppError {
+  readonly code = 'JWT_ACCESS_SECRET_MISSING_OR_WEAK'
+  readonly httpStatus = 500
+  constructor() {
+    super('JWT_ACCESS_SECRET_MISSING_OR_WEAK')
+  }
+}
+export class ReferralCodeGenerationError extends AppError {
+  readonly code = 'REFERRAL_CODE_GENERATION_FAILED'
+  readonly httpStatus = 500
+  constructor() {
+    super('REFERRAL_CODE_GENERATION_FAILED')
+  }
+}
+export class OAuthUpstreamError extends AppError {
+  readonly code = 'OAUTH_UPSTREAM_ERROR'
+  readonly httpStatus = 502
+  constructor(m: string) {
+    super(m)
+  }
+}
+export class OauthUserInvariantError extends AppError {
+  readonly code = 'OAUTH_USER_REQUIRES_NULL_PASSWORD'
+  readonly httpStatus = 500
+  constructor() {
+    super('OAUTH_USER_REQUIRES_NULL_PASSWORD')
+  }
+}
+export class CaptchaUpstreamError extends AppError {
+  readonly code = 'CAPTCHA_UPSTREAM_ERROR'
+  readonly httpStatus = 502
+  constructor(m: string) {
+    super(m)
+  }
+}

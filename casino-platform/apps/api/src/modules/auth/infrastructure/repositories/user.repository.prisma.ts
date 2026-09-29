@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common'
 import { prisma } from '@casino/database'
 
 import { User } from '../../domain/entities/user.entity'
+import { OauthUserInvariantError } from '../../domain/errors'
 import {
   type CreateUserInput,
   type IUserRepository,
@@ -50,7 +51,7 @@ export class PrismaUserRepository implements IUserRepository {
 
   async create(input: CreateUserInput): Promise<User> {
     if (input.email === null && input.passwordHash !== null) {
-      throw new Error('OAUTH_USER_REQUIRES_NULL_PASSWORD')
+      throw new OauthUserInvariantError()
     }
     const row = await prisma.user.create({
       data: {

@@ -9,6 +9,7 @@ import { CleanupSessionsJob } from '../application/cleanup-sessions.job'
 import { ExpireDepositsJob } from '../application/expire-deposits.job'
 import { UpdateRatesJob } from '../application/update-rates.job'
 import { WithdrawalReminderJob } from '../application/withdrawal-reminder.job'
+import { PaymentRequestNotPendingError } from '../domain/errors'
 import {
   type IExchangeRateWriter,
   type IPaymentMaintenanceRepo,
@@ -81,7 +82,7 @@ export class PrismaMaintenanceRepo implements IPaymentMaintenanceRepo {
       data: { status: 'expired' },
     })
     if (res.count === 0) {
-      throw new Error(`payment_request ${id} is not pending anymore`)
+      throw new PaymentRequestNotPendingError(id)
     }
   }
 }

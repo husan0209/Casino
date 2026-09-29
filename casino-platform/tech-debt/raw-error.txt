@@ -1,16 +1,3 @@
 apps/api/src/modules/admin/infrastructure/admin-jwt.service.ts	2
 apps/api/src/modules/admin/presentation/admin-auth.guard.ts	1
 apps/api/src/modules/admin/presentation/controllers/admin-finance.controller.ts	2
-apps/api/src/modules/auth/application/use-cases/oauth/google-oauth.use-case.ts	4
-apps/api/src/modules/auth/application/use-cases/oauth/oauth-user-provisioning.service.ts	1
-apps/api/src/modules/auth/application/use-cases/register.use-case.ts	1
-apps/api/src/modules/auth/infrastructure/repositories/user.repository.prisma.ts	1
-apps/api/src/modules/auth/infrastructure/services/captcha.service.ts	1
-apps/api/src/modules/auth/infrastructure/services/jwt.service.ts	7
-apps/api/src/modules/maintenance/infrastructure/maintenance.prisma.repo.ts	1
-apps/api/src/modules/maintenance/infrastructure/maintenance.worker.ts	1
-apps/api/src/modules/payments/infrastructure/clients/nowpayments.client.ts	1
-apps/api/src/modules/users/application/use-cases/get-me.use-case.ts	1
-apps/api/src/modules/users/application/use-cases/self-exclusion.use-case.ts	1
-apps/api/src/queues/infrastructure/smtp.mailer.ts	1
-apps/api/src/queues/queues.module.ts	1

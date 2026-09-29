@@ -6,7 +6,7 @@ import {
   type CaptchaVerifyResponse,
   type ICaptchaService,
 } from '../../domain/auth.ports'
-import { CaptchaFailedError, CaptchaRequiredError } from '../../domain/errors'
+import { CaptchaFailedError, CaptchaRequiredError, CaptchaUpstreamError } from '../../domain/errors'
 
 /**
  * GAP-55 (ж) (ТЗ ч.5 §5.2): «после 5 неудач — captcha» на входе.
@@ -104,7 +104,7 @@ export class CaptchaService implements ICaptchaService {
 async function defaultTransport(url: string, init: RequestInit): Promise<CaptchaVerifyResponse> {
   const response = await fetch(url, init)
   if (!response.ok) {
-    throw new Error(`siteverify HTTP ${String(response.status)}`)
+    throw new CaptchaUpstreamError(`siteverify HTTP ${String(response.status)}`)
   }
   return (await response.json()) as CaptchaVerifyResponse
 }

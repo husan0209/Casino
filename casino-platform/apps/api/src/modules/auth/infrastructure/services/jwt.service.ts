@@ -4,6 +4,8 @@ import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { type IJwtTokenService } from '../../domain/auth.ports'
+import { JwtSecretWeakError, JwtTokenError } from '../../domain/errors'
+
 
 const b64url = (buf: Buffer): string => buf.toString('base64url')
 
@@ -40,7 +42,7 @@ export class JwtTokenService implements IJwtTokenService {
   private accessSecret(): string {
     const secret = this.config.get<string>('JWT_ACCESS_SECRET')
     if (!secret || secret.length < 32) {
-      throw new Error('JWT_ACCESS_SECRET_MISSING_OR_WEAK')
+      throw new JwtSecretWeakError()
     }
     return secret
   }
@@ -68,27 +70,27 @@ export class JwtTokenService implements IJwtTokenService {
   verifyAccess(token: string): { sub: string; role: string; session_id: string } {
     const parts = token.split('.')
     if (parts.length !== 3) {
-      throw new Error('BAD_TOKEN')
+      throw new JwtTokenError('BAD_TOKEN')
     }
     const [header, body, sig] = parts as [string, string, string]
     const headerRaw = JSON.parse(Buffer.from(header, 'base64url').toString()) as { alg?: string }
     if (headerRaw.alg !== 'HS256') {
-      throw new Error('BAD_ALGORITHM')
+      throw new JwtTokenError('BAD_ALGORITHM')
     }
     const expected = createHmac('sha256', this.accessSecret()).update(`${header}.${body}`).digest()
     const given = Buffer.from(sig, 'base64url')
     if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
-      throw new Error('BAD_SIGNATURE')
+      throw new JwtTokenError('BAD_SIGNATURE')
     }
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString()) as AccessPayload
     if (payload.iss !== 'casino-platform') {
-      throw new Error('BAD_ISSUER')
+      throw new JwtTokenError('BAD_ISSUER')
     }
     if (payload.aud !== 'user') {
-      throw new Error('BAD_AUDIENCE')
+      throw new JwtTokenError('BAD_AUDIENCE')
     }
     if (payload.exp * 1000 < Date.now()) {
-      throw new Error('TOKEN_EXPIRED')
+      throw new JwtTokenError('TOKEN_EXPIRED')
     }
     return { sub: payload.sub, role: payload.role, session_id: payload.session_id }
   }

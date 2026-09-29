@@ -4,7 +4,7 @@ import { Inject, Injectable } from '@nestjs/common'
 
 import { EMAIL_QUEUE_SERVICE, IEmailQueueService, IPasswordHasher, IJwtTokenService, PASSWORD_HASHER, JWT_TOKEN_SERVICE } from '../../domain/auth.ports'
 import { type UserRole } from '../../domain/entities/user.entity'
-import { EmailAlreadyExistsError, WeakPasswordError } from '../../domain/errors'
+import { EmailAlreadyExistsError, ReferralCodeGenerationError, WeakPasswordError } from '../../domain/errors'
 import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 import { EMAIL_VERIFICATION_REPOSITORY, IEmailVerificationRepository } from '../../domain/repositories/verification-token.repository'
@@ -35,7 +35,7 @@ export class RegisterUseCase {
         return code
       }
     }
-    throw new Error('REFERRAL_CODE_GENERATION_FAILED')
+    throw new ReferralCodeGenerationError()
   }
 
   async execute(
