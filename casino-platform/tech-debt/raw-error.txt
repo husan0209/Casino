@@ -13,12 +13,9 @@ apps/api/src/modules/casino/infrastructure/providers/demo/demo-provider.adapter.
 apps/api/src/modules/casino/infrastructure/providers/gitslotpark/gitslotpark.adapter.ts	3
 apps/api/src/modules/casino/infrastructure/providers/provider-adapter.factory.ts	2
 apps/api/src/modules/casino/presentation/controllers/casino-admin.controller.ts	1
-apps/api/src/modules/kyc/presentation/controllers/kyc.controller.ts	1
 apps/api/src/modules/maintenance/infrastructure/maintenance.prisma.repo.ts	1
 apps/api/src/modules/maintenance/infrastructure/maintenance.worker.ts	1
-apps/api/src/modules/payments/application/use-cases/create-crypto-deposit.use-case.ts	1
-apps/api/src/modules/payments/infrastructure/clients/nowpayments.client.ts	7
-apps/api/src/modules/payments/infrastructure/clients/rukassa.client.ts	3
+apps/api/src/modules/payments/infrastructure/clients/nowpayments.client.ts	1
 apps/api/src/modules/users/application/use-cases/get-me.use-case.ts	1
 apps/api/src/modules/users/application/use-cases/self-exclusion.use-case.ts	1
 apps/api/src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma.ts	3

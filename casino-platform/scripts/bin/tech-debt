@@ -57,12 +57,18 @@ detect() {
         cut -d: -f1 | sed 's|\\|/|g' | sort | uniq -c |
         awk '{print $2 "\t" $1}' | sort
       ;;
-    # Use-case без соседнего .spec.ts (CONVENTIONS §11)
+    # Use-case без теста (CONVENTIONS §11). Тест считается найденным, если:
+    # (а) есть соседний .spec.ts, ИЛИ (б) имя класса упоминается в любом спеке
+    # apps/api/test/ (конвенция репо: спеки живут в test/, не рядом с кодом).
     use-case-specs)
       find apps/api/src/modules -name '*.use-case.ts' ! -name '*.spec.ts' 2>/dev/null |
         sed 's|\\|/|g' | sort |
         while IFS= read -r uc; do
-          [ -f "${uc%.ts}.spec.ts" ] || printf '%s\n' "$uc"
+          [ -f "${uc%.ts}.spec.ts" ] && continue
+          BASE=$(basename "$uc" .use-case.ts)
+          CLS=$(printf '%s' "$BASE" | awk -F'-' '{o="";for(i=1;i<=NF;i++)o=o toupper(substr($i,1,1)) substr($i,2); print o "UseCase"}')
+          grep -rqF "$CLS" apps/api/test --include='*.spec.ts' 2>/dev/null && continue
+          printf '%s\n' "$uc"
         done
       ;;
     # Кросс-модульные deep-импорты мимо Facade (MODULE_BOUNDARIES.md).
