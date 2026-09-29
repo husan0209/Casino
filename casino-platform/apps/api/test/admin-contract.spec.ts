@@ -7,8 +7,12 @@
  * error-конверт {success:false, error:{code, message}} с корректным статусом,
  * который errText() обоих фронтов уже умеет показывать.
  */
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import {
+  InvalidAdminCredentialsError,
+  SuperadminOnlyError,
+} from '../src/modules/admin/domain/errors'
 
 vi.mock('@casino/database', () => ({
   prisma: { adminUser: { update: vi.fn().mockResolvedValue({}) } },
@@ -41,10 +45,10 @@ beforeEach(() => {
 })
 
 describe('аудит 2026-09-26: POST /admin/auth/login', () => {
-  it('неверные креды → UnauthorizedException (401 + error-конверт), не HTTP-200', async () => {
+  it('неверные креды → InvalidAdminCredentialsError (401 + error-конверт), не HTTP-200', async () => {
     const ctl = new AdminAuthController(fakeAdminAuth(null), audit)
     await expect(ctl.login({ email: 'x@x.x', password: 'wrong-pass' })).rejects.toBeInstanceOf(
-      UnauthorizedException,
+      InvalidAdminCredentialsError,
     )
   })
 
@@ -57,17 +61,17 @@ describe('аудит 2026-09-26: POST /admin/auth/login', () => {
 })
 
 describe('аудит 2026-09-26: POST /admin/admins (создание/деактивация)', () => {
-  it('не-superadmin → ForbiddenException (403), не «успех» с HTTP-200', async () => {
+  it('не-superadmin → SuperadminOnlyError (403), не «успех» с HTTP-200', async () => {
     const svc = { create: vi.fn(), block: vi.fn() } as unknown as ConstructorParameters<
       typeof AdminAdminsController
     >[0]
     const ctl = new AdminAdminsController(svc, audit)
     await expect(
       ctl.create({ email: 'x@x.x', password: 'secret-pass', role: 'admin' }, reqWithRole('admin')),
-    ).rejects.toBeInstanceOf(ForbiddenException)
+    ).rejects.toBeInstanceOf(SuperadminOnlyError)
     await expect(
       ctl.deactivate('a2', reqWithRole('admin')),
-    ).rejects.toBeInstanceOf(ForbiddenException)
+    ).rejects.toBeInstanceOf(SuperadminOnlyError)
     expect(svc.create).not.toHaveBeenCalled()
     expect(svc.block).not.toHaveBeenCalled()
   })
