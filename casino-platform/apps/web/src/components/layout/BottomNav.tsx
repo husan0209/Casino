@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import { UserAvatar } from '@/components/layout/UserAvatar'
+import { useFavorites } from '@/hooks/useFavorites'
 import { useAuth } from '@/stores/auth'
 
 /**
@@ -17,6 +18,8 @@ import { useAuth } from '@/stores/auth'
 export function BottomNav(): React.JSX.Element | null {
   const pathname = usePathname()
   const { user } = useAuth()
+  const { favoriteSlugs } = useFavorites()
+  const favCount = favoriteSlugs.size
 
   if (pathname.startsWith('/login') || pathname.startsWith('/register')) {
     return null
@@ -39,12 +42,22 @@ export function BottomNav(): React.JSX.Element | null {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#2A2A4A]/60 bg-[#0F0F1A]/95 backdrop-blur md:hidden">
       <div className="grid grid-cols-4 py-2 text-center text-[11px]">
-        {items.map((item) => (
-          <Link key={item.href} href={item.href} className={linkClass(isActive(item.href))}>
-            <item.Icon size={22} strokeWidth={1.8} aria-hidden />
-            <span>{item.label}</span>
-          </Link>
-        ))}
+        {items.map((item) => {
+          const isFav = item.href === '/favorites'
+          return (
+            <Link key={item.href} href={item.href} className={linkClass(isActive(item.href))}>
+              <div className="relative">
+                <item.Icon size={22} strokeWidth={1.8} aria-hidden />
+                {isFav && favCount > 0 && (
+                  <span className="absolute -right-2 -top-1 grid h-4 min-w-[16px] place-items-center rounded-full bg-[#6C63FF] px-1 text-[9px] font-bold text-white shadow-sm">
+                    {favCount}
+                  </span>
+                )}
+              </div>
+              <span>{item.label}</span>
+            </Link>
+          )
+        })}
         <Link href="/profile" className={linkClass(isActive('/profile'))}>
           {user ? (
             <UserAvatar email={user.email} size={22} />

@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Bitcoin,
   Check,
+  ChevronDown,
   Coins,
   CreditCard,
   ShieldCheck,
@@ -82,9 +83,10 @@ function MethodRow({
  * GAP-36: при исчерпании KYC-лимита CTA ведёт на верификацию.
  */
 export function DepositSheet(): React.JSX.Element | null {
-  const { depositSheet, closeDeposit, depositCurrency, pendingGameSlug } = useUIStore()
+  const { depositSheet, closeDeposit, depositCurrency, pendingGameSlug, openWalletSwitcher } =
+    useUIStore()
   const { config, load } = useGeoStore()
-  const { activeCurrency, setActiveCurrency } = useWalletStore()
+  const { activeCurrency, setActiveCurrency, getActiveWallet } = useWalletStore()
   const { user } = useAuth()
   const router = useRouter()
   const [amount, setAmount] = useState('')
@@ -185,6 +187,22 @@ export function DepositSheet(): React.JSX.Element | null {
             className="rounded-lg p-1.5 text-muted transition hover:bg-white/5 hover:text-white"
           >
             <X size={18} aria-hidden />
+          </button>
+        </div>
+
+        {/* Активный кошелёк (как на скриншотах Варианта A / spinera) */}
+        <div className="mt-3 flex items-center justify-between rounded-xl bg-white/[0.03] px-3.5 py-2 text-xs border border-[#2A2A4A]/50">
+          <span className="text-muted">Активный кошелёк</span>
+          <button
+            type="button"
+            onClick={() => {
+              closeDeposit()
+              openWalletSwitcher()
+            }}
+            className="flex items-center gap-1 font-semibold text-white hover:text-brand"
+          >
+            <span>{formatAmount(getActiveWallet()?.available ?? '0', payCurrency, true)}</span>
+            <ChevronDown size={14} aria-hidden className="text-muted" />
           </button>
         </div>
 
