@@ -92,7 +92,7 @@ export function AppHeader(): React.JSX.Element {
                 type="button"
                 onClick={() => openDeposit(displayCurrency)}
                 aria-label="Пополнить"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#00E676] text-white shadow-lg shadow-[#00E676]/25 transition hover:bg-[#00C853] active:scale-95"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#00C853] text-[#03210E] shadow-lg shadow-[#00C853]/30 transition hover:bg-[#20DA72] active:scale-95"
               >
                 <Plus size={20} strokeWidth={2.4} aria-hidden />
               </button>

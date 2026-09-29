@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 import {
   PAYMENT_MAINTENANCE_REPO,
   type ExpiredCountResult,
-  IPaymentMaintenanceRepo,
+  type IPaymentMaintenanceRepo,
 } from '../domain/maintenance.ports'
 
 /** Окно ожидания депозита для фиата (без expires_at) — ТЗ ч.3 §13: 2 часа. */
@@ -30,7 +30,9 @@ export class ExpireDepositsJob {
     let expired = 0
     let skipped = 0
     for (const dep of pending) {
-      const isExpired = dep.expiresAt ? dep.expiresAt.getTime() <= now.getTime() : now.getTime() - dep.createdAt.getTime() > FIAT_PENDING_TTL_MS
+      const isExpired = dep.expiresAt
+        ? dep.expiresAt.getTime() <= now.getTime()
+        : now.getTime() - dep.createdAt.getTime() > FIAT_PENDING_TTL_MS
       if (!isExpired) {
         skipped++
         continue

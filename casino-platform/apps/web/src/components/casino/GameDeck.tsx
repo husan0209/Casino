@@ -133,7 +133,7 @@ export function GameDeck({
       <div className="mb-3 flex items-center justify-between">
         <div>
           <p className="caps-label flex items-center gap-1">
-            <Sparkles size={12} className="text-[#00E676]" />
+            <Sparkles size={12} className="text-[#8B7FFF]" />
             ВЫБОР МОМЕНТА
           </p>
           <h2 className="section-title">Колода слотов</h2>
@@ -189,6 +189,12 @@ export function GameDeck({
             <div className="font-extrabold text-[#00E676]">+32 400 ₽</div>
           </div>
 
+          {/* Живой пульс (ТЗ ч.5.1 §4.4): игра живёт, а не висит в каталоге */}
+          <div className="absolute bottom-20 left-4 sm:bottom-24 flex items-center gap-1.5 rounded-lg bg-black/60 px-2.5 py-1 text-[10px] text-white/75 backdrop-blur-md">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#00D2FF] shadow-[0_0_7px_#00D2FF]" aria-hidden />
+            Сейчас играют
+          </div>
+
           {/* Нижняя часть фронт-карты: название + кнопка Играть */}
           <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 flex items-end justify-between gap-4">
             <div className="min-w-0 flex-1">
@@ -207,7 +213,7 @@ export function GameDeck({
             <button
               type="button"
               onClick={playCurrent}
-              className="btn-money shrink-0 px-6 py-3 font-bold shadow-xl"
+              className="btn shrink-0 px-6 py-3 font-bold shadow-xl"
             >
               <Play size={16} className="fill-current" />
               <span>Играть</span>

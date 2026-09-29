@@ -75,15 +75,13 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
         aria-label={`Играть в ${displayName}`}
         className="block w-full cursor-pointer text-left"
       >
-        <div className="relative flex aspect-[4/5] items-center justify-center overflow-hidden rounded-t-2xl bg-gradient-to-br from-[#22223a] to-[#111122] text-3xl">
+        <div className="relative flex aspect-[1.05/1] items-center justify-center overflow-hidden rounded-t-2xl bg-gradient-to-br from-[#22223a] to-[#111122] text-3xl">
           <GameThumb src={game.thumbnailUrl} alt={displayName} />
 
           {badge && (
             <span
-              className={`absolute left-2 top-2 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide shadow-md ${
-                badge === 'NEW'
-                  ? 'bg-[#00D2FF]/25 text-[#00D2FF] ring-1 ring-[#00D2FF]/40'
-                  : 'bg-[#FF3D71]/25 text-[#FF3D71] ring-1 ring-[#FF3D71]/40'
+              className={`absolute left-2 top-2 rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white shadow-md ${
+                badge === 'NEW' ? 'bg-[#6C63FF]' : 'bg-[#FF3D71]'
               }`}
             >
               {badge}
@@ -142,7 +140,7 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
           {rtp && (
             <div className="flex items-center justify-between">
               <span className="text-muted">RTP:</span>
-              <span className="font-medium text-[#00E676]">{rtp}</span>
+              <span className="font-medium text-white">{rtp}</span>
             </div>
           )}
           <div className="flex gap-2 pt-1">

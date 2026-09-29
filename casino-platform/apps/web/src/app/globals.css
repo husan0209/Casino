@@ -43,8 +43,12 @@ body {
 
 /* ── Поверхности ───────────────────────────────────────────────────── */
 
-.card {
-  @apply rounded-2xl border border-[#2A2A4A] bg-[#16213E] p-4;
+/* Слой components, а не голое правило: иначе `p-4` перебивает утилиты на
+   элементе, и карточка с `card p-0` не может прижать обложку к краям. */
+@layer components {
+  .card {
+    @apply rounded-2xl border border-[#2A2A4A] bg-[#16213E] p-4;
+  }
 }
 
 /* Плитка-иконка метода/кошелька (касса, шторка) */
@@ -59,10 +63,11 @@ body {
   box-shadow: 0 8px 24px -10px rgba(108, 99, 255, 0.55);
 }
 
-/* Деньги: зелёная CTA — только деньги и успех (ТЗ §2 пр.4) */
+/* Деньги: зелёная CTA — только деньги и успех (ТЗ §2 пр.4).
+   Текст почти чёрный: белый на #00C853 читается как размытое пятно. */
 .btn-money {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-[#00E676] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#00C853] active:scale-[0.98] disabled:opacity-50;
-  box-shadow: 0 8px 24px -10px rgba(0, 230, 118, 0.45);
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-[#00C853] px-4 py-2.5 text-sm font-extrabold text-[#03210E] transition hover:bg-[#20DA72] active:scale-[0.98] disabled:opacity-50;
+  box-shadow: 0 8px 24px -10px rgba(0, 200, 83, 0.55);
 }
 
 .btn-ghost {

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import {
@@ -11,7 +11,7 @@ import {
 
 @Injectable()
 export class DemoProviderAdapter implements GameProviderAdapter {
-  constructor(private config: ConfigService) {}
+  constructor(@Inject(ConfigService) private config: ConfigService) {}
   async getLaunchUrl(params: LaunchParams): Promise<{ url: string }> {
     const webUrl = this.config.get<string>('APP_URL') || 'http://localhost:3000'
     const url = `${webUrl}/demo-game?token=${encodeURIComponent(params.sessionToken)}&game=${encodeURIComponent(params.gameExternalId)}&currency=${params.currency}&demo=${params.isDemo ? '1' : '0'}`
@@ -52,8 +52,12 @@ export class DemoProviderAdapter implements GameProviderAdapter {
     }
     return true
   }
-  parseCallback(_h: Record<string, unknown>, body: Record<string, unknown>): ParsedProviderCallback {
-    const opt = (v: unknown): string | undefined => (v === undefined || v === null ? undefined : String(v))
+  parseCallback(
+    _h: Record<string, unknown>,
+    body: Record<string, unknown>,
+  ): ParsedProviderCallback {
+    const opt = (v: unknown): string | undefined =>
+      v === undefined || v === null ? undefined : String(v)
     return {
       action: body.action as ParsedProviderCallback['action'],
       playerToken: opt(body.player_token ?? body.session_token),

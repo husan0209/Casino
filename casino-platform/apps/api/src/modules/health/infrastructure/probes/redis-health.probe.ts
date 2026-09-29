@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common'
-import { type ConfigService } from '@nestjs/config'
+import { Inject, Injectable } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import Redis from 'ioredis'
 
 import { type IHealthProbe, type ProbeName, type ProbeStatus } from '../../domain/health.ports'
@@ -11,7 +11,7 @@ const REDIS_CONNECT_TIMEOUT_MS = 1000
 export class RedisHealthProbe implements IHealthProbe {
   readonly name: ProbeName = 'redis'
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(@Inject(ConfigService) private readonly config: ConfigService) {}
 
   async check(): Promise<ProbeStatus> {
     return (await this.pingRedis()) ? 'ok' : 'fail'

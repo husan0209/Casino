@@ -13,8 +13,8 @@ import type { GameDto } from '@/types/casino'
  * (барабаны, монеты, 7-ки), лента слота внизу. Тон — §3:
  * «Твой следующий большой спин.». Показывается ТОЛЬКО гостю (§4.3).
  *
- * Цвета приведены к скриншотам: насыщенный фиолетовый градиент,
- * акцентный зелёный в заголовке, social-proof стек аватарок.
+ * Цвета приведены к скриншотам: насыщенный фиолетовый градиент, акцент
+ * заголовка — brand-light, зелёный оставлен только за деньгами (§2.4).
  */
 export function GuestHero({ games }: { games: GameDto[] }): React.JSX.Element | null {
   const { user } = useAuth()
@@ -36,7 +36,7 @@ export function GuestHero({ games }: { games: GameDto[] }): React.JSX.Element | 
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -bottom-20 -left-10 h-52 w-52 rounded-full bg-[#00E676]/12 blur-[60px]"
+        className="pointer-events-none absolute -bottom-20 -left-10 h-52 w-52 rounded-full bg-[#00D2FF]/12 blur-[60px]"
       />
       <div
         aria-hidden
@@ -59,15 +59,15 @@ export function GuestHero({ games }: { games: GameDto[] }): React.JSX.Element | 
 
       <div className="relative p-6 pb-5 md:p-8 md:pb-6">
         {/* ТЗ ч.5.1 §3: капс-лейбл с характером */}
-        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[#00E676]">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#00E676]" aria-hidden />
+        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[#B6B1FF]">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#00D2FF] shadow-[0_0_9px_#00D2FF]" aria-hidden />
           Новые игры каждую неделю
         </p>
 
         <h1 className="text-[28px] font-black leading-[1.1] tracking-tight md:text-4xl">
           Твой следующий
           <br />
-          <span className="text-[#00E676]">большой спин.</span>
+          <span className="text-[#8B7FFF]">большой спин.</span>
         </h1>
 
         <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/60 md:text-base">
@@ -111,7 +111,7 @@ export function GuestHero({ games }: { games: GameDto[] }): React.JSX.Element | 
             key={game.slug}
             className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-[#16213E] shadow-lg shadow-black/20 md:h-24 md:w-24"
           >
-            <GameThumb src={game.thumbnailUrl} alt="" sizes="96px" />
+            <GameThumb src={game.thumbnailUrl} alt="" seed={game.slug} sizes="96px" />
           </div>
         ))}
       </div>

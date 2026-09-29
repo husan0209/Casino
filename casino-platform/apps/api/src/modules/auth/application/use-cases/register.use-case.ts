@@ -2,12 +2,25 @@ import { randomBytes } from 'crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 
-import { EMAIL_QUEUE_SERVICE, IEmailQueueService, IPasswordHasher, IJwtTokenService, PASSWORD_HASHER, JWT_TOKEN_SERVICE } from '../../domain/auth.ports'
+import {
+  EMAIL_QUEUE_SERVICE,
+  type IEmailQueueService,
+  type IPasswordHasher,
+  type IJwtTokenService,
+  PASSWORD_HASHER,
+  JWT_TOKEN_SERVICE,
+} from '../../domain/auth.ports'
 import { type UserRole } from '../../domain/entities/user.entity'
 import { EmailAlreadyExistsError, WeakPasswordError } from '../../domain/errors'
-import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
-import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
-import { EMAIL_VERIFICATION_REPOSITORY, IEmailVerificationRepository } from '../../domain/repositories/verification-token.repository'
+import {
+  type ISessionRepository,
+  SESSION_REPOSITORY,
+} from '../../domain/repositories/session.repository'
+import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import {
+  EMAIL_VERIFICATION_REPOSITORY,
+  type IEmailVerificationRepository,
+} from '../../domain/repositories/verification-token.repository'
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const CODE_LENGTH = 8
@@ -41,7 +54,13 @@ export class RegisterUseCase {
   async execute(
     input: { email: string; password: string; referralCode?: string | undefined },
     meta?: { ip?: string | undefined; userAgent?: string | undefined },
-  ): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string | null; role: UserRole; }; referralCode: string; message: string; }> {
+  ): Promise<{
+    accessToken: string
+    refreshToken: string
+    user: { id: string; email: string | null; role: UserRole }
+    referralCode: string
+    message: string
+  }> {
     if (input.password.length < 8) {
       throw new WeakPasswordError()
     }

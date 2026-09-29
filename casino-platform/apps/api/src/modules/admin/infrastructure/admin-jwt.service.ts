@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import * as argon2 from 'argon2'
 
@@ -28,10 +28,25 @@ function hs256Verify(secret: string, token: string): Record<string, unknown> {
 
 @Injectable()
 export class AdminAuthService {
-  constructor(private config: ConfigService) {}
-  async validate(email: string, password: string): Promise<{ id: string; email: string; passwordHash: string; role: AdminRole; firstName: string | null; lastName: string | null; isActive: boolean; createdBy: string | null; lastLoginAt: Date | null; createdAt: Date; updatedAt: Date; } | null> {
+  constructor(@Inject(ConfigService) private config: ConfigService) {}
+  async validate(
+    email: string,
+    password: string,
+  ): Promise<{
+    id: string
+    email: string
+    passwordHash: string
+    role: AdminRole
+    firstName: string | null
+    lastName: string | null
+    isActive: boolean
+    createdBy: string | null
+    lastLoginAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+  } | null> {
     const admin = await prisma.adminUser.findUnique({ where: { email: email.toLowerCase() } })
-    if (!admin || !admin.isActive) {
+    if (!admin?.isActive) {
       return null
     }
     const ok = await argon2.verify(admin.passwordHash, password)
