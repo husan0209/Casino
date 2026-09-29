@@ -1,6 +1,5 @@
-import { GetKycStatusUseCase } from './get-kyc-status.use-case'
-
-import type { IKycRepository } from '../../domain/repositories/kyc.repository'
+import { GetKycStatusUseCase } from '../src/modules/kyc/application/use-cases/get-kyc-status.use-case'
+import type { IKycRepository } from '../src/modules/kyc/domain/repositories/kyc.repository'
 
 function makeRepo(status: { status: string } | null, total: string): IKycRepository {
   return {
@@ -11,7 +10,7 @@ function makeRepo(status: { status: string } | null, total: string): IKycReposit
 
 describe('GetKycStatusUseCase', () => {
   const geo = { convertRubToDisplay: async (rub: string) => `${rub} RUB` }
-  const config = { get: (key: string) => (key === 'KYC_DEPOSIT_LIMIT_RUB' ? undefined : undefined) }
+  const config = { get: () => undefined }
 
   it('лимит не исчерпан: remaining = limit − total, конвертируется в display-валюту', async () => {
     const repo = makeRepo({ status: 'pending' }, '1000')
@@ -24,7 +23,7 @@ describe('GetKycStatusUseCase', () => {
     expect(res.status).toBe('pending')
   })
 
-  it('total > limit (сущ. превышение): remaining = 0, не уходит в минус', async () => {
+  it('total > limit (существующее превышение): remaining = 0, не уходит в минус', async () => {
     const repo = makeRepo(null, '7000')
     const uc = new GetKycStatusUseCase(repo, geo as never, config as never)
     const res = await uc.execute('user-1')

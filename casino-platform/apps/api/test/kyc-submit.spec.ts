@@ -1,6 +1,5 @@
-import { SubmitKycUseCase } from './submit-kyc.use-case'
-
-import type { IKycRepository } from '../../domain/repositories/kyc.repository'
+import { SubmitKycUseCase } from '../src/modules/kyc/application/use-cases/submit-kyc.use-case'
+import type { IKycRepository } from '../src/modules/kyc/domain/repositories/kyc.repository'
 
 describe('SubmitKycUseCase', () => {
   it('маппит snake_case DTO → KycSubmitInput (даты парсятся, тип документа кастуется)', async () => {

@@ -1,16 +1,17 @@
 import { mkdirSync, writeFileSync } from 'fs'
 
-import { UploadKycDocumentUseCase } from './upload-kyc-document.use-case'
-import { KycFileError, KycNotSubmittedError } from '../../domain/errors'
+import { vi } from 'vitest'
 
-import type { IKycRepository } from '../../domain/repositories/kyc.repository'
+import { UploadKycDocumentUseCase } from '../src/modules/kyc/application/use-cases/upload-kyc-document.use-case'
+import { KycFileError, KycNotSubmittedError } from '../src/modules/kyc/domain/errors'
+import type { IKycRepository } from '../src/modules/kyc/domain/repositories/kyc.repository'
 
 vi.mock('fs', () => ({
   mkdirSync: vi.fn(),
   writeFileSync: vi.fn(),
 }))
 
-vi.mock('@/common/files/file-sniffer', () => ({
+vi.mock('../src/common/files/file-sniffer', () => ({
   sniffDocumentMime: (buf: Buffer) => (buf.length > 3 ? 'image/jpeg' : null),
   extForMime: (mime: string) => `.${mime.split('/')[1]}`,
 }))
@@ -92,7 +93,7 @@ describe('UploadKycDocumentUseCase', () => {
     expect(docs).toHaveLength(1)
     const { id, doc } = docs[0] as { id: string; doc: { fileName: string; mimeType: string } }
     expect(id).toBe('kyc-1')
-    expect(doc.fileName).toBe('.._.._etc_passwd.jpg') // пути вырезаны, длина ≤200
+    expect(doc.fileName).toBe('.._.._etc_passwd.jpg') // пути вырезаны
     expect(doc.mimeType).toBe('image/jpeg') // тип по magic bytes, не по Content-Type
   })
 })
