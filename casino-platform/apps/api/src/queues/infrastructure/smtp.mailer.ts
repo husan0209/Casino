@@ -26,6 +26,14 @@ export class EmailNotConfiguredError extends AppError {
     super('SMTP не настроен: письма не могут быть отправлены')
   }
 }
+/** Волна 3в (G17): был raw Error в mailerFactory. */
+export class SmtpHostRequiredError extends AppError {
+  readonly code = 'SMTP_HOST_REQUIRED_IN_PRODUCTION'
+  readonly httpStatus = 500
+  constructor() {
+    super('SMTP_HOST_REQUIRED_IN_PRODUCTION')
+  }
+}
 
 @Injectable()
 export class SmtpMailer implements MailerPort {
@@ -102,7 +110,7 @@ export function mailerFactory(config: ConfigService): MailerPort {
     return new SmtpMailer(config)
   }
   if (config.get<string>('NODE_ENV') === 'production') {
-    throw new Error('SMTP_HOST_REQUIRED_IN_PRODUCTION')
+    throw new SmtpHostRequiredError()
   }
   return new DevLogMailer(config)
 }
