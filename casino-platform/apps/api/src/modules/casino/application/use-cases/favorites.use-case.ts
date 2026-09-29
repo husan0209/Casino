@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { Decimal } from 'decimal.js'
 
+import { GameNotFoundError } from '../../domain/errors'
 import {
   GAME_CATALOG_REPOSITORY,
   GAME_FAVORITES_REPOSITORY,
@@ -54,7 +55,7 @@ export class FavoritesUseCase {
   async add(userId: string, slug: string): Promise<{ ok: boolean }> {
     const game = await this.catalog.findBySlug(slug)
     if (!game) {
-      throw new Error('GAME_NOT_FOUND')
+      throw new GameNotFoundError(slug)
     }
     await this.favorites.upsert(userId, game.id)
     return { ok: true }

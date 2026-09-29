@@ -4,7 +4,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import { Decimal } from 'decimal.js'
 
 import { KycFacade } from '@modules/kyc/facade/kyc.facade'
-import { WalletFacade } from '@modules/wallet/application/wallet.facade'
+import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import { type Currency } from '@casino/shared-types'
 

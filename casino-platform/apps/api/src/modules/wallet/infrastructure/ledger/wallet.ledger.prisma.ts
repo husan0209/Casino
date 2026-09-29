@@ -6,7 +6,12 @@ import { type LedgerEntryType, prisma, type Prisma } from '@casino/database'
 import { type Currency, type MoneyAmount, ZERO } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-import { InsufficientFundsError, OptimisticLockError } from '../../domain/errors'
+import {
+  InsufficientFundsError,
+  OptimisticLockError,
+  UnlockExceedsLockedError,
+  WalletNotFoundError,
+} from '../../domain/errors'
 import { type CreditInput, type CreditResult, type IWalletLedger, type IWalletRepository, type WalletAccount, type WithdrawalOpArgs } from '../../domain/repositories/wallet.repository'
 
 /**
@@ -220,7 +225,7 @@ export class PrismaWalletLedger implements IWalletLedger {
       where: { userId_currency: { userId, currency } },
     })
     if (!wallet) {
-      throw new Error('WALLET_NOT_FOUND')
+      throw new WalletNotFoundError(userId, currency)
     }
     return wallet
   }
@@ -292,7 +297,7 @@ export class PrismaWalletLedger implements IWalletLedger {
       // Prevent negative locked balance. If unlock amount > currently locked,
       // this is either a logic bug or an attack — abort the transaction.
       if (!money.isGreaterOrEqual(currentLocked, amount)) {
-        throw new Error('UNLOCK_EXCEEDS_LOCKED')
+        throw new UnlockExceedsLockedError()
       }
       const updated = await tx.walletAccount.updateMany({
         where: { id: wallet.id, version: wallet.version },
@@ -332,7 +337,7 @@ export class PrismaWalletLedger implements IWalletLedger {
         throw new InsufficientFundsError(amount, balanceBefore)
       }
       if (!money.isGreaterOrEqual(currentLocked, amount)) {
-        throw new Error('UNLOCK_EXCEEDS_LOCKED')
+        throw new UnlockExceedsLockedError()
       }
       const balanceAfter = money.subtract(balanceBefore, amount)
       const updated = await tx.walletAccount.updateMany({
