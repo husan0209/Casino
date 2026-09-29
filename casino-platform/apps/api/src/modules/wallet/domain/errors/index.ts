@@ -38,3 +38,11 @@ export class OptimisticLockError extends AppError {
     super('Optimistic lock conflict, retry needed')
   }
 }
+/** Разблокировка больше залоченного — logic bug или атака (G17: был raw Error). */
+export class UnlockExceedsLockedError extends AppError {
+  readonly code = 'UNLOCK_EXCEEDS_LOCKED'
+  readonly httpStatus = 409
+  constructor() {
+    super('UNLOCK_EXCEEDS_LOCKED')
+  }
+}

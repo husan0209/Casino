@@ -1,11 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
+import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
+import {
+  InvalidBetRequestError,
+  InvalidRollbackRequestError,
+  InvalidWinRequestError,
+  PlayerBlockedError,
+  RollbackOfRollbackError,
+  SessionInvalidError,
+} from '../../domain/errors'
 import { type ParsedProviderCallback, type ProviderCallbackResponse } from '../../domain/provider-adapter.interface'
 import { GAME_PLAY_REPOSITORY, type GameRow, type GameSessionWithGame, IGamePlayRepository } from '../../domain/repositories/casino.repository'
 
@@ -28,10 +36,10 @@ export class GameCallbackService {
   async authenticate(sessionToken: string): Promise<AuthenticateResult> {
     const session = await this.play.findSessionByTokenWithUser(sessionToken)
     if (!session || session.status !== 'active') {
-      throw new Error('SESSION_INVALID')
+      throw new SessionInvalidError()
     }
     if (session.user.status !== 'active') {
-      throw new Error('PLAYER_BLOCKED')
+      throw new PlayerBlockedError()
     }
     await this.play.touchSession(session.id)
     const balance = await this.getWalletBalance(session.userId, session.currency)
@@ -51,7 +59,7 @@ export class GameCallbackService {
 
   async bet(cb: ParsedProviderCallback, providerId: string): Promise<ProviderCallbackResponse> {
     if (!cb.playerToken || !cb.transactionId || !cb.betAmount) {
-      throw new Error('INVALID_BET_REQUEST')
+      throw new InvalidBetRequestError()
     }
     const session = await this.findActiveSession(cb.playerToken)
     const dup = await this.play.findTransactionByExternal(providerId, cb.transactionId)
@@ -109,11 +117,11 @@ export class GameCallbackService {
 
   async win(cb: ParsedProviderCallback, providerId: string): Promise<ProviderCallbackResponse> {
     if (!cb.playerToken || !cb.transactionId) {
-      throw new Error('INVALID_WIN_REQUEST')
+      throw new InvalidWinRequestError()
     }
     const session = await this.play.findSessionByTokenWithGame(cb.playerToken)
     if (!session) {
-      throw new Error('SESSION_INVALID')
+      throw new SessionInvalidError()
     }
     const dup = await this.play.findTransactionByExternal(providerId, cb.transactionId)
     if (dup) {
@@ -170,11 +178,11 @@ export class GameCallbackService {
 
   async rollback(cb: ParsedProviderCallback, providerId: string): Promise<ProviderCallbackResponse> {
     if (!cb.playerToken || !cb.rollbackTransactionId) {
-      throw new Error('INVALID_ROLLBACK_REQUEST')
+      throw new InvalidRollbackRequestError()
     }
     const session = await this.play.findSessionByToken(cb.playerToken)
     if (!session) {
-      throw new Error('SESSION_INVALID')
+      throw new SessionInvalidError()
     }
     const originalTx = await this.play.findTransactionByExternal(
       providerId,
@@ -190,7 +198,7 @@ export class GameCallbackService {
     }
     const rollbackAmount = originalTx.amount.toString()
     if (originalTx.type === 'rollback') {
-      throw new Error('CANNOT_ROLLBACK_A_ROLLBACK')
+      throw new RollbackOfRollbackError()
     }
     // Reverse the ORIGINAL effect: a bet (debit) is refunded with a credit;
     // a win (credit) is taken back with a debit. Without this, rolling back a
@@ -262,7 +270,7 @@ export class GameCallbackService {
   private async findActiveSession(token: string): Promise<GameSessionWithGame> {
     const session = await this.play.findSessionByTokenWithGame(token)
     if (!session || session.status !== 'active') {
-      throw new Error('SESSION_INVALID')
+      throw new SessionInvalidError()
     }
     return session
   }
