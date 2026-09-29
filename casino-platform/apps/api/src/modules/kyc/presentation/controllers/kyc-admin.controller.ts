@@ -5,7 +5,7 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
 
 import { AdminAuthGuard } from '@modules/admin/presentation/admin-auth.guard'
-import { type KycAdminService } from '@modules/kyc/application/use-cases/kyc-admin.service'
+import { KycAdminService } from '@modules/kyc/application/use-cases/kyc-admin.service'
 
 import { type KycProfileRow } from '@casino/shared-types'
 

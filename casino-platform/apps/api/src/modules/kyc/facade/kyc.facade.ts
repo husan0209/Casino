@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { type KycCheckService } from '../application/use-cases/kyc-check.service'
+import { KycCheckService } from '../application/use-cases/kyc-check.service'
 
 /**
  * Публичный API kyc-модуля (MODULE_TEMPLATE Шаг 8): другие модули ходят
