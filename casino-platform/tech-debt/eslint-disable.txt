@@ -10,4 +10,4 @@ apps/api/src/modules/payments/application/use-cases/create-crypto-deposit.use-ca
 apps/api/src/modules/payments/application/use-cases/create-fiat-deposit.use-case.ts	1
 apps/api/src/modules/payments/application/use-cases/process-nowpayments-webhook.use-case.ts	1
 apps/api/src/modules/payments/application/use-cases/process-rukassa-webhook.use-case.ts	1
-apps/api/src/modules/wallet/application/wallet.facade.ts	1
+apps/api/src/modules/wallet/facade/wallet.facade.ts	1

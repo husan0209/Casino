@@ -8,7 +8,7 @@ import type {
   IGamePlayRepository,
 } from '../src/modules/casino/domain/repositories/casino.repository'
 import type { ParsedProviderCallback } from '../src/modules/casino/domain/provider-adapter.interface'
-import type { WalletFacade } from '../src/modules/wallet/application/wallet.facade'
+import type { WalletFacade } from '../src/modules/wallet/facade/wallet.facade'
 import type { CreditInput, CreditResult } from '../src/modules/wallet/domain/repositories/wallet.repository'
 
 /** Маркер транзакции: в тестах вместо Prisma.TransactionClient. */

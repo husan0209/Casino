@@ -17,7 +17,7 @@ import { randomUUID } from 'crypto'
 
 import { prisma } from '@casino/database'
 
-import { WalletFacade } from '../src/modules/wallet/application/wallet.facade'
+import { WalletFacade } from '../src/modules/wallet/facade/wallet.facade'
 import { PrismaWalletLedger } from '../src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma'
 import { PrismaReferralRepository } from '../src/modules/referrals/infrastructure/referral.prisma.repository'
 import { ReferralCalcService } from '../src/modules/referrals/application/referral-calc.service'

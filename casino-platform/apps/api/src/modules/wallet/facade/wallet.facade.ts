@@ -4,9 +4,9 @@ import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 
-import { ConfirmWithdrawalUseCase, type ConfirmWithdrawalInput } from './use-cases/confirm-withdrawal.use-case'
-import { LockFundsUseCase, type LockFundsInput } from './use-cases/lock-funds.use-case'
-import { UnlockFundsUseCase, type UnlockFundsInput } from './use-cases/unlock-funds.use-case'
+import { ConfirmWithdrawalUseCase, type ConfirmWithdrawalInput } from '../application/use-cases/confirm-withdrawal.use-case'
+import { LockFundsUseCase, type LockFundsInput } from '../application/use-cases/lock-funds.use-case'
+import { UnlockFundsUseCase, type UnlockFundsInput } from '../application/use-cases/unlock-funds.use-case'
 import {
   IWalletLedger,
   IWalletRepository,
