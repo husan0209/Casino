@@ -2,3 +2,5 @@
 /*.jpg
 /*.jpeg
 /*.png
+node_modules/
+casino-platform/.env.stend
