@@ -49,7 +49,6 @@ interface PaymentMethodDto {
   label: string
 }
 
-/** Строка метода: иконка, имя, чек у выбранного (донор VANTA/spinera). */
 function MethodRow({
   method,
   selected,
@@ -75,13 +74,61 @@ function MethodRow({
   )
 }
 
-/**
- * DepositSheet (ТЗ ч.5.1 §4.9, отступление №1: один экран вместо шагов).
- * Методы строками, крипта — только в «Ещё способы» (Don't: не в первом ряду),
- * сумма с символом активной валюты + пресеты, зелёная «Перейти к оплате →»,
- * микрокоп доверия «Платёж защищён · зачисление обычно за 1 минуту».
- * GAP-36: при исчерпании KYC-лимита CTA ведёт на верификацию.
- */
+function MethodSection({
+  mode,
+  fiatMethods,
+  cryptoMethods,
+  method,
+  showCrypto,
+  setMethod,
+  openCrypto,
+  setMode,
+  setShowCrypto,
+}: {
+  mode: 'fiat' | 'crypto'
+  fiatMethods: PaymentMethodDto[]
+  cryptoMethods: PaymentMethodDto[]
+  method: string
+  showCrypto: boolean
+  setMethod: (id: string) => void
+  openCrypto: () => void
+  setMode: (m: 'fiat' | 'crypto') => void
+  setShowCrypto: (v: boolean) => void
+}): React.JSX.Element {
+  if (mode === 'fiat') {
+    return (
+      <div className="mt-4 space-y-2">
+        {fiatMethods.map((m) => (
+          <MethodRow key={m.id} method={m} selected={method === m.id} onSelect={setMethod} />
+        ))}
+        {cryptoMethods.length > 0 && !showCrypto && (
+          <button type="button" className="btn-ghost w-full text-sm" onClick={openCrypto}>
+            Ещё способы: {cryptoMethods.map((m) => m.label).join(', ')}
+          </button>
+        )}
+      </div>
+    )
+  }
+  return (
+    <div className="mt-4 space-y-2">
+      <p className="text-xs text-muted">Только USDT · TRC20 или BTC</p>
+      {cryptoMethods.map((m) => (
+        <MethodRow key={m.id} method={m} selected={method === m.id} onSelect={setMethod} />
+      ))}
+      <button
+        type="button"
+        className="text-sm text-muted"
+        onClick={() => {
+          setMode('fiat')
+          setShowCrypto(false)
+        }}
+      >
+        ← Фиат
+      </button>
+    </div>
+  )
+}
+
 export function DepositSheet(): React.JSX.Element | null {
   const { depositSheet, closeDeposit, depositCurrency, pendingGameSlug, openWalletSwitcher } =
     useUIStore()
@@ -122,8 +169,6 @@ export function DepositSheet(): React.JSX.Element | null {
       ? (cryptoMethods.find((m) => m.id === method)?.currency ?? 'USDT_TRC20')
       : currency
 
-  // GAP-36: остаток лимита — из API (в валюте шита), без пересчёта на клиенте.
-  // useQuery — до раннего return (правила хуков)
   const { data: kyc } = useQuery({
     queryKey: ['kyc-status', payCurrency],
     queryFn: () => getKycStatus(payCurrency),
@@ -134,7 +179,7 @@ export function DepositSheet(): React.JSX.Element | null {
     return null
   }
 
-  const kycNotApproved = Boolean(kyc) && kyc!.status !== 'approved'
+  const kycNotApproved = Boolean(kyc) && kyc?.status !== 'approved'
   const limitRemaining = kyc?.limit_remaining
   const limitExhausted =
     kycNotApproved && limitRemaining !== undefined && Number(limitRemaining) <= 0
@@ -190,7 +235,6 @@ export function DepositSheet(): React.JSX.Element | null {
           </button>
         </div>
 
-        {/* Активный кошелёк (как на скриншотах Варианта A / spinera) */}
         <div className="mt-3 flex items-center justify-between rounded-xl bg-white/[0.03] px-3.5 py-2 text-xs border border-[#2A2A4A]/50">
           <span className="text-muted">Активный кошелёк</span>
           <button
@@ -206,37 +250,17 @@ export function DepositSheet(): React.JSX.Element | null {
           </button>
         </div>
 
-        {mode === 'fiat' && (
-          <div className="mt-4 space-y-2">
-            {fiatMethods.map((m) => (
-              <MethodRow key={m.id} method={m} selected={method === m.id} onSelect={setMethod} />
-            ))}
-            {cryptoMethods.length > 0 && !showCrypto && (
-              <button type="button" className="btn-ghost w-full text-sm" onClick={openCrypto}>
-                Ещё способы: {cryptoMethods.map((m) => m.label).join(', ')}
-              </button>
-            )}
-          </div>
-        )}
-
-        {mode === 'crypto' && (
-          <div className="mt-4 space-y-2">
-            <p className="text-xs text-muted">Только USDT · TRC20 или BTC</p>
-            {cryptoMethods.map((m) => (
-              <MethodRow key={m.id} method={m} selected={method === m.id} onSelect={setMethod} />
-            ))}
-            <button
-              type="button"
-              className="text-sm text-muted"
-              onClick={() => {
-                setMode('fiat')
-                setShowCrypto(false)
-              }}
-            >
-              ← Фиат
-            </button>
-          </div>
-        )}
+        <MethodSection
+          mode={mode}
+          fiatMethods={fiatMethods}
+          cryptoMethods={cryptoMethods}
+          method={method}
+          showCrypto={showCrypto}
+          setMethod={setMethod}
+          openCrypto={openCrypto}
+          setMode={setMode}
+          setShowCrypto={setShowCrypto}
+        />
 
         <div className="mt-4">
           <label className="text-sm text-muted">Сумма, {currencyLabel(payCurrency)}</label>
@@ -270,8 +294,6 @@ export function DepositSheet(): React.JSX.Element | null {
           className="btn-money mt-5 w-full py-3.5 text-base"
           disabled={loading}
           onClick={() => {
-            // GAP-36: при исчерпании лимита CTA ведёт на верификацию,
-            // а не на ошибку 422 после отправки формы
             if (limitExhausted) {
               closeDeposit()
               router.push('/kyc')
@@ -295,7 +317,7 @@ export function DepositSheet(): React.JSX.Element | null {
 
         {kycNotApproved && limitRemaining !== undefined && !limitExhausted && (
           <p className="mt-2 text-center text-xs text-muted">
-            Без верификации осталось {formatAmount(limitRemaining, kyc!.limit_currency, true)}
+            Без верификации осталось {formatAmount(limitRemaining, kyc?.limit_currency ?? '', true)}
           </p>
         )}
 
