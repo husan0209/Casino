@@ -5,9 +5,9 @@ import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
 
-import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
+import { KycFacade } from '@modules/kyc/facade/kyc.facade'
 
-import { PaymentProviderError } from '../../domain/errors'
+import { InvalidCurrencyError, PaymentProviderError } from '../../domain/errors'
 import {
   INowPaymentsClient,
   IPaymentRequestRepository,
@@ -21,13 +21,13 @@ export class CreateCryptoDepositUseCase {
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(NOWPAYMENTS_CLIENT) private readonly np: INowPaymentsClient,
-    private kycCheck: KycCheckService,
+    private kycCheck: KycFacade,
     private config: ConfigService,
   ) {}
   async execute(userId: string, amount: string, currency: string): Promise<{ payment_request_id: string; pay_address: string; pay_amount: string; pay_currency: string; expires_at: string; }> {
     const allowed = ['USDT_TRC20', 'BTC', 'TON', 'TRX', 'LTC']
     if (!allowed.includes(currency)) {
-      throw new Error('INVALID_CURRENCY')
+      throw new InvalidCurrencyError()
     }
     // estimate RUB for KYC
     const est = await this.np.getEstimatePrice({

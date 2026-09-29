@@ -28,3 +28,26 @@ export class AmountTooLargeError extends AppError {
     super(`Amount too large, max ${max}`, { max })
   }
 }
+export class InvalidCurrencyError extends AppError {
+  readonly code = 'INVALID_CURRENCY'
+  readonly httpStatus = 422
+  constructor(m = 'INVALID_CURRENCY') {
+    super(m)
+  }
+}
+/** 400 сохранён от прежнего BadRequestException('NOT_FOUND') — контракт web. */
+export class PaymentRequestNotFoundError extends AppError {
+  readonly code = 'NOT_FOUND'
+  readonly httpStatus = 400
+  constructor(m = 'NOT_FOUND') {
+    super(m)
+  }
+}
+/** 403 сохранён от прежнего ForbiddenException. */
+export class WithdrawalCancelForbiddenError extends AppError {
+  readonly code = 'WITHDRAWAL_CANCEL_FORBIDDEN'
+  readonly httpStatus = 403
+  constructor(m = 'Forbidden') {
+    super(m)
+  }
+}

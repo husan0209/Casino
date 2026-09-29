@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
+import { Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -6,13 +6,14 @@ import { type UserActor } from '@/common/types/req-user'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 
-import { type PaymentProvider, type PaymentStatus, type PaymentType, type Prisma } from '@casino/database'
+import { type PaymentStatus } from '@casino/database'
 
 import { CancelWithdrawalUseCase } from '../../application/use-cases/cancel-withdrawal.use-case'
 import { CreateCryptoDepositUseCase } from '../../application/use-cases/create-crypto-deposit.use-case'
 import { CreateFiatDepositUseCase } from '../../application/use-cases/create-fiat-deposit.use-case'
 import { CreateWithdrawalUseCase } from '../../application/use-cases/create-withdrawal.use-case'
-import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
+import { GetDepositStatusUseCase } from '../../application/use-cases/get-deposit-status.use-case'
+import { ListWithdrawalsUseCase } from '../../application/use-cases/list-withdrawals.use-case'
 import { CreateCryptoDepositSchema } from '../dto/create-crypto-deposit.dto'
 import { CreateFiatDepositSchema } from '../dto/create-fiat-deposit.dto'
 import { CreateCryptoWithdrawalSchema, CreateFiatWithdrawalSchema } from '../dto/create-withdrawal.dto'
@@ -25,7 +26,8 @@ export class PaymentsController {
     private cryptoDep: CreateCryptoDepositUseCase,
     private createWd: CreateWithdrawalUseCase,
     private cancelWd: CancelWithdrawalUseCase,
-    private repo: PaymentRequestRepository,
+    private depStatusUc: GetDepositStatusUseCase,
+    private listWdUc: ListWithdrawalsUseCase,
   ) {}
   @Post('deposit/fiat')
   @UsePipes(new ZodValidationPipe(CreateFiatDepositSchema))
@@ -41,19 +43,8 @@ export class PaymentsController {
     return this.cryptoDep.execute(u.id, b.amount, b.currency)
   }
   @Get('deposit/:id/status')
-  async depositStatus(@CurrentUser() u: UserActor, @Param('id') id: string): Promise<{ id: string; status: PaymentStatus; currency: string; amount: string; payment_url: string | null; completed_at: Date | null; }> {
-    const pr = await this.repo.findById(id)
-    if (!pr || pr.userId !== u.id) {
-      throw new BadRequestException('NOT_FOUND')
-    }
-    return {
-      id: pr.id,
-      status: pr.status,
-      currency: pr.currency,
-      amount: pr.amount.toString(),
-      payment_url: pr.paymentUrl,
-      completed_at: pr.completedAt,
-    }
+  depositStatus(@CurrentUser() u: UserActor, @Param('id') id: string): Promise<{ id: string; status: PaymentStatus; currency: string; amount: string; payment_url: string | null; completed_at: Date | null; }> {
+    return this.depStatusUc.execute(u.id, id)
   }
   @Post('withdrawal/fiat')
   @UsePipes(new ZodValidationPipe(CreateFiatWithdrawalSchema))
@@ -81,18 +72,12 @@ export class PaymentsController {
     })
   }
   @Get('withdrawals')
-  async listWd(
+  listWd(
     @CurrentUser() u: UserActor,
     @Query() q: Record<string, string | undefined>,
-  ): Promise<{ items: { id: string; createdAt: Date; updatedAt: Date; type: PaymentType; amount: Prisma.Decimal; idempotencyKey: string; metadata: Prisma.JsonValue; userId: string; currency: string; status: PaymentStatus; provider: PaymentProvider; method: string | null; amountRub: Prisma.Decimal | null; fee: Prisma.Decimal; externalId: string | null; externalStatus: string | null; paymentUrl: string | null; destination: Prisma.JsonValue; errorMessage: string | null; expiresAt: Date | null; completedAt: Date | null; }[]; meta: { page: number; total: number; }; }> {
+  ): Promise<Awaited<ReturnType<ListWithdrawalsUseCase['execute']>>> {
     const page = parseInt(q.page ?? '') || 1
-    const [items, total] = await this.repo.listUser({
-      userId: u.id,
-      type: 'withdrawal',
-      page,
-      perPage: parseInt(q.per_page ?? '') || 20,
-    })
-    return { items, meta: { page, total } }
+    return this.listWdUc.execute(u.id, page, parseInt(q.per_page ?? '') || 20)
   }
   @Post('withdrawal/:id/cancel')
   cancel(@CurrentUser() u: UserActor, @Param('id') id: string): Promise<{ ok: boolean; }> {

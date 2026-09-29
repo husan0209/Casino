@@ -1,9 +1,10 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 
 import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 
 import type { Currency } from '@casino/shared-types'
 
+import { WithdrawalCancelForbiddenError } from '../../domain/errors'
 import { IPaymentRequestRepository, PAYMENT_REQUEST_REPOSITORY } from '../../domain/payments.ports'
 
 @Injectable()
@@ -15,10 +16,10 @@ export class CancelWithdrawalUseCase {
   async execute(userId: string, id: string): Promise<{ ok: boolean }> {
     const pr = await this.repo.findById(id)
     if (!pr || pr.userId !== userId) {
-      throw new ForbiddenException()
+      throw new WithdrawalCancelForbiddenError()
     }
     if (pr.status !== 'pending') {
-      throw new ForbiddenException('Cannot cancel')
+      throw new WithdrawalCancelForbiddenError('Cannot cancel')
     }
     // GAP-55 (§11): ключ детерминированный от id заявки + ссылка в метаданных —
     // повтор отмены той же заявки дедуплицируется ledger'ом, а строка истории
