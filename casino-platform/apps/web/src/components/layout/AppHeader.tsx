@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { Logo } from '@/components/layout/Logo'
-import { UserAvatar } from '@/components/layout/UserAvatar'
+import { UserMenu } from '@/components/layout/UserMenu'
 import { formatBalance } from '@/lib/format/currency'
 import { searchHref } from '@/lib/ui/desktop-nav'
 import { useAuth } from '@/stores/auth'
@@ -83,7 +83,7 @@ export function AppHeader(): React.JSX.Element {
                 type="button"
                 onClick={openWalletSwitcher}
                 aria-label="Сменить активный кошелёк"
-                className="flex items-center gap-1.5 rounded-full border border-[#2A2A4A] bg-white/[0.04] px-3 py-1.5 text-sm font-bold transition hover:border-brand/60"
+                className="flex items-center gap-1.5 rounded-full border border-[#2A2A4A]/80 bg-white/[0.06] px-3.5 py-1.5 text-sm font-bold transition hover:border-brand/60 hover:bg-white/[0.08]"
               >
                 {formatBalance(balance, displayCurrency)}
                 <ChevronDown size={14} aria-hidden className="text-muted" />
@@ -92,13 +92,11 @@ export function AppHeader(): React.JSX.Element {
                 type="button"
                 onClick={() => openDeposit(displayCurrency)}
                 aria-label="Пополнить"
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#00C853] text-white transition hover:bg-[#00B34A] active:scale-95"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#00E676] text-white shadow-lg shadow-[#00E676]/25 transition hover:bg-[#00C853] active:scale-95"
               >
                 <Plus size={20} strokeWidth={2.4} aria-hidden />
               </button>
-              <Link href="/profile" aria-label="Профиль" className="shrink-0">
-                <UserAvatar email={user.email} size={34} />
-              </Link>
+              <UserMenu email={user.email} />
             </>
           ) : (
             <>

@@ -37,8 +37,8 @@ export function BottomNav(): React.JSX.Element | null {
     href === '/' ? pathname === '/' : pathname.startsWith(href)
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#2A2A4A] bg-[#0F0F1A]/95 backdrop-blur md:hidden">
-      <div className="grid grid-cols-4 py-1.5 text-center text-[11px]">
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#2A2A4A]/60 bg-[#0F0F1A]/95 backdrop-blur md:hidden">
+      <div className="grid grid-cols-4 py-2 text-center text-[11px]">
         {items.map((item) => (
           <Link key={item.href} href={item.href} className={linkClass(isActive(item.href))}>
             <item.Icon size={22} strokeWidth={1.8} aria-hidden />

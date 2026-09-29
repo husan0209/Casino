@@ -34,7 +34,7 @@ export function DesktopNav({
               key={item.href}
               href={item.href}
               className={`group relative mx-2 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition hover:bg-white/5 ${
-                active ? 'bg-[#6C63FF]/15 text-white' : 'text-muted'
+                active ? 'bg-[#6C63FF]/15 text-white font-medium' : 'text-muted hover:text-white'
               }`}
             >
               <span className="w-5 shrink-0" aria-hidden>

@@ -1,5 +1,6 @@
 'use client'
 
+import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
 import { GameThumb } from '@/components/casino/GameThumb'
@@ -8,62 +9,109 @@ import type { GameDto } from '@/types/casino'
 
 /**
  * Герой гостя (ТЗ ч.5.1 §4.2, донор spinera): один оффер, один CTA,
- * social proof, казино-родной фон, лента слота внизу. Тон — §3:
- * «Твой следующий большой спин.», «N слотов на старте…». Гость-фёрст:
- * «Гость видит слоты. Депозит — когда сами решите.» (донор B).
- * Показывается ТОЛЬКО гостю; залогиненному маркетингового героя нет (§4.3).
+ * social proof (стек аватарок + «N игроков уже сегодня»), казино-родной фон
+ * (барабаны, монеты, 7-ки), лента слота внизу. Тон — §3:
+ * «Твой следующий большой спин.». Показывается ТОЛЬКО гостю (§4.3).
+ *
+ * Цвета приведены к скриншотам: насыщенный фиолетовый градиент,
+ * акцентный зелёный в заголовке, social-proof стек аватарок.
  */
 export function GuestHero({ games }: { games: GameDto[] }): React.JSX.Element | null {
   const { user } = useAuth()
-  const strip = games.slice(0, 4)
+  const strip = games.slice(0, 5)
 
   if (user ?? strip.length === 0) {
     return null
   }
 
   return (
-    <section className="relative mb-6 overflow-hidden rounded-2xl border border-[#2A2A4A] bg-gradient-to-br from-[#16213E] via-[#1A1A2E] to-[#0F0F1A]">
-      {/* казино-родной фон: мягкие световые пятна (барабаны/монеты), без эмодзи */}
+    <section className="relative mb-6 overflow-hidden rounded-2xl">
+      {/* Насыщенный фиолетовый градиент — как на скриншотах spinera */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#2A1B6B] via-[#1A1040] to-[#0F0F1A]" />
+
+      {/* Декоративные световые пятна — casino-родной фон */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[#6C63FF]/25 blur-3xl"
+        className="pointer-events-none absolute -right-12 -top-12 h-64 w-64 rounded-full bg-[#6C63FF]/30 blur-[80px]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute -bottom-24 left-10 h-48 w-48 rounded-full bg-[#00C853]/15 blur-3xl"
+        className="pointer-events-none absolute -bottom-20 -left-10 h-52 w-52 rounded-full bg-[#00E676]/12 blur-[60px]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-20 top-1/2 h-40 w-40 rounded-full bg-[#FF3D71]/10 blur-[50px]"
       />
 
-      <div className="relative p-5 md:p-7">
-        <h1 className="text-2xl font-extrabold leading-tight tracking-tight md:text-3xl">
-          Твой следующий большой спин.
-        </h1>
-        <p className="mt-2 max-w-md text-sm text-muted md:text-base">
-          Гость видит слоты. Депозит — когда сами решите.
+      {/* Декоративные символы — слот-машина мотив */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-4 top-8 text-[120px] font-black leading-none text-white/[0.03]"
+      >
+        7
+      </div>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute right-24 top-20 text-[80px] font-black leading-none text-[#FFB300]/[0.06]"
+      >
+        ★
+      </div>
+
+      <div className="relative p-6 pb-5 md:p-8 md:pb-6">
+        {/* ТЗ ч.5.1 §3: капс-лейбл с характером */}
+        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-[#00E676]">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#00E676]" aria-hidden />
+          Новые игры каждую неделю
         </p>
 
-        <div className="mt-4 flex flex-wrap items-center gap-4">
-          <Link href="/casino" className="btn px-6">
+        <h1 className="text-[28px] font-black leading-[1.1] tracking-tight md:text-4xl">
+          Твой следующий
+          <br />
+          <span className="text-[#00E676]">большой спин.</span>
+        </h1>
+
+        <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/60 md:text-base">
+          Яркие слоты от лучших провайдеров. Играй с удовольствием — без лишнего.
+        </p>
+
+        <div className="mt-5 flex flex-wrap items-center gap-4">
+          <Link
+            href="/casino"
+            className="inline-flex items-center gap-2 rounded-xl bg-[#8B7FFF] px-6 py-3 text-sm font-bold text-white shadow-lg shadow-[#6C63FF]/30 transition hover:bg-[#6C63FF] active:scale-[0.97]"
+          >
             Играть сейчас
+            <ArrowRight size={16} aria-hidden />
           </Link>
-          <span className="text-xs text-muted">
-            {strip.length >= 4 ? '12 слотов на старте' : `${strip.length} слотов на старте`}. Одна
-            зелёная кнопка, когда будете готовы.
-          </span>
+        </div>
+
+        {/* Social proof — стек аватарок (донор spinera §4.2) */}
+        <div className="mt-5 flex items-center gap-2">
+          <div className="flex -space-x-2">
+            {['#E53E3E', '#3182CE', '#D69E2E', '#805AD5'].map((color, index) => (
+              <span
+                key={color}
+                className="grid h-7 w-7 place-items-center rounded-full border-2 border-[#1A1040] text-[10px] font-bold text-white"
+                style={{ backgroundColor: color, zIndex: 4 - index }}
+              >
+                {['М', 'P', 'A'][index] ?? '+'}
+              </span>
+            ))}
+            <span className="grid h-7 w-7 place-items-center rounded-full border-2 border-[#1A1040] bg-white/10 text-[10px] font-medium text-white/70">
+              +
+            </span>
+          </div>
+          <span className="text-xs text-white/50">12 400 игроков уже сегодня</span>
         </div>
       </div>
 
-      {/* лента слота внизу героя — реальные каверы (§2 пр.3) */}
-      <div className="relative flex gap-2 px-5 pb-5 md:px-7 md:pb-7">
+      {/* Лента слотов внизу (реальные каверы §2 пр.3) */}
+      <div className="relative flex gap-2.5 overflow-x-auto px-6 pb-6 md:px-8 md:pb-8">
         {strip.map((game) => (
           <div
             key={game.slug}
-            className="h-16 w-16 overflow-hidden rounded-xl border border-[#2A2A4A] bg-[#16213E] md:h-20 md:w-20"
+            className="h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-[#16213E] shadow-lg shadow-black/20 md:h-24 md:w-24"
           >
-            <GameThumb
-              src={game.thumbnailUrl}
-              alt=""
-              sizes="80px"
-            />
+            <GameThumb src={game.thumbnailUrl} alt="" sizes="96px" />
           </div>
         ))}
       </div>

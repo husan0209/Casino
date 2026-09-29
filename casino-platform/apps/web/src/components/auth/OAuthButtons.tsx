@@ -39,7 +39,11 @@ declare global {
   }
 }
 
-export function OAuthButtons({ referralCode }: { referralCode?: string }): React.JSX.Element | null {
+export function OAuthButtons({
+  referralCode,
+}: {
+  referralCode?: string
+}): React.JSX.Element | null {
   const setSession = useAuth((s: AuthState) => s.setSession)
   const router = useRouter()
   const telegramContainer = useRef<HTMLDivElement>(null)
@@ -98,12 +102,7 @@ export function OAuthButtons({ referralCode }: { referralCode?: string }): React
   }
 
   return (
-    <div className="mt-4">
-      <div className="flex items-center gap-2 text-xs text-muted mb-2">
-        <span className="flex-1 border-t border-[#2A2A4A]" />
-        или
-        <span className="flex-1 border-t border-[#2A2A4A]" />
-      </div>
+    <div>
       <div className="space-y-2">
         {GOOGLE_CLIENT_ID !== undefined && (
           <button className="btn w-full" type="button" onClick={() => void startGoogle()}>
@@ -112,9 +111,17 @@ export function OAuthButtons({ referralCode }: { referralCode?: string }): React
         )}
         {TELEGRAM_BOT_NAME !== undefined && (
           <div ref={telegramContainer} className="flex justify-center min-h-10 items-center">
-            {telegramBusy && <span className="text-xs text-muted">Проверяем Telegram-подпись…</span>}
+            {telegramBusy && (
+              <span className="text-xs text-muted">Проверяем Telegram-подпись…</span>
+            )}
           </div>
         )}
+      </div>
+      {/* ТЗ ч.5.1 §4.8: OAuth сверху, разделитель — между ними и email-формой */}
+      <div className="mt-4 flex items-center gap-2 text-xs text-muted">
+        <span className="flex-1 border-t border-[#2A2A4A]" />
+        или
+        <span className="flex-1 border-t border-[#2A2A4A]" />
       </div>
     </div>
   )

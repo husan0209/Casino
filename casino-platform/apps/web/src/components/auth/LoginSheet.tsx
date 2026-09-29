@@ -1,4 +1,6 @@
 'use client'
+import { ArrowRight, Lock, X } from 'lucide-react'
+import Link from 'next/link'
 import { useState } from 'react'
 
 import { CaptchaField } from '@/components/auth/CaptchaField'
@@ -7,6 +9,11 @@ import { errCode, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 
+/**
+ * LoginSheet (ТЗ ч.5.1 §4.8, донор VANTA): нижний лист «Войдите, чтобы играть».
+ * Google и Telegram сверху, ниже email-форма, ссылка на регистрацию.
+ * После успеха — продолжить launch, не выкидывать на главную.
+ */
 export function LoginSheet(): React.JSX.Element | null {
   const { loginSheet, closeLogin, pendingGameSlug } = useUIStore()
   const { login, register } = useAuth()
@@ -14,7 +21,6 @@ export function LoginSheet(): React.JSX.Element | null {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  // GAP-55 (ж) §5.2: капча появляется только после CAPTCHA_REQUIRED от бэка
   const [captchaToken, setCaptchaToken] = useState('')
   const [captchaRequired, setCaptchaRequired] = useState(false)
 
@@ -54,38 +60,145 @@ export function LoginSheet(): React.JSX.Element | null {
     <>
       <div className="sheet-backdrop" onClick={closeLogin} />
       <div className="sheet-panel">
-        <h2 className="text-lg font-semibold">Войдите, чтобы играть</h2>
-        <p className="text-sm text-muted mt-1">Google / Telegram — скоро</p>
+        <div className="sheet-handle" />
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="caps-label">ДОБРО ПОЖАЛОВАТЬ</p>
+            <h2 className="text-lg font-bold">
+              {mode === 'login' ? 'Войдите, чтобы играть' : 'Создать аккаунт'}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={closeLogin}
+            aria-label="Закрыть"
+            className="rounded-lg p-1.5 text-muted transition hover:bg-white/5 hover:text-white"
+          >
+            <X size={18} aria-hidden />
+          </button>
+        </div>
+
+        {/* OAuth кнопки — §4.8: Google и Telegram сверху */}
+        <div className="mt-4 space-y-2.5">
+          <Link
+            href="/google/callback"
+            className="flex w-full items-center justify-center gap-3 rounded-xl border border-[#2A2A4A] bg-white/[0.04] px-4 py-3 text-sm font-medium transition hover:bg-white/[0.07]"
+          >
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-white text-sm font-bold text-[#4285F4]">
+              G
+            </span>
+            Продолжить с Google
+          </Link>
+          <button
+            type="button"
+            className="flex w-full items-center justify-center gap-3 rounded-xl border border-[#2A2A4A] bg-white/[0.04] px-4 py-3 text-sm font-medium transition hover:bg-white/[0.07]"
+          >
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-[#0088CC] text-sm font-bold text-white">
+              ▶
+            </span>
+            Войти через Telegram
+          </button>
+        </div>
+
+        {/* Разделитель */}
+        <div className="my-4 flex items-center gap-3">
+          <div className="h-px flex-1 bg-[#2A2A4A]" />
+          <span className="text-xs text-muted">или по email</span>
+          <div className="h-px flex-1 bg-[#2A2A4A]" />
+        </div>
+
         {captchaRequired && mode === 'login' && (
-          <div className="my-3">
+          <div className="mb-3">
             <CaptchaField onToken={setCaptchaToken} />
           </div>
         )}
-        <div className="my-4 space-y-3">
-          <input
-            className="input"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <input
-            className="input"
-            type="password"
-            placeholder="Пароль"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <button type="button" className="btn w-full" disabled={loading} onClick={submit}>
+
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs text-muted">Email</label>
+            <input
+              className="input"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 flex items-center justify-between text-xs text-muted">
+              <span>Пароль</span>
+              {mode === 'login' && (
+                <Link
+                  href="/forgot-password"
+                  className="text-brand hover:underline"
+                  onClick={closeLogin}
+                >
+                  Забыли пароль?
+                </Link>
+              )}
+            </label>
+            <div className="relative">
+              <input
+                className="input pr-10"
+                type="password"
+                placeholder="Введите пароль"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <Lock
+                size={14}
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
+                aria-hidden
+              />
+            </div>
+          </div>
+
+          {mode === 'login' && (
+            <label className="flex items-center gap-2 text-xs text-muted">
+              <input
+                type="checkbox"
+                defaultChecked
+                className="rounded border-[#2A2A4A] bg-[#1A1A2E] accent-brand"
+              />
+              Запомнить меня
+            </label>
+          )}
+
+          <button
+            type="button"
+            className="btn w-full py-3"
+            disabled={loading}
+            onClick={() => void submit()}
+          >
             {loading ? '…' : mode === 'login' ? 'Войти' : 'Создать аккаунт'}
+            {!loading && <ArrowRight size={16} aria-hidden />}
           </button>
         </div>
-        <button
-          type="button"
-          className="text-sm text-muted"
-          onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-        >
-          {mode === 'login' ? 'Нет аккаунта? Создать' : 'Уже есть аккаунт? Войти'}
-        </button>
+
+        <p className="mt-4 text-center text-sm text-muted">
+          {mode === 'login' ? (
+            <>
+              Нет аккаунта?{' '}
+              <button
+                type="button"
+                className="font-medium text-brand hover:underline"
+                onClick={() => setMode('register')}
+              >
+                Зарегистрироваться
+              </button>
+            </>
+          ) : (
+            <>
+              Уже есть аккаунт?{' '}
+              <button
+                type="button"
+                className="font-medium text-brand hover:underline"
+                onClick={() => setMode('login')}
+              >
+                Войти
+              </button>
+            </>
+          )}
+        </p>
       </div>
     </>
   )
