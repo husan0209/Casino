@@ -68,8 +68,10 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
           <GameThumb src={game.thumbnailUrl} alt={displayName} />
           {badge && (
             <span
-              className={`absolute left-2 top-2 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
-                badge === 'NEW' ? 'bg-[#00D2FF]/20 text-[#00D2FF]' : 'bg-[#FF3D71]/20 text-[#FF3D71]'
+              className={`absolute left-2 top-2 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                badge === 'NEW'
+                  ? 'bg-[#00D2FF]/20 text-[#00D2FF] ring-1 ring-[#00D2FF]/30'
+                  : 'bg-[#FF3D71]/20 text-[#FF3D71] ring-1 ring-[#FF3D71]/30'
               }`}
             >
               {badge}
@@ -85,7 +87,7 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
         type="button"
         aria-label="Об игре"
         onClick={() => setPreview((v) => !v)}
-        className="absolute right-1.5 top-1.5 rounded-full bg-black/50 px-1.5 py-0.5 text-xs text-muted hover:text-white"
+        className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/50 text-xs font-medium text-white/70 backdrop-blur-sm transition hover:bg-black/70 hover:text-white"
       >
         i
       </button>
@@ -99,7 +101,11 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
               RTP: <span className="text-white">{rtp}</span>
             </div>
           )}
-          <button type="button" onClick={toggleFavorite} className="btn-ghost w-full px-2 py-1.5 text-xs">
+          <button
+            type="button"
+            onClick={toggleFavorite}
+            className="btn-ghost w-full px-2 py-1.5 text-xs"
+          >
             {isFavorite ? '♥ В избранном' : '♡ В избранное'}
           </button>
         </div>

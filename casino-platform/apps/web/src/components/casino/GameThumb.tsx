@@ -27,15 +27,7 @@ export function GameThumb({
   const source = thumbSource(src, ALLOWED_HOSTS)
 
   if (source.kind === 'next') {
-    return (
-      <Image
-        src={source.src}
-        alt={alt}
-        fill
-        sizes={sizes}
-        className="object-cover"
-      />
-    )
+    return <Image src={source.src} alt={alt} fill sizes={sizes} className="object-cover" />
   }
   if (source.kind === 'raw') {
     return (
@@ -49,8 +41,23 @@ export function GameThumb({
     )
   }
   return (
-    <span aria-hidden className="text-3xl">
-      🎰
+    <span
+      aria-hidden
+      className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#22223a] to-[#111122]"
+    >
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="text-white/10">
+        <rect x="4" y="6" width="24" height="20" rx="3" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="16" cy="16" r="4" stroke="currentColor" strokeWidth="1.5" />
+        <line
+          x1="10"
+          y1="10"
+          x2="10"
+          y2="10.01"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      </svg>
     </span>
   )
 }

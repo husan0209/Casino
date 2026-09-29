@@ -83,4 +83,19 @@ export function networkLabel(currency: string): string {
   return currency
 }
 
+/** Полное название валюты для шторки кошелька (скриншоты spinera). */
+const CURRENCY_FULL_NAMES: Record<string, string> = {
+  RUB: 'Российский рубль',
+  KZT: 'Казахстанский тенге',
+  UAH: 'Украинская гривна',
+  BYN: 'Белорусский рубль',
+  UZS: 'Узбекский сум',
+  USDT_TRC20: 'Tether',
+  BTC: 'Bitcoin',
+}
+
+export function currencyFullName(currency: string): string {
+  return CURRENCY_FULL_NAMES[currency] ?? currency
+}
+
 export type { FiatCurrency }
