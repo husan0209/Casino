@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 
+import { InvalidSelfExclusionPeriodError } from '../../domain/errors'
 import {
   USER_SETTINGS_REPOSITORY,
   IUserSettingsRepository,
@@ -34,7 +35,7 @@ export class SelfExclusionUseCase {
    */
   async exclude(userId: string, periodHours: number): Promise<{ excludedUntil: Date | null }> {
     if (periodHours < 0) {
-      throw new Error('INVALID_PERIOD')
+      throw new InvalidSelfExclusionPeriodError()
     }
     // Minimum 24 hours — we enforce this server-side regardless of client input
     if (periodHours > 0 && periodHours < 24) {

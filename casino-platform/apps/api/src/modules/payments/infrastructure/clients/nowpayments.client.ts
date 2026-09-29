@@ -195,7 +195,7 @@ export class NOWPaymentsClient implements INowPaymentsClient {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`)
+      throw new PaymentProviderError(`HTTP ${res.status}`)
     }
     const d = asPspResponse<NOWPaymentsPaymentStatusResponse>(await res.json())
     return {
