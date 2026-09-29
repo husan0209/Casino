@@ -14,3 +14,18 @@ export class KycAlreadySubmittedError extends AppError {
     super('KYC already submitted')
   }
 }
+export class KycNotSubmittedError extends AppError {
+  readonly code = 'KYC_NOT_SUBMITTED'
+  readonly httpStatus = 400
+  constructor() {
+    // текст сохранён 1-в-1 с прежним raw new Error (G17)
+    super('KYC_NOT_SUBMITTED')
+  }
+}
+export class KycFileError extends AppError {
+  readonly code = 'KYC_FILE_INVALID'
+  readonly httpStatus = 400
+  constructor(msg: string) {
+    super(msg)
+  }
+}

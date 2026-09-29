@@ -6,7 +6,7 @@ import { ConfigService } from '@nestjs/config'
 import { errorMessage } from '@/common/utils/error-message'
 
 import { GeoFacade } from '@modules/geo/facade/geo.facade'
-import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
+import { KycFacade } from '@modules/kyc/facade/kyc.facade'
 import { UsersFacade } from '@modules/users/facade/users.facade'
 
 import type { DisplayCurrency } from '@casino/shared-config'
@@ -32,7 +32,7 @@ export class CreateFiatDepositUseCase {
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(RUKASSA_CLIENT) private readonly rukassa: IRukassaClient,
-    private kycCheck: KycCheckService,
+    private kycCheck: KycFacade,
     private config: ConfigService,
     private geo: GeoFacade,
     private users: UsersFacade,

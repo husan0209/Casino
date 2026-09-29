@@ -1,20 +1,29 @@
-import { randomUUID } from 'crypto'
-import { mkdirSync, writeFileSync } from 'fs'
 import { extname } from 'path'
 
-import { BadRequestException, Body, Controller, Get, Inject, Post, Query, UploadedFile, UseGuards, UseInterceptors, UsePipes } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+  UsePipes,
+} from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
-import { extForMime, sniffDocumentMime } from '@/common/files/file-sniffer'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
-import { IKycRepository, KYC_REPOSITORY, type KycProfileRow } from '@modules/kyc/domain/repositories/kyc.repository'
+import { UploadKycDocumentUseCase } from '@modules/kyc/application/use-cases/upload-kyc-document.use-case'
+import { KycFileError } from '@modules/kyc/domain/errors'
 
 import { type DisplayCurrency } from '@casino/shared-config'
+import { type KycProfileRow } from '@casino/shared-types'
 
 import { GetKycStatusUseCase } from '../../application/use-cases/get-kyc-status.use-case'
 import { SubmitKycUseCase } from '../../application/use-cases/submit-kyc.use-case'
@@ -22,12 +31,11 @@ import { KycDocumentTypeSchema, SubmitKycSchema } from '../dto/kyc.dto'
 
 // SECURITY_BASELINE.md §7.1 — KYC documents whitelist.
 // P1 #12: MIME-фильтр Multer'а — только первая линия; клиентский Content-Type
-// подделывается тривиально. Финальное решение — magic bytes (file-sniffer):
-// файл пишется на диск ТОЛЬКО после проверки сигнатуры, расширение задаётся
-// sniffed-типом (filename = randomUUID + ext), имя всегда безопасно.
+// подделывается тривиально. Финальное решение — magic bytes (file-sniffer),
+// они в UploadKycDocumentUseCase: файл пишется на диск ТОЛЬКО после проверки
+// сигнатуры (В3: запись/проверка — application, контроллер тонкий).
 const ALLOWED_EXT = new Set<string>(['.jpg', '.jpeg', '.png', '.webp', '.pdf'])
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
-const UPLOAD_DIR = './uploads/kyc'
 
 @UseGuards(AuthGuard)
 @Controller('kyc')
@@ -35,10 +43,22 @@ export class KycController {
   constructor(
     private submitUc: SubmitKycUseCase,
     private statusUc: GetKycStatusUseCase,
-    @Inject(KYC_REPOSITORY) private repo: IKycRepository,
+    private uploadUc: UploadKycDocumentUseCase,
   ) {}
   @Get('status')
-  status(@CurrentUser() u: UserActor, @Query('currency') currency?: string): Promise<{ deposit_limit_rub: string; total_deposited_rub: string; limit_remaining: string; limit_currency: DisplayCurrency; status?: string; submittedAt?: Date | null; rejectionReason?: string | null; documents?: string[]; }> {
+  status(
+    @CurrentUser() u: UserActor,
+    @Query('currency') currency?: string,
+  ): Promise<{
+    deposit_limit_rub: string
+    total_deposited_rub: string
+    limit_remaining: string
+    limit_currency: DisplayCurrency
+    status?: string
+    submittedAt?: Date | null
+    rejectionReason?: string | null
+    documents?: string[]
+  }> {
     return this.statusUc.execute(u.id, currency || 'RUB')
   }
   @Post('submit')
@@ -61,7 +81,7 @@ export class KycController {
   @Post('documents')
   @UseInterceptors(
     FileInterceptor('file', {
-      // P1 #12: память, не диск — решение «писать/не писать» принимает контроллер
+      // P1 #12: память, не диск — решение «писать/не писать» принимает use-case
       // ПОСЛЕ magic-byte проверки; недоверенный контент на диск не попадает.
       storage: memoryStorage(),
       limits: { fileSize: MAX_FILE_SIZE, files: 1 },
@@ -69,43 +89,21 @@ export class KycController {
       fileFilter: (_, f, cb) => {
         const ext = extname(f.originalname).toLowerCase()
         if (ext && !ALLOWED_EXT.has(ext)) {
-          return cb(new BadRequestException(`Unsupported file extension: ${ext}`), false)
+          return cb(new KycFileError(`Unsupported file extension: ${ext}`), false)
         }
         cb(null, true)
       },
     }),
   )
-  async upload(
+  upload(
     @CurrentUser() u: UserActor,
     @Body(new ZodValidationPipe(KycDocumentTypeSchema)) body: { document_type: string },
     @UploadedFile() file: Express.Multer.File,
-  ): Promise<{ ok: boolean; file_url: string; }> {
-    const profile = await this.repo.getByUserId(u.id)
-    if (!profile) {
-      throw new Error('KYC_NOT_SUBMITTED')
-    }
-    if (file.buffer.length === 0) {
-      throw new BadRequestException('File is required')
-    }
-    // P1 #12: реальный тип — только по magic bytes, не по клиентскому Content-Type
-    const sniffed = sniffDocumentMime(file.buffer)
-    if (!sniffed) {
-      throw new BadRequestException('File content does not match an allowed document type')
-    }
-    // Пишем на диск только проверенный контент; имя генерируем сами.
-    mkdirSync(UPLOAD_DIR, { recursive: true })
-    const filename = randomUUID() + extForMime(sniffed)
-    writeFileSync(`${UPLOAD_DIR}/${filename}`, file.buffer, { mode: 0o600 })
-    const url = `/uploads/kyc/${filename}`
-    // Sanitize originalName: strip any path components and limit length to prevent log/db bloat.
-    const safeOriginal = file.originalname.replace(/[\\/]/g, '_').slice(0, 200)
-    await this.repo.addDocument(profile.id, {
+  ): Promise<{ ok: boolean; file_url: string }> {
+    return this.uploadUc.execute({
+      userId: u.id,
       documentType: body.document_type,
-      fileUrl: url,
-      fileName: safeOriginal,
-      fileSize: file.size,
-      mimeType: sniffed,
+      file: { originalname: file.originalname, size: file.size, buffer: file.buffer },
     })
-    return { ok: true, file_url: url }
   }
 }

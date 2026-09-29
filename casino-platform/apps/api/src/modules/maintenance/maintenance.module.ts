@@ -31,7 +31,7 @@ import { MaintenanceAdminController } from './presentation/maintenance-admin.con
 import { MaintenanceScheduler } from '../../queues/infrastructure/maintenance.scheduler'
 import { EMAIL_QUEUE_PORT } from '../../queues/queue.types'
 import { QueuesModule } from '../../queues/queues.module'
-import { NOWPaymentsClient } from '../payments/infrastructure/clients/nowpayments.client'
+import { PaymentsModule } from '../payments/payments.module'
 
 /**
  * Scheduled jobs (GAP-33, ТЗ ч.3 §13): BullMQ-очередь `maintenance` с четырьмя
@@ -44,14 +44,14 @@ import { NOWPaymentsClient } from '../payments/infrastructure/clients/nowpayment
  * presentation-слой этого модуля (MaintenanceAdminController, решение В2; путь
  * сохранён после переезда из referrals).
  *
- * Зависимости: NOWPaymentsClient (для курсов) предоставляется локально,
- * ReferralsModule — ReferralCalcService; AdminModule — AuditLogService (audit-log
- * ручного триггера); EMAIL_QUEUE_PORT — из QueuesModule.
+ * Зависимости: PaymentsModule — PaymentsFacade.estimateRub (курсы; В1: раньше
+ * тянули NOWPaymentsClient напрямую), ReferralsModule — ReferralCalcService;
+ * EMAIL_QUEUE_PORT — из QueuesModule.
  * AdminModule/AuditLogService для напоминаний не нужен: дедуп/трейл пишутся
  * напрямую PrismaReminderAuditRepo (audit_logs).
  */
 @Module({
-  imports: [AuthModule, AdminModule, ReferralsModule, QueuesModule],
+  imports: [AuthModule, AdminModule, PaymentsModule, ReferralsModule, QueuesModule],
   controllers: [MaintenanceAdminController],
   providers: [
     MaintenanceScheduler,
@@ -61,7 +61,6 @@ import { NOWPaymentsClient } from '../payments/infrastructure/clients/nowpayment
     WithdrawalReminderJob,
     ReferralDailyJob,
     CleanupSessionsJob,
-    NOWPaymentsClient,
     { provide: PAYMENT_MAINTENANCE_REPO, useClass: PrismaMaintenanceRepo },
     { provide: SESSION_MAINTENANCE_REPO, useClass: PrismaSessionMaintenanceRepo },
     { provide: REMINDER_AUDIT_REPO, useClass: PrismaReminderAuditRepo },
