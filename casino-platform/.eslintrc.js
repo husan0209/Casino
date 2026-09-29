@@ -10,7 +10,17 @@ module.exports = {
     'plugin:import/typescript',
   ],
   settings: {
-    'import/resolver': { typescript: { alwaysTryTypes: true } },
+    'import/resolver': {
+      typescript: {
+        alwaysTryTypes: true,
+        project: [
+          './apps/api/tsconfig.json',
+          './apps/web/tsconfig.json',
+          './apps/admin/tsconfig.json',
+          './packages/*/tsconfig.json',
+        ],
+      },
+    },
   },
   env: { node: true, es2022: true },
   ignorePatterns: ['dist', 'build', '.next', 'node_modules', 'prisma/generated', 'coverage'],
@@ -21,12 +31,12 @@ module.exports = {
     'no-alert': 'error',
     'no-var': 'error',
     'prefer-const': 'error',
-    'eqeqeq': ['error', 'always'],
+    eqeqeq: ['error', 'always'],
     'no-implicit-coercion': 'error',
     'no-return-assign': 'error',
     'no-throw-literal': 'error',
     'no-duplicate-imports': 'off',
-    'curly': ['error', 'all'],
+    curly: ['error', 'all'],
     'brace-style': ['error', '1tbs', { allowSingleLine: false }],
 
     // ─── TypeScript ───────────────────────────────────────────────
@@ -70,7 +80,7 @@ module.exports = {
     // (граф зависимостей) — inline-disable с обоснованием.
     'max-params': ['error', 3],
     'max-depth': ['error', 3],
-    'complexity': ['error', 10],
+    complexity: ['error', 10],
     // Лимит перекалиброван 60→90 под prettier-нормализацию (printWidth 100 растягивает строки).
     // Вернуть к 60 после разбора 14 методов — GAP-30 (вместе с тестами GAP-21/24).
     'max-lines-per-function': ['error', { max: 60, skipBlankLines: true, skipComments: true }],
@@ -81,7 +91,8 @@ module.exports = {
       'error',
       {
         name: 'parseFloat',
-        message: 'parseFloat is forbidden for money. Use money.* helpers from @casino/shared-utils.',
+        message:
+          'parseFloat is forbidden for money. Use money.* helpers from @casino/shared-utils.',
       },
     ],
     'no-restricted-syntax': [
@@ -118,7 +129,7 @@ module.exports = {
       rules: {
         'max-lines-per-function': 'off',
         'max-params': 'off',
-        'complexity': 'off',
+        complexity: 'off',
         'max-depth': 'off',
         '@typescript-eslint/no-explicit-any': 'off',
       },
@@ -172,7 +183,7 @@ module.exports = {
               {
                 group: ['@casino/database', '**/node_modules/.prisma/**', '**/.prisma/client/**'],
                 message:
-                  'Application layer MUST NOT import the database client at runtime. Use a repository interface (IXxxRepository) or another module\'s Facade (type-only @prisma/client imports are allowed). See docs/AI_DEVELOPMENT_RULES.md §3.2.',
+                  "Application layer MUST NOT import the database client at runtime. Use a repository interface (IXxxRepository) or another module's Facade (type-only @prisma/client imports are allowed). See docs/AI_DEVELOPMENT_RULES.md §3.2.",
               },
             ],
           },

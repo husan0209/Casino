@@ -4,7 +4,7 @@ import { Worker } from 'bullmq'
 
 import { queueConnection } from '../../../queues/infrastructure/email.queue'
 import { QUEUES } from '../../../queues/queue.types'
-import { MaintenanceHandlers, MAINTENANCE_HANDLERS } from '../domain/maintenance.ports'
+import { type MaintenanceHandlers, MAINTENANCE_HANDLERS } from '../domain/maintenance.ports'
 
 /**
  * Воркер maintenance-очереди (GAP-33): диспетчер по job.name — каждый
@@ -18,7 +18,7 @@ export class MaintenanceWorker implements OnModuleDestroy {
   private readonly worker?: Worker
 
   constructor(
-    config: ConfigService,
+    @Inject(ConfigService) config: ConfigService,
     @Inject(MAINTENANCE_HANDLERS) private readonly handlers: MaintenanceHandlers,
   ) {
     const hasRedis = Boolean(config.get<string>('REDIS_URL'))
@@ -29,7 +29,8 @@ export class MaintenanceWorker implements OnModuleDestroy {
     this.worker = new Worker(
       QUEUES.MAINTENANCE,
       async (job) => {
-        const handler = this.handlers[job.name as keyof MaintenanceHandlers] as (() => Promise<unknown>) | undefined
+        const handler = this.handlers[job.name as keyof MaintenanceHandlers] as
+          (() => Promise<unknown>) | undefined
         if (!handler) {
           throw new Error(`Unknown maintenance job: ${job.name}`)
         }

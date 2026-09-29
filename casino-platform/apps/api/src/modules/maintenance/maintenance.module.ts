@@ -1,4 +1,4 @@
-import { Module, type OnApplicationBootstrap } from '@nestjs/common'
+import { Inject, Module, type OnApplicationBootstrap } from '@nestjs/common'
 
 import { AdminModule } from '../admin/admin.module'
 import { AuthModule } from '../auth/auth.module'
@@ -81,7 +81,7 @@ import { NOWPaymentsClient } from '../payments/infrastructure/clients/nowpayment
   ],
 })
 export class MaintenanceModule implements OnApplicationBootstrap {
-  constructor(private readonly scheduler: MaintenanceScheduler) {}
+  constructor(@Inject(MaintenanceScheduler) private readonly scheduler: MaintenanceScheduler) {}
 
   async onApplicationBootstrap(): Promise<void> {
     await this.scheduler.registerRepeatableJobs()

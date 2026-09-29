@@ -1,7 +1,6 @@
-import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common'
+import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Queue } from 'bullmq'
-
 
 import { MAINTENANCE_JOBS, QUEUES, type MaintenanceJobName } from '../queue.types'
 import { queueConnection } from './email.queue'
@@ -38,7 +37,7 @@ export class MaintenanceScheduler implements OnModuleDestroy {
   private readonly queue?: Queue
   private readonly connection?: Redis
 
-  constructor(config: ConfigService) {
+  constructor(@Inject(ConfigService) config: ConfigService) {
     const hasRedis = Boolean(config.get<string>('REDIS_URL'))
     const isTest = config.get<string>('NODE_ENV') === 'test'
     if (!hasRedis || isTest) {
