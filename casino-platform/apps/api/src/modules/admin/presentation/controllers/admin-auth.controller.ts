@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UnauthorizedException, UsePipes } from '@nestjs/common'
+import { Body, Controller, Post, UsePipes } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -6,6 +6,7 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminRole, prisma } from '@casino/database'
 
 import { AuditLogService } from '../../application/audit-log.service'
+import { InvalidAdminCredentialsError } from '../../domain/errors'
 import { AdminAuthService } from '../../infrastructure/admin-jwt.service'
 import { AdminLoginSchema } from '../dto/admin-auth.dto'
 
@@ -36,7 +37,7 @@ export class AdminAuthController {
       // с HTTP 200 (interceptor пропускал объект с ключом success) — клиент
       // получал data:undefined и «успешный» вход без токена. 401 + стандартный
       // error-конверт из GlobalExceptionFilter — как у всех остальных эндпоинтов.
-      throw new UnauthorizedException('Неверный email или пароль')
+      throw new InvalidAdminCredentialsError('Неверный email или пароль')
     }
     await prisma.adminUser.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } })
     await this.audit.log({ actorType: 'admin', actorId: admin.id, action: 'admin.login' })

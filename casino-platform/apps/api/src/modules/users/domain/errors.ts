@@ -15,3 +15,11 @@ export class InvalidSelfExclusionPeriodError extends AppError {
     super('INVALID_PERIOD')
   }
 }
+/** 403 сохранён от прежнего ForbiddenException; тексты 1-в-1 (Волна 4, G18). */
+export class SessionRevokeForbiddenError extends AppError {
+  readonly code = 'SESSION_REVOKE_FORBIDDEN'
+  readonly httpStatus = 403
+  constructor(m: string) {
+    super(m)
+  }
+}

@@ -11,11 +11,13 @@ import { PaymentRequestRepository } from '@modules/payments/infrastructure/repos
 import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
+
 import { type LedgerEntryType, type PaymentProvider, type PaymentStatus, type PaymentType, prisma, type Prisma } from '@casino/database'
 import { type Currency } from '@casino/shared-types'
 import { AppError } from '@casino/shared-utils'
 
 import { AuditLogService } from '../../application/audit-log.service'
+import { AdminForbiddenError } from '../../domain/errors'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { BatchApproveSchema, BatchRejectSchema, RejectWithdrawalSchema, WalletAdjustSchema } from '../dto/admin-finance.dto'
 
@@ -286,7 +288,7 @@ export class AdminFinanceController {
     @Req() req: Request,
   ): Promise<CreditResult> {
     if (admin.role !== 'superadmin') {
-      throw new Error('FORBIDDEN')
+      throw new AdminForbiddenError()
     }
     const res = await this.wallet.credit({
       userId,
@@ -319,7 +321,7 @@ export class AdminFinanceController {
     @Req() req: Request,
   ): Promise<CreditResult> {
     if (admin.role !== 'superadmin') {
-      throw new Error('FORBIDDEN')
+      throw new AdminForbiddenError()
     }
     const res = await this.wallet.debit({
       userId,
