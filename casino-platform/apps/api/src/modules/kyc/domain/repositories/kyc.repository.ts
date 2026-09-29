@@ -8,22 +8,11 @@ export interface KycSubmitInput {
   documentNumber: string
   documentExpiry?: Date | null
 }
-/** Полная строка KYC-профиля (Prisma KycProfile + documents). */
-export interface KycProfileRow {
-  id: string
-  userId: string
-  status: string
-  firstName: string | null
-  lastName: string | null
-  dateOfBirth: Date | null
-  country: string | null
-  documentType: string | null
-  documentNumber: string | null
-  rejectionReason: string | null
-  submittedAt: Date | null
-  approvedAt: Date | null
-  rejectedAt: Date | null
-}
+/** Read-модель KYC-профиля живёт в @casino/shared-types (В4); тут реэкспорт
+ *  для внутренних потребителей домена/application. */
+import type { KycProfileRow } from '@casino/shared-types'
+
+export type { KycProfileRow }
 export interface IKycRepository {
   getByUserId(userId: string): Promise<KycProfileRow | null>
   getById(id: string): Promise<KycProfileRow | null>
@@ -38,9 +27,7 @@ export interface IKycRepository {
       mimeType?: string
     },
   ): Promise<void>
-  getStatus(
-    userId: string,
-  ): Promise<{
+  getStatus(userId: string): Promise<{
     status: string
     submittedAt: Date | null
     rejectionReason: string | null
