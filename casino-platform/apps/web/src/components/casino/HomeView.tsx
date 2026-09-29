@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 
+import { GameDeck } from '@/components/casino/GameDeck'
 import { GameSection } from '@/components/casino/GameSection'
 import { GuestHero } from '@/components/casino/GuestHero'
 import { HomeChips } from '@/components/casino/HomeChips'
@@ -53,6 +54,11 @@ export function HomeView({
       {/* §4.2: герой гостя — spinera; залогиненному маркетингового героя нет (§4.3) */}
       {!user && <GuestHero games={popular} />}
 
+      {/* §4.4: GameDeck у гостя (после Hero) */}
+      {!user && (
+        <GameDeck games={popular} favoriteSlugs={favoriteSlugs} onToggleFavorite={toggleFavorite} />
+      )}
+
       {user && (
         <GameSection
           title="Продолжить играть"
@@ -61,6 +67,16 @@ export function HomeView({
           actionLabel="Вся история"
           games={recent ?? []}
           variant="row"
+          favoriteSlugs={favoriteSlugs}
+          onToggleFavorite={toggleFavorite}
+        />
+      )}
+
+      {/* §4.4: GameDeck у залогиненного (после «Продолжить играть») */}
+      {user && (
+        <GameDeck
+          games={popular}
+          recentGames={recent ?? []}
           favoriteSlugs={favoriteSlugs}
           onToggleFavorite={toggleFavorite}
         />
