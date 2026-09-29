@@ -1,3 +1,5 @@
+import { API_BASE_URL as API_URL } from '@/lib/api-base'
+
 import type { Metadata } from 'next'
 
 /**
@@ -5,7 +7,6 @@ import type { Metadata } from 'next'
  * «{Название} — игры провайдера | Casino». Данные тянутся из API
  * (клиентская page.tsx не может экспортировать metadata).
  */
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001/api/v1'
 
 interface ProviderApiShape {
   slug?: string

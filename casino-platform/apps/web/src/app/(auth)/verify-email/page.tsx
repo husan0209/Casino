@@ -4,6 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useEffect, useState, Suspense } from 'react'
 
 import { errText, setAccessToken } from '@/lib/api'
+import { API_BASE_URL as API_URL } from '@/lib/api-base'
 import { type AuthState, type WebUser, useAuth } from '@/stores/auth'
 
 function VerifyInner(): React.JSX.Element {
@@ -23,11 +24,7 @@ function VerifyInner(): React.JSX.Element {
           accessToken?: string
           user?: WebUser
         }
-      >(
-        (process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3001/api/v1') +
-          '/auth/verify-email?token=' +
-          token,
-      )
+      >(API_URL + '/auth/verify-email?token=' + token)
       .then((r) => {
         const d = (r.data.data ?? r.data) as { accessToken?: string; user?: WebUser }
         if (d.accessToken && d.user) {
@@ -37,9 +34,7 @@ function VerifyInner(): React.JSX.Element {
         setStatus('Email подтверждён! Перенаправляем…')
         setTimeout(() => router.push('/profile'), 1200)
       })
-      .catch((e: unknown) =>
-        setStatus('Ошибка: ' + (errText(e) || 'неверный токен')),
-      )
+      .catch((e: unknown) => setStatus('Ошибка: ' + (errText(e) || 'неверный токен')))
   }, [token, router, setAuth])
   return (
     <div className="container-1 py-12 max-w-sm mx-auto">
