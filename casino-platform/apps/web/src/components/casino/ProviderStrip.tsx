@@ -20,8 +20,10 @@ export function ProviderStrip({
 
   return (
     <section className="mb-4">
-      <h2 className="mb-2 text-sm text-muted">Провайдеры</h2>
-      <div className="flex gap-2 overflow-x-auto pb-2">
+      {/* ТЗ ч.5.1 §3: капс-лейбл «ПРОВЕРЕННЫЕ СТУДИИ» → Провайдеры */}
+      <p className="caps-label">ПРОВЕРЕННЫЕ СТУДИИ</p>
+      <h2 className="section-title mb-3">Провайдеры</h2>
+      <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-2">
         {providers.map((provider) => (
           <Link
             key={provider.slug}
