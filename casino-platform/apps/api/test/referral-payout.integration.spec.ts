@@ -17,7 +17,7 @@ import { randomUUID } from 'crypto'
 
 import { prisma } from '@casino/database'
 
-import { WalletFacade } from '../src/modules/wallet/application/wallet.facade'
+import { WalletFacade } from '../src/modules/wallet/facade/wallet.facade'
 import { PrismaWalletLedger } from '../src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma'
 import { PrismaReferralRepository } from '../src/modules/referrals/infrastructure/referral.prisma.repository'
 import { ReferralCalcService } from '../src/modules/referrals/application/referral-calc.service'
@@ -91,6 +91,10 @@ async function makeRound(userId: string) {
 }
 
 /** bet/win транзакции в пределах «сегодня» (UTC) — день для runDaily. */
+/** Флак на границе суток UTC (2026-09-29): «сегодня» и createdAt вставок должны
+ *  жить в одном UTC-дне — фиксируем полдень тестового дня. */
+let pinnedNow = new Date('1970-01-01T12:00:00.000Z')
+
 async function addGameTx(userId: string, type: 'bet' | 'win', amount: string) {
   await prisma.gameTransaction.create({
     data: {
@@ -103,6 +107,7 @@ async function addGameTx(userId: string, type: 'bet' | 'win', amount: string) {
       amount,
       currency: 'RUB',
       balanceAfter: '0',
+      createdAt: pinnedNow,
     },
   })
 }
@@ -135,6 +140,7 @@ afterAll(async () => {
 
 dDb('referral daily payout (real Postgres, GAP-32)', () => {
   it('GGR>0 → проводка REFERRAL_REWARD (ggr×rate) + referral_rewards.status=credited', async () => {
+    pinnedNow = new Date(new Date().toISOString().slice(0, 10) + 'T12:00:00.000Z')
     const referrerId = await makeUser()
     const referredId = await makeUser(referrerId)
     await makeRound(referredId)
@@ -162,6 +168,7 @@ dDb('referral daily payout (real Postgres, GAP-32)', () => {
   })
 
   it('повторный запуск за тот же день не создаёт вторую проводку (критерий 3)', async () => {
+    pinnedNow = new Date(new Date().toISOString().slice(0, 10) + 'T12:00:00.000Z')
     const referrerId = await makeUser()
     const referredId = await makeUser(referrerId)
     await makeRound(referredId)
@@ -180,6 +187,7 @@ dDb('referral daily payout (real Postgres, GAP-32)', () => {
   })
 
   it('день без GGR (win > bet) → статус zero, проводок нет (критерий 4)', async () => {
+    pinnedNow = new Date(new Date().toISOString().slice(0, 10) + 'T12:00:00.000Z')
     const referrerId = await makeUser()
     const referredId = await makeUser(referrerId)
     await makeRound(referredId)
