@@ -38,20 +38,20 @@ const envSchema = z.object({
   APP_URL: z.string().url(),
   ADMIN_URL: z.string().url(),
   DOMAIN: z.string().min(3),
-  
+
   // Database
   DATABASE_URL: z.string().url(),
-  
+
   // Redis
   REDIS_URL: z.string().url(),
   REDIS_PASSWORD: z.string().min(20),
-  
+
   // JWT
   JWT_ACCESS_SECRET: z.string().min(64),
   JWT_REFRESH_SECRET: z.string().min(64),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
-  
+
   // ... остальные
 })
 
@@ -69,40 +69,41 @@ export function validateEnv() {
 
 ## 2. Application
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `NODE_ENV` | enum | ✅ | — | `development`, `staging`, `production` |
-| `APP_PORT` | int | ❌ | `3001` | Порт API |
-| `APP_URL` | URL | ✅ | — | `https://casino.example.com` |
-| `ADMIN_URL` | URL | ✅ | — | `https://admin.casino.example.com` |
-| `THROTTLE_TTL_MS` | int | ❌ | `60000` | Окно rate-limit в мс (GAP-19) |
-| `THROTTLE_GLOBAL_LIMIT` | int | ❌ | `120` | Запросов/окно на IP (глобально) |
-| `THROTTLE_AUTH_LIMIT` | int | ❌ | `10` | Запросов/окно на IP для `/auth/*` |
-| `THROTTLE_ADMIN_LIMIT` | int | ❌ | `5` | Попыток логина админки за окно на IP (pre-launch B5) |
-| `LOCKOUT_MAX_ATTEMPTS` | int | ❌ | `10` | Неудачных входов за окно до блокировки аккаунта (GAP-18) |
-| `LOCKOUT_WINDOW_MS` | int | ❌ | `900000` | Скользящее окно подсчёта неудач, мс (15 мин) |
-| `LOCKOUT_DURATION_MS` | int | ❌ | `1800000` | Длительность блокировки аккаунта, мс (30 мин) |
-| `JOB_EXPIRE_DEPOSITS_EVERY_MS` | int | ❌ | `300000` | Интервал задачи истечения pending-депозитов, мс (GAP-33) |
-| `JOB_UPDATE_RATES_EVERY_MS` | int | ❌ | `300000` | Интервал задачи обновления курсов, мс (GAP-33) |
-| `JOB_WITHDRAWAL_REMINDER_EVERY_MS` | int | ❌ | `3600000` | Интервал напоминания о зависших выводах, мс (GAP-33) |
-| `JOB_REFERRAL_DAILY_EVERY_MS` | int | ❌ | `86400000` | Интервал ежедневных реферальных начислений, мс (GAP-32/33) |
-| `JOB_CLEANUP_SESSIONS_EVERY_MS` | int | ❌ | `3600000` | Интервал очистки мёртвых сессий (expired/отозванные >7 дней), мс — pre-launch hardening A1 |
-| `DOMAIN` | string | ✅ | — | `casino.example.com` (без доменной зоны) |
-| `ADMIN_DOMAIN` | string | ✅ (compose) | — | Домен админки `admin.casino.example.com`. Читают compose (envsubst nginx-шаблона, сервис nginx) и `infra/scripts/ssl_init.sh`; код приложения — нет (GAP-56) |
-| `SSL_EMAIL` | email | ❌ | `admin@<DOMAIN>` | Email для выпуска Let's Encrypt в `infra/scripts/ssl_init.sh` (GAP-56) |
+| Variable                           | Type   | Required     | Default          | Description                                                                                                                                                  |
+| ---------------------------------- | ------ | ------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NODE_ENV`                         | enum   | ✅           | —                | `development`, `staging`, `production`                                                                                                                       |
+| `APP_PORT`                         | int    | ❌           | `3001`           | Порт API                                                                                                                                                     |
+| `APP_URL`                          | URL    | ✅           | —                | `https://casino.example.com`                                                                                                                                 |
+| `ADMIN_URL`                        | URL    | ✅           | —                | `https://admin.casino.example.com`                                                                                                                           |
+| `THROTTLE_TTL_MS`                  | int    | ❌           | `60000`          | Окно rate-limit в мс (GAP-19)                                                                                                                                |
+| `THROTTLE_GLOBAL_LIMIT`            | int    | ❌           | `120`            | Запросов/окно на IP (глобально)                                                                                                                              |
+| `THROTTLE_AUTH_LIMIT`              | int    | ❌           | `10`             | Запросов/окно на IP для `/auth/*`                                                                                                                            |
+| `THROTTLE_REFRESH_LIMIT`           | int    | ❌           | `30`             | Запросов/окно на IP для `/auth/refresh` (зонд сессии при каждой загрузке страницы, P1 #11; в проде внешним ограничителем остаётся nginx `api_auth 10r/m`)    |
+| `THROTTLE_ADMIN_LIMIT`             | int    | ❌           | `5`              | Попыток логина админки за окно на IP (pre-launch B5)                                                                                                         |
+| `LOCKOUT_MAX_ATTEMPTS`             | int    | ❌           | `10`             | Неудачных входов за окно до блокировки аккаунта (GAP-18)                                                                                                     |
+| `LOCKOUT_WINDOW_MS`                | int    | ❌           | `900000`         | Скользящее окно подсчёта неудач, мс (15 мин)                                                                                                                 |
+| `LOCKOUT_DURATION_MS`              | int    | ❌           | `1800000`        | Длительность блокировки аккаунта, мс (30 мин)                                                                                                                |
+| `JOB_EXPIRE_DEPOSITS_EVERY_MS`     | int    | ❌           | `300000`         | Интервал задачи истечения pending-депозитов, мс (GAP-33)                                                                                                     |
+| `JOB_UPDATE_RATES_EVERY_MS`        | int    | ❌           | `300000`         | Интервал задачи обновления курсов, мс (GAP-33)                                                                                                               |
+| `JOB_WITHDRAWAL_REMINDER_EVERY_MS` | int    | ❌           | `3600000`        | Интервал напоминания о зависших выводах, мс (GAP-33)                                                                                                         |
+| `JOB_REFERRAL_DAILY_EVERY_MS`      | int    | ❌           | `86400000`       | Интервал ежедневных реферальных начислений, мс (GAP-32/33)                                                                                                   |
+| `JOB_CLEANUP_SESSIONS_EVERY_MS`    | int    | ❌           | `3600000`        | Интервал очистки мёртвых сессий (expired/отозванные >7 дней), мс — pre-launch hardening A1                                                                   |
+| `DOMAIN`                           | string | ✅           | —                | `casino.example.com` (без доменной зоны)                                                                                                                     |
+| `ADMIN_DOMAIN`                     | string | ✅ (compose) | —                | Домен админки `admin.casino.example.com`. Читают compose (envsubst nginx-шаблона, сервис nginx) и `infra/scripts/ssl_init.sh`; код приложения — нет (GAP-56) |
+| `SSL_EMAIL`                        | email  | ❌           | `admin@<DOMAIN>` | Email для выпуска Let's Encrypt в `infra/scripts/ssl_init.sh` (GAP-56)                                                                                       |
 
 ---
 
 ## 3. Database
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `DATABASE_URL` | URL | ✅ | — | `postgresql://user:pass@host:5432/db` |
-| `DB_USER` | string | ✅ (compose) | — | Пользователь БД. Читает `docker-compose.prod.yml` (контейнер postgres + интерполяция) и `infra/scripts/postgres-backup.sh`/`restore.sh`; код приложения — нет (GAP-56) |
-| `DB_PASSWORD` | string | ✅ (compose) | — | Пароль БД; обязан совпадать с паролем в `DATABASE_URL` |
-| `DB_NAME` | string | ✅ (compose) | — | Имя БД; обязано совпадать с путём в `DATABASE_URL` |
-| `DB_POOL_SIZE` | int | ❌ | `10` | Prisma connection pool |
-| `DB_LOG_QUERIES` | bool | ❌ | `false` | Логировать все SQL запросы (только dev) |
+| Variable         | Type   | Required     | Default | Description                                                                                                                                                            |
+| ---------------- | ------ | ------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`   | URL    | ✅           | —       | `postgresql://user:pass@host:5432/db`                                                                                                                                  |
+| `DB_USER`        | string | ✅ (compose) | —       | Пользователь БД. Читает `docker-compose.prod.yml` (контейнер postgres + интерполяция) и `infra/scripts/postgres-backup.sh`/`restore.sh`; код приложения — нет (GAP-56) |
+| `DB_PASSWORD`    | string | ✅ (compose) | —       | Пароль БД; обязан совпадать с паролем в `DATABASE_URL`                                                                                                                 |
+| `DB_NAME`        | string | ✅ (compose) | —       | Имя БД; обязано совпадать с путём в `DATABASE_URL`                                                                                                                     |
+| `DB_POOL_SIZE`   | int    | ❌           | `10`    | Prisma connection pool                                                                                                                                                 |
+| `DB_LOG_QUERIES` | bool   | ❌           | `false` | Логировать все SQL запросы (только dev)                                                                                                                                |
 
 **Генерация DATABASE_URL:**
 
@@ -116,25 +117,25 @@ postgresql://DB_USER:DB_PASSWORD@DB_HOST:DB_PORT/DB_NAME
 
 ## 4. Redis
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `REDIS_URL` | URL | ✅ | — | `redis://:password@host:6379` |
-| `REDIS_PASSWORD` | string | ✅ (prod) | — | ≥ 20 символов |
-| `REDIS_TLS` | bool | ❌ | `false` | Use TLS для Redis |
+| Variable         | Type   | Required  | Default | Description                   |
+| ---------------- | ------ | --------- | ------- | ----------------------------- |
+| `REDIS_URL`      | URL    | ✅        | —       | `redis://:password@host:6379` |
+| `REDIS_PASSWORD` | string | ✅ (prod) | —       | ≥ 20 символов                 |
+| `REDIS_TLS`      | bool   | ❌        | `false` | Use TLS для Redis             |
 
 ---
 
 ## 5. JWT
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `JWT_ACCESS_SECRET` | string | ✅ | — | ≥ 64 chars (256 bits) |
-| `JWT_REFRESH_SECRET` | string | ✅ | — | ≥ 64 chars, **отличается** от access |
-| `JWT_ACCESS_EXPIRES_IN` | string | ❌ | `15m` | Access token TTL |
-| `JWT_REFRESH_EXPIRES_IN` | string | ❌ | `30d` | Refresh token TTL |
-| `JWT_ISSUER` | string | ❌ | `casino-platform` | `iss` claim |
-| `JWT_AUDIENCE_USER` | string | ❌ | `user` | `aud` для user JWT |
-| `JWT_AUDIENCE_ADMIN` | string | ❌ | `admin` | `aud` для admin JWT |
+| Variable                 | Type   | Required | Default           | Description                          |
+| ------------------------ | ------ | -------- | ----------------- | ------------------------------------ |
+| `JWT_ACCESS_SECRET`      | string | ✅       | —                 | ≥ 64 chars (256 bits)                |
+| `JWT_REFRESH_SECRET`     | string | ✅       | —                 | ≥ 64 chars, **отличается** от access |
+| `JWT_ACCESS_EXPIRES_IN`  | string | ❌       | `15m`             | Access token TTL                     |
+| `JWT_REFRESH_EXPIRES_IN` | string | ❌       | `30d`             | Refresh token TTL                    |
+| `JWT_ISSUER`             | string | ❌       | `casino-platform` | `iss` claim                          |
+| `JWT_AUDIENCE_USER`      | string | ❌       | `user`            | `aud` для user JWT                   |
+| `JWT_AUDIENCE_ADMIN`     | string | ❌       | `admin`           | `aud` для admin JWT                  |
 
 **Генерация секретов:**
 
@@ -146,34 +147,34 @@ openssl rand -hex 64
 
 ## 6. Google OAuth
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `GOOGLE_CLIENT_ID` | string | ✅ | — | From Google Cloud Console |
-| `GOOGLE_CLIENT_SECRET` | string | ✅ | — | From Google Cloud Console |
-| `GOOGLE_CALLBACK_URL` | URL | ✅ | — | `https://casino.example.com/api/v1/auth/google/callback` |
+| Variable               | Type   | Required | Default | Description                                              |
+| ---------------------- | ------ | -------- | ------- | -------------------------------------------------------- |
+| `GOOGLE_CLIENT_ID`     | string | ✅       | —       | From Google Cloud Console                                |
+| `GOOGLE_CLIENT_SECRET` | string | ✅       | —       | From Google Cloud Console                                |
+| `GOOGLE_CALLBACK_URL`  | URL    | ✅       | —       | `https://casino.example.com/api/v1/auth/google/callback` |
 
 ---
 
 ## 7. Telegram Login
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `TELEGRAM_BOT_TOKEN` | string | ✅ | — | From @BotFather |
-| `TELEGRAM_BOT_NAME` | string | ✅ | — | `@your_casino_bot` |
+| Variable             | Type   | Required | Default | Description        |
+| -------------------- | ------ | -------- | ------- | ------------------ |
+| `TELEGRAM_BOT_TOKEN` | string | ✅       | —       | From @BotFather    |
+| `TELEGRAM_BOT_NAME`  | string | ✅       | —       | `@your_casino_bot` |
 
 ---
 
 ## 8. Rukassa (Fiat Payments)
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `RUKASSA_SHOP_ID` | string | ✅ | — | Shop ID |
-| `RUKASSA_API_KEY` | string | ✅ | — | API key |
-| `RUKASSA_SECRET_KEY` | string | ✅ | — | HMAC secret |
-| `RUKASSA_API_BASE` | URL | ❌ | `https://pay.rukassa.is` | База API (клиент дописывает `/api/v1/...`) |
-| `RUKASSA_WEBHOOK_URL` | URL | ✅ | — | Public URL для callback |
-| `RUKASSA_SUCCESS_URL` | URL | ✅ | — | Redirect после успеха |
-| `RUKASSA_FAIL_URL` | URL | ✅ | — | Redirect после неудачи |
+| Variable              | Type   | Required | Default                  | Description                                |
+| --------------------- | ------ | -------- | ------------------------ | ------------------------------------------ |
+| `RUKASSA_SHOP_ID`     | string | ✅       | —                        | Shop ID                                    |
+| `RUKASSA_API_KEY`     | string | ✅       | —                        | API key                                    |
+| `RUKASSA_SECRET_KEY`  | string | ✅       | —                        | HMAC secret                                |
+| `RUKASSA_API_BASE`    | URL    | ❌       | `https://pay.rukassa.is` | База API (клиент дописывает `/api/v1/...`) |
+| `RUKASSA_WEBHOOK_URL` | URL    | ✅       | —                        | Public URL для callback                    |
+| `RUKASSA_SUCCESS_URL` | URL    | ✅       | —                        | Redirect после успеха                      |
+| `RUKASSA_FAIL_URL`    | URL    | ✅       | —                        | Redirect после неудачи                     |
 
 **Webhook registration:**
 
@@ -183,26 +184,26 @@ openssl rand -hex 64
 
 ## 9. NOWPayments (Crypto Payments)
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `NOWPAYMENTS_API_KEY` | string | ✅ | — | API key |
-| `NOWPAYMENTS_IPN_SECRET` | string | ✅ | — | HMAC secret для IPN |
-| `NOWPAYMENTS_API_BASE` | URL | ❌ | `https://api.nowpayments.io/v1` | API base |
-| `NOWPAYMENTS_WEBHOOK_URL` | URL | ✅ | — | Public URL для IPN |
+| Variable                  | Type   | Required | Default                         | Description         |
+| ------------------------- | ------ | -------- | ------------------------------- | ------------------- |
+| `NOWPAYMENTS_API_KEY`     | string | ✅       | —                               | API key             |
+| `NOWPAYMENTS_IPN_SECRET`  | string | ✅       | —                               | HMAC secret для IPN |
+| `NOWPAYMENTS_API_BASE`    | URL    | ❌       | `https://api.nowpayments.io/v1` | API base            |
+| `NOWPAYMENTS_WEBHOOK_URL` | URL    | ✅       | —                               | Public URL для IPN  |
 
 ---
 
 ## 10. SMTP (Email)
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `SMTP_HOST` | string | ✅ | — | `smtp.resend.com` (рекомендуется Resend) |
-| `SMTP_PORT` | int | ✅ | `587` | TLS port |
-| `SMTP_USER` | string | ✅ | — | `resend` or `apikey` |
-| `SMTP_PASSWORD` | string | ✅ | — | API key от Resend |
-| `SMTP_FROM_EMAIL` | email | ✅ | — | `noreply@casino.example.com` |
-| `SMTP_FROM_NAME` | string | ❌ | `Casino Support` | Display name |
-| `EMAIL_WORKER_IN_PROCESS` | bool | ❌ | `true` | GAP-02 post-MVP: консьюмер BullMQ-очереди `email` в процессе API. `false` — очередь разбирает отдельный процесс `apps/api/src/worker.ts` (сервис `worker` в docker-compose.prod.yml); в compose флаг переопределён на обоих сервисах |
+| Variable                  | Type   | Required | Default          | Description                                                                                                                                                                                                                          |
+| ------------------------- | ------ | -------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SMTP_HOST`               | string | ✅       | —                | `smtp.resend.com` (рекомендуется Resend)                                                                                                                                                                                             |
+| `SMTP_PORT`               | int    | ✅       | `587`            | TLS port                                                                                                                                                                                                                             |
+| `SMTP_USER`               | string | ✅       | —                | `resend` or `apikey`                                                                                                                                                                                                                 |
+| `SMTP_PASSWORD`           | string | ✅       | —                | API key от Resend                                                                                                                                                                                                                    |
+| `SMTP_FROM_EMAIL`         | email  | ✅       | —                | `noreply@casino.example.com`                                                                                                                                                                                                         |
+| `SMTP_FROM_NAME`          | string | ❌       | `Casino Support` | Display name                                                                                                                                                                                                                         |
+| `EMAIL_WORKER_IN_PROCESS` | bool   | ❌       | `true`           | GAP-02 post-MVP: консьюмер BullMQ-очереди `email` в процессе API. `false` — очередь разбирает отдельный процесс `apps/api/src/worker.ts` (сервис `worker` в docker-compose.prod.yml); в compose флаг переопределён на обоих сервисах |
 
 **Провайдеры:**
 
@@ -214,61 +215,61 @@ openssl rand -hex 64
 
 ## 11. KYC
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `KYC_DEPOSIT_LIMIT_RUB` | money | ❌ | `5000.00` | Суммарный лимит депозитов без KYC |
-| `KYC_MIN_AGE` | int | ❌ | `18` | Минимальный возраст пользователя |
-| `KYC_DOCUMENT_MAX_SIZE_MB` | int | ❌ | `10` | Макс размер документа |
+| Variable                   | Type  | Required | Default   | Description                       |
+| -------------------------- | ----- | -------- | --------- | --------------------------------- |
+| `KYC_DEPOSIT_LIMIT_RUB`    | money | ❌       | `5000.00` | Суммарный лимит депозитов без KYC |
+| `KYC_MIN_AGE`              | int   | ❌       | `18`      | Минимальный возраст пользователя  |
+| `KYC_DOCUMENT_MAX_SIZE_MB` | int   | ❌       | `10`      | Макс размер документа             |
 
 ---
 
 ## 12. Referral System
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `REFERRAL_REWARD_RATE` | decimal | ❌ | `0.05` | Доля реферера (5%) |
-| `REFERRAL_ENABLED` | bool | ❌ | `true` | Включить ли программу |
-| `REFERRAL_MIN_WITHDRAWAL` | money | ❌ | `100.00` | Минимум для вывода reward |
+| Variable                  | Type    | Required | Default  | Description               |
+| ------------------------- | ------- | -------- | -------- | ------------------------- |
+| `REFERRAL_REWARD_RATE`    | decimal | ❌       | `0.05`   | Доля реферера (5%)        |
+| `REFERRAL_ENABLED`        | bool    | ❌       | `true`   | Включить ли программу     |
+| `REFERRAL_MIN_WITHDRAWAL` | money   | ❌       | `100.00` | Минимум для вывода reward |
 
 ---
 
 ## 13. File Uploads
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `UPLOAD_DIR` | path | ✅ | `/app/uploads` | Директория для KYC/support файлов |
-| `UPLOAD_MAX_SIZE_MB` | int | ❌ | `10` | Макс размер файла |
-| `UPLOAD_ALLOWED_TYPES` | csv | ❌ | `jpg,jpeg,png,pdf,webp` | Extensions |
+| Variable               | Type | Required | Default                 | Description                       |
+| ---------------------- | ---- | -------- | ----------------------- | --------------------------------- |
+| `UPLOAD_DIR`           | path | ✅       | `/app/uploads`          | Директория для KYC/support файлов |
+| `UPLOAD_MAX_SIZE_MB`   | int  | ❌       | `10`                    | Макс размер файла                 |
+| `UPLOAD_ALLOWED_TYPES` | csv  | ❌       | `jpg,jpeg,png,pdf,webp` | Extensions                        |
 
 ---
 
 ## 14. Rate Limiting
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `RATE_LIMIT_TTL_SECONDS` | int | ❌ | `60` | Период rate limit |
-| `RATE_LIMIT_MAX_REQUESTS` | int | ❌ | `60` | Макс запросов в период |
-| `RATE_LIMIT_AUTH_MAX` | int | ❌ | `10` | Auth-specific (login, register) |
+| Variable                  | Type | Required | Default | Description                     |
+| ------------------------- | ---- | -------- | ------- | ------------------------------- |
+| `RATE_LIMIT_TTL_SECONDS`  | int  | ❌       | `60`    | Период rate limit               |
+| `RATE_LIMIT_MAX_REQUESTS` | int  | ❌       | `60`    | Макс запросов в период          |
+| `RATE_LIMIT_AUTH_MAX`     | int  | ❌       | `10`    | Auth-specific (login, register) |
 
 ---
 
 ## 15. Logging
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `LOG_LEVEL` | enum | ❌ | `info` | `error`, `warn`, `info`, `debug` |
-| `LOG_FORMAT` | enum | ❌ | `json` | `json` или `pretty` (для dev) |
-| `LOG_DIR` | path | ❌ | `/app/logs` | Куда писать логи |
-| `SENTRY_DSN` | url | ❌ | — | GAP-50 (вне ТЗ, согласовано владельцем): DSN проекта Sentry. Пусто/не задано — Sentry не инициализируется (no-op); уходят только необработанные исключения и 5xx |
+| Variable     | Type | Required | Default     | Description                                                                                                                                                      |
+| ------------ | ---- | -------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LOG_LEVEL`  | enum | ❌       | `info`      | `error`, `warn`, `info`, `debug`                                                                                                                                 |
+| `LOG_FORMAT` | enum | ❌       | `json`      | `json` или `pretty` (для dev)                                                                                                                                    |
+| `LOG_DIR`    | path | ❌       | `/app/logs` | Куда писать логи                                                                                                                                                 |
+| `SENTRY_DSN` | url  | ❌       | —           | GAP-50 (вне ТЗ, согласовано владельцем): DSN проекта Sentry. Пусто/не задано — Sentry не инициализируется (no-op); уходят только необработанные исключения и 5xx |
 
 ---
 
 ## 16. Seeding (One-time)
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `SEED_ADMIN_EMAIL` | email | ❌ (one-time) | `superadmin@casino.example.com` | |
-| `SEED_ADMIN_PASSWORD` | string | ❌ (one-time) | — | ≥ 12 chars |
+| Variable              | Type   | Required      | Default                         | Description |
+| --------------------- | ------ | ------------- | ------------------------------- | ----------- |
+| `SEED_ADMIN_EMAIL`    | email  | ❌ (one-time) | `superadmin@casino.example.com` |             |
+| `SEED_ADMIN_PASSWORD` | string | ❌ (one-time) | —                               | ≥ 12 chars  |
 
 ⚠️ **Удалить** `SEED_*` после первой инициализации.
 
@@ -276,11 +277,12 @@ openssl rand -hex 64
 
 ## 17. Internal Auth
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `INTERNAL_API_SECRET` | string | ✅ | — | Секрет для inter-service auth |
+| Variable              | Type   | Required | Default | Description                   |
+| --------------------- | ------ | -------- | ------- | ----------------------------- |
+| `INTERNAL_API_SECRET` | string | ✅       | —       | Секрет для inter-service auth |
 
 Используется для:
+
 - Provider callbacks (вместо JWT)
 - Admin задач по расписанию (BullMQ jobs)
 - Внутренние health checks
@@ -291,15 +293,15 @@ openssl rand -hex 64
 
 Frontend env доступны после `NEXT_PUBLIC_` prefix. Все остальные — только backend.
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `NEXT_PUBLIC_API_URL` | URL | ✅ | — | `https://casino.example.com/api/v1` |
-| `NEXT_PUBLIC_DOMAIN` | string | ✅ | — | `casino.example.com` (для cookies) |
-| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | string | ✅ | — | Google OAuth |
-| `NEXT_PUBLIC_TELEGRAM_BOT_NAME` | string | ✅ | — | Telegram widget |
-| `TURNSTILE_SECRET_KEY` | string | ⬜ | — | GAP-55 (ж): секрет Cloudflare Turnstile; пусто ⇒ капча выключена (fail-open по умолчанию) |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | string | ⬜ | — | GAP-55 (ж): публичный ключ виджета |
-| `CAPTCHA_AFTER_FAILED_ATTEMPTS` | number | ⬜ | 5 | GAP-55 (ж): после скольких неудач требовать капчу (§5.2) |
+| Variable                         | Type   | Required | Default | Description                                                                               |
+| -------------------------------- | ------ | -------- | ------- | ----------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_API_URL`            | URL    | ✅       | —       | `https://casino.example.com/api/v1`                                                       |
+| `NEXT_PUBLIC_DOMAIN`             | string | ✅       | —       | `casino.example.com` (для cookies)                                                        |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID`   | string | ✅       | —       | Google OAuth                                                                              |
+| `NEXT_PUBLIC_TELEGRAM_BOT_NAME`  | string | ✅       | —       | Telegram widget                                                                           |
+| `TURNSTILE_SECRET_KEY`           | string | ⬜       | —       | GAP-55 (ж): секрет Cloudflare Turnstile; пусто ⇒ капча выключена (fail-open по умолчанию) |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | string | ⬜       | —       | GAP-55 (ж): публичный ключ виджета                                                        |
+| `CAPTCHA_AFTER_FAILED_ATTEMPTS`  | number | ⬜       | 5       | GAP-55 (ж): после скольких неудач требовать капчу (§5.2)                                  |
 
 | `NEXT_PUBLIC_IMAGE_HOSTS` | CSV | ⬜ | пусто | GAP-55 §22: allowlist CDN-хостов обложек для next/image (пусто → обычный `<img>`) |
 
@@ -307,9 +309,9 @@ Frontend env доступны после `NEXT_PUBLIC_` prefix. Все оста�
 
 ## 19. CORS Origins
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `CORS_ORIGINS` | csv | ✅ | — | `https://casino.example.com,https://admin.casino.example.com` |
+| Variable       | Type | Required | Default | Description                                                   |
+| -------------- | ---- | -------- | ------- | ------------------------------------------------------------- |
+| `CORS_ORIGINS` | csv  | ✅       | —       | `https://casino.example.com,https://admin.casino.example.com` |
 
 ---
 
@@ -331,9 +333,9 @@ Frontend env доступны после `NEXT_PUBLIC_` prefix. Все оста�
 
 ### 21.1. Demo Provider
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `DEMO_PROVIDER_ENABLED` | bool | ❌ | `false` (не задана) | Включить DemoProvider. Dev/staging only; в production должен быть выключен — см. README «Payment security (fail-closed)» |
+| Variable                | Type | Required | Default             | Description                                                                                                              |
+| ----------------------- | ---- | -------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `DEMO_PROVIDER_ENABLED` | bool | ❌       | `false` (не задана) | Включить DemoProvider. Dev/staging only; в production должен быть выключен — см. README «Payment security (fail-closed)» |
 
 Код: `apps/api/src/modules/casino/infrastructure/providers/provider-adapter.factory.ts`.
 
@@ -346,12 +348,12 @@ Frontend env доступны после `NEXT_PUBLIC_` prefix. Все оста�
 поднимая прод по этой доке, оператор обязан заполнить все три, иначе каталог
 GitSlotPark не играется.
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `GITSLOTPARK_AGENT_ID` | string | ✅ (для брендов агрегатора) | — | ID агента из контракта; участвует в подписи `userAuth`/`gamelist` |
-| `GITSLOTPARK_API_TOKEN` | string | ✅ (для брендов агрегатора) | — | Токен в query-параметре `api_token` |
-| `GITSLOTPARK_SECRET_KEY` | string | ✅ (для брендов агрегатора) | — | Секрет HMAC-SHA256 для sign/verify коллбэков (bet/win/rollback/deposit/withdraw) |
-| `GITSLOTPARK_API_BASE` | URL | ❌ | `https://apiv2.gitslotpark.com` | База API (песочница/стенд провайдера — другой хост) |
+| Variable                 | Type   | Required                    | Default                         | Description                                                                      |
+| ------------------------ | ------ | --------------------------- | ------------------------------- | -------------------------------------------------------------------------------- |
+| `GITSLOTPARK_AGENT_ID`   | string | ✅ (для брендов агрегатора) | —                               | ID агента из контракта; участвует в подписи `userAuth`/`gamelist`                |
+| `GITSLOTPARK_API_TOKEN`  | string | ✅ (для брендов агрегатора) | —                               | Токен в query-параметре `api_token`                                              |
+| `GITSLOTPARK_SECRET_KEY` | string | ✅ (для брендов агрегатора) | —                               | Секрет HMAC-SHA256 для sign/verify коллбэков (bet/win/rollback/deposit/withdraw) |
+| `GITSLOTPARK_API_BASE`   | URL    | ❌                          | `https://apiv2.gitslotpark.com` | База API (песочница/стенд провайдера — другой хост)                              |
 
 Код: `apps/api/src/modules/casino/infrastructure/providers/gitslotpark/gitslotpark.adapter.ts`.
 
@@ -377,6 +379,8 @@ ADMIN_DOMAIN=localhost
 THROTTLE_TTL_MS=60000
 THROTTLE_GLOBAL_LIMIT=120
 THROTTLE_AUTH_LIMIT=10
+# /auth/refresh — зонд сессии при каждой загрузке страницы (P1 #11), мягче AUTH
+THROTTLE_REFRESH_LIMIT=30
 THROTTLE_ADMIN_LIMIT=5
 
 # ── Account lockout (GAP-18) ───────────────────────────────
