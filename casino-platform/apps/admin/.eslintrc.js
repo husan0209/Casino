@@ -21,10 +21,7 @@ module.exports = {
     // ignorePrimitives: на строках/числах семантика || осознанная — пустая строка
     // и 0 невалидны (URL, сообщения, валюта) и должны фолбэкаться. Опция
     // оставляет правило включённым для nullable-объектов (GAP-39 stage 9).
-    '@typescript-eslint/prefer-nullish-coalescing': [
-      'warn',
-      { ignorePrimitives: true },
-    ],
+    '@typescript-eslint/prefer-nullish-coalescing': ['warn', { ignorePrimitives: true }],
     '@typescript-eslint/prefer-optional-chain': 'warn',
     'import/no-cycle': 'warn',
     '@typescript-eslint/explicit-function-return-type': [
@@ -47,6 +44,15 @@ module.exports = {
         complexity: 'off',
         'max-depth': 'off',
       },
+    },
+    {
+      // TS 6/7-волна: tsconfig не включает файлы-конфиги (tailwind/next/postcss/vitest) —
+      // typed-парсер падал на tailwind.config.js при lint-staged. project: null +
+      // disable-type-checked отключают только type-aware правила для этих файлов,
+      // остальные (import-порядок, запреты) продолжают работать.
+      files: ['.eslintrc.js', '*.config.js', '*.config.cjs', '*.config.mjs', '*.config.ts'],
+      parserOptions: { project: null },
+      extends: ['plugin:@typescript-eslint/disable-type-checked'],
     },
   ],
 }

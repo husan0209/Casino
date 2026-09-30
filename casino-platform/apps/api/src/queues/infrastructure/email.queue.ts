@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { Queue } from 'bullmq'
 import Redis from 'ioredis'
@@ -20,7 +20,7 @@ export class BullMqEmailQueue implements EmailQueuePort {
   private readonly logger = new Logger(BullMqEmailQueue.name)
   private readonly queue: Queue<EmailJobData>
 
-  constructor(config: ConfigService) {
+  constructor(@Inject(ConfigService) config: ConfigService) {
     this.queue = new Queue<EmailJobData>(QUEUES.EMAIL, {
       connection: queueConnection(config),
       defaultJobOptions: {

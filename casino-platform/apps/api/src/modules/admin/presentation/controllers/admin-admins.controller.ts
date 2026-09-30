@@ -1,11 +1,20 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common'
 import { type Request } from 'express'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
 
 import { type AdminUserRow } from '@modules/admin/domain/admin.repository'
-
 
 import { AdminUsersService } from '../../application/admin-users.service'
 import { AuditLogService } from '../../application/audit-log.service'
@@ -20,8 +29,8 @@ function isSuper(req: Request): boolean {
 @Controller('admin/admins')
 export class AdminAdminsController {
   constructor(
-    private svc: AdminUsersService,
-    private audit: AuditLogService,
+    @Inject(AdminUsersService) private svc: AdminUsersService,
+    @Inject(AuditLogService) private audit: AuditLogService,
   ) {}
   @Get() async list(): Promise<AdminUserRow[]> {
     const r = await this.svc.list(1, 100)
@@ -49,7 +58,7 @@ export class AdminAdminsController {
     return admin
   }
   @Post(':id/deactivate')
-  async deactivate(@Param('id') id: string, @Req() req: Request): Promise<{ ok: boolean; }> {
+  async deactivate(@Param('id') id: string, @Req() req: Request): Promise<{ ok: boolean }> {
     if (!isSuper(req)) {
       throw new SuperadminOnlyError('superadmin only')
     }

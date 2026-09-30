@@ -27,6 +27,6 @@ declare module 'express-serve-static-core' {
     /** Кладут UserAuthGuard/OptionalAuthGuard (UserActor) или AdminAuthGuard (AdminActor). */
     user?: UserActor | AdminActor
     /** Ставится RequestIdMiddleware (или pino genReqId раньше него). */
-    id?: string
+    id: string
   }
 }

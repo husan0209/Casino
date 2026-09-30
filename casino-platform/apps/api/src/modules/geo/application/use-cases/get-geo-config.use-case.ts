@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 
 import { type GeoConfigResult, resolveGeoConfig } from '@modules/geo/domain/geo-config.policy'
 import { UsersFacade } from '@modules/users/facade/users.facade'
@@ -11,7 +11,7 @@ export interface ResolveGeoInput {
 
 @Injectable()
 export class GetGeoConfigUseCase {
-  constructor(private users: UsersFacade) {}
+  constructor(@Inject(UsersFacade) private users: UsersFacade) {}
 
   async execute(input: ResolveGeoInput): Promise<GeoConfigResult> {
     const userContext = input.userId ? await this.users.getGeoContext(input.userId) : null

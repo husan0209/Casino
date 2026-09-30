@@ -3,14 +3,19 @@ import { Inject, Injectable } from '@nestjs/common'
 import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-
-import { ConfirmWithdrawalUseCase, type ConfirmWithdrawalInput } from '../application/use-cases/confirm-withdrawal.use-case'
-import { LockFundsUseCase, type LockFundsInput } from '../application/use-cases/lock-funds.use-case'
-import { UnlockFundsUseCase, type UnlockFundsInput } from '../application/use-cases/unlock-funds.use-case'
 import {
-  IWalletLedger,
-  IWalletRepository,
-  IWalletTransactionRunner,
+  ConfirmWithdrawalUseCase,
+  type ConfirmWithdrawalInput,
+} from '../application/use-cases/confirm-withdrawal.use-case'
+import { LockFundsUseCase, type LockFundsInput } from '../application/use-cases/lock-funds.use-case'
+import {
+  UnlockFundsUseCase,
+  type UnlockFundsInput,
+} from '../application/use-cases/unlock-funds.use-case'
+import {
+  type IWalletLedger,
+  type IWalletRepository,
+  type IWalletTransactionRunner,
   WALLET_LEDGER,
   WALLET_REPOSITORY,
   WALLET_TRANSACTION_RUNNER,
@@ -48,9 +53,9 @@ export class WalletFacade {
     @Inject(WALLET_LEDGER) private ledger: IWalletLedger,
     @Inject(WALLET_REPOSITORY) private repo: IWalletRepository,
     @Inject(WALLET_TRANSACTION_RUNNER) private txRunner: IWalletTransactionRunner,
-    private lockFunds: LockFundsUseCase,
-    private unlockFunds: UnlockFundsUseCase,
-    private confirmWithdrawalUc: ConfirmWithdrawalUseCase,
+    @Inject(LockFundsUseCase) private lockFunds: LockFundsUseCase,
+    @Inject(UnlockFundsUseCase) private unlockFunds: UnlockFundsUseCase,
+    @Inject(ConfirmWithdrawalUseCase) private confirmWithdrawalUc: ConfirmWithdrawalUseCase,
   ) {}
   /**
    * P0 #3: атомарный денежный сценарий. Колбэк получает Prisma tx — передавайте

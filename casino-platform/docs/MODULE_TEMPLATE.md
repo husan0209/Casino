@@ -18,14 +18,14 @@ last_updated: 2026-08-28
 
 Создавать модуль **можно только** когда:
 
--   [ ] В TZ (tz-part-*.md) явно описан этот модуль или одобрена его необходимость пользователем
--   [ ] Прочитан [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md) — модуль не дублирует существующий
--   [ ] Прочитан [AI_DEVELOPMENT_RULES.md](./AI_DEVELOPMENT_RULES.md) — особенно правила про деньги, idempotency, ошибки
--   [ ] Прочитан [CONVENTIONS.md](./CONVENTIONS.md) — naming, типы, money helpers
--   [ ] Прочитан [ARCHITECTURE.md](./ARCHITECTURE.md) §5 — 4 слоя и их зависимости
--   [ ] Проверены `packages/shared-types/src/` — какие enum/types уже есть (не дублировать)
--   [ ] Проверены `packages/shared-utils/src/` — какие helpers есть (money, error, etc.)
--   [ ] Проверены `packages/database/prisma/schema.prisma` — какие таблицы уже есть
+- [ ] В TZ (tz-part-*.md) явно описан этот модуль или одобрена его необходимость пользователем
+- [ ] Прочитан [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md) — модуль не дублирует существующий
+- [ ] Прочитан [AI_DEVELOPMENT_RULES.md](./AI_DEVELOPMENT_RULES.md) — особенно правила про деньги, idempotency, ошибки
+- [ ] Прочитан [CONVENTIONS.md](./CONVENTIONS.md) — naming, типы, money helpers
+- [ ] Прочитан [ARCHITECTURE.md](./ARCHITECTURE.md) §5 — 4 слоя и их зависимости
+- [ ] Проверены `packages/shared-types/src/` — какие enum/types уже есть (не дублировать)
+- [ ] Проверены `packages/shared-utils/src/` — какие helpers есть (money, error, etc.)
+- [ ] Проверены `packages/database/prisma/schema.prisma` — какие таблицы уже есть
 
 **Если хотя бы один пункт неясен — спроси пользователя ДО начала работы.**
 
@@ -33,13 +33,13 @@ last_updated: 2026-08-28
 
 ## Шаг 1. Определить имя и границы
 
-| Вопрос | Ответ записать в `module-name/README.md` |
-|--------|------------------------------------------|
-| Имя модуля | `<kebab-case>` (например `wallet`, `referrals`) |
-| Ответственность | Одно предложение: что делает модуль |
-| Ключевые use cases | Список (5–15 UC из TZ) |
-| Зависит от | Какие модули (через Facade) |
-| Используется в | Какие модули будут использовать |
+| Вопрос             | Ответ записать в `module-name/README.md`        |
+| ------------------ | ----------------------------------------------- |
+| Имя модуля         | `<kebab-case>` (например `wallet`, `referrals`) |
+| Ответственность    | Одно предложение: что делает модуль             |
+| Ключевые use cases | Список (5–15 UC из TZ)                          |
+| Зависит от         | Какие модули (через Facade)                     |
+| Используется в     | Какие модули будут использовать                 |
 
 **Пример README модуля** (`modules/wallet/README.md`):
 
@@ -47,9 +47,11 @@ last_updated: 2026-08-28
 # Wallet Module
 
 ## Ответственность
+
 Кошельки по валютам, ledger, lock/unlock для операций.
 
 ## Ключевые use cases
+
 - UC-WALLET-01: Get balance by currency
 - UC-WALLET-02: Get all balances
 - UC-WALLET-03: Credit (deposit, win, refund, admin credit)
@@ -58,9 +60,11 @@ last_updated: 2026-08-28
 - UC-WALLET-06: Currency conversion (через exchange_rates)
 
 ## Зависит от
+
 - users (UserFacade)
 
 ## Используется в
+
 - payments, casino, game-sessions, referrals, admin
 ```
 
@@ -270,9 +274,9 @@ export interface CreditWalletResult {
 Файл: `application/use-cases/<action-name>.use-case.ts`
 
 ```typescript
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { PrismaService } from '@casino/database'
-import { IXxxRepository, IYyyRepository } from '../../domain/repositories/...'
+import { XXX_REPOSITORY, type IXxxRepository } from '../../domain/repositories/...'
 import { CreditXxxInput, CreditXxxResult } from '../dto/...'
 import { money } from '@casino/shared-utils'
 import { eventBus, EventTypes } from '../../../events'
@@ -281,8 +285,8 @@ import { OptimisticLockError, DuplicateRequestError } from '@casino/shared-utils
 @Injectable()
 export class CreditXxxUseCase {
   constructor(
-    private readonly xxxRepo: IXxxRepository,
-    private readonly prisma: PrismaService,
+    @Inject(XXX_REPOSITORY) private readonly xxxRepo: IXxxRepository,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
   ) {}
 
   async execute(input: CreditXxxInput): Promise<CreditXxxResult> {
@@ -360,7 +364,7 @@ import { EventTypes } from '../../../events/events'
 // Handler регистрируется в модуле:
 @Injectable()
 export class XxxEventHandler {
-  constructor(private readonly yyyFacade: YyyFacade) {}
+  constructor(@Inject(YyyFacade) private readonly yyyFacade: YyyFacade) {}
 
   @OnEvent(EventTypes.XXX_CREDITED)
   async handle(payload: XxxCreditedPayload) {
@@ -378,7 +382,7 @@ export class XxxEventHandler {
 Файл: `infrastructure/repositories/prisma-xxx.repository.ts`
 
 ```typescript
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { PrismaService } from '@casino/database'
 import { XxxEntity } from '../../domain/entities/xxx.entity'
 import { IXxxRepository } from '../../domain/repositories/xxx.repository.interface'
@@ -386,7 +390,7 @@ import { money } from '@casino/shared-utils'
 
 @Injectable()
 export class PrismaXxxRepository implements IXxxRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
 
   async findById(id: string): Promise<XxxEntity | null> {
     const row = await this.prisma.xxxEntity.findUnique({ where: { id } })
@@ -394,7 +398,10 @@ export class PrismaXxxRepository implements IXxxRepository {
   }
 
   async atomicCredit(
-    walletId: string, amount: string, expectedVersion: number, tx: Prisma.TransactionClient,
+    walletId: string,
+    amount: string,
+    expectedVersion: number,
+    tx: Prisma.TransactionClient,
   ): Promise<boolean> {
     const result = await tx.walletAccount.updateMany({
       where: { id: walletId, version: expectedVersion },
@@ -408,9 +415,7 @@ export class PrismaXxxRepository implements IXxxRepository {
   }
 
   private toEntity(row: any): XxxEntity {
-    return new XxxEntity(
-      row.id, row.userId, row.currency, row.balance, row.locked, row.version,
-    )
+    return new XxxEntity(row.id, row.userId, row.currency, row.balance, row.locked, row.version)
   }
 }
 ```
@@ -427,7 +432,7 @@ export class PrismaXxxRepository implements IXxxRepository {
 // Пример для платёжного провайдера
 @Injectable()
 export class XxxPaymentAdapter implements PaymentProvider {
-  constructor(private readonly httpClient: HttpClient) {}
+  constructor(@Inject(HttpClient) private readonly httpClient: HttpClient) {}
 
   async createDeposit(input: CreateDepositInput): Promise<PaymentRequest> {
     // ...
@@ -449,16 +454,12 @@ export class XxxQueueProducer {
   constructor(@InjectQueue('xxx-jobs') private readonly queue: Queue) {}
 
   async scheduleReminder(input: ScheduleInput): Promise<void> {
-    await this.queue.add(
-      'xxx-reminder',
-      input,
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 1000,
-        removeOnFail: 5000,
-      },
-    )
+    await this.queue.add('xxx-reminder', input, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 1000 },
+      removeOnComplete: 1000,
+      removeOnFail: 5000,
+    })
   }
 }
 ```
@@ -478,7 +479,7 @@ import { Currency } from '@casino/shared-types'
 export class CreditXxxRequestDto {
   @IsUUID() userId!: string
   @IsEnum(Currency) currency!: Currency
-  @IsString() @IsNotEmpty() amount!: string  // НЕ number!
+  @IsString() @IsNotEmpty() amount!: string // НЕ number!
   @IsString() @IsNotEmpty() idempotencyKey!: string
 }
 ```
@@ -488,7 +489,7 @@ export class CreditXxxRequestDto {
 Файл: `presentation/controllers/<module-name>.controller.ts`
 
 ```typescript
-import { Controller, Post, Body, UseGuards, HttpCode } from '@nestjs/common'
+import { Controller, Inject, Post, Body, UseGuards, HttpCode } from '@nestjs/common'
 import { JwtAuthGuard, CurrentUser, Roles, RolesGuard } from '@casino/auth'
 import { CreditXxxUseCase } from '../../application/use-cases/credit-xxx.use-case'
 import { CreditXxxRequestDto } from '../dtos/credit-xxx.request.dto'
@@ -497,7 +498,7 @@ import { successResponse } from '@casino/shared-types'
 @Controller('api/v1/xxx')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class XxxController {
-  constructor(private readonly creditUseCase: CreditXxxUseCase) {}
+  constructor(@Inject(CreditXxxUseCase) private readonly creditUseCase: CreditXxxUseCase) {}
 
   @Post('credit')
   @Roles('admin')
@@ -525,15 +526,15 @@ export class XxxController {
 Файл: `facade/<module-name>.facade.ts`
 
 ```typescript
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { CreditXxxUseCase } from '../application/use-cases/credit-xxx.use-case'
 import { DebitXxxUseCase } from '../application/use-cases/debit-xxx.use-case'
 
 @Injectable()
 export class XxxFacade {
   constructor(
-    private readonly creditUseCase: CreditXxxUseCase,
-    private readonly debitUseCase: DebitXxxUseCase,
+    @Inject(CreditXxxUseCase) private readonly creditUseCase: CreditXxxUseCase,
+    @Inject(DebitXxxUseCase) private readonly debitUseCase: DebitXxxUseCase,
   ) {}
 
   // Один метод = одна "бизнес-операция" для других модулей
@@ -592,8 +593,8 @@ import { IXxxRepository } from './domain/repositories/xxx.repository.interface'
 
 @Module({
   imports: [
-    PrismaModule,                                // для prisma
-    BullModule.registerQueue({ name: 'xxx-jobs' }),  // если есть queue
+    PrismaModule, // для prisma
+    BullModule.registerQueue({ name: 'xxx-jobs' }), // если есть queue
   ],
   controllers: [XxxController],
   providers: [
@@ -607,7 +608,7 @@ import { IXxxRepository } from './domain/repositories/xxx.repository.interface'
     // Event handlers (если есть)
     // XxxEventHandler,
   ],
-  exports: [XxxFacade, IXxxRepository],  // ⭐ только Facade наружу
+  exports: [XxxFacade, IXxxRepository], // ⭐ только Facade наружу
 })
 export class XxxModule {}
 ```
@@ -676,24 +677,24 @@ describe('CreditXxxUseCase', () => {
 
 После создания модуля:
 
--   [ ] Добавить модуль в карту в [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md) § 1 и § 15 (dependency graph)
--   [ ] Если модуль ставит задачи в очередь — добавить тип job в `apps/api/src/queues/queue.types.ts`
--   [ ] Добавить новые типы в `packages/shared-types/` (если типы cross-module)
--   [ ] Добавить новые endpoints в [API_CONVENTIONS.md](./API_CONVENTIONS.md) (если публичные)
--   [ ] Обновить `apps/api/src/modules/<module-name>/README.md` если менялся use case список
+- [ ] Добавить модуль в карту в [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md) § 1 и § 15 (dependency graph)
+- [ ] Если модуль ставит задачи в очередь — добавить тип job в `apps/api/src/queues/queue.types.ts`
+- [ ] Добавить новые типы в `packages/shared-types/` (если типы cross-module)
+- [ ] Добавить новые endpoints в [API_CONVENTIONS.md](./API_CONVENTIONS.md) (если публичные)
+- [ ] Обновить `apps/api/src/modules/<module-name>/README.md` если менялся use case список
 
 ### 10.3. Чеклист перед PR
 
--   [ ] `pnpm typecheck` проходит
--   [ ] `pnpm lint` проходит (нет warnings)
--   [ ] `pnpm test` — все new unit tests проходят
--   [ ] Модуль экспортирует **только Facade** наружу
--   [ ] Не используется `number` для денег (только `string`)
--   [ ] Все financial use cases имеют `idempotencyKey` и проверку дубликата
--   [ ] Все ошибки — кастомные классы с `code` и `httpStatus`
--   [ ] Все controller методы возвращают `successResponse(...)` или throw AppError
--   [ ] Use cases НЕ импортируют Controllers, DTOs, Express, class-validator
--   [ ] Domain layer НЕ импортирует `@nestjs/common`, Prisma, IO
+- [ ] `pnpm typecheck` проходит
+- [ ] `pnpm lint` проходит (нет warnings)
+- [ ] `pnpm test` — все new unit tests проходят
+- [ ] Модуль экспортирует **только Facade** наружу
+- [ ] Не используется `number` для денег (только `string`)
+- [ ] Все financial use cases имеют `idempotencyKey` и проверку дубликата
+- [ ] Все ошибки — кастомные классы с `code` и `httpStatus`
+- [ ] Все controller методы возвращают `successResponse(...)` или throw AppError
+- [ ] Use cases НЕ импортируют Controllers, DTOs, Express, class-validator
+- [ ] Domain layer НЕ импортирует `@nestjs/common`, Prisma, IO
 
 ---
 

@@ -8,9 +8,20 @@ import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import { type Currency } from '@casino/shared-types'
 
-import { IProviderAdapterFactory, PROVIDER_ADAPTER_FACTORY } from '../../domain/casino.ports'
-import { CurrencyNotSupportedError, GameDisabledError, GameNotFoundError, ProviderDisabledError } from '../../domain/errors'
-import { GAME_CATALOG_REPOSITORY, GAME_PLAY_REPOSITORY, type GameWithProvider, IGameCatalogRepository, IGamePlayRepository } from '../../domain/repositories/casino.repository'
+import { type IProviderAdapterFactory, PROVIDER_ADAPTER_FACTORY } from '../../domain/casino.ports'
+import {
+  CurrencyNotSupportedError,
+  GameDisabledError,
+  GameNotFoundError,
+  ProviderDisabledError,
+} from '../../domain/errors'
+import {
+  GAME_CATALOG_REPOSITORY,
+  GAME_PLAY_REPOSITORY,
+  type GameWithProvider,
+  type IGameCatalogRepository,
+  type IGamePlayRepository,
+} from '../../domain/repositories/casino.repository'
 
 interface LaunchGameInput {
   userId?: string | null
@@ -33,12 +44,14 @@ export class LaunchGameUseCase {
   // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(PROVIDER_ADAPTER_FACTORY) private adapters: IProviderAdapterFactory,
-    private wallet: WalletFacade,
+    @Inject(WalletFacade) private wallet: WalletFacade,
     @Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository,
     @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
   ) {}
 
-  async execute(input: LaunchGameInput): Promise<{ session_id: string | null; launch_url: string; currency: string; }> {
+  async execute(
+    input: LaunchGameInput,
+  ): Promise<{ session_id: string | null; launch_url: string; currency: string }> {
     const game = await this.catalog.findBySlug(input.gameSlug)
     if (!game) {
       throw new GameNotFoundError(input.gameSlug)

@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 
 import { PaymentRequestNotFoundError } from '../../domain/errors'
 import {
-  IPaymentRequestRepository,
+  type IPaymentRequestRepository,
   PAYMENT_REQUEST_REPOSITORY,
   type PaymentRequest,
 } from '../../domain/payments.ports'
@@ -10,7 +10,9 @@ import {
 /** Статус депозита для владельца заявки (В3: контроллер без репозитория). */
 @Injectable()
 export class GetDepositStatusUseCase {
-  constructor(@Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository) {}
+  constructor(
+    @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
+  ) {}
 
   async execute(
     userId: string,
@@ -24,7 +26,7 @@ export class GetDepositStatusUseCase {
     completed_at: Date | null
   }> {
     const pr = await this.repo.findById(id)
-    if (!pr || pr.userId !== userId) {
+    if (pr?.userId !== userId) {
       throw new PaymentRequestNotFoundError()
     }
     return {

@@ -1,6 +1,5 @@
-import { Body, Controller, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
+import { Body, Controller, Inject, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
 import { type Request } from 'express'
-
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -15,7 +14,7 @@ import { SendNotificationSchema } from '../dto/admin-notifications.dto'
 @UseGuards(AdminAuthGuard)
 @Controller('admin/notifications')
 export class AdminNotificationsController {
-  constructor(private audit: AuditLogService) {}
+  constructor(@Inject(AuditLogService) private audit: AuditLogService) {}
 
   @Post('send')
   @UsePipes(new ZodValidationPipe(SendNotificationSchema))
@@ -23,7 +22,7 @@ export class AdminNotificationsController {
     @Body() body: { userIds: string[]; title: string; message: string; type: string },
     @CurrentUser() admin: AdminActor,
     @Req() req: Request,
-  ): Promise<{ success: boolean; sentCount: number; }> {
+  ): Promise<{ success: boolean; sentCount: number }> {
     // Send to specific users or all users if userIds is empty
     let targets = body.userIds
     if (targets.length === 0) {

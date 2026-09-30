@@ -2,10 +2,10 @@ import { randomBytes } from 'crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 
-import { EMAIL_QUEUE_SERVICE, IEmailQueueService } from '../../domain/auth.ports'
-import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { EMAIL_QUEUE_SERVICE, type IEmailQueueService } from '../../domain/auth.ports'
+import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 import {
-  IPasswordResetRepository,
+  type IPasswordResetRepository,
   PASSWORD_RESET_REPOSITORY,
 } from '../../domain/repositories/verification-token.repository'
 
@@ -16,7 +16,7 @@ export class ForgotPasswordUseCase {
     @Inject(PASSWORD_RESET_REPOSITORY) private resets: IPasswordResetRepository,
     @Inject(EMAIL_QUEUE_SERVICE) private email: IEmailQueueService,
   ) {}
-  async execute(emailInput: string): Promise<{ message: string; }> {
+  async execute(emailInput: string): Promise<{ message: string }> {
     const user = await this.users.findByEmail(emailInput.toLowerCase().trim())
     if (user) {
       const token = randomBytes(64).toString('hex')
