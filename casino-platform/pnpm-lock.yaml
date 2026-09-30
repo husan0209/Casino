@@ -256,6 +256,9 @@ importers:
       react-hook-form:
         specifier: ^7.52.1
         version: 7.89.0(@types/react@18.3.31)(react@18.3.1)
+      react-qr-code:
+        specifier: ^2.2.0
+        version: 2.2.0(react@18.3.1)
       zod:
         specifier: ^3.23.8
         version: 3.25.76
@@ -7332,6 +7335,12 @@ packages:
       }
     engines: { node: '>=6' }
 
+  qrcode-generator@2.0.4:
+    resolution:
+      {
+        integrity: sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==,
+      }
+
   qs@6.14.2:
     resolution:
       {
@@ -7410,6 +7419,14 @@ packages:
       {
         integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==,
       }
+
+  react-qr-code@2.2.0:
+    resolution:
+      {
+        integrity: sha512-e5nS0UUN22K3Nf8KBRUzemfdJ6OmnN5w+kbnj1lvJaol9RyVRFeGl05bCkxSN2ZegbLxjjYjX1+mmAoX9+fAhw==,
+      }
+    peerDependencies:
+      react: '*'
 
   react-refresh@0.14.2:
     resolution:
@@ -13380,6 +13397,8 @@ snapshots:
 
   punycode@2.3.1: {}
 
+  qrcode-generator@2.0.4: {}
+
   qs@6.14.2:
     dependencies:
       side-channel: 1.1.1
@@ -13416,6 +13435,12 @@ snapshots:
   react-is@17.0.2: {}
 
   react-is@18.3.1: {}
+
+  react-qr-code@2.2.0(react@18.3.1):
+    dependencies:
+      prop-types: 15.8.1
+      qrcode-generator: 2.0.4
+      react: 18.3.1
 
   react-refresh@0.14.2: {}
 

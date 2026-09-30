@@ -2,14 +2,15 @@
 
 import { Check, Clock, Copy } from 'lucide-react'
 import { useState } from 'react'
+import { QRCode } from 'react-qr-code'
 
 import { pollDepositStatus, type CryptoDepositTicket } from '@/lib/api/wallet.api'
 import { currencyLabel, formatAmount, networkLabel } from '@/lib/format/currency'
 
 /**
  * ТЗ ч.5.1 §4.9 «DepositSheet (крипта)»: сеть крупно и всегда, предупреждение
- * «только X в сети Y», адрес с копированием, дедлайн, «Проверить статус» и факт
- * зачисления. Редиректа на платёжку здесь нет — игрок отправляет сам, поэтому
+ * «только X в сети Y», QR адреса, адрес с копированием, дедлайн, «Проверить статус»
+ * и факт зачисления. Редиректа на платёжку здесь нет — игрок отправляет сам, поэтому
  * статус опрашивается по кнопке.
  */
 
@@ -96,6 +97,19 @@ export function CryptoDepositTicketPanel({
         <p className="mt-1 text-xs text-muted">
           Зачисляем в кошельке {coin} — без конвертации в другие валюты.
         </p>
+      </div>
+
+      {/* QR — дубль адреса (ТЗ §4.9): камерой кошелька он считается быстрее, чем адрес
+          копируется с экрана. p-6 = ~4 модуля кода — минимальная тихая зона по ISO 18004,
+          без неё сканер код не читает. */}
+      <div className="flex justify-center rounded-xl bg-white p-6">
+        <QRCode
+          aria-label="QR-код адреса кошелька"
+          level="M"
+          role="img"
+          size={168}
+          value={ticket.pay_address}
+        />
       </div>
 
       <div>

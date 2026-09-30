@@ -248,6 +248,14 @@ describe('GAP-59: DepositSheet (крипта) — активный кошелё�
     expect(screen.getByText(/Адрес действует/)).toBeTruthy()
   })
 
+  it('кладёт над адресом QR с тем же адресом заявки (ТЗ §4.9)', async () => {
+    await requestCryptoDeposit()
+    const qr = await screen.findByRole('img', { name: 'QR-код адреса кошелька' })
+    expect(qr.tagName.toLowerCase()).toBe('svg')
+    // react-qr-code рисует код двумя путями (модули + подложка): один путь = пустой код
+    expect(qr.querySelectorAll('path')).toHaveLength(2)
+  })
+
   it('«Проверить статус» при completed закрывает кассу', async () => {
     pollMock.mockResolvedValue({ id: 'pr-1', status: 'completed', currency: 'USDT_TRC20' })
     await requestCryptoDeposit()
