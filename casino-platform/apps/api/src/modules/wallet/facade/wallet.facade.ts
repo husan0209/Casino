@@ -62,6 +62,9 @@ export class WalletFacade {
    * P0 #3: атомарный денежный сценарий. Колбэк получает Prisma tx — передавайте
    * его в credit/debit (CreditInput.tx) и в репозитории игровых транзакций,
    * чтобы ledger-запись и gameTransaction коммитились одним $transaction.
+   *
+   * GAP-57: `target` — кошелёк, который мутирует fn. По нему транзакция берёт
+   * advisory-лок (очередь вместо abort-волн при конкурентных ставках).
    */
   runInTransaction<T>(
     target: WalletLockTarget,
