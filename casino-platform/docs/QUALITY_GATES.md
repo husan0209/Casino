@@ -79,9 +79,10 @@ GitSlotPark → `CALLBACK_MESSAGE_BUILDERS/firstPresent/mapProviderGame`,
 `syncGames` → `upsertGameRow/gameSlug`, provider-callback → `dispatch`).
 
 > `packages/*` и `apps/web`/`apps/admin` под `pnpm -r lint` не попадают по-разному:
-> у `packages/*` lint-скрипта нет (гейт — `apps/api`: `eslint src --ext .ts`), у фронтенда
+> у `packages/*` lint-скрипта нет (гейт — `apps/api`: `eslint src test --ext .ts`), у фронтенда
 > `next lint` + собственные overrides (`complexity: off` для `app/**`, `components/**`) —
-> на 2026-09-01 обе точки дают 0 errors.
+> на 2026-09-01 обе точки дают 0 errors. С 2026-09-30 область линта — `src` **и** `test`
+> (см. §2.4), раньше `test/` не линтировался ни одним гейтом.
 
 ### 2.2. Что добавлено
 
@@ -127,11 +128,34 @@ GAP-39 жил при зелёном CI со `✖ 1171 problems (0 errors, 1171 w
 в `warn`, а `warn` не ломал сборку. С 2026-09-03 порог закреплён машиной — во всех трёх
 приложениях с `lint`-скриптом стоит `--max-warnings=0`:
 
-| Приложение   | Скрипт                                  |
-| ------------ | --------------------------------------- |
-| `apps/api`   | `eslint src --ext .ts --max-warnings=0` |
-| `apps/web`   | `next lint --max-warnings=0`            |
-| `apps/admin` | `next lint --max-warnings=0`            |
+| Приложение   | Скрипт                                            |
+| ------------ | ------------------------------------------------- |
+| `apps/api`   | `eslint src test --ext .ts --max-warnings=0`      |
+| `apps/web`   | `next lint --dir src --dir test --max-warnings=0` |
+| `apps/admin` | `next lint --dir src --dir test --max-warnings=0` |
+
+До 2026-09-30 в скриптах был только `src`, и это расходилось с pre-commit: lint-staged
+гоняет eslint по КАЖДОМУ staged-файлу, поэтому `test/` и `infra/load-tests` ловили ошибки
+при коммите, но не в CI. Практическое следствие: слияние в `main` (merge-коммит тащит
+чужие файлы) падало на хуке, а rebase — нет; синхронизироваться с `main` приходилось
+rebase-ом. Теперь область совпадает, и расхождения тому нет:
+
+- тестовые overrides (§11 в `docs/CONVENTIONS.md`) живут в корневом `.eslintrc.js`
+  (`**/*.spec.ts(x)`, `**/*.test.ts(x)`, `**/*.e2e-spec.ts`) и в `apps/api/.eslintrc.js`
+  (`test/**/*.ts`): размер функции/параметры/complexity и `no-explicit-any` + `unsafe-*`
+  для моков выключены, `import/order`, `no-unused-vars`, `no-floating-promises`,
+  `consistent-type-imports` остаются `error`;
+- деньги в тестах: money-селектор `no-restricted-syntax` покрывает и ключ `total`, а в
+  спеках `total` — счётчик пагинации из конверта `{items, meta}`. Для тестов тот же
+  селектор объявлен без `total` (число как деньги по-прежнему `error`), в `src` — без
+  изменений;
+- `infra/load-tests/**/*.js` (k6): globals `__ENV`/`__VU`/`__ITER`, `import/no-unresolved`
+  выключен (модулей `k6/*` нет в node_modules), `max-params` выключен — сигнатура билдера
+  подписи повторяет порядок полей провайдера (GAP-43).
+
+Расширение касается только линта. `pnpm typecheck` по-прежнему `tsc -p tsconfig.json`, то
+есть `src`: `tsc -p apps/api/tsconfig.eslint.json` (src+test) даёт 49 ошибок в 12 файлах
+`test/` — это отдельная работа, и линт-гейт её не подменяет.
 
 Форма с `=` (а не `--max-warnings 0`) выбрана намеренно: у `next lint` аргумент объявлен
 как необязательный (`[maxWarnings]`), а `0` для ESLint — falsy, так что `=` убирает обе
@@ -262,6 +286,7 @@ Tier 1 + Tier 2 ловят **синтаксические** и **структу�
 | 2026-09-04 | Guard **G14** (Tier 2): любой `eslint-disable` для `max-lines-per-function` роняет CI — закрепляет закрытие GAP-48 (само подавление снято в PR #63). Попутно: строка §2.1 вралила про порог («временно 90», хотя GAP-30 вернул 60 ещё 2026-09-02) — исправлена; §2.1.1 явно ограничен `max-params` (раньше текст читался как лицензия на любые обходы); зарегистрирован **GAP-51** — три TODO в коде ссылались на закрытый GAP-22, из-за чего неотрекенный долг выглядел исполненным                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | AI agent (GAP-48 / GAP-51)             |
 | 2026-09-30 | Тулчейн переезжает на нативную сборку: `typescript` → `npm:@typescript/typescript6@6`, `@typescript/native` → `npm:typescript@7` (`tsgo`), typescript-eslint → 8. С типизированными правилами ESLint впервые проверяет `apps/api/src` целиком — после sweep'а 0 ошибок/0 warnings. Цена переезда: `emitDecoratorMetadata: false` (tsgo его не эмитит) ломает implicit-DI в Nest, поэтому конструкторы переведены на явный `@Inject(Token)`, правило зафиксировано в `docs/AI_DEVELOPMENT_RULES.md` §3.2. **Tier 1 +=** `fileParallelism: false` в `apps/api/vitest.config.ts`: интеграционные спеки на Serializable-транзакциях флакали при параллельных файлах-воркерах (см. PR #100/#102/#104). **Попутно:** `apps/api/src` лежал рассортированным шире `printWidth: 100`, так что prettier из pre-commit хука переносит строки в каждом затрагиваемом файле; 9 методов из-за этого перешагнули `max-lines-per-function` и приведены в порядок выносом длинных return-типов в алиасы и приватные хелперы (inline-подавление запрещено G14) | AI agent (миграция TS 6/7-native)      |
 | 2026-09-30 | Guard **G22** (Tier 2): `node scripts/check-explicit-di.mjs` роняет CI, если у внедряемого параметра конструктора Nest-провайдера нет `@Inject(Token)`. После переезда на `emitDecoratorMetadata: false` такой код собирается, проходит `tsc` и ESLint, приложение стартует — и падает в первом же обращении. Причину нашёл не гард, а E2E player-lifecycle: `AuthController` с десятью неявными зависимостями ломал регистрацию и логин (HTTP 500); unit-спеки этого не ловят (DI контроллера в них не проверяется), как и `boot`-проверка `/health`. Тем же симптомом были закрыты `ProviderCallbackController` (колбэки провайдера) и `PaymentsWebhookController` (вебхуки платежей)                                                                                                                                                                                                                                                                                                                                                      | AI agent (миграция TS 6/7-native, G22) |
+| 2026-09-30 | Область линта = область кода: `eslint src test` в `apps/api`, `next lint --dir src --dir test` в `apps/web` и `apps/admin` (скрипты §2.4). До этого `test/` линтировал только pre-commit (lint-staged по staged-файлам), из-за чего merge-ом в `main` дерево нельзя было коммитить, а CI оставался зелёным. Долг снят на месте: 15 нарушений в `apps/api/test` (import/order, мёртвые переменные, `require()`, `no-extra-semi`, лишние `?.`), 13 — в `infra/load-tests/wallet-concurrency.js`, 3 — во фронтенд-спеках. Тестовые overrides приведены к конвенции §11 (`.tsx` спеки больше не считаются по «взрослым» лимитам, money-селектор в тестах не бьёт по пагинационному `total`). **Известный остаток:** `pnpm typecheck` по-прежнему только `src`; `tsc -p apps/api/tsconfig.eslint.json` даёт 49 ошибок в 12 файлах `test/` — это отдельная работа, а не регресс этого change                                                                                                                                                       | AI agent (линт тестов)                 |
 
 ---
 
