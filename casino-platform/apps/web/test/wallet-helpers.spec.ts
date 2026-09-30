@@ -6,11 +6,18 @@ import { describe, expect, it } from 'vitest'
  *   - sortWallets: активный кошелёк — первый, далее с положительным available,
  *     потом пустые, потом по алфавиту currency;
  *   - findFundedAlternative: первый НЕ-активный кошелёк с available > 0;
- *   - isWalletEmpty: true если кошелька нет в списке или available <= 0.
+ *   - isWalletEmpty: true если кошелька нет в списке или available <= 0;
+ *   - mergeWallets: кошелёк на каждую разрешённую гео-валюту, отсутствующий — нули.
  *
  * Все суммы — MoneyAmount (string), деньги сравниваются через @casino/shared-utils.
  */
-import { findFundedAlternative, isWalletEmpty, sortWallets } from '../src/lib/wallet/helpers'
+import {
+  findFundedAlternative,
+  isWalletEmpty,
+  mergeWallets,
+  sortWallets,
+} from '../src/lib/wallet/helpers'
+
 import type { WalletBalance } from '../src/types/wallet'
 
 function wb(currency: string, available: string): WalletBalance {
@@ -83,5 +90,25 @@ describe('GAP-44 isWalletEmpty', () => {
 
   it('пустой список → все валюты пустые', () => {
     expect(isWalletEmpty([], 'RUB')).toBe(true)
+  })
+})
+
+describe('mergeWallets', () => {
+  it('отдаёт разрешённые валюты даже когда бэк вернул [] (новый игрок)', () => {
+    const merged = mergeWallets([], ['RUB', 'USDT_TRC20'])
+    expect(merged.map((w) => [w.currency, w.available])).toEqual([
+      ['RUB', '0'],
+      ['USDT_TRC20', '0'],
+    ])
+  })
+
+  it('не подменяет баланс, который бэк вернул', () => {
+    const merged = mergeWallets([wb('RUB', '250')], ['RUB', 'UAH'])
+    expect(merged[0]).toMatchObject({ currency: 'RUB', available: '250' })
+    expect(merged[1]?.available).toBe('0')
+  })
+
+  it('лишний кошелёк в ответе бэка не показывает', () => {
+    expect(mergeWallets([wb('BYN', '10')], ['RUB']).map((w) => w.currency)).toEqual(['RUB'])
   })
 })

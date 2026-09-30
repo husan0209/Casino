@@ -2,6 +2,17 @@ import type { WalletBalance } from '@/types/wallet'
 
 import { money } from '@casino/shared-utils'
 
+/**
+ * Балансы по списку разрешённых валют: бэк не провиженит кошельки и новому игроку
+ * отдаёт `[]`, а и свитчер, и страница «Мои кошельки» показывают все валюты гео.
+ */
+export function mergeWallets(balances: WalletBalance[], enabled: string[]): WalletBalance[] {
+  const map = new Map(balances.map((w) => [w.currency, w]))
+  return enabled.map(
+    (currency) => map.get(currency) ?? { currency, balance: '0', locked: '0', available: '0' },
+  )
+}
+
 export function sortWallets(wallets: WalletBalance[], activeCurrency: string): WalletBalance[] {
   return [...wallets].sort((a, b) => {
     if (a.currency === activeCurrency) {
