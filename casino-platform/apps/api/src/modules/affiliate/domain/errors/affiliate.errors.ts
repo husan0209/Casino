@@ -138,3 +138,54 @@ export class AffiliateClawbackNotAllowedError extends AppError {
     super(`Clawback not allowed for commission ${commissionId} in status ${currentStatus}`)
   }
 }
+
+/**
+ * Не удалось сгенерировать уникальный tracking_code: кандидаты исчерпаны.
+ *
+ * Внутренняя ошибка инфраструктуры, а не клиентская: код не пришёл от
+ * пользователя, поэтому наружу уходит 500 с нейтральным текстом, а детали
+ * оператора пишутся в лог. Публичный код стабилен — по нему алерт на
+ * исчерпание пространства кодов.
+ */
+export class AffiliateCodeGenerationError extends AppError {
+  readonly code = 'AFFILIATE_CODE_GENERATION_FAILED'
+  readonly httpStatus = 500
+
+  constructor(public readonly attempts: number) {
+    super(`Failed to generate unique affiliate tracking code after ${attempts} attempts`)
+  }
+}
+
+/**
+ * Не удалось сгенерировать игровой реферальный код игроку.
+ *
+ * Код ошибки намеренно тот же, что у `ReferralCodeGenerationError` в модуле
+ * auth: это один и тот же сценарий (кандидаты исчерпаны), и клиенты должны
+ * видеть один стабильный код. Класс объявлен здесь, а не импортирован из
+ * `auth/domain`, потому что межмодульные импорты внутренних слоёв запрещены
+ * (AGENTS.md правило 4, гвард G16).
+ */
+export class PlayerReferralCodeGenerationError extends AppError {
+  readonly code = 'REFERRAL_CODE_GENERATION_FAILED'
+  readonly httpStatus = 500
+
+  constructor(public readonly attempts: number) {
+    super(`REFERRAL_CODE_GENERATION_FAILED after ${attempts} attempts`)
+  }
+}
+
+/**
+ * AFFILIATE_JWT_SECRET отсутствует или короче минимальной длины.
+ *
+ * Fail-closed по решению из ТЗ ч.8 §14.1: выпускать токены партнёра со слабым
+ * секретом нельзя, поэтому в production модуль не поднимается. В dev
+ * подставляется ослабленный дефолт с предупреждением в лог.
+ */
+export class AffiliateJwtSecretInvalidError extends AppError {
+  readonly code = 'AFFILIATE_JWT_SECRET_MISSING_OR_WEAK'
+  readonly httpStatus = 500
+
+  constructor(public readonly configuredLength: number) {
+    super(`AFFILIATE_JWT_SECRET is missing or too weak: configured length ${configuredLength}`)
+  }
+}

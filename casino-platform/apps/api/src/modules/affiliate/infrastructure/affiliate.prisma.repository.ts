@@ -12,6 +12,7 @@ import { Decimal } from 'decimal.js'
 
 import { prisma } from '@casino/database'
 
+import { AffiliateCodeGenerationError } from '../domain/errors/affiliate.errors'
 import {
   type AffiliateAttributionRepository,
   type AffiliateClickRepository,
@@ -231,7 +232,7 @@ export class PrismaAffiliateRepository implements AffiliateRepository {
         return code
       }
     }
-    throw new Error('Failed to generate unique affiliate tracking code')
+    throw new AffiliateCodeGenerationError(TRACKING_CODE_MAX_ATTEMPTS)
   }
 
   async addEarned(id: string, amount: string): Promise<void> {

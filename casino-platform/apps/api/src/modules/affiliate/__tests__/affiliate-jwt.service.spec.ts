@@ -143,7 +143,11 @@ describe('AffiliateJwtService', () => {
     const weak = new AffiliateJwtService(
       makeConfig({ AFFILIATE_JWT_SECRET: 'short', NODE_ENV: 'production' }) as never,
     )
-    expect(() => weak.signAccess('aff-1', 'a@b.ru')).toThrow(/AFFILIATE_JWT_SECRET_MISSING_OR_WEAK/)
+    // Проверяем стабильный code, а не текст сообщения: code попадает в
+    // контракт API, а сообщение — человекочитаемый текст и может меняться.
+    expect(() => weak.signAccess('aff-1', 'a@b.ru')).toThrow(
+      expect.objectContaining({ code: 'AFFILIATE_JWT_SECRET_MISSING_OR_WEAK' }),
+    )
   })
 
   it('falls back to a dev secret outside production', () => {
