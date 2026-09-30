@@ -17,7 +17,10 @@ import { randomBytes } from 'node:crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import * as argon2 from 'argon2'
 
-import { AffiliateAlreadyExistsError } from '../../domain/errors/affiliate.errors'
+import {
+  AffiliateAlreadyExistsError,
+  PlayerReferralCodeGenerationError,
+} from '../../domain/errors/affiliate.errors'
 import {
   AFFILIATE_PLAYER_PROVISIONING_REPOSITORY,
   AFFILIATE_REPOSITORY,
@@ -57,7 +60,6 @@ export interface RegisterAffiliateResult {
 
 @Injectable()
 export class RegisterAffiliateUseCase {
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(AFFILIATE_REPOSITORY) private readonly affiliates: AffiliateRepository,
     @Inject(AFFILIATE_PLAYER_PROVISIONING_REPOSITORY)
@@ -132,7 +134,7 @@ export class RegisterAffiliateUseCase {
         return candidate
       }
     }
-    throw new Error('REFERRAL_CODE_GENERATION_FAILED')
+    throw new PlayerReferralCodeGenerationError(REFERRAL_CODE_ATTEMPTS)
   }
 
   /** Ссылка партнёра: домен из APP_URL, как и у игровых реферальных ссылок. */

@@ -15,7 +15,10 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
-import { AffiliateCredentialsInvalidError } from '../domain/errors/affiliate.errors'
+import {
+  AffiliateCredentialsInvalidError,
+  AffiliateJwtSecretInvalidError,
+} from '../domain/errors/affiliate.errors'
 
 /** Минимальная длина секрета — как у остальных JWT-секретов проекта. */
 const MIN_SECRET_LENGTH = 64
@@ -68,7 +71,7 @@ export class AffiliateJwtService {
     if (this.config.get<string>('NODE_ENV') === 'production') {
       // В production слабый/отсутствующий секрет — фатальная ошибка, а не
       // молчаливое использование dev-значения.
-      throw new Error('AFFILIATE_JWT_SECRET_MISSING_OR_WEAK')
+      throw new AffiliateJwtSecretInvalidError(value.length)
     }
     return DEV_SECRET
   }

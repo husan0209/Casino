@@ -17,7 +17,11 @@ import {
   JWT_TOKEN_SERVICE,
 } from '../../domain/auth.ports'
 import { type UserRole } from '../../domain/entities/user.entity'
-import { EmailAlreadyExistsError, WeakPasswordError } from '../../domain/errors'
+import {
+  EmailAlreadyExistsError,
+  ReferralCodeGenerationError,
+  WeakPasswordError,
+} from '../../domain/errors'
 import {
   type ISessionRepository,
   SESSION_REPOSITORY,
@@ -116,7 +120,7 @@ export class RegisterUseCase {
         return code
       }
     }
-    throw new Error('REFERRAL_CODE_GENERATION_FAILED')
+    throw new ReferralCodeGenerationError()
   }
 
   async execute(

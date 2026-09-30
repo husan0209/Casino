@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
 import { ConfigService } from '@nestjs/config'
+import { describe, it, expect, vi } from 'vitest'
 
 import {
   CALLBACK_MESSAGE_BUILDERS,
@@ -31,10 +31,18 @@ function buildConfig(overrides: {
 } = {}): ConfigService {
   const config = new ConfigService()
   vi.spyOn(config, 'get').mockImplementation(((key: string) => {
-    if (key === 'GITSLOTPARK_AGENT_ID') return overrides.agentId ?? AGENT
-    if (key === 'GITSLOTPARK_API_TOKEN') return overrides.apiToken ?? API_TOKEN
-    if (key === 'GITSLOTPARK_SECRET_KEY') return overrides.secret ?? SECRET
-    if (key === 'GITSLOTPARK_API_BASE') return overrides.apiBase
+    if (key === 'GITSLOTPARK_AGENT_ID') {
+return overrides.agentId ?? AGENT
+}
+    if (key === 'GITSLOTPARK_API_TOKEN') {
+return overrides.apiToken ?? API_TOKEN
+}
+    if (key === 'GITSLOTPARK_SECRET_KEY') {
+return overrides.secret ?? SECRET
+}
+    if (key === 'GITSLOTPARK_API_BASE') {
+return overrides.apiBase
+}
     return undefined
   }) as never)
   return config

@@ -6,7 +6,7 @@ import { ConfigService } from '@nestjs/config'
 import { errorMessage } from '@/common/utils/error-message'
 
 import { GeoFacade } from '@modules/geo/facade/geo.facade'
-import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
+import { KycFacade } from '@modules/kyc/facade/kyc.facade'
 import { UsersFacade } from '@modules/users/facade/users.facade'
 
 import type { DisplayCurrency } from '@casino/shared-config'
@@ -14,8 +14,8 @@ import { money } from '@casino/shared-utils'
 
 import { AmountTooLargeError, AmountTooSmallError, PaymentProviderError } from '../../domain/errors'
 import {
-  IRukassaClient,
-  IPaymentRequestRepository,
+  type IRukassaClient,
+  type IPaymentRequestRepository,
   PAYMENT_REQUEST_REPOSITORY,
   RUKASSA_CLIENT,
 } from '../../domain/payments.ports'
@@ -26,19 +26,29 @@ export interface CreateFiatDepositInput {
   method: string
 }
 
+export interface CreateFiatDepositResult {
+  payment_request_id: string
+  payment_url: string
+  currency: string
+  method: string
+}
+
 @Injectable()
 export class CreateFiatDepositUseCase {
   // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(RUKASSA_CLIENT) private readonly rukassa: IRukassaClient,
-    private kycCheck: KycCheckService,
-    private config: ConfigService,
-    private geo: GeoFacade,
-    private users: UsersFacade,
+    // KycFacade, а не KycCheckService напрямую: межмодульный доступ только
+    // через фасад (AGENTS.md правило 4). @Inject обязателен — design:paramtypes
+    // в этой сборке не выдаётся (CONVENTIONS §1.4).
+    @Inject(KycFacade) private kycCheck: KycFacade,
+    @Inject(ConfigService) private config: ConfigService,
+    @Inject(GeoFacade) private geo: GeoFacade,
+    @Inject(UsersFacade) private users: UsersFacade,
   ) {}
 
-  async execute(userId: string, input: CreateFiatDepositInput): Promise<{ payment_request_id: string; payment_url: string; currency: string; method: string; }> {
+  async execute(userId: string, input: CreateFiatDepositInput): Promise<CreateFiatDepositResult> {
     const { amount, currency, method } = input
 
     const userContext = await this.users.getGeoContext(userId)
@@ -70,22 +80,14 @@ export class CreateFiatDepositUseCase {
       expiresAt: new Date(Date.now() + 2 * 3600 * 1000),
     })
 
-    const webhookUrl =
-      this.config.get<string>('RUKASSA_WEBHOOK_URL') ||
-      'http://localhost:3001/api/v1/payments/webhooks/rukassa'
-    const successUrl =
-      this.config.get<string>('RUKASSA_SUCCESS_URL') || 'http://localhost:3000/?deposit=success'
-    const failUrl =
-      this.config.get<string>('RUKASSA_FAIL_URL') || 'http://localhost:3000/?deposit=failed'
-
     try {
       const res = await this.rukassa.createPayment({
         amount,
         orderId: pr.id,
         method,
-        webhookUrl,
-        successUrl,
-        failUrl,
+        webhookUrl: this.webhookUrl(),
+        successUrl: this.successUrl(),
+        failUrl: this.failUrl(),
       })
       await this.repo.updateStatus(pr.id, 'pending', {
         externalId: res.paymentId,
@@ -96,5 +98,21 @@ export class CreateFiatDepositUseCase {
       await this.repo.updateStatus(pr.id, 'failed', { errorMessage: errorMessage(e) })
       throw new PaymentProviderError('Rukassa error', { cause: errorMessage(e) })
     }
+  }
+
+  /** Адреса возврата/коллбэка Rukassa: env → дефолт локальной разработки. */
+  private webhookUrl(): string {
+    return (
+      this.config.get<string>('RUKASSA_WEBHOOK_URL') ||
+      'http://localhost:3001/api/v1/payments/webhooks/rukassa'
+    )
+  }
+
+  private successUrl(): string {
+    return this.config.get<string>('RUKASSA_SUCCESS_URL') || 'http://localhost:3000/?deposit=success'
+  }
+
+  private failUrl(): string {
+    return this.config.get<string>('RUKASSA_FAIL_URL') || 'http://localhost:3000/?deposit=failed'
   }
 }

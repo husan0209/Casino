@@ -25,7 +25,7 @@ import { errorMessage } from '@/common/utils/error-message'
 import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-import { WalletFacade } from '../../../wallet/application/wallet.facade'
+import { WalletFacade } from '../../../wallet/facade/wallet.facade'
 import {
   AFFILIATE_ATTRIBUTION_REPOSITORY,
   AFFILIATE_COMMISSION_REPOSITORY,
@@ -75,7 +75,6 @@ export interface ClawbackResult {
 export class ClawbackPlayerCommissionsUseCase {
   private readonly logger = new Logger(ClawbackPlayerCommissionsUseCase.name)
 
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(AFFILIATE_REPOSITORY) private readonly affiliates: AffiliateRepository,
     @Inject(AFFILIATE_COMMISSION_REPOSITORY)

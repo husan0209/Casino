@@ -3,15 +3,15 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 import { errorMessage } from '@/common/utils/error-message'
 
 import { UsersFacade } from '@modules/users/facade/users.facade'
-import { WalletFacade } from '@modules/wallet/application/wallet.facade'
+import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import { type Currency } from '@casino/shared-types'
 
 import { classifyPaymentStatus } from '../../domain/payment-status'
 import {
   type PaymentRequest,
-  IRukassaClient,
-  IPaymentRequestRepository,
+  type IRukassaClient,
+  type IPaymentRequestRepository,
   PAYMENT_REQUEST_REPOSITORY,
   RUKASSA_CLIENT,
 } from '../../domain/payments.ports'
@@ -41,8 +41,8 @@ export class ProcessRukassaWebhookUseCase {
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(RUKASSA_CLIENT) private readonly rukassa: IRukassaClient,
-    private wallet: WalletFacade,
-    private users: UsersFacade,
+    @Inject(WalletFacade) private wallet: WalletFacade,
+    @Inject(UsersFacade) private users: UsersFacade,
   ) {}
   async execute(input: ProcessRukassaWebhookInput): Promise<{ ok: boolean }> {
     const { rawHeaders, body, rawBody, ip } = input

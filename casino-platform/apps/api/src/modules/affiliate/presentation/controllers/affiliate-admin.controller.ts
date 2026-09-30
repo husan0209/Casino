@@ -32,7 +32,8 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
 
-import { AuditLogService } from '../../../admin/application/audit-log.service'
+import { AdminFacade } from '@modules/admin/facade/admin.facade'
+
 import { AdminAuthGuard } from '../../../admin/presentation/admin-auth.guard'
 import { Roles, RolesGuard } from '../../../auth/presentation/guards/roles.guard'
 import { AffiliateSettingsService } from '../../application/affiliate-settings.service'
@@ -69,7 +70,6 @@ import type { AffiliateEntity } from '../../domain/entities/affiliate.entity'
 @UseGuards(AdminAuthGuard, RolesGuard)
 @Controller('admin/affiliate')
 export class AffiliateAdminController {
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(AFFILIATE_REPOSITORY) private readonly affiliates: AffiliateRepository,
     @Inject(AFFILIATE_COMMISSION_REPOSITORY)
@@ -80,7 +80,7 @@ export class AffiliateAdminController {
     @Inject(AffiliateDailyRunUseCase) private readonly dailyRun: AffiliateDailyRunUseCase,
     @Inject(ClawbackPlayerCommissionsUseCase)
     private readonly clawback: ClawbackPlayerCommissionsUseCase,
-    @Inject(AuditLogService) private readonly audit: AuditLogService,
+    @Inject(AdminFacade) private readonly audit: AdminFacade,
   ) {}
 
   /**
@@ -186,7 +186,7 @@ export class AffiliateAdminController {
       country: body.country ?? null,
       isAgreed: true,
     })
-    await this.audit.log({
+    await this.audit.logAction({
       actorType: 'admin',
       actorId: admin.id,
       action: 'affiliate.partner.created',
@@ -222,7 +222,7 @@ export class AffiliateAdminController {
     const revshareRate =
       body.revshareRate !== undefined ? parseRevShareRate(body.revshareRate) : undefined
     const updated = await this.affiliates.update(id, { ...body, revshareRate })
-    await this.audit.log({
+    await this.audit.logAction({
       actorType: 'admin',
       actorId: admin.id,
       action: revshareRate !== undefined ? 'affiliate.rate.changed' : 'affiliate.partner.updated',
@@ -288,7 +288,7 @@ export class AffiliateAdminController {
       type: body.type,
       updatedBy: admin.id,
     })
-    await this.audit.log({
+    await this.audit.logAction({
       actorType: 'admin',
       actorId: admin.id,
       action: 'affiliate.settings.updated',
@@ -438,7 +438,7 @@ export class AffiliateAdminController {
     errors: string[]
   }> {
     const result = await this.dailyRun.execute(body.date)
-    await this.audit.log({
+    await this.audit.logAction({
       actorType: 'admin',
       actorId: admin.id,
       action: 'affiliate.daily.manual_run',
@@ -472,7 +472,7 @@ export class AffiliateAdminController {
     insufficient_funds: Array<{ commission_id: string; amount: string; currency: string }>
   }> {
     const result = await this.clawback.execute({ playerId })
-    await this.audit.log({
+    await this.audit.logAction({
       actorType: 'admin',
       actorId: admin.id,
       action: 'affiliate.clawback.manual',

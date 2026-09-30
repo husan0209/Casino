@@ -53,7 +53,7 @@ export function SiteFooter(): React.JSX.Element {
         </div>
       </div>
       <div className="container-1 mt-6 text-xs text-white/20">
-        © {new Date().getFullYear()} Casino Club
+        © {new Date().getFullYear()} spinera · Casino Club
       </div>
     </footer>
   )

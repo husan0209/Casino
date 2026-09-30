@@ -28,10 +28,9 @@ export class AccountLockedError extends AppError {
   readonly code = 'ACCOUNT_LOCKED'
   readonly httpStatus = 423
   constructor(public readonly lockedUntil: Date) {
-    super(
-      `Слишком много неудачных попыток входа. Повторите после ${lockedUntil.toISOString()}`,
-      { lockedUntil },
-    )
+    super(`Слишком много неудачных попыток входа. Повторите после ${lockedUntil.toISOString()}`, {
+      lockedUntil,
+    })
   }
 }
 
@@ -147,5 +146,70 @@ export class SelfExcludedError extends AppError {
       `Аккаунт временно заблокирован по запросу пользователя до ${excludedUntil.toISOString()}`,
       { excludedUntil },
     )
+  }
+}
+
+// ── JWT-верификация (Волна 3в, G17): message = прежний код строки —
+// обработчики разбирают текст, поэтому он сохранён 1-в-1.
+export type JwtTokenErrorCode =
+  'BAD_TOKEN' | 'BAD_ALGORITHM' | 'BAD_SIGNATURE' | 'BAD_ISSUER' | 'BAD_AUDIENCE' | 'TOKEN_EXPIRED'
+
+export class JwtTokenError extends AppError {
+  readonly code: string
+  readonly httpStatus = 401
+  constructor(code: JwtTokenErrorCode) {
+    super(code)
+    this.code = code
+  }
+}
+export class JwtSecretWeakError extends AppError {
+  readonly code = 'JWT_ACCESS_SECRET_MISSING_OR_WEAK'
+  readonly httpStatus = 500
+  constructor() {
+    super('JWT_ACCESS_SECRET_MISSING_OR_WEAK')
+  }
+}
+export class ReferralCodeGenerationError extends AppError {
+  readonly code = 'REFERRAL_CODE_GENERATION_FAILED'
+  readonly httpStatus = 500
+  constructor() {
+    super('REFERRAL_CODE_GENERATION_FAILED')
+  }
+}
+export class OAuthUpstreamError extends AppError {
+  readonly code = 'OAUTH_UPSTREAM_ERROR'
+  readonly httpStatus = 502
+  constructor(m: string) {
+    super(m)
+  }
+}
+export class OauthUserInvariantError extends AppError {
+  readonly code = 'OAUTH_USER_REQUIRES_NULL_PASSWORD'
+  readonly httpStatus = 500
+  constructor() {
+    super('OAUTH_USER_REQUIRES_NULL_PASSWORD')
+  }
+}
+export class CaptchaUpstreamError extends AppError {
+  readonly code = 'CAPTCHA_UPSTREAM_ERROR'
+  readonly httpStatus = 502
+  constructor(m: string) {
+    super(m)
+  }
+}
+
+/**
+ * Токен есть, но ролей недостаточно: пользователь не админ, либо роль не входит
+ * в требуемый набор @Roles.
+ *
+ * Отдельный код вместо встроенного исключения NestJS — по правилу 6 ошибки
+ * оформляются кастомным классом, а код стабилен и попадает в контракт API.
+ * Код и HTTP-статус сохранены один в один, так что клиенты ничего не замечают.
+ */
+export class InsufficientPermissionsError extends AppError {
+  readonly code = 'INSUFFICIENT_PERMISSIONS'
+  readonly httpStatus = 403
+  constructor() {
+    super('INSUFFICIENT_PERMISSIONS')
   }
 }

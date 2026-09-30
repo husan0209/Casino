@@ -17,7 +17,6 @@ import {
 export class AffiliateClicksCleanupService {
   private readonly logger = new Logger(AffiliateClicksCleanupService.name)
 
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(AFFILIATE_CLICK_REPOSITORY) private readonly clicks: AffiliateClickRepository,
     @Inject(AffiliateSettingsService) private readonly settings: AffiliateSettingsService,

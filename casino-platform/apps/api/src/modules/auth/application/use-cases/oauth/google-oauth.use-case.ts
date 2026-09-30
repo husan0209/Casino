@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
@@ -9,10 +9,13 @@ import {
   OAuthNotConfiguredError,
   OAuthStateError,
   OAuthExchangeError,
+  OAuthUpstreamError,
 } from '@modules/auth/domain/errors'
 
-import { OAuthUserProvisioningService,
-  type OAuthSignInResult,} from './oauth-user-provisioning.service'
+import {
+  OAuthUserProvisioningService,
+  type OAuthSignInResult,
+} from './oauth-user-provisioning.service'
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
@@ -30,11 +33,11 @@ interface StatePayload {
 @Injectable()
 export class GoogleOAuthUseCase {
   constructor(
-    private config: ConfigService,
-    private provisioning: OAuthUserProvisioningService,
+    @Inject(ConfigService) private config: ConfigService,
+    @Inject(OAuthUserProvisioningService) private provisioning: OAuthUserProvisioningService,
   ) {}
 
-  private credentials(): { clientId: string; clientSecret: string; } {
+  private credentials(): { clientId: string; clientSecret: string } {
     const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')
     const clientSecret = this.config.get<string>('GOOGLE_CLIENT_SECRET')
     if (!clientId || !clientSecret) {
@@ -114,23 +117,23 @@ export class GoogleOAuthUseCase {
         }),
       })
       if (!tokenRes.ok) {
-        throw new Error(`token ${tokenRes.status}`)
+        throw new OAuthUpstreamError(`token ${tokenRes.status}`)
       }
       const { access_token } = (await tokenRes.json()) as { access_token?: string }
       if (!access_token) {
-        throw new Error('no access_token')
+        throw new OAuthUpstreamError('no access_token')
       }
 
       const uiRes = await fetch(USERINFO_URL, {
         headers: { Authorization: `Bearer ${access_token}` },
       })
       if (!uiRes.ok) {
-        throw new Error(`userinfo ${uiRes.status}`)
+        throw new OAuthUpstreamError(`userinfo ${uiRes.status}`)
       }
       const ui = (await uiRes.json()) as { sub: string; email?: string; email_verified?: boolean }
       providerUserId = ui.sub
       if (!ui.email || ui.email_verified === false) {
-        throw new Error('email not available/verified')
+        throw new OAuthUpstreamError('email not available/verified')
       }
       email = ui.email
     } catch (e) {

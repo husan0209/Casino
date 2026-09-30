@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Post, Query, Req, Res, UseGuards, UsePipes } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { type Request, type Response } from 'express'
 
@@ -12,16 +23,16 @@ import { type UserActor } from '@/common/types/req-user'
 
 import { type UserRole } from '@casino/database'
 
-import { type ChangePasswordUseCase } from '../../application/use-cases/change-password.use-case'
-import { type ForgotPasswordUseCase } from '../../application/use-cases/forgot-password.use-case'
-import { type LoginUseCase } from '../../application/use-cases/login.use-case'
-import { type LogoutUseCase } from '../../application/use-cases/logout.use-case'
-import { type GoogleOAuthUseCase } from '../../application/use-cases/oauth/google-oauth.use-case'
-import { type TelegramLoginUseCase } from '../../application/use-cases/oauth/telegram-login.use-case'
-import { type RefreshUseCase } from '../../application/use-cases/refresh.use-case'
-import { type RegisterUseCase } from '../../application/use-cases/register.use-case'
-import { type ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case'
-import { type VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case'
+import { ChangePasswordUseCase } from '../../application/use-cases/change-password.use-case'
+import { ForgotPasswordUseCase } from '../../application/use-cases/forgot-password.use-case'
+import { LoginUseCase } from '../../application/use-cases/login.use-case'
+import { LogoutUseCase } from '../../application/use-cases/logout.use-case'
+import { GoogleOAuthUseCase } from '../../application/use-cases/oauth/google-oauth.use-case'
+import { TelegramLoginUseCase } from '../../application/use-cases/oauth/telegram-login.use-case'
+import { RefreshUseCase } from '../../application/use-cases/refresh.use-case'
+import { RegisterUseCase } from '../../application/use-cases/register.use-case'
+import { ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case'
+import { VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case'
 import { type LoginDto, LoginSchema } from '../dto/login.dto'
 import { GoogleLoginSchema, TelegramLoginSchema } from '../dto/oauth.dto'
 import {
@@ -46,17 +57,21 @@ interface RequestWithCookies {
   },
 })
 export class AuthController {
+  // Явный @Inject на КАЖДОЙ зависимости обязателен (CONVENTIONS.md §1.4): в этой
+  // сборке TypeScript 6 не выдаёт design:paramtypes, поэтому инъекция «по типу»
+  // молча передаёт undefined — весь /auth/* отдавал 500. Тип-импорты выше
+  // заменены на обычные: для @Inject нужен рантайм-объект класса.
   constructor(
-    private readonly registerUc: RegisterUseCase,
-    private readonly verifyUc: VerifyEmailUseCase,
-    private readonly loginUc: LoginUseCase,
-    private readonly refreshUc: RefreshUseCase,
-    private readonly logoutUc: LogoutUseCase,
-    private readonly forgotUc: ForgotPasswordUseCase,
-    private readonly resetUc: ResetPasswordUseCase,
-    private readonly changePasswordUc: ChangePasswordUseCase,
-    private readonly googleUc: GoogleOAuthUseCase,
-    private readonly telegramUc: TelegramLoginUseCase,
+    @Inject(RegisterUseCase) private readonly registerUc: RegisterUseCase,
+    @Inject(VerifyEmailUseCase) private readonly verifyUc: VerifyEmailUseCase,
+    @Inject(LoginUseCase) private readonly loginUc: LoginUseCase,
+    @Inject(RefreshUseCase) private readonly refreshUc: RefreshUseCase,
+    @Inject(LogoutUseCase) private readonly logoutUc: LogoutUseCase,
+    @Inject(ForgotPasswordUseCase) private readonly forgotUc: ForgotPasswordUseCase,
+    @Inject(ResetPasswordUseCase) private readonly resetUc: ResetPasswordUseCase,
+    @Inject(ChangePasswordUseCase) private readonly changePasswordUc: ChangePasswordUseCase,
+    @Inject(GoogleOAuthUseCase) private readonly googleUc: GoogleOAuthUseCase,
+    @Inject(TelegramLoginUseCase) private readonly telegramUc: TelegramLoginUseCase,
   ) {}
 
   @Post('register')
@@ -71,7 +86,7 @@ export class AuthController {
     referralCode: string
   }> {
     // Код партнёра из ?ref= (партнёрская программа, ТЗ ч.8 §7.3). Тот же
-    // параметр используется игровой рефералкой, но резолвится независимо:
+    // параметр используется и игровой рефералкой, но резолвится независимо:
     // player-ref ищется в users.referral_code, affiliate-код — в
     // affiliates.tracking_code. Совпадёт максимум один.
     const affiliateCode = typeof req.query['ref'] === 'string' ? req.query['ref'] : undefined

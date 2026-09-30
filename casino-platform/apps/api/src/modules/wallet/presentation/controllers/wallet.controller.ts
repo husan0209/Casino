@@ -1,24 +1,30 @@
-import { Controller, Get, Param, Query, UseGuards, UsePipes } from '@nestjs/common'
+import { Controller, Get, Inject, Param, Query, UseGuards, UsePipes } from '@nestjs/common'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
-import { type WalletBalanceView, WalletFacade } from '@modules/wallet/application/wallet.facade'
+import { type WalletBalanceView, WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import { type LedgerEntryType, prisma, type Prisma } from '@casino/database'
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-import { ListTransactionsSchema, type ListTransactionsDto, type TransactionRow } from '../dto/list-transactions.dto'
+import {
+  ListTransactionsSchema,
+  type ListTransactionsDto,
+  type TransactionRow,
+} from '../dto/list-transactions.dto'
 
 @UseGuards(AuthGuard)
 @Controller('wallet')
 export class WalletController {
-  constructor(private readonly walletFacade: WalletFacade) {}
+  constructor(@Inject(WalletFacade) private readonly walletFacade: WalletFacade) {}
 
   @Get('balances')
-  async balances(@CurrentUser() currentUser: { id: string }): Promise<{ currency: string; balance: string; locked: string; available: string; }[]> {
+  async balances(
+    @CurrentUser() currentUser: { id: string },
+  ): Promise<{ currency: string; balance: string; locked: string; available: string }[]> {
     const rows = await this.walletFacade.getBalances(currentUser.id)
     return rows.map((row) => ({
       currency: row.currency,
@@ -29,7 +35,10 @@ export class WalletController {
   }
 
   @Get('balances/:currency')
-  async balance(@CurrentUser() currentUser: { id: string }, @Param('currency') currency: string): Promise<WalletBalanceView> {
+  async balance(
+    @CurrentUser() currentUser: { id: string },
+    @Param('currency') currency: string,
+  ): Promise<WalletBalanceView> {
     return this.walletFacade.getBalance(currentUser.id, currency as Currency)
   }
 
@@ -38,7 +47,17 @@ export class WalletController {
   async transactions(
     @CurrentUser() currentUser: { id: string },
     @Query() queryParams: ListTransactionsDto,
-  ): Promise<{ data: TransactionRow[]; meta: { page: number; per_page: number; total: number; total_pages: number; hasNext: boolean; hasPrev: boolean } }> {
+  ): Promise<{
+    data: TransactionRow[]
+    meta: {
+      page: number
+      per_page: number
+      total: number
+      total_pages: number
+      hasNext: boolean
+      hasPrev: boolean
+    }
+  }> {
     const page = parseInt(queryParams.page ?? '1', 10) || 1
     const perPage = Math.min(parseInt(queryParams.per_page || '20', 10) || 20, 100)
 
@@ -140,7 +159,10 @@ export class WalletController {
    * Период §11: `from` — сутки целиком с начала, `to` — включая весь день.
    * Формат дат уже проверен Zod-схемой (YYYY-MM-DD), поэтому здесь только сборка.
    */
-  private periodFilter(from?: string, to?: string): Pick<Prisma.LedgerEntryWhereInput, 'createdAt'> {
+  private periodFilter(
+    from?: string,
+    to?: string,
+  ): Pick<Prisma.LedgerEntryWhereInput, 'createdAt'> {
     if (from === undefined && to === undefined) {
       return {}
     }

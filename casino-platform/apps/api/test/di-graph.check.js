@@ -31,15 +31,18 @@ function setEnv() {
   process.env['ADMIN_URL'] = process.env['ADMIN_URL'] || 'http://localhost:3002'
   process.env['DOMAIN'] = process.env['DOMAIN'] || 'localhost'
   // Без Redis планировщик и воркеры молча выключаются — это нужно, чтобы
-  // проверка не зависела от запущенного Redis.
-  delete process.env['REDIS_URL']
+  // проверка не зависела от запущенного Redis. Именно поэтому ставим
+  // заглушку, а НЕ удаляем переменную: env.validation.ts требует REDIS_URL
+  // присутствовать, и удаление валило проверку на старте. Подключения к
+  // Redis при preview: true не происходит — lifecycle-хуки не выполняются.
+  process.env['REDIS_URL'] = process.env['REDIS_URL'] || 'redis://127.0.0.1:6379'
 }
 
 async function main() {
   setEnv()
   const { AppModule } = require('../dist/app.module')
   const { AffiliateFacade } = require('../dist/modules/affiliate/facade/affiliate.facade')
-  const { WalletFacade } = require('../dist/modules/wallet/application/wallet.facade')
+  const { WalletFacade } = require('../dist/modules/wallet/facade/wallet.facade')
 
   const app = await NestFactory.create(AppModule, { preview: true, logger: false })
   const affiliateFacade = app.get(AffiliateFacade, { strict: false })

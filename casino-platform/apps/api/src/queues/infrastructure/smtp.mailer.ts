@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module'
 
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { AppError } from '@casino/shared-utils'
@@ -26,14 +26,24 @@ export class EmailNotConfiguredError extends AppError {
     super('SMTP не настроен: письма не могут быть отправлены')
   }
 }
+/** Волна 3в (G17): был raw Error в mailerFactory. */
+export class SmtpHostRequiredError extends AppError {
+  readonly code = 'SMTP_HOST_REQUIRED_IN_PRODUCTION'
+  readonly httpStatus = 500
+  constructor() {
+    super('SMTP_HOST_REQUIRED_IN_PRODUCTION')
+  }
+}
 
 @Injectable()
 export class SmtpMailer implements MailerPort {
   private readonly logger = new Logger(SmtpMailer.name)
   private transport: SmtpTransport | null = null
 
-  constructor(private config: ConfigService) {
-    // пусто: ConfigService через DI
+  constructor(@Inject(ConfigService) private config: ConfigService) {
+    // Явный @Inject обязателен: в этой сборке emitDecoratorMetadata не выдаёт
+    // design:paramtypes, поэтому инъекция «по типу» передала бы undefined
+    // (см. CONVENTIONS.md §1.4).
   }
 
   /** nodemailer — optional peer: require ленивый, чтобы dev-среда без пакета собиралась. */
@@ -66,7 +76,8 @@ export class SmtpMailer implements MailerPort {
       host,
       port: Number(this.config.get<string>('SMTP_PORT') || 587),
       secure: Number(this.config.get<string>('SMTP_PORT')) === 465,
-      ...(smtpUser !== undefined && smtpPassword !== undefined && { auth: { user: smtpUser, pass: smtpPassword } }),
+      ...(smtpUser !== undefined &&
+        smtpPassword !== undefined && { auth: { user: smtpUser, pass: smtpPassword } }),
     })
     return this.transport
   }
@@ -89,7 +100,7 @@ export class SmtpMailer implements MailerPort {
 @Injectable()
 export class DevLogMailer implements MailerPort {
   private readonly logger = new Logger(DevLogMailer.name)
-  constructor(config: ConfigService) {
+  constructor(@Inject(ConfigService) config: ConfigService) {
     void config
   }
   async send(msg: MailMessage): Promise<void> {
@@ -102,7 +113,7 @@ export function mailerFactory(config: ConfigService): MailerPort {
     return new SmtpMailer(config)
   }
   if (config.get<string>('NODE_ENV') === 'production') {
-    throw new Error('SMTP_HOST_REQUIRED_IN_PRODUCTION')
+    throw new SmtpHostRequiredError()
   }
   return new DevLogMailer(config)
 }

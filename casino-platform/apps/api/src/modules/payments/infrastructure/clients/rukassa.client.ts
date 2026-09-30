@@ -1,12 +1,13 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
 
 import { AppError } from '@casino/shared-utils'
 
+import { PaymentProviderError } from '../../domain/errors'
 import { type IRukassaClient, type RukassaCreatePayment } from '../../domain/payments.ports'
 
 export type { RukassaCreatePayment }
@@ -46,7 +47,7 @@ function pickPaymentFields(data: Record<string, unknown>): {
 @Injectable()
 export class RukassaClient implements IRukassaClient {
   private readonly logger = new Logger(RukassaClient.name)
-  constructor(private config: ConfigService) {}
+  constructor(@Inject(ConfigService) private config: ConfigService) {}
 
   private isProd(): boolean {
     return this.config.get<string>('NODE_ENV') === 'production'
@@ -92,13 +93,15 @@ export class RukassaClient implements IRukassaClient {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       })
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
+        throw new PaymentProviderError(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
       }
       // external PSP payload — defensive parsing неизвестной формы
       const data = (await res.json()) as Record<string, unknown>
       const { paymentId, paymentUrl } = pickPaymentFields(data)
       if (!paymentId || !paymentUrl) {
-        throw new Error(`unexpected response shape: ${JSON.stringify(data).slice(0, 200)}`)
+        throw new PaymentProviderError(
+          `unexpected response shape: ${JSON.stringify(data).slice(0, 200)}`,
+        )
       }
       this.logger.log(`Rukassa order created: ${paymentId}`)
       return { paymentId, paymentUrl }
@@ -119,7 +122,7 @@ export class RukassaClient implements IRukassaClient {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`)
+      throw new PaymentProviderError(`HTTP ${res.status}`)
     }
     // external PSP payload — defensive parsing неизвестной формы
     const d = (await res.json()) as Record<string, unknown>

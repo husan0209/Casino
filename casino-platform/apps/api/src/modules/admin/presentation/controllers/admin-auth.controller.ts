@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UnauthorizedException, UsePipes } from '@nestjs/common'
+import { Body, Controller, Inject, Post, UsePipes } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -6,6 +6,7 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminRole, prisma } from '@casino/database'
 
 import { AuditLogService } from '../../application/audit-log.service'
+import { InvalidAdminCredentialsError } from '../../domain/errors'
 import { AdminAuthService } from '../../infrastructure/admin-jwt.service'
 import { AdminLoginSchema } from '../dto/admin-auth.dto'
 
@@ -24,19 +25,21 @@ import { AdminLoginSchema } from '../dto/admin-auth.dto'
 @Controller('admin/auth')
 export class AdminAuthController {
   constructor(
-    private auth: AdminAuthService,
-    private audit: AuditLogService,
+    @Inject(AdminAuthService) private auth: AdminAuthService,
+    @Inject(AuditLogService) private audit: AuditLogService,
   ) {}
   @Post('login')
   @UsePipes(new ZodValidationPipe(AdminLoginSchema))
-  async login(@Body() body: { email: string; password: string }): Promise<{ accessToken: string; admin: { id: string; email: string; role: AdminRole; }; }> {
+  async login(
+    @Body() body: { email: string; password: string },
+  ): Promise<{ accessToken: string; admin: { id: string; email: string; role: AdminRole } }> {
     const admin = await this.auth.validate(body.email, body.password)
     if (!admin) {
       // Аудит контрактов 2026-09-26: раньше возвращалось {success:false, error}
       // с HTTP 200 (interceptor пропускал объект с ключом success) — клиент
       // получал data:undefined и «успешный» вход без токена. 401 + стандартный
       // error-конверт из GlobalExceptionFilter — как у всех остальных эндпоинтов.
-      throw new UnauthorizedException('Неверный email или пароль')
+      throw new InvalidAdminCredentialsError('Неверный email или пароль')
     }
     await prisma.adminUser.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } })
     await this.audit.log({ actorType: 'admin', actorId: admin.id, action: 'admin.login' })

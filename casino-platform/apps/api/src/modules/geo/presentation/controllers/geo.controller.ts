@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common'
+import { Controller, Get, Inject, Req, UseGuards } from '@nestjs/common'
 import { type Request } from 'express'
 
 import { OptionalAuthGuard } from '@/common/guards/optional-auth.guard'
@@ -9,7 +9,7 @@ import { GeoFacade } from '../../facade/geo.facade'
 
 @Controller('geo')
 export class GeoController {
-  constructor(private geo: GeoFacade) {}
+  constructor(@Inject(GeoFacade) private geo: GeoFacade) {}
 
   @Get('config')
   @UseGuards(OptionalAuthGuard)

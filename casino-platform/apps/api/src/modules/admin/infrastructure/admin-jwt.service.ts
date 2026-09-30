@@ -1,10 +1,12 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import * as argon2 from 'argon2'
 
 import { type AdminRole, prisma } from '@casino/database'
+
+import { AdminJwtTokenError } from '../domain/errors'
 
 const b64url = (buf: Buffer): string => buf.toString('base64url')
 
@@ -21,17 +23,32 @@ function hs256Verify(secret: string, token: string): Record<string, unknown> {
   const expected = createHmac('sha256', secret).update(`${h}.${p}`).digest()
   const given = Buffer.from(sig!, 'base64url')
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
-    throw new Error('BAD_SIGNATURE')
+    throw new AdminJwtTokenError('BAD_SIGNATURE')
   }
   return JSON.parse(Buffer.from(p!, 'base64url').toString()) as Record<string, unknown>
 }
 
 @Injectable()
 export class AdminAuthService {
-  constructor(private config: ConfigService) {}
-  async validate(email: string, password: string): Promise<{ id: string; email: string; passwordHash: string; role: AdminRole; firstName: string | null; lastName: string | null; isActive: boolean; createdBy: string | null; lastLoginAt: Date | null; createdAt: Date; updatedAt: Date; } | null> {
+  constructor(@Inject(ConfigService) private config: ConfigService) {}
+  async validate(
+    email: string,
+    password: string,
+  ): Promise<{
+    id: string
+    email: string
+    passwordHash: string
+    role: AdminRole
+    firstName: string | null
+    lastName: string | null
+    isActive: boolean
+    createdBy: string | null
+    lastLoginAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+  } | null> {
     const admin = await prisma.adminUser.findUnique({ where: { email: email.toLowerCase() } })
-    if (!admin || !admin.isActive) {
+    if (!admin?.isActive) {
       return null
     }
     const ok = await argon2.verify(admin.passwordHash, password)
@@ -60,7 +77,7 @@ export class AdminAuthService {
     const payload = hs256Verify(this.config.get<string>('JWT_ACCESS_SECRET')!, token)
     const exp = typeof payload['exp'] === 'number' ? payload['exp'] : 0
     if (exp * 1000 < Date.now()) {
-      throw new Error('TOKEN_EXPIRED')
+      throw new AdminJwtTokenError('TOKEN_EXPIRED')
     }
     return payload
   }

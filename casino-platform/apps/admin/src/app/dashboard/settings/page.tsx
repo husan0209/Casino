@@ -60,7 +60,7 @@ export default function SettingsPage(): React.JSX.Element {
       )}
 
       {list.isLoading && <Loading />}
-      {list.data && list.data.length === 0 && (
+      {list.data?.length === 0 && (
         <div className="text-sm text-[#8b8ba7]">
           Настройки пока не заданы (таблица system_settings пуста).
         </div>

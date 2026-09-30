@@ -1,4 +1,17 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
+// Inject обязателен в этой сборке: emitDecoratorMetadata не выдаёт
+// design:paramtypes, поэтому инъекция «по типу» молча даёт undefined
+// (CONVENTIONS §1.4). ForbiddenException убран — в теле файла не используется.
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common'
 import { type Request } from 'express'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -8,18 +21,21 @@ import { type AdminUserRow } from '@modules/admin/domain/admin.repository'
 
 import { AdminUsersService } from '../../application/admin-users.service'
 import { AuditLogService } from '../../application/audit-log.service'
+import { SuperadminOnlyError } from '../../domain/errors'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { CreateAdminSchema } from '../dto/admin-admins.dto'
 
 function isSuper(req: Request): boolean {
-  return req.user?.role === 'superadmin'
+  const user = req.user
+  // 'role' in user отсекает AffiliateActor: у партнёрского токена роли нет.
+  return user !== undefined && 'role' in user && user.role === 'superadmin'
 }
 @UseGuards(AdminAuthGuard)
 @Controller('admin/admins')
 export class AdminAdminsController {
   constructor(
-    private svc: AdminUsersService,
-    private audit: AuditLogService,
+    @Inject(AdminUsersService) private svc: AdminUsersService,
+    @Inject(AuditLogService) private audit: AuditLogService,
   ) {}
   @Get() async list(): Promise<AdminUserRow[]> {
     const r = await this.svc.list(1, 100)
@@ -31,7 +47,7 @@ export class AdminAdminsController {
     // Аудит контрактов 2026-09-26: раньше {success:false, error} с HTTP 200 —
     // клиент уходил в onSuccess и рапортовал об успехе. 403 + error-конверт.
     if (!isSuper(req)) {
-      throw new ForbiddenException('superadmin only')
+      throw new SuperadminOnlyError('superadmin only')
     }
     const admin = await this.svc.create(
       body as unknown as Parameters<typeof this.svc.create>[0],
@@ -47,9 +63,9 @@ export class AdminAdminsController {
     return admin
   }
   @Post(':id/deactivate')
-  async deactivate(@Param('id') id: string, @Req() req: Request): Promise<{ ok: boolean; }> {
+  async deactivate(@Param('id') id: string, @Req() req: Request): Promise<{ ok: boolean }> {
     if (!isSuper(req)) {
-      throw new ForbiddenException('superadmin only')
+      throw new SuperadminOnlyError('superadmin only')
     }
     await this.svc.block(id)
     await this.audit.log({

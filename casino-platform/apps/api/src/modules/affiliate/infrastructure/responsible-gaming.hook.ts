@@ -10,7 +10,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 
 import { ClawbackPlayerCommissionsUseCase } from '../application/use-cases/clawback-player-commissions.use-case'
 
-import type { ResponsibleGamingHook } from '../../users/domain/responsible-gaming-hook'
+import type { ResponsibleGamingHook } from '../../../common/ports/responsible-gaming-hook'
 
 @Injectable()
 export class AffiliateResponsibleGamingHook implements ResponsibleGamingHook {

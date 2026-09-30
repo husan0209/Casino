@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
@@ -11,7 +11,8 @@ import {
   type ParsedProviderCallback,
   type ProviderGameRow,
 } from '@modules/casino/domain/provider-adapter.interface'
-import { PaymentProviderNotConfiguredError } from '@modules/payments/infrastructure/clients/rukassa.client'
+
+import { CasinoProviderError, CasinoProviderNotConfiguredError } from '../../../domain/errors'
 
 const has = (v: unknown): boolean => v !== null && v !== undefined
 
@@ -88,28 +89,29 @@ function mapProviderGame(g: RawGameRow): ProviderGameRow {
  * после сверки с менеджером правится **только** эта таблица, и спек сразу показывает
  * diff (expected vs actual HMAC для каждой операции).
  */
-export const CALLBACK_MESSAGE_BUILDERS: Record<string, (body: Record<string, unknown>) => string> = {
-  getbalance: (b) => `${b.agentID}${b.userID}`,
-  withdraw: (b) => `${b.agentID}${b.userID}${AMT(b.amount)}${b.transactionID}${b.roundID}`,
-  deposit: (b) =>
-    `${b.agentID}${b.userID}${AMT(b.amount)}${b.refTransactionID ?? ''}${b.transactionID ?? ''}${b.roundID ?? ''}`,
-  betwin: (b) =>
-    `${b.agentID}${b.userID}${AMT(b.betAmount)}${AMT(b.winAmount)}${b.transactionID}${b.roundID}`,
-  rollbacktransaction: (b) => `${b.agentID}${b.userID}${b.refTransactionID}`,
-}
+export const CALLBACK_MESSAGE_BUILDERS: Record<string, (body: Record<string, unknown>) => string> =
+  {
+    getbalance: (b) => `${b.agentID}${b.userID}`,
+    withdraw: (b) => `${b.agentID}${b.userID}${AMT(b.amount)}${b.transactionID}${b.roundID}`,
+    deposit: (b) =>
+      `${b.agentID}${b.userID}${AMT(b.amount)}${b.refTransactionID ?? ''}${b.transactionID ?? ''}${b.roundID ?? ''}`,
+    betwin: (b) =>
+      `${b.agentID}${b.userID}${AMT(b.betAmount)}${AMT(b.winAmount)}${b.transactionID}${b.roundID}`,
+    rollbacktransaction: (b) => `${b.agentID}${b.userID}${b.refTransactionID}`,
+  }
 
 @Injectable()
 export class GitslotparkProviderAdapter implements GameProviderAdapter {
   private readonly logger = new Logger(GitslotparkProviderAdapter.name)
 
-  constructor(private config: ConfigService) {}
+  constructor(@Inject(ConfigService) private config: ConfigService) {}
 
-  private creds(): { agentId: string; apiToken: string; secret: string; } {
+  private creds(): { agentId: string; apiToken: string; secret: string } {
     const agentId = this.config.get<string>('GITSLOTPARK_AGENT_ID')
     const apiToken = this.config.get<string>('GITSLOTPARK_API_TOKEN')
     const secret = this.config.get<string>('GITSLOTPARK_SECRET_KEY')
     if (!agentId || !apiToken || !secret) {
-      throw new PaymentProviderNotConfiguredError(
+      throw new CasinoProviderNotConfiguredError(
         'GitSlotPark',
         'GITSLOTPARK_AGENT_ID, GITSLOTPARK_API_TOKEN, GITSLOTPARK_SECRET_KEY',
       )
@@ -140,14 +142,14 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
       signal: AbortSignal.timeout(30_000),
     })
     if (!res.ok) {
-      throw new Error(`userAuth HTTP ${res.status}`)
+      throw new CasinoProviderError(`userAuth HTTP ${res.status}`)
     }
     // external PSP payload — defensive parsing неизвестной формы
     const d = (await res.json()) as Record<string, unknown>
     // ответ: {status:0, game_url|url|launch_url} — парсим defensively
     const url = String(d.game_url ?? d.url ?? d.launch_url ?? '')
     if (String(d.status ?? '0') !== '0' || !url) {
-      throw new Error(`userAuth failed: ${JSON.stringify(d).slice(0, 200)}`)
+      throw new CasinoProviderError(`userAuth failed: ${JSON.stringify(d).slice(0, 200)}`)
     }
     return { url }
   }
@@ -160,7 +162,7 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
       signal: AbortSignal.timeout(30_000),
     })
     if (!res.ok) {
-      throw new Error(`gamelist HTTP ${res.status}`)
+      throw new CasinoProviderError(`gamelist HTTP ${res.status}`)
     }
     // Внешний API без контракта — ответ читается через unknown-индексацию с фолбэками
     const d = (await res.json()) as GameListEnvelope
@@ -190,7 +192,10 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
     }
   }
 
-  parseCallback(_headers: Record<string, string>, body: Record<string, unknown>): ParsedProviderCallback {
+  parseCallback(
+    _headers: Record<string, string>,
+    body: Record<string, unknown>,
+  ): ParsedProviderCallback {
     const op = String(_headers['x-gsp-op'] || '').toLowerCase()
     const map: Record<string, ParsedProviderCallback['action']> = {
       getbalance: 'balance',
@@ -214,12 +219,15 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
     }
   }
 
-  formatSuccessResponse(balance: string, _transactionId?: string): { status: number; balance: string; } {
+  formatSuccessResponse(
+    balance: string,
+    _transactionId?: string,
+  ): { status: number; balance: string } {
     // Код результата 0 = success по таблице GitSlotPark
     return { status: 0, balance: Number(balance).toFixed(2) }
   }
 
-  formatErrorResponse(code: string, message: string): { status: number; message: string; } {
+  formatErrorResponse(code: string, message: string): { status: number; message: string } {
     const codes: Record<string, number> = {
       INSUFFICIENT_FUNDS: 6,
       SESSION_EXPIRED: 5,

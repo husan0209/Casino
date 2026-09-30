@@ -16,7 +16,7 @@ import { errorMessage } from '@/common/utils/error-message'
 
 import type { Currency } from '@casino/shared-types'
 
-import { WalletFacade } from '../../../wallet/application/wallet.facade'
+import { WalletFacade } from '../../../wallet/facade/wallet.facade'
 import {
   AFFILIATE_COMMISSION_REPOSITORY,
   AFFILIATE_REPOSITORY,

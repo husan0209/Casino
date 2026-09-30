@@ -1,6 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { IUserProfileRepository, USER_PROFILE_REPOSITORY, type UserProfileFull } from '../../domain/repositories/user-profile.repository'
+import { MeNotFoundError } from '../../domain/errors'
+import {
+  type IUserProfileRepository,
+  USER_PROFILE_REPOSITORY,
+  type UserProfileFull,
+} from '../../domain/repositories/user-profile.repository'
 
 @Injectable()
 export class GetMeUseCase {
@@ -8,7 +13,7 @@ export class GetMeUseCase {
   async execute(userId: string): Promise<UserProfileFull> {
     const data = await this.repo.getMe(userId)
     if (!data) {
-      throw new Error('NOT_FOUND')
+      throw new MeNotFoundError()
     }
     return data
   }

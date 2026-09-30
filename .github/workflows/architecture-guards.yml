@@ -404,6 +404,20 @@ jobs:
         id: g21
         run: sh scripts/bin/tech-debt check use-case-specs
 
+      # ──────────────────────────────────────────────────────────────
+      # Q. Явный Nest-DI (гард найден при переезде на TS 6 / tsgo)
+      # Catches: emitDecoratorMetadata:false → конструктор без @Inject собирается,
+      #          проходит tsc и ESLint, и падает в рантайме первым же вызовом
+      #          («Cannot read properties of undefined (reading 'execute')»).
+      #          Поймано E2E player-lifecycle: AuthController с 10 неявными params.
+      # Rule: docs/ARCHITECTURE.md §5.3, docs/AI_DEVELOPMENT_RULES.md §3.2,
+      #       docs/MODULE_TEMPLATE.md (каркасы провайдеров)
+      # NOTE: детектор — scripts/check-explicit-di.mjs (без зависимостей, node из образа)
+      # ──────────────────────────────────────────────────────────────
+      - name: G22 — Nest DI tokens are declared explicitly
+        id: g22
+        run: node scripts/check-explicit-di.mjs
+
       # ── Final summary ─────────────────────────────────────────────
       - name: Summary
         if: always()
@@ -430,3 +444,4 @@ jobs:
           echo "- G19 eslint-disable rat.:  ${{ steps.g19.outcome }}"
           echo "- G20 money-number ratchet: ${{ steps.g20.outcome }}"
           echo "- G21 use-case specs rat.:  ${{ steps.g21.outcome }}"
+          echo "- G22 explicit Nest DI:     ${{ steps.g22.outcome }}"

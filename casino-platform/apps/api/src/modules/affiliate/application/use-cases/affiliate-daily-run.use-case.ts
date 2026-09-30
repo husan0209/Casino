@@ -64,7 +64,6 @@ export function resolvePeriod(dateStr?: string): DailyPeriod {
 export class AffiliateDailyRunUseCase {
   private readonly logger = new Logger(AffiliateDailyRunUseCase.name)
 
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(AFFILIATE_ATTRIBUTION_REPOSITORY)
     private readonly attributions: AffiliateAttributionRepository,
@@ -140,7 +139,6 @@ export class AffiliateDailyRunUseCase {
     }
   }
 
-  // eslint-disable-next-line max-params -- аргументы задаются предметной областью: атрибуция + валюта + период + накопитель
   private async processCurrency(
     item: AttributionForCalc,
     currency: string,
