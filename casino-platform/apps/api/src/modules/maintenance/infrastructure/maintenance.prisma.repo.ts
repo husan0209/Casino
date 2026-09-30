@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import Redis from 'ioredis'
 
@@ -32,13 +32,23 @@ const RATES_CACHE_TTL_SECONDS = 300
 export class PaymentJobHandlers {
   // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
-    private readonly expire: ExpireDepositsJob,
-    private readonly rates: UpdateRatesJob,
-    private readonly reminder: WithdrawalReminderJob,
-    private readonly cleanupSessions: CleanupSessionsJob,
+    @Inject(ExpireDepositsJob) private readonly expire: ExpireDepositsJob,
+    @Inject(UpdateRatesJob) private readonly rates: UpdateRatesJob,
+    @Inject(WithdrawalReminderJob) private readonly reminder: WithdrawalReminderJob,
+    @Inject(CleanupSessionsJob) private readonly cleanupSessions: CleanupSessionsJob,
   ) {}
 
-  get map(): Omit<MaintenanceHandlers, 'referral-daily'> {
+  /**
+   * Задачи, диспетчеризуемые из этого класса.
+   *
+   * `referral-daily` и три affiliate-задачи добавляются в MaintenanceModule
+   * через фабрику MAINTENANCE_HANDLERS — они требуют модулей, которые этот
+   * класс не тянет. Тип отражает реальность: здесь их нет.
+   */
+  get map(): Omit<
+    MaintenanceHandlers,
+    'referral-daily' | 'affiliate-daily' | 'affiliate-qualification' | 'affiliate-clicks-cleanup'
+  > {
     return {
       'expire-deposits': () => this.expire.execute(),
       'update-rates': () => this.rates.execute(),
@@ -62,7 +72,14 @@ export class PrismaMaintenanceRepo implements IPaymentMaintenanceRepo {
   async listPendingWithdrawals(): Promise<MaintenancePaymentRow[]> {
     const rows = await prisma.paymentRequest.findMany({
       where: { type: 'withdrawal', status: 'pending' },
-      select: { id: true, createdAt: true, provider: true, expiresAt: true, amount: true, currency: true },
+      select: {
+        id: true,
+        createdAt: true,
+        provider: true,
+        expiresAt: true,
+        amount: true,
+        currency: true,
+      },
     })
     return rows.map((r) => ({
       id: r.id,
@@ -97,7 +114,11 @@ export class PrismaReminderAuditRepo implements IReminderAuditRepo {
     return row !== null
   }
 
-  async recordReminder(input: { targetId: string; adminsNotified: number; count: number }): Promise<void> {
+  async recordReminder(input: {
+    targetId: string
+    adminsNotified: number
+    count: number
+  }): Promise<void> {
     await prisma.auditLog.create({
       data: {
         actorType: 'system',
@@ -124,9 +145,14 @@ export class PrismaReminderAuditRepo implements IReminderAuditRepo {
 export class PrismaExchangeRateWriter implements IExchangeRateWriter {
   private redis: Redis | null = null
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(@Inject(ConfigService) private readonly config: ConfigService) {}
 
-  async saveRate(input: { currencyFrom: string; currencyTo: string; rate: string; source: string }): Promise<void> {
+  async saveRate(input: {
+    currencyFrom: string
+    currencyTo: string
+    rate: string
+    source: string
+  }): Promise<void> {
     await prisma.exchangeRate.create({ data: input })
   }
 
@@ -144,9 +170,7 @@ export class PrismaExchangeRateWriter implements IExchangeRateWriter {
     if (!url) {
       return
     }
-    if (!this.redis) {
-      this.redis = new Redis(url, { maxRetriesPerRequest: null, lazyConnect: true })
-    }
+    this.redis ??= new Redis(url, { maxRetriesPerRequest: null, lazyConnect: true })
     await this.redis.set(RATES_REDIS_KEY, JSON.stringify(rates), 'EX', RATES_CACHE_TTL_SECONDS)
   }
 
@@ -161,10 +185,14 @@ export class PrismaExchangeRateWriter implements IExchangeRateWriter {
  */
 @Injectable()
 export class NowPaymentsRatesProvider implements IRatesProvider {
-  constructor(private readonly client: NOWPaymentsClient) {}
+  constructor(@Inject(NOWPaymentsClient) private readonly client: NOWPaymentsClient) {}
 
   async estimateRub(currency: string): Promise<{ rate: string; source: string } | null> {
-    const res = await this.client.estimate({ amount: '1', currencyFrom: currency, currencyTo: 'RUB' })
+    const res = await this.client.estimate({
+      amount: '1',
+      currencyFrom: currency,
+      currencyTo: 'RUB',
+    })
     if (!res) {
       return null
     }
@@ -179,10 +207,7 @@ export class PrismaSessionMaintenanceRepo implements ISessionMaintenanceRepo {
   async purgeDeadSessions(cutoff: Date): Promise<number> {
     const res = await prisma.session.deleteMany({
       where: {
-        OR: [
-          { expiresAt: { lt: cutoff } },
-          { revokedAt: { lt: cutoff } },
-        ],
+        OR: [{ expiresAt: { lt: cutoff } }, { revokedAt: { lt: cutoff } }],
       },
     })
     return res.count

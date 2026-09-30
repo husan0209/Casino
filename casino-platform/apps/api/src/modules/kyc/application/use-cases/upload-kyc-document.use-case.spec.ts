@@ -15,7 +15,7 @@ vi.mock('@/common/files/file-sniffer', () => ({
   extForMime: (mime: string) => `.${mime.split('/')[1]}`,
 }))
 
-function makeRepo(profileId: string | null) {
+function makeRepo(profileId: string | null): { repo: IKycRepository; docs: unknown[] } {
   const docs: unknown[] = []
   const repo = {
     getByUserId: async () => (profileId ? { id: profileId } : null),

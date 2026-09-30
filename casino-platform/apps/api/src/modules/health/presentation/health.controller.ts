@@ -1,5 +1,5 @@
-import { Controller, Get, Res } from '@nestjs/common'
-import { Response } from 'express'
+import { Controller, Get, Inject, Res } from '@nestjs/common'
+import { type Response } from 'express'
 
 import { GetReadinessUseCase } from '../application/use-cases/get-readiness.use-case'
 
@@ -10,7 +10,7 @@ import { GetReadinessUseCase } from '../application/use-cases/get-readiness.use-
  */
 @Controller('health')
 export class HealthController {
-  constructor(private readonly readinessUseCase: GetReadinessUseCase) {}
+  constructor(@Inject(GetReadinessUseCase) private readonly readinessUseCase: GetReadinessUseCase) {}
 
   @Get()
   getHealth(): { status: string; timestamp: string } {

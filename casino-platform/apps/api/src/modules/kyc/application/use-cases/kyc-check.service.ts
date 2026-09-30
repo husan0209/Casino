@@ -3,7 +3,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import { money } from '@casino/shared-utils'
 
 import { KycRequiredError } from '../../domain/errors'
-import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
+import { type IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
 
 @Injectable()
 export class KycCheckService {

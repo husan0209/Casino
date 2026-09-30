@@ -1,6 +1,7 @@
 import {
   type CanActivate,
   type ExecutionContext,
+  Inject,
   Injectable,
   ForbiddenException,
   SetMetadata,
@@ -13,7 +14,7 @@ export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
   SetMetadata('roles', roles)
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(@Inject(Reflector) private reflector: Reflector) {}
   canActivate(ctx: ExecutionContext): boolean {
     // getAllAndOverride по [handler, class]: class-level @Roles применялся ранее
     // только через get(handler) и ИГНОРИРОВАЛСЯ — любой авторизованный user
@@ -26,7 +27,13 @@ export class RolesGuard implements CanActivate {
       return true
     }
     const user = getHttpRequest(ctx).user
-    if (!user || !roles.includes(user.role)) {
+    if (user === undefined) {
+      throw new ForbiddenException('INSUFFICIENT_PERMISSIONS')
+    }
+    // AffiliateActor поля role не имеет — партнёр не админ ни при каких условиях.
+    // Отсутствие роли само по себе отсекает партнёрский токен от admin-эндпоинтов.
+    const role = 'role' in user ? user.role : null
+    if (role === null || !roles.includes(role)) {
       throw new ForbiddenException('INSUFFICIENT_PERMISSIONS')
     }
     return true

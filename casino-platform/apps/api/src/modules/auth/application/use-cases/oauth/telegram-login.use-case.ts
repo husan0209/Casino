@@ -1,9 +1,12 @@
 import { createHash, createHmac, timingSafeEqual } from 'crypto'
 
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
-import { type OAuthSignInResult, OAuthUserProvisioningService } from '@modules/auth/application/use-cases/oauth/oauth-user-provisioning.service'
+import {
+  type OAuthSignInResult,
+  OAuthUserProvisioningService,
+} from '@modules/auth/application/use-cases/oauth/oauth-user-provisioning.service'
 import { OAuthExchangeError, OAuthNotConfiguredError } from '@modules/auth/domain/errors'
 
 const MAX_AUTH_AGE_SEC = 86_400 // виджет Telegram рекомендует отвергать данные старше суток
@@ -25,8 +28,8 @@ export interface TelegramWidgetPayload {
 @Injectable()
 export class TelegramLoginUseCase {
   constructor(
-    private config: ConfigService,
-    private provisioning: OAuthUserProvisioningService,
+    @Inject(ConfigService) private config: ConfigService,
+    @Inject(OAuthUserProvisioningService) private provisioning: OAuthUserProvisioningService,
   ) {}
 
   private verify(payload: TelegramWidgetPayload): void {

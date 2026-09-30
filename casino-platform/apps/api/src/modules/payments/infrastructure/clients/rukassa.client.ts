@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
@@ -46,7 +46,7 @@ function pickPaymentFields(data: Record<string, unknown>): {
 @Injectable()
 export class RukassaClient implements IRukassaClient {
   private readonly logger = new Logger(RukassaClient.name)
-  constructor(private config: ConfigService) {}
+  constructor(@Inject(ConfigService) private config: ConfigService) {}
 
   private isProd(): boolean {
     return this.config.get<string>('NODE_ENV') === 'production'
