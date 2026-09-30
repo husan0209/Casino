@@ -62,7 +62,11 @@ function makeHarness(passwordHash: string | null): {
   }
   const hasher = {
     hash: vi.fn().mockResolvedValue('new-hash'),
-    verify: vi.fn().mockImplementation((hash, plain) => Promise.resolve(hash === 'old-hash' && plain === 'correct')),
+    verify: vi
+      .fn()
+      .mockImplementation((hash, plain) =>
+        Promise.resolve(hash === 'old-hash' && plain === 'correct'),
+      ),
   } as unknown as PasswordHasher
   return { useCase: new ChangePasswordUseCase(users, sessions, hasher), users, sessions }
 }
@@ -77,7 +81,9 @@ describe('GAP-52 ChangePasswordUseCase', () => {
 
   it('rejects weak new password (< 8 chars) with WEAK_PASSWORD', async () => {
     const { useCase } = makeHarness('old-hash')
-    await expect(useCase.execute({ ...input, newPassword: 'short1' })).rejects.toThrow(WeakPasswordError)
+    await expect(useCase.execute({ ...input, newPassword: 'short1' })).rejects.toThrow(
+      WeakPasswordError,
+    )
   })
 
   it('rejects OAuth account without password with PASSWORD_NOT_SET, not INVALID_CREDENTIALS', async () => {
@@ -87,7 +93,9 @@ describe('GAP-52 ChangePasswordUseCase', () => {
 
   it('rejects wrong current password with INVALID_CREDENTIALS', async () => {
     const { useCase } = makeHarness('old-hash')
-    await expect(useCase.execute({ ...input, currentPassword: 'wrong' })).rejects.toThrow(InvalidCredentialsError)
+    await expect(useCase.execute({ ...input, currentPassword: 'wrong' })).rejects.toThrow(
+      InvalidCredentialsError,
+    )
   })
 
   it('happy path: updates hash and revokes all sessions EXCEPT the current one', async () => {

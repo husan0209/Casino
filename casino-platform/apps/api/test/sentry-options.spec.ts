@@ -1,10 +1,7 @@
 import { describe, it, expect } from 'vitest'
 
 import { LOG_REDACT_PATHS } from '../src/common/logger/logger.options'
-import {
-  buildSentryOptions,
-  scrubPII,
-} from '../src/common/sentry/sentry.options'
+import { buildSentryOptions, scrubPII } from '../src/common/sentry/sentry.options'
 
 /**
  * GAP-50: контракт Sentry-агрегатора (вне ТЗ, согласовано владельцем 2026-09-04).
@@ -71,8 +68,8 @@ describe('sentry.options (GAP-50)', () => {
       // глубже 6 уровней — замена на [deep], не бесконечная рекурсия
       let v: unknown = { password: 'x' }
       for (let i = 0; i < 10; i++) {
-v = { nested: v }
-}
+        v = { nested: v }
+      }
       const flat = JSON.stringify(scrubPII(v))
       expect(flat).toContain('[deep]')
     })

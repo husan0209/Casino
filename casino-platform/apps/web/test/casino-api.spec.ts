@@ -36,7 +36,15 @@ beforeEach(() => {
 describe('GAP-53 casino.api — контракты путей/методов', () => {
   it('fetchProviders → GET /casino/providers (snake_case поля)', async () => {
     mockedApi.get.mockResolvedValueOnce(
-      ok([{ slug: 'pragmatic', name: 'Pragmatic Play', logo_url: null, game_count: 12, type: 'slots' }]),
+      ok([
+        {
+          slug: 'pragmatic',
+          name: 'Pragmatic Play',
+          logo_url: null,
+          game_count: 12,
+          type: 'slots',
+        },
+      ]),
     )
     const res = await fetchProviders()
     expect(mockedApi.get).toHaveBeenCalledWith('/casino/providers', { params: undefined })

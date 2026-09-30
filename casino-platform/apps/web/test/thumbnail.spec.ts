@@ -5,11 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import {
-  isAllowedImageHost,
-  parseImageHosts,
-  thumbSource,
-} from '../src/lib/ui/thumbnail'
+import { isAllowedImageHost, parseImageHosts, thumbSource } from '../src/lib/ui/thumbnail'
 
 const HOSTS = parseImageHosts('cdn.gitslotpark.com, IMG.Example.com ,')
 

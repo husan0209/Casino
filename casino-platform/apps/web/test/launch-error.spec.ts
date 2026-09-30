@@ -28,9 +28,7 @@ describe('GAP-55 §8.4 — каждый случай ошибки запуска
   }
 
   it('все заголовки различны — экраны не схлопываются в один текст', () => {
-    const titles = new Set(
-      cases.map((testCase) => describeLaunchError(testCase.input).title),
-    )
+    const titles = new Set(cases.map((testCase) => describeLaunchError(testCase.input).title))
     expect(titles.size).toBe(cases.length)
   })
 })

@@ -76,7 +76,9 @@ describe('email HTML templates (GAP-02 post-MVP)', () => {
 
     it('subject — прежний, ссылка есть в html и в text', () => {
       expect(mail.subject).toBe('Сброс пароля')
-      expect(mail.html).toContain('href="http://localhost:3000/reset-password?token=tok_456&amp;src=mail"')
+      expect(mail.html).toContain(
+        'href="http://localhost:3000/reset-password?token=tok_456&amp;src=mail"',
+      )
       expect(mail.html).toContain('Сбросить пароль')
       expect(mail.text).toContain(RESET_LINK)
     })

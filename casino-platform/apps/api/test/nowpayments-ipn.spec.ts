@@ -17,8 +17,8 @@ function signPythonStyle(rawBody: string): string {
   const obj = JSON.parse(marked) as Record<string, unknown>
   const sorted: Record<string, unknown> = {}
   for (const k of Object.keys(obj).sort()) {
-sorted[k] = obj[k]
-}
+    sorted[k] = obj[k]
+  }
   const s = pyDumps(JSON.stringify(sorted).replace(/"\\u0000NUM:([^"\\]*)\\u0000"/g, '$1'))
   return createHmac('sha512', SECRET).update(s, 'utf8').digest('hex')
 }
@@ -32,8 +32,8 @@ function pyDumps(s: string): string {
       out += ch
     } else {
       for (const unit of ch) {
-out += '\\u' + unit.charCodeAt(0).toString(16).padStart(4, '0')
-}
+        out += '\\u' + unit.charCodeAt(0).toString(16).padStart(4, '0')
+      }
     }
   }
   return out
@@ -54,8 +54,8 @@ function markNumbers(raw: string): string {
         continue
       }
       if (ch === '"') {
-inStr = false
-}
+        inStr = false
+      }
       out += ch
       i++
       continue
@@ -99,7 +99,8 @@ describe('P0 #4: NOWPayments IPN canonical-sorted-JSON HMAC (dual-check)', () =>
   })
 
   it('подпись Python-стиля сходится независимо от порядка ключей и whitespace', () => {
-    const shuffled = '{"order_id":"order-42",  "payment_id":500,' +
+    const shuffled =
+      '{"order_id":"order-42",  "payment_id":500,' +
       '\n      "actually_paid":"10.5","pay_address":"TXabc123","payment_status":"finished"}'
     const sig = signPythonStyle(shuffled)
     expect(client().verifyIPN(shuffled, sig)).toBe(true)
@@ -133,8 +134,7 @@ describe('P0 #4: NOWPayments IPN canonical-sorted-JSON HMAC (dual-check)', () =>
     const canonical = canonicalizeForNOWPayments(raw)
     // Python НЕ экранирует «/», числа сохраняют запись, ключи отсортированы,
     // кириллица → \uXXXX в нижнем регистре
-    const u = (c: string) =>
-      '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')
+    const u = (c: string) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0')
     const cyr = 'привет'.split('').map(u).join('')
     const expected = '{"a":"x/y","b":2.50,"c":"' + cyr + '","d":[1,2.0]}'
     expect(canonical).toBe(expected)
@@ -146,8 +146,8 @@ describe('P0 #4: NOWPayments IPN canonical-sorted-JSON HMAC (dual-check)', () =>
     const obj = JSON.parse(marked) as Record<string, unknown>
     const sorted: Record<string, unknown> = {}
     for (const k of Object.keys(obj).sort()) {
-sorted[k] = obj[k]
-}
+      sorted[k] = obj[k]
+    }
     const s = pyDumps(JSON.stringify(sorted).replace(/"\\u0000NUM:([^"\\]*)\\u0000"/g, '$1'))
     const sig = createHmac('sha512', SECRET).update(s.split('/').join('\\/'), 'utf8').digest('hex')
     expect(client().verifyIPN(raw, sig)).toBe(true)

@@ -25,7 +25,7 @@ vi.mock('@/stores/auth', () => ({
 
 vi.mock('@/lib/api', () => ({
   errText: (e: unknown): string =>
-    (e as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+    (e as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error
       ?.message ?? 'Ошибка',
   apiPost: vi.fn(),
   apiGet: vi.fn(),

@@ -23,26 +23,28 @@ const SECRET = 'test_secret_gitslotpark_deterministic_only'
 const AGENT = 'AGENT42'
 const API_TOKEN = 'API_TOKEN_LOCAL'
 
-function buildConfig(overrides: {
-  agentId?: string
-  apiToken?: string
-  secret?: string
-  apiBase?: string
-} = {}): ConfigService {
+function buildConfig(
+  overrides: {
+    agentId?: string
+    apiToken?: string
+    secret?: string
+    apiBase?: string
+  } = {},
+): ConfigService {
   const config = new ConfigService()
   vi.spyOn(config, 'get').mockImplementation(((key: string) => {
     if (key === 'GITSLOTPARK_AGENT_ID') {
-return overrides.agentId ?? AGENT
-}
+      return overrides.agentId ?? AGENT
+    }
     if (key === 'GITSLOTPARK_API_TOKEN') {
-return overrides.apiToken ?? API_TOKEN
-}
+      return overrides.apiToken ?? API_TOKEN
+    }
     if (key === 'GITSLOTPARK_SECRET_KEY') {
-return overrides.secret ?? SECRET
-}
+      return overrides.secret ?? SECRET
+    }
     if (key === 'GITSLOTPARK_API_BASE') {
-return overrides.apiBase
-}
+      return overrides.apiBase
+    }
     return undefined
   }) as never)
   return config
@@ -62,7 +64,6 @@ describe('GAP-43 GitslotparkProviderAdapter', () => {
     // менеджер подтвердит — оставляем как есть; если скажет «у нас порядок X»
     // — фикс в адаптере ИЛИ в этом спеке, но НЕ односторонне.
 
-    const adapter = new GitslotparkProviderAdapter(buildConfig())
     const build = (op: string) => CALLBACK_MESSAGE_BUILDERS[op]
     const AMT = (v: unknown) => Number(v ?? 0).toFixed(2)
 
@@ -134,7 +135,10 @@ describe('GAP-43 GitslotparkProviderAdapter', () => {
   })
 
   describe('verifyCallback', () => {
-    function buildSignedBody(op: string, extra: Record<string, unknown>): {
+    function buildSignedBody(
+      op: string,
+      extra: Record<string, unknown>,
+    ): {
       headers: Record<string, string>
       body: Record<string, unknown>
     } {
@@ -205,12 +209,15 @@ describe('GAP-43 GitslotparkProviderAdapter', () => {
     const adapter = new GitslotparkProviderAdapter(buildConfig())
 
     it('withdraw → action=bet', () => {
-      const r = adapter.parseCallback({ 'x-gsp-op': 'withdraw' }, {
-        userID: 'u-1',
-        amount: '10',
-        transactionID: 'tx-w-1',
-        roundID: 'r-1',
-      })
+      const r = adapter.parseCallback(
+        { 'x-gsp-op': 'withdraw' },
+        {
+          userID: 'u-1',
+          amount: '10',
+          transactionID: 'tx-w-1',
+          roundID: 'r-1',
+        },
+      )
       expect(r.action).toBe('bet')
       expect(r.playerToken).toBe('uid:u-1')
       expect(r.playerId).toBe('u-1')
@@ -220,35 +227,44 @@ describe('GAP-43 GitslotparkProviderAdapter', () => {
     })
 
     it('betwin → action=win, betAmount из betAmount, winAmount из winAmount', () => {
-      const r = adapter.parseCallback({ 'x-gsp-op': 'betwin' }, {
-        userID: 'u-1',
-        betAmount: '10',
-        winAmount: '25',
-        transactionID: 'tx-bw-1',
-        roundID: 'r-1',
-      })
+      const r = adapter.parseCallback(
+        { 'x-gsp-op': 'betwin' },
+        {
+          userID: 'u-1',
+          betAmount: '10',
+          winAmount: '25',
+          transactionID: 'tx-bw-1',
+          roundID: 'r-1',
+        },
+      )
       expect(r.action).toBe('win')
       expect(r.betAmount).toBe('10')
       expect(r.winAmount).toBe('25')
     })
 
     it('deposit → action=win, winAmount из amount (fallback)', () => {
-      const r = adapter.parseCallback({ 'x-gsp-op': 'deposit' }, {
-        userID: 'u-1',
-        amount: '50',
-        transactionID: 'tx-d-1',
-        roundID: 'r-1',
-      })
+      const r = adapter.parseCallback(
+        { 'x-gsp-op': 'deposit' },
+        {
+          userID: 'u-1',
+          amount: '50',
+          transactionID: 'tx-d-1',
+          roundID: 'r-1',
+        },
+      )
       expect(r.action).toBe('win')
       expect(r.winAmount).toBe('50')
     })
 
     it('rollbacktransaction → action=rollback, rollbackTransactionId из refTransactionID', () => {
-      const r = adapter.parseCallback({ 'x-gsp-op': 'rollbacktransaction' }, {
-        userID: 'u-1',
-        refTransactionID: 'tx-r-1',
-        transactionID: 'tx-new-1',
-      })
+      const r = adapter.parseCallback(
+        { 'x-gsp-op': 'rollbacktransaction' },
+        {
+          userID: 'u-1',
+          refTransactionID: 'tx-r-1',
+          transactionID: 'tx-new-1',
+        },
+      )
       expect(r.action).toBe('rollback')
       expect(r.rollbackTransactionId).toBe('tx-r-1')
       expect(r.transactionId).toBe('tx-new-1')

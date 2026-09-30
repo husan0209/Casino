@@ -222,4 +222,3 @@ dDb('wallet ledger integration (real Postgres)', () => {
     expect(await prisma.ledgerEntry.count({ where: { userId } })).toBe(parallel + 1)
   })
 })
-
