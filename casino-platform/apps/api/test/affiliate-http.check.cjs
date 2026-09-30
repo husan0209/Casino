@@ -1,4 +1,9 @@
-/* eslint-disable no-console, max-lines-per-function, max-depth, max-params, @typescript-eslint/no-require-imports, @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unnecessary-condition -- автономный Node-скрипт проверки (CommonJS, без типов, линейный сценарий), а не модуль приложения */
+/*
+ * Автономный Node-скрипт проверки: CommonJS и без типов, поэтому правила
+ * модулей приложения к нему неприменимы — require() и console здесь норма,
+ * а type-aware правила видят только any.
+ */
+/* eslint-disable no-console, max-lines-per-function, max-depth, max-params, @typescript-eslint/no-require-imports, @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unnecessary-condition */
 /**
  * HTTP-проверка партнёрской программы: контроллеры, Zod, guard'ы, контракт.
  *
