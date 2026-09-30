@@ -130,9 +130,7 @@ afterAll(async () => {
   if (providerId) {
     await prisma.gameProvider.delete({ where: { id: providerId } }).catch(() => {})
   }
-  await prisma.referralReward
-    .deleteMany({ where: { referrerId: { in: userIds } } })
-    .catch(() => {})
+  await prisma.referralReward.deleteMany({ where: { referrerId: { in: userIds } } }).catch(() => {})
   for (const id of userIds) {
     await prisma.user.delete({ where: { id } }).catch(() => {})
   }
@@ -195,7 +193,7 @@ dDb('referral daily payout (real Postgres, GAP-32)', () => {
     await addGameTx(referredId, 'win', '50') // GGR = -40
 
     const today = new Date().toISOString().slice(0, 10)
-    const res = await calc.runDaily(today)
+    await calc.runDaily(today)
 
     const reward = await prisma.referralReward.findFirst({
       where: { referrerId, referredId, periodStart: { gte: new Date(today + 'T00:00:00.000Z') } },

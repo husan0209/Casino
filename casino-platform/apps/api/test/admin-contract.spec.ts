@@ -9,18 +9,19 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { AuditLogService } from '../src/modules/admin/application/audit-log.service'
 import {
   InvalidAdminCredentialsError,
   SuperadminOnlyError,
 } from '../src/modules/admin/domain/errors'
+import { AdminAdminsController } from '../src/modules/admin/presentation/controllers/admin-admins.controller'
+import { AdminAuthController } from '../src/modules/admin/presentation/controllers/admin-auth.controller'
 
+// vitest поднимает vi.mock выше импортов сам — блок стоит после строк import,
+// чтобы не рвать импорт-группу (import/order).
 vi.mock('@casino/database', () => ({
   prisma: { adminUser: { update: vi.fn().mockResolvedValue({}) } },
 }))
-
-import { AuditLogService } from '../src/modules/admin/application/audit-log.service'
-import { AdminAdminsController } from '../src/modules/admin/presentation/controllers/admin-admins.controller'
-import { AdminAuthController } from '../src/modules/admin/presentation/controllers/admin-auth.controller'
 
 const auditRepo = { log: vi.fn().mockResolvedValue(undefined) }
 const audit = new AuditLogService(
@@ -69,9 +70,9 @@ describe('аудит 2026-09-26: POST /admin/admins (создание/деакт
     await expect(
       ctl.create({ email: 'x@x.x', password: 'secret-pass', role: 'admin' }, reqWithRole('admin')),
     ).rejects.toBeInstanceOf(SuperadminOnlyError)
-    await expect(
-      ctl.deactivate('a2', reqWithRole('admin')),
-    ).rejects.toBeInstanceOf(SuperadminOnlyError)
+    await expect(ctl.deactivate('a2', reqWithRole('admin'))).rejects.toBeInstanceOf(
+      SuperadminOnlyError,
+    )
     expect(svc.create).not.toHaveBeenCalled()
     expect(svc.block).not.toHaveBeenCalled()
   })
@@ -86,7 +87,9 @@ describe('аудит 2026-09-26: POST /admin/admins (создание/деакт
 
     const res = await ctl.create({ email: 'new@casino.local' }, reqWithRole('superadmin'))
     expect(res).toEqual(created)
-    expect(auditRepo.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'admin.admin_created' }))
+    expect(auditRepo.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'admin.admin_created' }),
+    )
 
     await ctl.deactivate('a2', reqWithRole('superadmin'))
     expect(svc.block).toHaveBeenCalledWith('a2')

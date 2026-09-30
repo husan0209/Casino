@@ -1,3 +1,5 @@
+import nodeModule from 'node:module'
+
 import { ConfigService } from '@nestjs/config'
 import { describe, it, expect, vi } from 'vitest'
 
@@ -44,16 +46,24 @@ interface ModuleLike {
 }
 
 /** Подменяет Module._load так, чтобы require('nodemailer') возвращал наш stub. */
-function mockRequireNodemailer(): { createTransport: ReturnType<typeof vi.fn>; restore: () => void } {
+function mockRequireNodemailer(): {
+  createTransport: ReturnType<typeof vi.fn>
+  restore: () => void
+} {
   const createTransport = vi.fn((opts: Record<string, unknown>) => ({
     options: opts,
     sendMail: vi.fn(async () => ({ messageId: 'test-id' })),
   }))
   const stub = { createTransport }
 
-  const Module = require('node:module') as { _load: ModuleLike['_load'] }
+  const Module = nodeModule as unknown as ModuleLike
   const originalLoad = Module._load
-  Module._load = function patchedLoad(this: unknown, request: string, parent: unknown, isMain: boolean) {
+  Module._load = function patchedLoad(
+    this: unknown,
+    request: string,
+    parent: unknown,
+    isMain: boolean,
+  ) {
     if (request === NODEMAILER_MODULE_NAME) {
       return stub
     }
@@ -73,26 +83,26 @@ function buildConfig(env: SmtpEnvShape): ConfigService {
   const config = new ConfigService()
   vi.spyOn(config, 'get').mockImplementation(((key: string) => {
     if (key === 'NODE_ENV') {
-return env.NODE_ENV
-}
+      return env.NODE_ENV
+    }
     if (key === 'SMTP_HOST') {
-return env.SMTP_HOST
-}
+      return env.SMTP_HOST
+    }
     if (key === 'SMTP_PORT') {
-return env.SMTP_PORT
-}
+      return env.SMTP_PORT
+    }
     if (key === 'SMTP_USER') {
-return env.SMTP_USER
-}
+      return env.SMTP_USER
+    }
     if (key === 'SMTP_PASSWORD') {
-return env.SMTP_PASSWORD
-}
+      return env.SMTP_PASSWORD
+    }
     if (key === 'SMTP_PASS') {
-return env.SMTP_PASS
-}
+      return env.SMTP_PASS
+    }
     if (key === 'SMTP_FROM_EMAIL') {
-return env.SMTP_FROM_EMAIL ?? 'no-reply@casino.local'
-}
+      return env.SMTP_FROM_EMAIL ?? 'no-reply@casino.local'
+    }
     return undefined
   }) as never)
   return config

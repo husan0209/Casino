@@ -9,6 +9,9 @@
     "allowJs": true,
     "checkJs": false
   },
-  "include": ["src", "test"],
+  // `.eslintrc.js` — сам конфиг api: lint-staged линтует каждый staged-файл, и без
+  // него в include type-aware правила падают «Parsing error: ... TSConfig does not
+  // include this file» ещё до того, как успевают проверить содержимое.
+  "include": ["src", "test", ".eslintrc.js"],
   "exclude": ["node_modules", "dist"]
 }

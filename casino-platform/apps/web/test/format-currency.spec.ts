@@ -87,7 +87,6 @@ describe('GAP-44 formatBalance', () => {
   })
 })
 
-
 describe('GAP-55: currencyLabel — единый источник подписи валюты (ТЗ §2.5)', () => {
   it('фиат — символ, а не ISO-код (в шапке и кассе игроку виден символ)', () => {
     expect(currencyLabel('RUB')).toBe('\u20bd')

@@ -31,8 +31,8 @@ describe('Provider Stubs Security', () => {
     it('fails closed in production when keys are not configured', async () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') {
-return 'production'
-}
+          return 'production'
+        }
         return undefined
       })
 
@@ -51,31 +51,28 @@ return 'production'
     it('fails closed in production when verifying callback without secret', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') {
-return 'production'
-}
+          return 'production'
+        }
         return undefined
       })
 
-      expect(() =>
-        rukassaClient.verifyCallback({}, { order_id: '123', amount: '100' }),
-      ).toThrow(/обязательные ключи/)
+      expect(() => rukassaClient.verifyCallback({}, { order_id: '123', amount: '100' })).toThrow(
+        /обязательные ключи/,
+      )
     })
 
     it('returns false in development when secret is not configured', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') {
-return 'development'
-}
+          return 'development'
+        }
         if (key === 'RUKASSA_SECRET_KEY') {
-return undefined
-}
+          return undefined
+        }
         return undefined
       })
 
-      const result = rukassaClient.verifyCallback(
-        {},
-        { order_id: '123', amount: '100' },
-      )
+      const result = rukassaClient.verifyCallback({}, { order_id: '123', amount: '100' })
 
       expect(result).toBe(false)
     })
@@ -85,8 +82,8 @@ return undefined
     it('fails closed in production when keys are not configured', async () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') {
-return 'production'
-}
+          return 'production'
+        }
         return undefined
       })
 
@@ -104,27 +101,24 @@ return 'production'
     it('fails closed in production when verifying IPN without secret', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') {
-return 'production'
-}
+          return 'production'
+        }
         return undefined
       })
 
       expect(() =>
-        nowpaymentsClient.verifyIPN(
-          { order_id: '123', amount: '100' },
-          'fake_signature',
-        ),
+        nowpaymentsClient.verifyIPN({ order_id: '123', amount: '100' }, 'fake_signature'),
       ).toThrow(/обязательные ключи/)
     })
 
     it('returns false in development when secret is not configured', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') {
-return 'development'
-}
+          return 'development'
+        }
         if (key === 'NOWPAYMENTS_IPN_SECRET') {
-return undefined
-}
+          return undefined
+        }
         return undefined
       })
 
@@ -141,8 +135,8 @@ return undefined
     it('throws in production when verifying callback', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') {
-return 'production'
-}
+          return 'production'
+        }
         return undefined
       })
 
@@ -152,8 +146,8 @@ return 'production'
     it('returns true in development', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') {
-return 'development'
-}
+          return 'development'
+        }
         return undefined
       })
 
@@ -166,43 +160,39 @@ return 'development'
     it('throws when requesting demo provider in production', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') {
-return 'production'
-}
+          return 'production'
+        }
         if (key === 'DEMO_PROVIDER_ENABLED') {
-return false
-}
+          return false
+        }
         return undefined
       })
 
-      expect(() => factory.getAdapter('demo-provider')).toThrow(
-        'DEMO_PROVIDER_DISABLED',
-      )
+      expect(() => factory.getAdapter('demo-provider')).toThrow('DEMO_PROVIDER_DISABLED')
     })
 
     it('throws when demo provider is disabled', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') {
-return 'development'
-}
+          return 'development'
+        }
         if (key === 'DEMO_PROVIDER_ENABLED') {
-return false
-}
+          return false
+        }
         return undefined
       })
 
-      expect(() => factory.getAdapter('demo-provider')).toThrow(
-        'DEMO_PROVIDER_DISABLED',
-      )
+      expect(() => factory.getAdapter('demo-provider')).toThrow('DEMO_PROVIDER_DISABLED')
     })
 
     it('returns demo adapter when enabled in development', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') {
-return 'development'
-}
+          return 'development'
+        }
         if (key === 'DEMO_PROVIDER_ENABLED') {
-return true
-}
+          return true
+        }
         return undefined
       })
 

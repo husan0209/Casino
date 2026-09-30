@@ -12,7 +12,9 @@ import { gameBadge, gameDisplayName, gameHasDemo, gameRtpLabel } from '../src/li
 
 describe('GAP-55 имя игры (§6.4)', () => {
   it('русское название приоритетно', () => {
-    expect(gameDisplayName({ name: 'Sweet Bonanza', nameRu: 'Сладкая бонанза' })).toBe('Сладкая бонанза')
+    expect(gameDisplayName({ name: 'Sweet Bonanza', nameRu: 'Сладкая бонанза' })).toBe(
+      'Сладкая бонанза',
+    )
   })
 
   it('пустое/пробельное nameRu → оригинал (не пустая карточка)', () => {

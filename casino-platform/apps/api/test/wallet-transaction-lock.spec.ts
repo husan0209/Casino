@@ -52,7 +52,8 @@ function makeTx(calls: string[] = []) {
   }
 }
 
-function conflictOnAttempt(failAttempts: number, calls: string[]): number {
+/** Вешает на `transactionMock` конфликт P2034 первые `failAttempts` попыток. */
+function conflictOnAttempt(failAttempts: number, calls: string[]): void {
   let attempt = 0
   transactionMock.mockImplementation(async (txBody) => {
     attempt += 1
@@ -62,7 +63,6 @@ function conflictOnAttempt(failAttempts: number, calls: string[]): number {
     }
     return 'committed'
   })
-  return attempt
 }
 
 describe('GAP-57: runWalletTransaction — advisory-лок на кошелёк + ReadCommitted', () => {
@@ -72,8 +72,8 @@ describe('GAP-57: runWalletTransaction — advisory-лок на кошелёк +
 
   it('берёт advisory-лок ДО чтения кошелька (иначе лок не защищает read-modify-write)', async () => {
     const calls: string[] = []
-    transactionMock.mockImplementation(async (txBody) =>
-      txBody(makeTx(calls) as never) as Promise<unknown>,
+    transactionMock.mockImplementation(
+      async (txBody) => txBody(makeTx(calls) as never) as Promise<unknown>,
     )
 
     const res = await runWalletTransaction(TARGET, async (tx) => {
@@ -91,7 +91,9 @@ describe('GAP-57: runWalletTransaction — advisory-лок на кошелёк +
   })
 
   it('транзакция идёт на ReadCommitted, а не Serializable (лок уже сериализует)', async () => {
-    transactionMock.mockImplementation(async (txBody) => txBody(makeTx() as never) as Promise<unknown>)
+    transactionMock.mockImplementation(
+      async (txBody) => txBody(makeTx() as never) as Promise<unknown>,
+    )
 
     await runWalletTransaction(TARGET, async () => 'ok')
 
@@ -131,7 +133,7 @@ describe('GAP-57: runWalletTransaction — advisory-лок на кошелёк +
 
   it('два конфликта подряд → третья попытка коммитится (body переигран)', async () => {
     const calls: string[] = []
-    const attempts = conflictOnAttempt(2, calls)
+    conflictOnAttempt(2, calls)
     const body = vi.fn().mockResolvedValue('committed')
 
     const res = await runWalletTransaction(TARGET, body)

@@ -38,21 +38,31 @@ describe('GAP-55 лимиты и пресеты', () => {
 
 describe('GAP-55 валидация реквизитов (§10.3)', () => {
   it('карта: 16–19 цифр, пробелы и дефисы нормализуются', () => {
-    expect(validateDestination({ currency: 'RUB', method: 'card', value: '2200 7000 1234 5678' })).toBeNull()
-    expect(validateDestination({ currency: 'RUB', method: 'card', value: '2200-7000-1234-5678' })).toBeNull()
-    expect(normalizeDestination({ currency: 'RUB', method: 'card', value: '2200 7000 1234 5678' })).toBe(
-      '2200700012345678',
-    )
+    expect(
+      validateDestination({ currency: 'RUB', method: 'card', value: '2200 7000 1234 5678' }),
+    ).toBeNull()
+    expect(
+      validateDestination({ currency: 'RUB', method: 'card', value: '2200-7000-1234-5678' }),
+    ).toBeNull()
+    expect(
+      normalizeDestination({ currency: 'RUB', method: 'card', value: '2200 7000 1234 5678' }),
+    ).toBe('2200700012345678')
   })
 
   it('карта: буквы и короткое число отбиваются', () => {
-    expect(validateDestination({ currency: 'RUB', method: 'card', value: '2200 7000 abcd 5678' })).toContain('только цифры')
-    expect(validateDestination({ currency: 'RUB', method: 'card', value: '1234' })).toContain('16–19')
+    expect(
+      validateDestination({ currency: 'RUB', method: 'card', value: '2200 7000 abcd 5678' }),
+    ).toContain('только цифры')
+    expect(validateDestination({ currency: 'RUB', method: 'card', value: '1234' })).toContain(
+      '16–19',
+    )
   })
 
   it('СБП: телефон из 11 цифр', () => {
     expect(validateDestination({ currency: 'RUB', method: 'sbp', value: '79991234567' })).toBeNull()
-    expect(validateDestination({ currency: 'RUB', method: 'sbp', value: '+7 999 123-45-67' })).toContain('11 цифр')
+    expect(
+      validateDestination({ currency: 'RUB', method: 'sbp', value: '+7 999 123-45-67' }),
+    ).toContain('11 цифр')
   })
 
   it('адреса: валидные формы проходят', () => {
@@ -64,7 +74,9 @@ describe('GAP-55 валидация реквизитов (§10.3)', () => {
   })
 
   it('обрезанный адрес отбивается (32 вместо 34)', () => {
-    expect(validateDestination({ currency: 'USDT_TRC20', value: TRC20.slice(0, 32) })).not.toBeNull()
+    expect(
+      validateDestination({ currency: 'USDT_TRC20', value: TRC20.slice(0, 32) }),
+    ).not.toBeNull()
   })
 
   it('TRC20-адрес НЕ проходит валидацию BTC и наоборот (§10.3)', () => {
@@ -74,26 +86,42 @@ describe('GAP-55 валидация реквизитов (§10.3)', () => {
   })
 
   it('пустое поле и неизвестная валюта дадут текст, а не undefined', () => {
-    expect(validateDestination({ currency: 'RUB', method: 'card', value: '   ' })).toBe('Укажите реквизиты')
+    expect(validateDestination({ currency: 'RUB', method: 'card', value: '   ' })).toBe(
+      'Укажите реквизиты',
+    )
     expect(validateDestination({ currency: 'ETH', value: 'x' })).toBe('Неизвестная валюта')
   })
 })
 
 describe('GAP-55 проверка суммы (деньги — Decimal, не number)', () => {
   it('ниже минимума / выше максимума / больше остатка — отказ с причиной', () => {
-    expect(checkWithdrawAmount({ amount: '100', currency: 'RUB', available: '5000' }).reason).toBe('min')
-    expect(checkWithdrawAmount({ amount: '300000', currency: 'RUB', available: '500000' }).reason).toBe('max')
-    expect(checkWithdrawAmount({ amount: '6000', currency: 'RUB', available: '5000' }).reason).toBe('insufficient')
+    expect(checkWithdrawAmount({ amount: '100', currency: 'RUB', available: '5000' }).reason).toBe(
+      'min',
+    )
+    expect(
+      checkWithdrawAmount({ amount: '300000', currency: 'RUB', available: '500000' }).reason,
+    ).toBe('max')
+    expect(checkWithdrawAmount({ amount: '6000', currency: 'RUB', available: '5000' }).reason).toBe(
+      'insufficient',
+    )
   })
 
   it('мусор в поле — format, а не NaN-арифметика', () => {
-    expect(checkWithdrawAmount({ amount: 'abc', currency: 'RUB', available: '5000' }).reason).toBe('format')
-    expect(checkWithdrawAmount({ amount: '', currency: 'RUB', available: '5000' }).reason).toBe('format')
+    expect(checkWithdrawAmount({ amount: 'abc', currency: 'RUB', available: '5000' }).reason).toBe(
+      'format',
+    )
+    expect(checkWithdrawAmount({ amount: '', currency: 'RUB', available: '5000' }).reason).toBe(
+      'format',
+    )
   })
 
   it('разделители тысяч (пробел) принимаются, точная граница остатка — ок', () => {
-    expect(checkWithdrawAmount({ amount: '1 000', currency: 'RUB', available: '1000' }).ok).toBe(true)
-    expect(checkWithdrawAmount({ amount: '0.001', currency: 'BTC', available: '0.002' }).ok).toBe(true)
+    expect(checkWithdrawAmount({ amount: '1 000', currency: 'RUB', available: '1000' }).ok).toBe(
+      true,
+    )
+    expect(checkWithdrawAmount({ amount: '0.001', currency: 'BTC', available: '0.002' }).ok).toBe(
+      true,
+    )
   })
 })
 
@@ -104,12 +132,22 @@ describe('GAP-55 порядок проверок до формы (§10.3)', () =
   ]
 
   it('KYC не approved — стоп ПЕРЕД всеми остальными проверками', () => {
-    const blocked = resolveWithdrawPrecheck({ kycApproved: false, activeCurrency: 'RUB', wallets: [{ currency: 'RUB', available: '9999' }] })
+    const blocked = resolveWithdrawPrecheck({
+      kycApproved: false,
+      activeCurrency: 'RUB',
+      wallets: [{ currency: 'RUB', available: '9999' }],
+    })
     expect(blocked).toEqual({ kind: 'kyc_required' })
   })
 
   it('активный кошелёк с деньгами — форма в активной валюте', () => {
-    expect(resolveWithdrawPrecheck({ kycApproved: true, activeCurrency: 'RUB', wallets: [{ currency: 'RUB', available: '1200' }] })).toEqual({
+    expect(
+      resolveWithdrawPrecheck({
+        kycApproved: true,
+        activeCurrency: 'RUB',
+        wallets: [{ currency: 'RUB', available: '1200' }],
+      }),
+    ).toEqual({
       kind: 'form',
       currency: 'RUB',
       available: '1200',
@@ -118,7 +156,12 @@ describe('GAP-55 порядок проверок до формы (§10.3)', () =
 
   it('активный пуст, в другом есть — предлагаем вывести ту валюту', () => {
     const result = resolveWithdrawPrecheck({ kycApproved: true, activeCurrency: 'RUB', wallets })
-    expect(result).toMatchObject({ kind: 'suggest_currency', from: 'RUB', to: 'USDT_TRC20', amount: '150' })
+    expect(result).toMatchObject({
+      kind: 'suggest_currency',
+      from: 'RUB',
+      to: 'USDT_TRC20',
+      amount: '150',
+    })
   })
 
   it('денег нет нигде — «Нечего выводить»', () => {
@@ -132,7 +175,9 @@ describe('GAP-55 порядок проверок до формы (§10.3)', () =
   })
 
   it('кошелька активной валюты вообще нет — не нулевая форма, а предложение/отказ', () => {
-    expect(resolveWithdrawPrecheck({ kycApproved: true, activeCurrency: 'KZT', wallets })).toMatchObject({
+    expect(
+      resolveWithdrawPrecheck({ kycApproved: true, activeCurrency: 'KZT', wallets }),
+    ).toMatchObject({
       kind: 'suggest_currency',
       to: 'USDT_TRC20',
     })
@@ -153,13 +198,19 @@ describe('GAP-55 подписи, сеть и маскировка реквизи
   })
 
   it('на подтверждении карта показана последними цифрами, а не целиком (SECURITY_BASELINE)', () => {
-    const masked = maskDestination({ currency: 'RUB', method: 'card', value: '2200 7000 1234 5678' })
+    const masked = maskDestination({
+      currency: 'RUB',
+      method: 'card',
+      value: '2200 7000 1234 5678',
+    })
     expect(masked).toBe('\u2022\u2022\u2022\u2022 5678')
     expect(masked).not.toContain('2200')
   })
 
   it('телефон.masked: первая цифра + последние 4', () => {
-    expect(maskDestination({ currency: 'RUB', method: 'sbp', value: '79991234567' })).toBe('7\u2022\u2022\u2022 4567')
+    expect(maskDestination({ currency: 'RUB', method: 'sbp', value: '79991234567' })).toBe(
+      '7\u2022\u2022\u2022 4567',
+    )
   })
 
   it('адрес крипты — префикс и суффикс (проверить глазами можно, дампнуть нельзя)', () => {

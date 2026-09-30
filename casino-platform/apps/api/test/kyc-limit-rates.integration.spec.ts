@@ -1,6 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest'
 
-
 import { ExchangeRatesService } from '@modules/geo/application/exchange-rates.service'
 import { GetGeoConfigUseCase } from '@modules/geo/application/use-cases/get-geo-config.use-case'
 import { GeoFacade } from '@modules/geo/facade/geo.facade'
@@ -20,7 +19,10 @@ const createdIds: string[] = []
 
 async function makeUseCase(): Promise<GetKycStatusUseCase> {
   const reader = new PrismaExchangeRatesReader({ get: () => undefined } as never)
-  const facade = new GeoFacade(new GetGeoConfigUseCase({} as never), new ExchangeRatesService(reader))
+  const facade = new GeoFacade(
+    new GetGeoConfigUseCase({} as never),
+    new ExchangeRatesService(reader),
+  )
   return new GetKycStatusUseCase(
     {
       getStatus: async () => ({ kyc_status: 'unverified' }),

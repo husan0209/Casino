@@ -1,6 +1,6 @@
 import { PassThrough } from 'stream'
 
-import pino from 'pino'
+import { pino } from 'pino'
 
 import {
   buildPinoHttpOptions,
@@ -78,10 +78,10 @@ describe('GAP-23 pino redact', () => {
     } finally {
       process.env['NODE_ENV'] = prevNodeEnv
       if (prevFormat === undefined) {
-delete process.env['LOG_FORMAT']
-} else {
-process.env['LOG_FORMAT'] = prevFormat
-}
+        delete process.env['LOG_FORMAT']
+      } else {
+        process.env['LOG_FORMAT'] = prevFormat
+      }
     }
   })
 })
