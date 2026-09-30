@@ -51,6 +51,12 @@ import { PaymentRequestRepository } from '../payments/infrastructure/repositorie
   // и без экспорта импортирующие модули (KycModule) падали на DI (E2E, PR #15)
   // наружу отдаём фасад: прямой доступ к AuditLogService из других модулей
   // считается межмодульным долгом (гвард G16, AGENTS.md правило 4).
-  exports: [AdminFacade, AdminAuthGuard, AdminAuthService],
+  // Наружу отдаём и фасад, и сам AuditLogService: фасад — sanctioned-путь для
+  // новых модулей (правило 4, гвард G16), а maintenance пока остаётся
+  // legacy-потребителем и импортирует сервис напрямую (его долг учтён в
+  // tech-debt/cross-module-imports.txt). Убрать сервис из exports нельзя —
+  // Nest перестанет резолвить MaintenanceAdminController, и это видно только
+  // на E2E-прогоне с реальной БД.
+  exports: [AdminFacade, AuditLogService, AdminAuthGuard, AdminAuthService],
 })
 export class AdminModule {}
