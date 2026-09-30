@@ -25,7 +25,7 @@ import { useWalletStore } from '@/stores/wallet'
 export function AppHeader(): React.JSX.Element {
   const { user } = useAuth()
   const { activeCurrency, getActiveWallet, fetchWallets } = useWalletStore()
-  const { config, load } = useGeoStore()
+  const { load } = useGeoStore()
   const { openDeposit, openLogin, openWalletSwitcher } = useUIStore()
   const router = useRouter()
   const pathname = usePathname()
@@ -39,7 +39,12 @@ export function AppHeader(): React.JSX.Element {
   }, [user, load, fetchWallets])
 
   const wallet = getActiveWallet()
-  const displayCurrency = config?.activeCurrency ?? activeCurrency
+  // Число берём из активного кошелька — им и подписываем. `config.activeCurrency`
+  // на бэке типизирован как FiatCurrency (geo-config.policy.ts:29) и криптой быть
+  // не может, поэтому 84.20 USDT подписывались рублями, а 3 200 ₴ — рублями до
+  // перезагрузки гео-конфига. Автоконвертации по ТЗ нет (Don't-лист §6), так что
+  // единственно честный вариант — метка той валюты, чей баланс показан.
+  const displayCurrency = wallet?.currency ?? activeCurrency
   const balance = wallet?.available ?? '0'
 
   const submitSearch = (event: React.FormEvent): void => {
@@ -87,7 +92,7 @@ export function AppHeader(): React.JSX.Element {
                 type="button"
                 onClick={openWalletSwitcher}
                 aria-label="Сменить активный кошелёк"
-                className="flex items-center gap-1.5 rounded-full border border-[#2A2A4A]/80 bg-white/[0.06] px-3.5 py-1.5 text-sm font-bold transition hover:border-brand/60 hover:bg-white/[0.08]"
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#2A2A4A]/80 bg-white/[0.06] px-3.5 py-1.5 text-sm font-bold transition hover:border-brand/60 hover:bg-white/[0.08]"
               >
                 {formatBalance(balance, displayCurrency)}
                 <ChevronDown size={14} aria-hidden className="text-muted" />

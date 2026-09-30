@@ -102,14 +102,16 @@ export default function GamePage(): React.JSX.Element {
   const shouldLaunch = search.get('launch') === '1'
   const { user } = useAuth()
   const { openLogin, openDeposit, openWalletSwitcher } = useUIStore()
-  const { activeCurrency, fetchWallets, setLastPlayed } = useWalletStore()
-  const { config, load } = useGeoStore()
+  const { activeCurrency, fetchWallets, getActiveWallet, setLastPlayed } = useWalletStore()
+  const { load } = useGeoStore()
   const { favoriteSlugs, toggleFavorite } = useFavorites()
   const { startDemo, isRunning: demoLoading } = useDemoLaunch()
   const [failure, setFailure] = useState<{ view: LaunchErrorView; code?: string } | null>(null)
   const launchedKeyRef = useRef<string | null>(null)
 
-  const currency = config?.activeCurrency ?? activeCurrency
+  // Валюта запуска = валюта активного кошелька. `config.activeCurrency` — фиат из
+  // гео-конфига, с ним игрок с активным USDT крутил бы спины рублями.
+  const currency = getActiveWallet()?.currency ?? activeCurrency
 
   const { data: game } = useQuery({
     queryKey: ['game', slug],

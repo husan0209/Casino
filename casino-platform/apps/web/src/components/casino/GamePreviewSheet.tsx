@@ -16,7 +16,6 @@ import {
   gameVolatilityLabel,
 } from '@/lib/ui/game'
 import { useAuth } from '@/stores/auth'
-import { useGeoStore } from '@/stores/geo'
 import { useUIStore, type GamePreviewOptions } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
@@ -66,16 +65,11 @@ export function GamePreviewSheet(): React.JSX.Element | null {
   return <GamePreviewBody options={gamePreview} />
 }
 
-function GamePreviewBody({
-  options,
-}: {
-  options: GamePreviewOptions
-}): React.JSX.Element {
+function GamePreviewBody({ options }: { options: GamePreviewOptions }): React.JSX.Element {
   const { game, isFavorite, onToggleFavorite } = options
   const { user } = useAuth()
   const { closeGamePreview, openLogin } = useUIStore()
   const { activeCurrency, getActiveWallet } = useWalletStore()
-  const { config } = useGeoStore()
   const router = useRouter()
   const { startDemo, isRunning: demoLoading } = useDemoLaunch()
 
@@ -90,7 +84,9 @@ function GamePreviewBody({
 
   const displayName = gameDisplayName(game)
   const provider = game.provider?.name ?? ''
-  const currency = config?.activeCurrency ?? activeCurrency
+  // Баланс показываем от активного кошелька — валюта того же кошелька, а не
+  // фиатный `config.activeCurrency` (иначе USDT подписывались ₽).
+  const currency = getActiveWallet()?.currency ?? activeCurrency
   const hasDemo = gameHasDemo(game.hasDemo)
   const balance = getActiveWallet()?.available ?? '0'
 

@@ -16,11 +16,16 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { toast } from '@/components/ui/toaster'
+import { CryptoDepositTicketPanel } from '@/components/wallet/CryptoDepositTicket'
 import { saveDepositContext } from '@/components/wallet/DepositReturnHandler'
 import { errText } from '@/lib/api'
 import { getKycStatus } from '@/lib/api/kyc.api'
-import { createFiatDeposit } from '@/lib/api/wallet.api'
-import { currencyLabel, formatAmount } from '@/lib/format/currency'
+import {
+  createCryptoDeposit,
+  createFiatDeposit,
+  type CryptoDepositTicket,
+} from '@/lib/api/wallet.api'
+import { currencyLabel, formatAmount, isCryptoCurrency } from '@/lib/format/currency'
 import { useAuth } from '@/stores/auth'
 import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
@@ -151,11 +156,98 @@ function MethodSection({
   )
 }
 
+/** Шапка кассы и строка активного кошелька: пополняем ровно тот кошелёк, что выбран. */
+function SheetTop({
+  currency,
+  balance,
+  onClose,
+  onSwitchWallet,
+}: {
+  currency: string
+  balance: string
+  onClose: () => void
+  onSwitchWallet: () => void
+}): React.JSX.Element {
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="caps-label">КАССА</p>
+          <h2 className="text-lg font-bold">Пополнить {currencyLabel(currency)}</h2>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Закрыть"
+          className="rounded-lg p-1.5 text-muted transition hover:bg-white/5 hover:text-white"
+        >
+          <X size={18} aria-hidden />
+        </button>
+      </div>
+      <div className="mt-3 flex items-center justify-between rounded-xl bg-white/[0.03] px-3.5 py-2 text-xs border border-[#2A2A4A]/50">
+        <span className="text-muted">Активный кошелёк</span>
+        <button
+          type="button"
+          onClick={onSwitchWallet}
+          className="flex items-center gap-1 font-semibold text-white hover:text-brand"
+        >
+          <span>{formatAmount(balance, currency, true)}</span>
+          <ChevronDown size={14} aria-hidden className="text-muted" />
+        </button>
+      </div>
+    </>
+  )
+}
+
+/** Сумма: поле + пресеты активной валюты + минимум (§4.9, Часть 5 §2.5). */
+function AmountField({
+  currency,
+  amount,
+  onAmount,
+  presets,
+  min,
+}: {
+  currency: string
+  amount: string
+  onAmount: (value: string) => void
+  presets: string[]
+  min: string | undefined
+}): React.JSX.Element {
+  return (
+    <div className="mt-4">
+      <label className="text-sm text-muted">Сумма, {currencyLabel(currency)}</label>
+      <input
+        className="input mt-1"
+        value={amount}
+        onChange={(e) => onAmount(e.target.value)}
+        /* Фиатная подсказка «2000» в поле USDT — тот же обман масштаба, из-за
+           которого пресеты в крипто-кассе убраны. */
+        placeholder={isCryptoCurrency(currency) ? '0.00' : '2000'}
+      />
+      <div className="mt-2 flex flex-wrap gap-2">
+        {presets.map((p) => (
+          <button
+            key={p}
+            type="button"
+            className="btn-ghost px-3 py-1 text-xs"
+            onClick={() => onAmount(p)}
+          >
+            {formatAmount(p, currency, true)}
+          </button>
+        ))}
+      </div>
+      {min && (
+        <p className="mt-2 text-xs text-muted">Минимум {formatAmount(min, currency, true)}</p>
+      )}
+    </div>
+  )
+}
+
 export function DepositSheet(): React.JSX.Element | null {
   const { depositSheet, closeDeposit, depositCurrency, pendingGameSlug, openWalletSwitcher } =
     useUIStore()
   const { config, load } = useGeoStore()
-  const { activeCurrency, setActiveCurrency, getActiveWallet } = useWalletStore()
+  const { activeCurrency, fetchWallets, getActiveWallet, setActiveCurrency } = useWalletStore()
   const { user } = useAuth()
   const router = useRouter()
   const [amount, setAmount] = useState('')
@@ -163,8 +255,12 @@ export function DepositSheet(): React.JSX.Element | null {
   const [loading, setLoading] = useState(false)
   const [showCrypto, setShowCrypto] = useState(false)
   const [mode, setMode] = useState<'fiat' | 'crypto'>('fiat')
+  const [ticket, setTicket] = useState<CryptoDepositTicket | null>(null)
 
-  const currency = depositCurrency || config?.activeCurrency || activeCurrency
+  // Валюта пополнения — валюта активного кошелька: «Пополнить» с USDT-кошелька не
+  // должен обещать зачисление в рубли (конвертации по ТЗ нет, Don't-лист §6).
+  const currency =
+    depositCurrency || getActiveWallet()?.currency || config?.activeCurrency || activeCurrency
 
   useEffect(() => {
     if (depositSheet) {
@@ -176,12 +272,15 @@ export function DepositSheet(): React.JSX.Element | null {
     if (!depositSheet) {
       return
     }
-    setMode('fiat')
-    setShowCrypto(false)
-    if (config?.paymentMethods[0]) {
-      setMethod(config.paymentMethods[0].id)
+    const crypto = isCryptoCurrency(currency)
+    setMode(crypto ? 'crypto' : 'fiat')
+    setShowCrypto(crypto)
+    setTicket(null)
+    const first = crypto ? config?.cryptoMethods[0] : config?.paymentMethods[0]
+    if (first) {
+      setMethod(first.id)
     }
-  }, [config, depositSheet])
+  }, [config, depositSheet, currency])
 
   const presets = config?.depositPresets ?? ['1000', '2000', '5000', '10000']
   const fiatMethods = config?.paymentMethods ?? []
@@ -212,6 +311,10 @@ export function DepositSheet(): React.JSX.Element | null {
     }
     setLoading(true)
     try {
+      if (mode === 'crypto') {
+        setTicket(await createCryptoDeposit({ amount, currency: payCurrency }))
+        return
+      }
       await setActiveCurrency(payCurrency)
       const res = await createFiatDeposit({ amount, currency: payCurrency, method })
       if (res.payment_url) {
@@ -237,114 +340,94 @@ export function DepositSheet(): React.JSX.Element | null {
     }
   }
 
+  const credited = (): void => {
+    setTicket(null)
+    closeDeposit()
+    void fetchWallets()
+    toast.success('Зачислено')
+  }
+
   return (
     <>
       <div className="sheet-backdrop" onClick={closeDeposit} />
       <div className="sheet-panel">
         <div className="sheet-handle" />
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="caps-label">КАССА</p>
-            <h2 className="text-lg font-bold">Пополнить {currencyLabel(payCurrency)}</h2>
-          </div>
-          <button
-            type="button"
-            onClick={closeDeposit}
-            aria-label="Закрыть"
-            className="rounded-lg p-1.5 text-muted transition hover:bg-white/5 hover:text-white"
-          >
-            <X size={18} aria-hidden />
-          </button>
-        </div>
-
-        <div className="mt-3 flex items-center justify-between rounded-xl bg-white/[0.03] px-3.5 py-2 text-xs border border-[#2A2A4A]/50">
-          <span className="text-muted">Активный кошелёк</span>
-          <button
-            type="button"
-            onClick={() => {
-              closeDeposit()
-              openWalletSwitcher()
-            }}
-            className="flex items-center gap-1 font-semibold text-white hover:text-brand"
-          >
-            <span>{formatAmount(getActiveWallet()?.available ?? '0', payCurrency, true)}</span>
-            <ChevronDown size={14} aria-hidden className="text-muted" />
-          </button>
-        </div>
-
-        <MethodSection
-          mode={mode}
-          fiatMethods={fiatMethods}
-          cryptoMethods={cryptoMethods}
-          method={method}
-          showCrypto={showCrypto}
-          setMethod={setMethod}
-          openCrypto={openCrypto}
-          setMode={setMode}
-          setShowCrypto={setShowCrypto}
+        <SheetTop
+          currency={payCurrency}
+          balance={getActiveWallet()?.available ?? '0'}
+          onClose={closeDeposit}
+          onSwitchWallet={() => {
+            closeDeposit()
+            openWalletSwitcher()
+          }}
         />
 
-        <div className="mt-4">
-          <label className="text-sm text-muted">Сумма, {currencyLabel(payCurrency)}</label>
-          <input
-            className="input mt-1"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="2000"
-          />
-          <div className="mt-2 flex flex-wrap gap-2">
-            {presets.map((p) => (
-              <button
-                key={p}
-                type="button"
-                className="btn-ghost px-3 py-1 text-xs"
-                onClick={() => setAmount(p)}
-              >
-                {formatAmount(p, payCurrency, true)}
-              </button>
-            ))}
-          </div>
-          {config?.depositMin && mode === 'fiat' && (
-            <p className="mt-2 text-xs text-muted">
-              Минимум {formatAmount(config.depositMin, payCurrency, true)}
+        {ticket ? (
+          <CryptoDepositTicketPanel ticket={ticket} onCredited={credited} onClose={closeDeposit} />
+        ) : (
+          <>
+            <MethodSection
+              mode={mode}
+              fiatMethods={fiatMethods}
+              cryptoMethods={cryptoMethods}
+              method={method}
+              showCrypto={showCrypto}
+              setMethod={setMethod}
+              openCrypto={openCrypto}
+              setMode={setMode}
+              setShowCrypto={setShowCrypto}
+            />
+
+            <AmountField
+              currency={payCurrency}
+              amount={amount}
+              onAmount={setAmount}
+              /* Пресеты и минимум отдаёт только для активного фиата
+                 (geo-config.policy.ts:51 — CURRENCY_LIMITS[activeCurrency], где
+                 activeCurrency всегда фиат). Крипто-шкала на бэке есть, но наружу
+                 не выходит, а автоконвертации нет (Don't-лист §6) — значит рублёвые
+                 «500 / 1000 / 2000» под подписью USDT были бы враньём. */
+              presets={mode === 'fiat' ? presets : []}
+              min={mode === 'fiat' ? config?.depositMin : undefined}
+            />
+
+            <button
+              type="button"
+              className="btn-money mt-5 w-full py-3.5 text-base"
+              disabled={loading}
+              onClick={() => {
+                if (limitExhausted) {
+                  closeDeposit()
+                  router.push('/kyc')
+                  return
+                }
+                void pay()
+              }}
+            >
+              {loading
+                ? 'Переход к оплате…'
+                : limitExhausted
+                  ? 'Лимит исчерпан — пройти верификацию'
+                  : 'Перейти к оплате'}
+              {!loading && !limitExhausted && <ArrowRight size={16} aria-hidden />}
+            </button>
+
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted">
+              <ShieldCheck size={14} aria-hidden className="text-[#00C853]" />
+              Платёж защищён · зачисление обычно за 1 минуту
             </p>
-          )}
-        </div>
 
-        <button
-          type="button"
-          className="btn-money mt-5 w-full py-3.5 text-base"
-          disabled={loading}
-          onClick={() => {
-            if (limitExhausted) {
-              closeDeposit()
-              router.push('/kyc')
-              return
-            }
-            void pay()
-          }}
-        >
-          {loading
-            ? 'Переход к оплате…'
-            : limitExhausted
-              ? 'Лимит исчерпан — пройти верификацию'
-              : 'Перейти к оплате'}
-          {!loading && !limitExhausted && <ArrowRight size={16} aria-hidden />}
-        </button>
+            {kycNotApproved && limitRemaining !== undefined && !limitExhausted && (
+              <p className="mt-2 text-center text-xs text-muted">
+                Без верификации осталось{' '}
+                {formatAmount(limitRemaining, kyc?.limit_currency ?? '', true)}
+              </p>
+            )}
 
-        <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted">
-          <ShieldCheck size={14} aria-hidden className="text-[#00C853]" />
-          Платёж защищён · зачисление обычно за 1 минуту
-        </p>
-
-        {kycNotApproved && limitRemaining !== undefined && !limitExhausted && (
-          <p className="mt-2 text-center text-xs text-muted">
-            Без верификации осталось {formatAmount(limitRemaining, kyc?.limit_currency ?? '', true)}
-          </p>
-        )}
-
-        {pendingGameSlug && (
-          <p className="mt-2 text-center text-xs text-muted">После оплаты — вернётесь в игру</p>
+            {pendingGameSlug && (
+              <p className="mt-2 text-center text-xs text-muted">После оплаты — вернётесь в игру</p>
+            )}
+          </>
         )}
       </div>
     </>
