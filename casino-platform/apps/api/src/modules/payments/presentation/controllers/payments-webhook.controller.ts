@@ -1,8 +1,8 @@
 import { Body, Controller, Headers, Post, Req, HttpCode } from '@nestjs/common'
 import { SkipThrottle } from '@nestjs/throttler'
 
-import { ProcessNOWPaymentsWebhookUseCase } from '../../application/use-cases/process-nowpayments-webhook.use-case'
-import { ProcessRukassaWebhookUseCase } from '../../application/use-cases/process-rukassa-webhook.use-case'
+import { type ProcessNOWPaymentsWebhookUseCase } from '../../application/use-cases/process-nowpayments-webhook.use-case'
+import { type ProcessRukassaWebhookUseCase } from '../../application/use-cases/process-rukassa-webhook.use-case'
 
 /**
  * Webhook controller.
@@ -34,7 +34,7 @@ export class PaymentsWebhookController {
     @Headers() headers: Record<string, string>,
     @Body() body: unknown,
     @Req() req: { rawBody?: string; ip?: string },
-  ): Promise<{ ok: boolean; }> {
+  ): Promise<{ ok: boolean }> {
     return this.rukassa.execute({
       rawHeaders: headers,
       body: body as Record<string, unknown>,
@@ -49,7 +49,7 @@ export class PaymentsWebhookController {
     @Headers() headers: Record<string, string>,
     @Body() body: unknown,
     @Req() req: { rawBody?: string; ip?: string },
-  ): Promise<{ ok: boolean; }> {
+  ): Promise<{ ok: boolean }> {
     return this.np.execute({
       rawHeaders: headers,
       body: body as Record<string, unknown>,

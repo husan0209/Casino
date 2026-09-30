@@ -1,7 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common'
 
 import { MeNotFoundError } from '../../domain/errors'
-import { IUserProfileRepository, USER_PROFILE_REPOSITORY, type UserProfileFull } from '../../domain/repositories/user-profile.repository'
+import {
+  type IUserProfileRepository,
+  USER_PROFILE_REPOSITORY,
+  type UserProfileFull,
+} from '../../domain/repositories/user-profile.repository'
 
 @Injectable()
 export class GetMeUseCase {

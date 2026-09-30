@@ -7,18 +7,22 @@ import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 import { WalletFacade } from '../../wallet/facade/wallet.facade'
-import { type CurrencySumRow, IReferralRepository, REFERRAL_REPOSITORY } from '../domain/referral.repository'
+import {
+  type CurrencySumRow,
+  type IReferralRepository,
+  REFERRAL_REPOSITORY,
+} from '../domain/referral.repository'
 
 @Injectable()
 export class ReferralCalcService {
   private logger = new Logger(ReferralCalcService.name)
 
   constructor(
-    private readonly walletFacade: WalletFacade,
+    @Inject(WalletFacade) private readonly walletFacade: WalletFacade,
     @Inject(REFERRAL_REPOSITORY) private readonly repo: IReferralRepository,
   ) {}
 
-  async runDaily(dateStr?: string): Promise<{ processed: number; credited: number; date: Date; }> {
+  async runDaily(dateStr?: string): Promise<{ processed: number; credited: number; date: Date }> {
     const date = dateStr ? new Date(dateStr) : new Date(Date.now() - 86400000)
     const dayStart = new Date(date)
     dayStart.setUTCHours(0, 0, 0, 0)
@@ -58,8 +62,18 @@ export class ReferralCalcService {
     rewardRate: Decimal
   }): Promise<{ processed: number; credited: number }> {
     const { referredId, referrerId, dayStart, dayEnd, rewardRate } = args
-    const bets = await this.repo.sumTransactions({ userId: referredId, type: 'bet', from: dayStart, to: dayEnd })
-    const wins = await this.repo.sumTransactions({ userId: referredId, type: 'win', from: dayStart, to: dayEnd })
+    const bets = await this.repo.sumTransactions({
+      userId: referredId,
+      type: 'bet',
+      from: dayStart,
+      to: dayEnd,
+    })
+    const wins = await this.repo.sumTransactions({
+      userId: referredId,
+      type: 'win',
+      from: dayStart,
+      to: dayEnd,
+    })
     const currencies = new Set<string>([
       ...bets.map((b: CurrencySumRow) => b.currency),
       ...wins.map((w: CurrencySumRow) => w.currency),

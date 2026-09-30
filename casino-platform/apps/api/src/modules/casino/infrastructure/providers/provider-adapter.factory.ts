@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { DemoProviderAdapter } from './demo/demo-provider.adapter'
@@ -11,7 +11,7 @@ import { type GameProviderAdapter } from '../../domain/provider-adapter.interfac
 export class ProviderAdapterFactory implements IProviderAdapterFactory {
   private readonly logger = new Logger(ProviderAdapterFactory.name)
 
-  constructor(private config: ConfigService) {}
+  constructor(@Inject(ConfigService) private config: ConfigService) {}
 
   getAdapter(slug: string): GameProviderAdapter {
     switch (slug) {
@@ -21,7 +21,9 @@ export class ProviderAdapterFactory implements IProviderAdapterFactory {
 
         if (env === 'production') {
           this.logger.error('Demo provider requested in production. DEMO_PROVIDER_DISABLED.')
-          throw new DemoProviderDisabledError('DEMO_PROVIDER_DISABLED. Demo provider is not available in production.')
+          throw new DemoProviderDisabledError(
+            'DEMO_PROVIDER_DISABLED. Demo provider is not available in production.',
+          )
         }
 
         if (!demoEnabled) {

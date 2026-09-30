@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 
 import {
-  IPaymentRequestRepository,
+  type IPaymentRequestRepository,
   PAYMENT_REQUEST_REPOSITORY,
   type PaymentRequest,
 } from '../../domain/payments.ports'
@@ -9,7 +9,9 @@ import {
 /** Список выводов пользователя (В3: контроллер без репозитория). */
 @Injectable()
 export class ListWithdrawalsUseCase {
-  constructor(@Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository) {}
+  constructor(
+    @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
+  ) {}
 
   async execute(
     userId: string,

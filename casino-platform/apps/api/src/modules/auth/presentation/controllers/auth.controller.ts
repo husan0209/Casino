@@ -2,26 +2,33 @@ import { Body, Controller, Get, Post, Query, Req, Res, UseGuards, UsePipes } fro
 import { Throttle } from '@nestjs/throttler'
 import { type Request, type Response } from 'express'
 
-import { clearRefreshTokenCookie, setRefreshTokenCookie } from '@/common/cookies/refresh-token-cookie'
+import {
+  clearRefreshTokenCookie,
+  setRefreshTokenCookie,
+} from '@/common/cookies/refresh-token-cookie'
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
 
 import { type UserRole } from '@casino/database'
 
-import { ChangePasswordUseCase } from '../../application/use-cases/change-password.use-case'
-import { ForgotPasswordUseCase } from '../../application/use-cases/forgot-password.use-case'
-import { LoginUseCase } from '../../application/use-cases/login.use-case'
-import { LogoutUseCase } from '../../application/use-cases/logout.use-case'
-import { GoogleOAuthUseCase } from '../../application/use-cases/oauth/google-oauth.use-case'
-import { TelegramLoginUseCase } from '../../application/use-cases/oauth/telegram-login.use-case'
-import { RefreshUseCase } from '../../application/use-cases/refresh.use-case'
-import { RegisterUseCase } from '../../application/use-cases/register.use-case'
-import { ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case'
-import { VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case'
+import { type ChangePasswordUseCase } from '../../application/use-cases/change-password.use-case'
+import { type ForgotPasswordUseCase } from '../../application/use-cases/forgot-password.use-case'
+import { type LoginUseCase } from '../../application/use-cases/login.use-case'
+import { type LogoutUseCase } from '../../application/use-cases/logout.use-case'
+import { type GoogleOAuthUseCase } from '../../application/use-cases/oauth/google-oauth.use-case'
+import { type TelegramLoginUseCase } from '../../application/use-cases/oauth/telegram-login.use-case'
+import { type RefreshUseCase } from '../../application/use-cases/refresh.use-case'
+import { type RegisterUseCase } from '../../application/use-cases/register.use-case'
+import { type ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case'
+import { type VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case'
 import { type LoginDto, LoginSchema } from '../dto/login.dto'
 import { GoogleLoginSchema, TelegramLoginSchema } from '../dto/oauth.dto'
-import { ChangePasswordSchema, ForgotPasswordSchema, ResetPasswordSchema } from '../dto/password-reset.dto'
+import {
+  ChangePasswordSchema,
+  ForgotPasswordSchema,
+  ResetPasswordSchema,
+} from '../dto/password-reset.dto'
 import { type RegisterDto, RegisterSchema } from '../dto/register.dto'
 import { AuthGuard } from '../guards/auth.guard'
 
@@ -58,7 +65,11 @@ export class AuthController {
     @Body() body: RegisterDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: UserRole; }; referralCode: string; }> {
+  ): Promise<{
+    accessToken: string
+    user: { id: string; email: string | null; role: UserRole }
+    referralCode: string
+  }> {
     const result = await this.registerUc.execute(
       { email: body.email, password: body.password, referralCode: body.referral_code },
       { ip: req.ip, userAgent: req.headers['user-agent'] },
@@ -68,7 +79,14 @@ export class AuthController {
   }
 
   @Get('verify-email')
-  async verify(@Query('token') token: string, @Req() req: Request): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string | null; role: UserRole; }; }> {
+  async verify(
+    @Query('token') token: string,
+    @Req() req: Request,
+  ): Promise<{
+    accessToken: string
+    refreshToken: string
+    user: { id: string; email: string | null; role: UserRole }
+  }> {
     const result = await this.verifyUc.execute(token, req.ip, req.headers['user-agent'])
     return result
   }
@@ -79,7 +97,7 @@ export class AuthController {
     @Body() body: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: UserRole; }; }> {
+  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: UserRole } }> {
     const result = await this.loginUc.execute({
       email: body.email,
       password: body.password,
@@ -95,7 +113,7 @@ export class AuthController {
   async refresh(
     @Req() req: RequestWithCookies,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ accessToken: string; }> {
+  ): Promise<{ accessToken: string }> {
     // Refresh token lives only in the httpOnly cookie. Accepting it from the
     // request body weakens CSRF protection and breaks the cookie-based rotation
     // contract — do not reintroduce the body fallback.
@@ -106,7 +124,10 @@ export class AuthController {
   }
 
   @Post('logout')
-  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<{ ok: boolean; }> {
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ ok: boolean }> {
     const user = req.user
     if (user && 'sessionId' in user && user.sessionId) {
       await this.logoutUc.execute(user.sessionId)
@@ -117,13 +138,13 @@ export class AuthController {
 
   @Post('forgot-password')
   @UsePipes(new ZodValidationPipe(ForgotPasswordSchema))
-  async forgot(@Body() body: { email: string }): Promise<{ message: string; }> {
+  async forgot(@Body() body: { email: string }): Promise<{ message: string }> {
     return this.forgotUc.execute(body.email)
   }
 
   @Post('reset-password')
   @UsePipes(new ZodValidationPipe(ResetPasswordSchema))
-  async reset(@Body() body: { token: string; new_password: string }): Promise<{ ok: boolean; }> {
+  async reset(@Body() body: { token: string; new_password: string }): Promise<{ ok: boolean }> {
     return this.resetUc.execute(body.token, body.new_password)
   }
 
@@ -135,7 +156,7 @@ export class AuthController {
   async changePassword(
     @CurrentUser() user: UserActor,
     @Body() body: { current_password: string; new_password: string },
-  ): Promise<{ ok: boolean; }> {
+  ): Promise<{ ok: boolean }> {
     return this.changePasswordUc.execute({
       userId: user.id,
       currentPassword: body.current_password,
@@ -147,7 +168,7 @@ export class AuthController {
   // ===== OAuth (TZ part 2) =====
 
   @Get('google/url')
-  googleUrl(@Query('redirect_uri') redirectUri?: string): { url: string; state: string; } {
+  googleUrl(@Query('redirect_uri') redirectUri?: string): { url: string; state: string } {
     return this.googleUc.buildAuthUrl(redirectUri)
   }
 
@@ -157,7 +178,7 @@ export class AuthController {
     @Body() body: { code: string; redirect_uri?: string; state?: string; referral_code?: string },
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: string; }; }> {
+  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: string } }> {
     const result = await this.googleUc.execute({
       code: body.code,
       redirectUri: body.redirect_uri,
@@ -176,7 +197,7 @@ export class AuthController {
     @Body() payload: Record<string, unknown>,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: string; }; }> {
+  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: string } }> {
     const result = await this.telegramUc.execute(
       payload as unknown as Parameters<typeof this.telegramUc.execute>[0],
       { ip: req.ip, userAgent: req.headers['user-agent'] },

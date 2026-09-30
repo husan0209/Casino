@@ -1,11 +1,29 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { CAPTCHA_SERVICE, ICaptchaService, IPasswordHasher, IJwtTokenService, PASSWORD_HASHER, JWT_TOKEN_SERVICE } from '../../domain/auth.ports'
+import {
+  CAPTCHA_SERVICE,
+  type ICaptchaService,
+  type IPasswordHasher,
+  type IJwtTokenService,
+  PASSWORD_HASHER,
+  JWT_TOKEN_SERVICE,
+} from '../../domain/auth.ports'
 import { type LockoutConfig, type UserRole } from '../../domain/entities/user.entity'
-import { AccountBlockedError, AccountLockedError, InvalidCredentialsError, SelfExcludedError } from '../../domain/errors'
-import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
-import { IUserSettingsRepository, USER_SETTINGS_REPOSITORY } from '../../domain/repositories/user-settings.repository'
-import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import {
+  AccountBlockedError,
+  AccountLockedError,
+  InvalidCredentialsError,
+  SelfExcludedError,
+} from '../../domain/errors'
+import {
+  type ISessionRepository,
+  SESSION_REPOSITORY,
+} from '../../domain/repositories/session.repository'
+import {
+  type IUserSettingsRepository,
+  USER_SETTINGS_REPOSITORY,
+} from '../../domain/repositories/user-settings.repository'
+import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 
 @Injectable()
 export class LoginUseCase {
@@ -31,7 +49,11 @@ export class LoginUseCase {
     ip?: string | undefined
     userAgent?: string | undefined
     captchaToken?: string | undefined
-  }): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string | null; role: UserRole; }; }> {
+  }): Promise<{
+    accessToken: string
+    refreshToken: string
+    user: { id: string; email: string | null; role: UserRole }
+  }> {
     const now = new Date()
     const user = await this.users.findByEmail(input.email.toLowerCase().trim())
     if (!user?.passwordHash) {

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import {
@@ -11,10 +11,9 @@ import {
 
 import { DemoProviderDisabledError } from '../../../domain/errors'
 
-
 @Injectable()
 export class DemoProviderAdapter implements GameProviderAdapter {
-  constructor(private config: ConfigService) {}
+  constructor(@Inject(ConfigService) private config: ConfigService) {}
   async getLaunchUrl(params: LaunchParams): Promise<{ url: string }> {
     const webUrl = this.config.get<string>('APP_URL') || 'http://localhost:3000'
     const url = `${webUrl}/demo-game?token=${encodeURIComponent(params.sessionToken)}&game=${encodeURIComponent(params.gameExternalId)}&currency=${params.currency}&demo=${params.isDemo ? '1' : '0'}`
@@ -51,12 +50,18 @@ export class DemoProviderAdapter implements GameProviderAdapter {
   verifyCallback(): boolean {
     const env = this.config.get<string>('NODE_ENV')
     if (env === 'production') {
-      throw new DemoProviderDisabledError('DEMO_PROVIDER_DISABLED. Demo provider cannot be used in production.')
+      throw new DemoProviderDisabledError(
+        'DEMO_PROVIDER_DISABLED. Demo provider cannot be used in production.',
+      )
     }
     return true
   }
-  parseCallback(_h: Record<string, unknown>, body: Record<string, unknown>): ParsedProviderCallback {
-    const opt = (v: unknown): string | undefined => (v === undefined || v === null ? undefined : String(v))
+  parseCallback(
+    _h: Record<string, unknown>,
+    body: Record<string, unknown>,
+  ): ParsedProviderCallback {
+    const opt = (v: unknown): string | undefined =>
+      v === undefined || v === null ? undefined : String(v)
     return {
       action: body.action as ParsedProviderCallback['action'],
       playerToken: opt(body.player_token ?? body.session_token),

@@ -3,7 +3,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import { InvalidSelfExclusionPeriodError } from '../../domain/errors'
 import {
   USER_SETTINGS_REPOSITORY,
-  IUserSettingsRepository,
+  type IUserSettingsRepository,
 } from '../../domain/repositories/user-settings.repository'
 
 // Minimum cooloff before self-exclusion can be lifted (72 hours)

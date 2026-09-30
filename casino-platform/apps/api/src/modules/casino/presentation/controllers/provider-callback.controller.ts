@@ -6,9 +6,9 @@ import { errorMessage } from '@/common/utils/error-message'
 
 import { prisma } from '@casino/database'
 
-import { GameCallbackService } from '../../application/services/game-callback.service'
+import { type GameCallbackService } from '../../application/services/game-callback.service'
 import { type ParsedProviderCallback } from '../../domain/provider-adapter.interface'
-import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
+import { type ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 
 /** Доменные ошибки -> коды результата GitSlotPark. */
 const CALLBACK_ERROR_CODES: Record<string, string> = {

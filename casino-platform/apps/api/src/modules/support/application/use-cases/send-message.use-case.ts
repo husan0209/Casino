@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 
 import { TicketNotFoundError, TicketClosedError, ForbiddenTicketError } from '../../domain/errors'
 import {
-  ISupportRepository,
+  type ISupportRepository,
   SUPPORT_REPOSITORY,
 } from '../../domain/repositories/support.repository'
 
@@ -16,7 +16,7 @@ export class SendMessageUseCase {
     message: string
     isInternal?: boolean
     ownerCheckUserId?: string
-  }): Promise<{ id: string; }> {
+  }): Promise<{ id: string }> {
     const t = await this.repo.getAdmin(input.ticketId)
     if (!t) {
       throw new TicketNotFoundError()

@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -16,34 +26,61 @@ import { GetDepositStatusUseCase } from '../../application/use-cases/get-deposit
 import { ListWithdrawalsUseCase } from '../../application/use-cases/list-withdrawals.use-case'
 import { CreateCryptoDepositSchema } from '../dto/create-crypto-deposit.dto'
 import { CreateFiatDepositSchema } from '../dto/create-fiat-deposit.dto'
-import { CreateCryptoWithdrawalSchema, CreateFiatWithdrawalSchema } from '../dto/create-withdrawal.dto'
+import {
+  CreateCryptoWithdrawalSchema,
+  CreateFiatWithdrawalSchema,
+} from '../dto/create-withdrawal.dto'
 
 @UseGuards(AuthGuard)
 @Controller('payments')
 export class PaymentsController {
   constructor(
-    private fiatDep: CreateFiatDepositUseCase,
-    private cryptoDep: CreateCryptoDepositUseCase,
-    private createWd: CreateWithdrawalUseCase,
-    private cancelWd: CancelWithdrawalUseCase,
-    private depStatusUc: GetDepositStatusUseCase,
-    private listWdUc: ListWithdrawalsUseCase,
+    @Inject(CreateFiatDepositUseCase) private fiatDep: CreateFiatDepositUseCase,
+    @Inject(CreateCryptoDepositUseCase) private cryptoDep: CreateCryptoDepositUseCase,
+    @Inject(CreateWithdrawalUseCase) private createWd: CreateWithdrawalUseCase,
+    @Inject(CancelWithdrawalUseCase) private cancelWd: CancelWithdrawalUseCase,
+    @Inject(GetDepositStatusUseCase) private depStatusUc: GetDepositStatusUseCase,
+    @Inject(ListWithdrawalsUseCase) private listWdUc: ListWithdrawalsUseCase,
   ) {}
   @Post('deposit/fiat')
   @UsePipes(new ZodValidationPipe(CreateFiatDepositSchema))
   depositFiat(
     @CurrentUser() u: UserActor,
     @Body() b: { amount: string; currency: string; method: string },
-  ): Promise<{ payment_request_id: string; payment_url: string; currency: string; method: string; }> {
+  ): Promise<{
+    payment_request_id: string
+    payment_url: string
+    currency: string
+    method: string
+  }> {
     return this.fiatDep.execute(u.id, { amount: b.amount, currency: b.currency, method: b.method })
   }
   @Post('deposit/crypto')
   @UsePipes(new ZodValidationPipe(CreateCryptoDepositSchema))
-  depositCrypto(@CurrentUser() u: UserActor, @Body() b: { amount: string; currency: string }): Promise<{ payment_request_id: string; pay_address: string; pay_amount: string; pay_currency: string; expires_at: string; }> {
+  depositCrypto(
+    @CurrentUser() u: UserActor,
+    @Body() b: { amount: string; currency: string },
+  ): Promise<{
+    payment_request_id: string
+    pay_address: string
+    pay_amount: string
+    pay_currency: string
+    expires_at: string
+  }> {
     return this.cryptoDep.execute(u.id, b.amount, b.currency)
   }
   @Get('deposit/:id/status')
-  depositStatus(@CurrentUser() u: UserActor, @Param('id') id: string): Promise<{ id: string; status: PaymentStatus; currency: string; amount: string; payment_url: string | null; completed_at: Date | null; }> {
+  depositStatus(
+    @CurrentUser() u: UserActor,
+    @Param('id') id: string,
+  ): Promise<{
+    id: string
+    status: PaymentStatus
+    currency: string
+    amount: string
+    payment_url: string | null
+    completed_at: Date | null
+  }> {
     return this.depStatusUc.execute(u.id, id)
   }
   @Post('withdrawal/fiat')
@@ -51,7 +88,7 @@ export class PaymentsController {
   wdFiat(
     @CurrentUser() u: UserActor,
     @Body() b: { amount: string; method: string; destination: string },
-  ): Promise<{ payment_request_id: string; }> {
+  ): Promise<{ payment_request_id: string }> {
     return this.createWd.execute(u.id, {
       amount: b.amount,
       currency: 'RUB',
@@ -64,7 +101,7 @@ export class PaymentsController {
   wdCrypto(
     @CurrentUser() u: UserActor,
     @Body() b: { amount: string; currency: string; destination: string },
-  ): Promise<{ payment_request_id: string; }> {
+  ): Promise<{ payment_request_id: string }> {
     return this.createWd.execute(u.id, {
       amount: b.amount,
       currency: b.currency,
@@ -80,7 +117,7 @@ export class PaymentsController {
     return this.listWdUc.execute(u.id, page, parseInt(q.per_page ?? '') || 20)
   }
   @Post('withdrawal/:id/cancel')
-  cancel(@CurrentUser() u: UserActor, @Param('id') id: string): Promise<{ ok: boolean; }> {
+  cancel(@CurrentUser() u: UserActor, @Param('id') id: string): Promise<{ ok: boolean }> {
     return this.cancelWd.execute(u.id, id)
   }
 }
