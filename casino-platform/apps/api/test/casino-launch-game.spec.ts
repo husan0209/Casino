@@ -1,9 +1,15 @@
-import { randomBytes } from 'crypto'
-
 import { LaunchGameUseCase } from '../src/modules/casino/application/use-cases/launch-game.use-case'
-import { GameDisabledError, GameNotFoundError, ProviderDisabledError } from '../src/modules/casino/domain/errors'
+import {
+  GameDisabledError,
+  GameNotFoundError,
+  ProviderDisabledError,
+} from '../src/modules/casino/domain/errors'
+
 import type { IProviderAdapterFactory } from '../src/modules/casino/domain/casino.ports'
-import type { IGameCatalogRepository, IGamePlayRepository } from '../src/modules/casino/domain/repositories/casino.repository'
+import type {
+  IGameCatalogRepository,
+  IGamePlayRepository,
+} from '../src/modules/casino/domain/repositories/casino.repository'
 import type { WalletFacade } from '../src/modules/wallet/facade/wallet.facade'
 
 function makeGame(over: Record<string, unknown> = {}) {
@@ -61,7 +67,9 @@ describe('LaunchGameUseCase', () => {
   })
 
   it('провайдер выключен → ProviderDisabledError', async () => {
-    const { uc } = makeUc(makeGame({ provider: { slug: 'demo-provider', isEnabled: false, config: null } }))
+    const { uc } = makeUc(
+      makeGame({ provider: { slug: 'demo-provider', isEnabled: false, config: null } }),
+    )
     await expect(uc.execute(input())).rejects.toBeInstanceOf(ProviderDisabledError)
   })
 

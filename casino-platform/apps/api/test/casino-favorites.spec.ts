@@ -1,6 +1,10 @@
 import { FavoritesUseCase } from '../src/modules/casino/application/use-cases/favorites.use-case'
 import { GameNotFoundError } from '../src/modules/casino/domain/errors'
-import type { IGameCatalogRepository, IGameFavoritesRepository } from '../src/modules/casino/domain/repositories/casino.repository'
+
+import type {
+  IGameCatalogRepository,
+  IGameFavoritesRepository,
+} from '../src/modules/casino/domain/repositories/casino.repository'
 
 const game = { id: 'g1', slug: 'sweet-bonanza' }
 
