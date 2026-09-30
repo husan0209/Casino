@@ -25,7 +25,19 @@ export interface AuthState {
   login: (email: string, password: string, captchaToken?: string) => Promise<void>
   setSession: (token: string, user: WebUser) => void
   setAuth: (user: WebUser, token: string) => void
-  register: (email: string, password: string, referralCode?: string) => Promise<void>
+  /**
+   * Регистрация игрока.
+   *
+   * `referralCode` — игровая рефералка, `affiliateCode` — партнёрская программа
+   * (ТЗ ч.8 §7.3). Это две РАЗНЫЕ программы (рефералы игроков §9 и партнёры §9a
+   * в MODULE_BOUNDARIES), и сервер резолвит каждую в своей таблице. Оба
+   * необязательны: обычная регистрация не отличается по форме запроса.
+   */
+  register: (
+    email: string,
+    password: string,
+    codes?: { referral?: string | undefined; affiliate?: string | undefined },
+  ) => Promise<void>
   logout: () => void
   /**
    * P1 #11: сессия после перезагрузки страницы. Access-token живёт ТОЛЬКО
@@ -45,7 +57,9 @@ export const useAuth = create<AuthState>()((set, get) => ({
     const res = await apiPost<AuthResponse>('/auth/login', {
       email,
       password,
-      ...(captchaToken !== undefined && captchaToken.length > 0 ? { captcha_token: captchaToken } : {}),
+      ...(captchaToken !== undefined && captchaToken.length > 0
+        ? { captcha_token: captchaToken }
+        : {}),
     })
     set({ token: res.accessToken, user: res.user })
   },
@@ -53,11 +67,13 @@ export const useAuth = create<AuthState>()((set, get) => ({
   /** verify-email flow */
   setAuth: (user, token) => set({ token, user }),
   /** регистрация нового пользователя (письмо-подтверждение уходит с API) */
-  register: async (email, password, referralCode) => {
+  register: async (email, password, codes) => {
     const res = await apiPost<AuthResponse>('/auth/register', {
       email,
       password,
-      referral_code: referralCode,
+      referral_code: codes?.referral,
+      // Код партнёра едет в query-параметре ref (его читает RegisterController).
+      ...(codes?.affiliate !== undefined && codes.affiliate !== '' ? { ref: codes.affiliate } : {}),
     })
     set({ token: res.accessToken, user: res.user })
   },

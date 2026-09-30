@@ -69,28 +69,31 @@ export function validateEnv() {
 
 ## 2. Application
 
-| Variable                           | Type   | Required     | Default          | Description                                                                                                                                                  |
-| ---------------------------------- | ------ | ------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `NODE_ENV`                         | enum   | ✅           | —                | `development`, `staging`, `production`                                                                                                                       |
-| `APP_PORT`                         | int    | ❌           | `3001`           | Порт API                                                                                                                                                     |
-| `APP_URL`                          | URL    | ✅           | —                | `https://casino.example.com`                                                                                                                                 |
-| `ADMIN_URL`                        | URL    | ✅           | —                | `https://admin.casino.example.com`                                                                                                                           |
-| `THROTTLE_TTL_MS`                  | int    | ❌           | `60000`          | Окно rate-limit в мс (GAP-19)                                                                                                                                |
-| `THROTTLE_GLOBAL_LIMIT`            | int    | ❌           | `120`            | Запросов/окно на IP (глобально)                                                                                                                              |
-| `THROTTLE_AUTH_LIMIT`              | int    | ❌           | `10`             | Запросов/окно на IP для `/auth/*`                                                                                                                            |
-| `THROTTLE_REFRESH_LIMIT`           | int    | ❌           | `30`             | Запросов/окно на IP для `/auth/refresh` (зонд сессии при каждой загрузке страницы, P1 #11; в проде внешним ограничителем остаётся nginx `api_auth 10r/m`)    |
-| `THROTTLE_ADMIN_LIMIT`             | int    | ❌           | `5`              | Попыток логина админки за окно на IP (pre-launch B5)                                                                                                         |
-| `LOCKOUT_MAX_ATTEMPTS`             | int    | ❌           | `10`             | Неудачных входов за окно до блокировки аккаунта (GAP-18)                                                                                                     |
-| `LOCKOUT_WINDOW_MS`                | int    | ❌           | `900000`         | Скользящее окно подсчёта неудач, мс (15 мин)                                                                                                                 |
-| `LOCKOUT_DURATION_MS`              | int    | ❌           | `1800000`        | Длительность блокировки аккаунта, мс (30 мин)                                                                                                                |
-| `JOB_EXPIRE_DEPOSITS_EVERY_MS`     | int    | ❌           | `300000`         | Интервал задачи истечения pending-депозитов, мс (GAP-33)                                                                                                     |
-| `JOB_UPDATE_RATES_EVERY_MS`        | int    | ❌           | `300000`         | Интервал задачи обновления курсов, мс (GAP-33)                                                                                                               |
-| `JOB_WITHDRAWAL_REMINDER_EVERY_MS` | int    | ❌           | `3600000`        | Интервал напоминания о зависших выводах, мс (GAP-33)                                                                                                         |
-| `JOB_REFERRAL_DAILY_EVERY_MS`      | int    | ❌           | `86400000`       | Интервал ежедневных реферальных начислений, мс (GAP-32/33)                                                                                                   |
-| `JOB_CLEANUP_SESSIONS_EVERY_MS`    | int    | ❌           | `3600000`        | Интервал очистки мёртвых сессий (expired/отозванные >7 дней), мс — pre-launch hardening A1                                                                   |
-| `DOMAIN`                           | string | ✅           | —                | `casino.example.com` (без доменной зоны)                                                                                                                     |
-| `ADMIN_DOMAIN`                     | string | ✅ (compose) | —                | Домен админки `admin.casino.example.com`. Читают compose (envsubst nginx-шаблона, сервис nginx) и `infra/scripts/ssl_init.sh`; код приложения — нет (GAP-56) |
-| `SSL_EMAIL`                        | email  | ❌           | `admin@<DOMAIN>` | Email для выпуска Let's Encrypt в `infra/scripts/ssl_init.sh` (GAP-56)                                                                                       |
+| Variable                                | Type   | Required     | Default          | Description                                                                                                                                                  |
+| --------------------------------------- | ------ | ------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NODE_ENV`                              | enum   | ✅           | —                | `development`, `staging`, `production`                                                                                                                       |
+| `APP_PORT`                              | int    | ❌           | `3001`           | Порт API                                                                                                                                                     |
+| `APP_URL`                               | URL    | ✅           | —                | `https://casino.example.com`                                                                                                                                 |
+| `ADMIN_URL`                             | URL    | ✅           | —                | `https://admin.casino.example.com`                                                                                                                           |
+| `THROTTLE_TTL_MS`                       | int    | ❌           | `60000`          | Окно rate-limit в мс (GAP-19)                                                                                                                                |
+| `THROTTLE_GLOBAL_LIMIT`                 | int    | ❌           | `120`            | Запросов/окно на IP (глобально)                                                                                                                              |
+| `THROTTLE_AUTH_LIMIT`                   | int    | ❌           | `10`             | Запросов/окно на IP для `/auth/*`                                                                                                                            |
+| `THROTTLE_REFRESH_LIMIT`                | int    | ❌           | `30`             | Запросов/окно на IP для `/auth/refresh` (зонд сессии при каждой загрузке страницы, P1 #11; в проде внешним ограничителем остаётся nginx `api_auth 10r/m`)    |
+| `THROTTLE_ADMIN_LIMIT`                  | int    | ❌           | `5`              | Попыток логина админки за окно на IP (pre-launch B5)                                                                                                         |
+| `LOCKOUT_MAX_ATTEMPTS`                  | int    | ❌           | `10`             | Неудачных входов за окно до блокировки аккаунта (GAP-18)                                                                                                     |
+| `LOCKOUT_WINDOW_MS`                     | int    | ❌           | `900000`         | Скользящее окно подсчёта неудач, мс (15 мин)                                                                                                                 |
+| `LOCKOUT_DURATION_MS`                   | int    | ❌           | `1800000`        | Длительность блокировки аккаунта, мс (30 мин)                                                                                                                |
+| `JOB_EXPIRE_DEPOSITS_EVERY_MS`          | int    | ❌           | `300000`         | Интервал задачи истечения pending-депозитов, мс (GAP-33)                                                                                                     |
+| `JOB_UPDATE_RATES_EVERY_MS`             | int    | ❌           | `300000`         | Интервал задачи обновления курсов, мс (GAP-33)                                                                                                               |
+| `JOB_WITHDRAWAL_REMINDER_EVERY_MS`      | int    | ❌           | `3600000`        | Интервал напоминания о зависших выводах, мс (GAP-33)                                                                                                         |
+| `JOB_REFERRAL_DAILY_EVERY_MS`           | int    | ❌           | `86400000`       | Интервал ежедневных реферальных начислений, мс (GAP-32/33)                                                                                                   |
+| `JOB_CLEANUP_SESSIONS_EVERY_MS`         | int    | ❌           | `3600000`        | Интервал очистки мёртвых сессий (expired/отозванные >7 дней), мс — pre-launch hardening A1                                                                   |
+| `JOB_AFFILIATE_DAILY_EVERY_MS`          | int    | ❌           | `86400000`       | Интервал суточного расчёта RevShare партнёрам (ТЗ ч.8 §15)                                                                                                   |
+| `JOB_AFFILIATE_QUALIFICATION_EVERY_MS`  | int    | ❌           | `3600000`        | Интервал квалификации атрибуций (ловит гонку «депозит раньше KYC»)                                                                                           |
+| `JOB_AFFILIATE_CLICKS_CLEANUP_EVERY_MS` | int    | ❌           | `86400000`       | Интервал retention кликов партнёрской программы                                                                                                              |
+| `DOMAIN`                                | string | ✅           | —                | `casino.example.com` (без доменной зоны)                                                                                                                     |
+| `ADMIN_DOMAIN`                          | string | ✅ (compose) | —                | Домен админки `admin.casino.example.com`. Читают compose (envsubst nginx-шаблона, сервис nginx) и `infra/scripts/ssl_init.sh`; код приложения — нет (GAP-56) |
+| `SSL_EMAIL`                             | email  | ❌           | `admin@<DOMAIN>` | Email для выпуска Let's Encrypt в `infra/scripts/ssl_init.sh` (GAP-56)                                                                                       |
 
 ---
 
@@ -230,6 +233,28 @@ openssl rand -hex 64
 | `REFERRAL_REWARD_RATE`    | decimal | ❌       | `0.05`   | Доля реферера (5%)        |
 | `REFERRAL_ENABLED`        | bool    | ❌       | `true`   | Включить ли программу     |
 | `REFERRAL_MIN_WITHDRAWAL` | money   | ❌       | `100.00` | Минимум для вывода reward |
+
+---
+
+## 12a. Affiliate Program (партнёрская программа, ТЗ ч.8 §17)
+
+> ⚠️ **env — только дефолт первого запуска.** Фактические значения живут в
+> `system_settings` с префиксом `affiliate_` и правятся из админ-панели. Админка
+> перекрывает env: без этого «поменял ставку в UI, а cron считает по env».
+> Приоритет: индивидуальная ставка партнёра > `affiliate_default_revshare_rate` > env.
+
+| Variable                            | Type         | Required    | Default | Description                                                                                                                                                                                            |
+| ----------------------------------- | ------------ | ----------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `AFFILIATE_ENABLED`                 | bool         | ❌          | `true`  | Общий флаг программы                                                                                                                                                                                   |
+| `AFFILIATE_JWT_SECRET`              | string       | **✅ prod** | —       | Секрет JWT партнёров, мин. 64 символа. **Отдельный от `JWT_ACCESS_SECRET`:** партнёрский токен имеет `aud=affiliate` и не должен открывать кабинет игрока/админа. Генерировать: `openssl rand -hex 32` |
+| `AFFILIATE_JWT_ACCESS_EXPIRES_IN`   | string       | ❌          | `1h`    | TTL access-токена партнёра                                                                                                                                                                             |
+| `AFFILIATE_JWT_REFRESH_EXPIRES_IN`  | string       | ❌          | `30d`   | TTL refresh-токена партнёра                                                                                                                                                                            |
+| `AFFILIATE_DEFAULT_REVSHARE_RATE`   | decimal 0..1 | ❌          | `0.20`  | Ставка RevShare для НОВЫХ партнёров (20% от NGR). Нижняя граница рынка                                                                                                                                 |
+| `AFFILIATE_COOKIE_DAYS`             | int 1..365   | ❌          | `30`    | Cookie-окно атрибуции, дней (рыночная норма 30–90)                                                                                                                                                     |
+| `AFFILIATE_CLICK_RETENTION_DAYS`    | int 7..3650  | ❌          | `180`   | Retention кликов. **Должен быть ≥ `AFFILIATE_COOKIE_DAYS`**, иначе антифрод F1 останется без сигнала (не будет свежих кликов для сравнения IP)                                                         |
+| `THROTTLE_AFFILIATE_TRACKING_LIMIT` | int          | ❌          | `120`   | Rate limit трекинг-ссылки, req/min (публичный endpoint, очень шумный)                                                                                                                                  |
+| `THROTTLE_AFFILIATE_REGISTER_LIMIT` | int          | ❌          | `5`     | Rate limit регистрации партнёра, req/min                                                                                                                                                               |
+| `THROTTLE_AFFILIATE_LOGIN_LIMIT`    | int          | ❌          | `10`    | Rate limit входа партнёра, req/min                                                                                                                                                                     |
 
 ---
 

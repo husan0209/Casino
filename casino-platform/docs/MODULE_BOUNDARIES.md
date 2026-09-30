@@ -13,8 +13,8 @@ last_updated: 2026-09-28
 
 ## 1. Карта модулей
 
-Фактические каталоги — `apps/api/src/modules/`: **13 модулей** — admin, auth,
-casino, geo, health, kyc, maintenance, notifications, payments, referrals,
+Фактические каталоги — `apps/api/src/modules/`: **14 модулей** — admin, affiliate,
+auth, casino, geo, health, kyc, maintenance, notifications, payments, referrals,
 support, users, wallet. Game-sessions — часть casino (§8), audit-log — часть
 admin (§12); отдельных каталогов под них нет.
 
@@ -28,7 +28,11 @@ admin (§12); отдельных каталогов под них нет.
 │                                                                   │
 │   ┌──────────────────────────┐ ┌───────────┐ ┌─────────┐        │
 │   │ casino (+ game-sessions) │ │ referrals │ │ support │        │
-│   └──────────────────────────┘ └───────────┘ └─────────┘        │
+│   └──────────────────────────┘ └─────┬─────┘ └─────────┘        │
+│                                      │ partner-программа (ТЗ ч.8)│
+│   ┌───────────────┐ ┌─────────────────┐ ┌────────┐              │
+│   │ notifications │ │ admin (+ audit) │ │affiliate│              │
+│   └───────────────┘ └─────────────────┘ └────────┘              │
 │                                                                   │
 │   ┌───────────────┐ ┌─────────────────┐                          │
 │   │ notifications │ │ admin (+ audit) │                          │
@@ -58,18 +62,18 @@ admin (§12); отдельных каталогов под них нет.
 
 ### 2.2. Ключевые Use Cases
 
-| UC | Описание |
-|----|----------|
-| UC-AUTH-01 | Регистрация через email |
-| UC-AUTH-02 | Email verification |
-| UC-AUTH-03 | Login через email |
-| UC-AUTH-04 | Refresh token rotation |
+| UC         | Описание                    |
+| ---------- | --------------------------- |
+| UC-AUTH-01 | Регистрация через email     |
+| UC-AUTH-02 | Email verification          |
+| UC-AUTH-03 | Login через email           |
+| UC-AUTH-04 | Refresh token rotation      |
 | UC-AUTH-05 | Logout (invalidate refresh) |
 | UC-AUTH-06 | Google OAuth login/register |
-| UC-AUTH-07 | Telegram login |
-| UC-AUTH-08 | Forgot password |
-| UC-AUTH-09 | Reset password |
-| UC-AUTH-10 | Change password |
+| UC-AUTH-07 | Telegram login              |
+| UC-AUTH-08 | Forgot password             |
+| UC-AUTH-09 | Reset password              |
+| UC-AUTH-10 | Change password             |
 
 ### 2.3. Использует
 
@@ -134,11 +138,11 @@ sessions             (refresh tokens hashed)
 
 ### 3a.2. Ключевые Use Cases
 
-| UC | Описание |
-|----|----------|
+| UC        | Описание                                             |
+| --------- | ---------------------------------------------------- |
 | UC-GEO-01 | GET /geo/config — конфиг для гостя / авторизованного |
-| UC-GEO-02 | Валидация фиатного метода депозита |
-| UC-GEO-03 | RUB → display currency (KYC limit_remaining) |
+| UC-GEO-02 | Валидация фиатного метода депозита                   |
+| UC-GEO-03 | RUB → display currency (KYC limit_remaining)         |
 
 ### 3a.3. Использует
 
@@ -320,14 +324,14 @@ payment_callbacks    (raw callbacks от провайдеров)
 
 ### 7.2. Key Use Cases
 
-| UC | Описание |
-|----|----------|
-| UC-CASINO-01 | Список провайдеров |
+| UC           | Описание                 |
+| ------------ | ------------------------ |
+| UC-CASINO-01 | Список провайдеров       |
 | UC-CASINO-02 | Список игр (с фильтрами) |
-| UC-CASINO-03 | Детали игры |
-| UC-CASINO-04 | Запуск игры (с wallet) |
-| UC-CASINO-05 | Запуск demo |
-| UC-CASINO-06 | Add/remove favorite |
+| UC-CASINO-03 | Детали игры              |
+| UC-CASINO-04 | Запуск игры (с wallet)   |
+| UC-CASINO-05 | Запуск demo              |
+| UC-CASINO-06 | Add/remove favorite      |
 
 ### 7.3. Использует
 
@@ -375,14 +379,14 @@ game_transactions    (модель GameTransaction — bet/win/rollback events)
 
 ### 8.4. Ключевые Use Cases
 
-| UC | Описание |
-|----|----------|
+| UC       | Описание                                           |
+| -------- | -------------------------------------------------- |
 | UC-GS-01 | Создать game session (внутри launch-game.use-case) |
-| UC-GS-02 | Authenticate provider callback (по sessionToken) |
-| UC-GS-03 | Balance callback (возврат текущего баланса) |
-| UC-GS-04 | Process bet |
-| UC-GS-05 | Process win |
-| UC-GS-06 | Process rollback |
+| UC-GS-02 | Authenticate provider callback (по sessionToken)   |
+| UC-GS-03 | Balance callback (возврат текущего баланса)        |
+| UC-GS-04 | Process bet                                        |
+| UC-GS-05 | Process win                                        |
+| UC-GS-06 | Process rollback                                   |
 
 NB: refund из протокола провайдера в MVP не реализован (метода в
 `GameCallbackService` нет).
@@ -436,6 +440,69 @@ referral_rewards                (period, ggr, reward_amount, status)
   `GET /admin/referrals/stats`; ручной триггер `POST /admin/referrals/run-daily`
   переехал в maintenance presentation, §18 — решение В2, путь/контракт сохранены)
 - `maintenance` (job `referral-daily` запускает `ReferralCalcService.runDaily`, §18)
+
+---
+
+## 9a. Affiliate Module (партнёрская программа, ТЗ ч.8)
+
+### 9a.1 Ответственность
+
+- Регистрация/вход партнёров (affiliate) — внешних вебмастеров
+- Трекинг кликов по ссылке `/go/{tracking_code}` + cookie-атрибуция
+- Привязка игрока к партнёру при регистрации + антифрод F1–F3
+- Квалификация атрибуции (депозит ≥ порога + KYC)
+- Расчёт NGR и RevShare, начисление комиссии на кошелёк партнёра
+- Clawback начислений при самоисключении игрока (ответственная игра)
+- Admin-API: партнёры, индивидуальные ставки, начисления, настройки программы
+
+**НЕ путать с §9 referrals:** `referrals` — программа «приведи друга» для
+игроков (GGR, общая ставка из env). `affiliate` — внешние вебмастеры,
+индивидуальная ставка, расчёт от **NGR**, своя сущность и свой кабинет.
+
+### 9a.2 Ключевые таблицы
+
+```
+affiliates              (partner: userId, email, tracking_code, revshare_rate, status)
+affiliate_clicks        (клик: affiliateId, landing_path, ip_hash — только хеш)
+affiliate_attributions  (привязка: playerId UNIQUE, status, reject_reason)
+affiliate_commissions   (начисление: ngr_amount, revshare_rate-снимок, commission_amount)
+system_settings         (affiliate_* — настройки программы, включая ставку по умолчанию)
+```
+
+### 9a.3 Использует
+
+- `wallet` (WalletFacade.credit/debit — единственный способ зачислить/списать комиссию)
+- `admin` (AuditLogService — аудит смены ставки/статуса/настроек)
+- `auth` (RolesGuard на admin-эндпоинтах; AuthModule — из-за цикла см. §15)
+- `users` (ТОЛЬКО порт `RESPONSIBLE_GAMING_HOOK` — clawback; см. §9a.5)
+- read-only `game_transactions` / `ledger_entries` / `kyc_profiles` / `users`
+  через порты репозиториев (ADR GAP-51, согласован с referrals)
+
+### 9a.4 Используется в
+
+- `auth` (привязка игрока к партнёру при регистрации)
+- `maintenance` (джобы `affiliate-daily`, `affiliate-qualification`,
+  `affiliate-clicks-cleanup`)
+- `admin`-API (контроллер живёт в affiliate-модуле, пути `admin/affiliate/...`)
+
+### 9a.5 КРИТИЧНО
+
+- **Наружу экспортируется только `AffiliateFacade`** (+ JwtService/Guard для
+  своих контроллеров). Остальные use cases — внутренние.
+- **Цикл модулей auth ↔ affiliate разорван через `ModuleRef`:** affiliate
+  импортирует AuthModule (нужны RolesGuard), поэтому auth не может импортировать
+  affiliate. Привязка игрока вызывается из `RegisterUseCase` через
+  `ModuleRef.get(AffiliateFacade, { strict: false })` — ленивое разрешение без
+  статической зависимости. **Прямой импорт affiliate в auth сломает сборку.**
+- **Деньги — только через WalletFacade**, ledger type = `CONVERSION_CREDIT`,
+  idempotencyKey = `aff_{commissionId}` (кредит) / `aff_clawback_{id}` (дебет).
+- **IP не хранится в открытом виде** — только SHA-256(ip + INTERNAL_API_SECRET).
+  Хеш обязан считаться тем же `IpHasher` (DI-токен с `useExisting`), иначе
+  антифрод-правила F1/F3 молча перестанут срабатывать.
+- **Ставка не применяется задним числом:** начисление хранит снимок
+  `revshare_rate`; смена ставки действует со следующего периода.
+- **Идемпотентность расчёта** обеспечена уникальным индексом
+  `(affiliate_id, player_id, period_start, currency)`.
 
 ---
 
@@ -623,6 +690,18 @@ referrals     → wallet              (WalletFacade.credit для reward)
               → admin               (AuditLogService в referrals-admin)
               (read-only prisma.gameTransaction.groupBy для GGR — ADR GAP-51)
 
+affiliate     → wallet              (WalletFacade.credit/debit — комиссия и clawback)
+              → admin               (AuditLogService в affiliate-admin)
+              → auth                (RolesGuard на admin-эндпоинтах)
+              → users               (порт RESPONSIBLE_GAMING_HOOK; реализацию
+                                     поставляет affiliate — зависимость через
+                                     порт односторонняя, цикла нет)
+              (read-only game_transactions/ledger_entries/kyc_profiles/users
+               через порты — ADR GAP-51)
+
+auth          ↛ affiliate           (цикл разорван: привязка через ModuleRef,
+                                     см. §9a.5. ПРЯМОЙ ИМПОРТ ЗАПРЕЩЁН)
+
 support       → auth                (guards) — больше ничего
 
 notifications → queues              (EMAIL_QUEUE_PORT)
@@ -636,6 +715,7 @@ admin         → wallet              (WalletFacade — manual credit/debit)
 health        → (standalone: readiness проверяет db/redis)
 
 maintenance   → referrals           (ReferralCalcService.runDaily — job referral-daily)
+              → affiliate           (AffiliateFacade.runDaily + 3 affiliate-джоба)
               → queues              (BullMQ-очередь `maintenance`: scheduler + worker; EMAIL_QUEUE_PORT)
               → payments            (NOWPaymentsClient — импорт клиента курсов)
               (пишет напрямую: payment_requests, exchange_rates, sessions,
@@ -714,13 +794,16 @@ BullMQ Job Schedulers `upsertJobScheduler`), вызывается из
 `MaintenanceModule.onApplicationBootstrap`. Интервалы — из env `JOB_*_EVERY_MS`
 (дефолты в scheduler; без REDIS_URL / в test — no-op).
 
-| Job (application) | Дефолт | Что делает |
-|----|----|----|
-| `expire-deposits` | 5 мин | pending-депозиты → `expired`: крипто — по `expires_at` провайдера, фиат — через 2ч после `created_at`; идемпотентен (условный update) |
-| `update-rates` | 5 мин | курсы RUB display-валют → `exchange_rates` + Redis-кеш TTL 5 мин: крипто — NOWPayments /estimate (dev-stub без ключа), фиат — константы `DISPLAY_RUB_RATES` из `@casino/shared-config` (source='static') |
-| `withdrawal-reminder` | 1 ч | письмо активным админам о выводах в pending >24ч; дедуп 24ч через запись в `audit_logs` (`maintenance.withdrawal_reminder`) |
-| `referral-daily` | 24 ч | ежедневный запуск `ReferralCalcService.runDaily` (GGR-share начисления, GAP-32; дедуп внутри) |
-| `cleanup-sessions` | 1 ч | удаление мёртвых auth-сессий из `sessions` (expired / отозванные старше grace 7 дней; pre-launch hardening A1) |
+| Job (application)          | Дефолт | Что делает                                                                                                                                                                                               |
+| -------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `expire-deposits`          | 5 мин  | pending-депозиты → `expired`: крипто — по `expires_at` провайдера, фиат — через 2ч после `created_at`; идемпотентен (условный update)                                                                    |
+| `update-rates`             | 5 мин  | курсы RUB display-валют → `exchange_rates` + Redis-кеш TTL 5 мин: крипто — NOWPayments /estimate (dev-stub без ключа), фиат — константы `DISPLAY_RUB_RATES` из `@casino/shared-config` (source='static') |
+| `withdrawal-reminder`      | 1 ч    | письмо активным админам о выводах в pending >24ч; дедуп 24ч через запись в `audit_logs` (`maintenance.withdrawal_reminder`)                                                                              |
+| `referral-daily`           | 24 ч   | ежедневный запуск `ReferralCalcService.runDaily` (GGR-share начисления, GAP-32; дедуп внутри)                                                                                                            |
+| `cleanup-sessions`         | 1 ч    | удаление мёртвых auth-сессий из `sessions` (expired / отозванные старше grace 7 дней; pre-launch hardening A1)                                                                                           |
+| `affiliate-daily`          | 24 ч   | суточный расчёт RevShare партнёрам от NGR (`AffiliateFacade.runDaily`, ТЗ ч.8 §15; дедуп уникальным индексом)                                                                                            |
+| `affiliate-qualification`  | 1 ч    | квалификация `pending` → `qualified` (депозит ≥ порога + KYC); ловит гонку «депозит раньше KYC»                                                                                                          |
+| `affiliate-clicks-cleanup` | 24 ч   | удаление кликов старше `affiliate_click_retention_days` (атрибуции переживают: ON DELETE SET NULL)                                                                                                       |
 
 ### 18.2. Ключевые файлы
 

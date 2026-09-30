@@ -42,6 +42,7 @@ last_updated: 2026-08-28
 | **Payments / wallet**      | [PAYMENT_OVERVIEW.md](./PAYMENT_OVERVIEW.md) + [USER_FLOW_FIRST_90_SECONDS.md](./USER_FLOW_FIRST_90_SECONDS.md) §Backend                                                                         |
 | **Security / auth**        | [SECURITY_BASELINE.md](./SECURITY_BASELINE.md)                                                                                                                                                   |
 | **Casino providers**       | [PROVIDER_INTEGRATION_STRATEGY.md](./PROVIDER_INTEGRATION_STRATEGY.md)                                                                                                                           |
+| **Партнёрская программа**  | [tz-part-8-affiliate-program.md](./tz-part-8-affiliate-program.md) + [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md) §9a                                                                          |
 | **Frontend web / витрина** | [tz-part-5-frontend-web.md](./tz-part-5-frontend-web.md) + [tz-part-5.1-frontend-design.md](./tz-part-5.1-frontend-design.md) + [USER_FLOW_FIRST_90_SECONDS.md](./USER_FLOW_FIRST_90_SECONDS.md) |
 | **Env-переменные**         | [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md)                                                                                                                                           |
 
@@ -59,6 +60,7 @@ last_updated: 2026-08-28
 | 5.1 | Frontend Design   | [tz-part-5.1-frontend-design.md](./tz-part-5.1-frontend-design.md)             | **Дополнение к Части 5:** гибридный UI, визуальные решения, GameDeck, тон голоса |
 | 6   | Admin & Support   | [tz-part-6-admin-support-referrals.md](./tz-part-6-admin-support-referrals.md) | Admin panel, support, referrals                                                  |
 | 7   | DevOps            | [tz-part-7-devops-security-qa.md](./tz-part-7-devops-security-qa.md)           | VPS, Docker, CI/CD, security, QA                                                 |
+| 8   | Affiliate Program | [tz-part-8-affiliate-program.md](./tz-part-8-affiliate-program.md)             | **Партнёрская программа:** трекинг-ссылки, RevShare % от NGR, clawback, антифрод |
 
 ### Продуктовый user-flow (не часть ТЗ, но контракт приёмки)
 

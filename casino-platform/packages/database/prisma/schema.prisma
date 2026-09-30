@@ -44,6 +44,11 @@ model User {
   notifications    Notification[]
   referralRewardsAsReferrer ReferralReward[] @relation("Referrer")
   referralRewardsAsReferred ReferralReward[] @relation("Referred")
+  // Affiliate program (ТЗ ч.8): игрок может быть источником трафика партнёра.
+  // FK живёт на affiliates.user_id — здесь только обратная сторона 1:1.
+  affiliateProfile      Affiliate?
+  affiliateAttributions AffiliateAttribution[]
+  affiliateCommissions  AffiliateCommission[]
   @@map("users")
 }
 enum UserStatus {
@@ -646,6 +651,150 @@ enum ReferralRewardStatus {
   credited
   zero
 }
+// ─────────────────────────────────────────────────────────────────────────────
+// Affiliate program (ТЗ ч.8). Отдельная подсистема от referrals: контрагент —
+// внешний вебмастер (affiliate), а не игрок-пригласитель. Ставка RevShare
+// индивидуальна и задаётся из админки; начисления считаются от NGR, а не GGR.
+// Деньги — DECIMAL(20,8), ставки — DECIMAL(5,4) (правило §1 AI_DEVELOPMENT_RULES).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Партнёр программы. userId — FK на players: партнёр получает реальный кошелёк
+/// игрока, поэтому начисление идёт через обычный WalletFacade.credit.
+model Affiliate {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String            @unique @map("user_id") @db.Uuid
+  email              String            @unique @db.VarChar(255)
+  passwordHash       String            @map("password_hash") @db.Text
+  status             AffiliateStatus   @default(active)
+  trackingCode       String            @unique @map("tracking_code") @db.VarChar(32)
+  displayName        String?           @map("display_name") @db.VarChar(128)
+  country            String?           @db.VarChar(2)
+  telegram           String?           @db.VarChar(64)
+  website            String?           @db.Text
+  trafficSources     Json              @default("[]") @map("traffic_sources") @db.JsonB
+  /// Индивидуальная ставка RevShare. Перекрывает affiliate_default_revshare_rate.
+  revshareRate       Decimal           @default(0.2000) @map("revshare_rate") @db.Decimal(5, 4)
+  payoutCurrency     String            @default("RUB") @map("payout_currency") @db.VarChar(16)
+  totalEarned        Decimal           @default(0) @map("total_earned") @db.Decimal(20, 8)
+  totalPaid          Decimal           @default(0) @map("total_paid") @db.Decimal(20, 8)
+  isAgreed           Boolean           @default(false) @map("is_agreed")
+  agreedAt           DateTime?         @map("agreed_at") @db.Timestamptz
+  suspendedReason    String?           @map("suspended_reason") @db.Text
+  lastClickAt        DateTime?         @map("last_click_at") @db.Timestamptz
+  lastLoginAt        DateTime?         @map("last_login_at") @db.Timestamptz
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clicks             AffiliateClick[]
+  attributions       AffiliateAttribution[]
+  commissions        AffiliateCommission[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("affiliates")
+}
+enum AffiliateStatus {
+  active
+  suspended
+  rejected
+}
+
+/// Клик по трекинг-ссылке партнёра. IP хранится ТОЛЬКО хешем (GDPR/152-ФЗ):
+/// сырой IP в БД не сохраняется ни при каких условиях.
+model AffiliateClick {
+  id            BigInt    @id @default(autoincrement())
+  affiliateId   String    @map("affiliate_id") @db.Uuid
+  landingPath   String    @map("landing_path") @db.VarChar(255)
+  /// SHA-256(ip + INTERNAL_API_SECRET) — используется только для антифрод-сравнения
+  ipHash        String    @map("ip_hash") @db.VarChar(64)
+  userAgent     String?   @map("user_agent") @db.VarChar(255)
+  refererHost   String?   @map("referer_host") @db.VarChar(255)
+  geoCountry    String?   @map("geo_country") @db.VarChar(2)
+  campaignId    String?   @map("campaign_id") @db.VarChar(64)
+  subId         String?   @map("sub_id") @db.VarChar(64)
+  isConverted   Boolean   @default(false) @map("is_converted")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  affiliate     Affiliate            @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  attributions  AffiliateAttribution[]
+
+  @@index([affiliateId, createdAt])
+  @@index([createdAt])
+  @@map("affiliate_clicks")
+}
+
+/// Привязка игрока к партнёру. playerId UNIQUE — игрок принадлежит ровно одному
+/// партнёру навсегда (защита от «перехвата» конкурирующим партнёром).
+model AffiliateAttribution {
+  id             String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  affiliateId    String                      @map("affiliate_id") @db.Uuid
+  playerId       String                      @unique @map("player_id") @db.Uuid
+  clickId        BigInt?                     @map("click_id")
+  status         AffiliateAttributionStatus  @default(pending)
+  qualifiedAt    DateTime?                   @map("qualified_at") @db.Timestamptz
+  firstDepositId String?                     @map("first_deposit_id") @db.Uuid
+  firstDepositAt DateTime?                   @map("first_deposit_at") @db.Timestamptz
+  totalDeposit   Decimal                     @default(0) @map("total_deposit") @db.Decimal(20, 8)
+  depositCount   Int                         @default(0) @map("deposit_count")
+  isSelfReferral Boolean                     @default(false) @map("is_self_referral")
+  rejectReason   String?                     @map("reject_reason") @db.VarChar(64)
+  createdAt      DateTime                    @default(now()) @map("created_at") @db.Timestamptz
+  affiliate      Affiliate                   @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  player         User                        @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  /// Клик, через который пришёл игрок. SetNull: клики чистятся по retention,
+  /// и удаление клика не должно стирать историю атрибуции.
+  click          AffiliateClick?             @relation(fields: [clickId], references: [id], onDelete: SetNull)
+  commissions    AffiliateCommission[]
+
+  @@index([affiliateId, status])
+  @@index([affiliateId, firstDepositAt])
+  @@map("affiliate_attributions")
+}
+enum AffiliateAttributionStatus {
+  pending
+  qualified
+  rejected
+}
+
+/// Начисление RevShare. revshareRate — СНИМОК ставки на момент расчёта: изменение
+/// ставки в админке не пересчитывает закрытые периоды (ТЗ ч.8 §11.2).
+/// Уникальный индекс — последний рубеж идемпотентности (гонка двух cron-тиков).
+model AffiliateCommission {
+  id              String                    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  affiliateId     String                    @map("affiliate_id") @db.Uuid
+  playerId        String                    @map("player_id") @db.Uuid
+  attributionId   String?                   @map("attribution_id") @db.Uuid
+  periodStart     DateTime                  @map("period_start") @db.Date
+  periodEnd       DateTime                  @map("period_end") @db.Date
+  currency        String                    @db.VarChar(16)
+  betSum          Decimal                   @default(0) @map("bet_sum") @db.Decimal(20, 8)
+  winSum          Decimal                   @default(0) @map("win_sum") @db.Decimal(20, 8)
+  rollbackSum     Decimal                   @default(0) @map("rollback_sum") @db.Decimal(20, 8)
+  bonusSum        Decimal                   @default(0) @map("bonus_sum") @db.Decimal(20, 8)
+  providerFeeSum  Decimal                   @default(0) @map("provider_fee_sum") @db.Decimal(20, 8)
+  ggrAmount       Decimal                   @default(0) @map("ggr_amount") @db.Decimal(20, 8)
+  ngrAmount       Decimal                   @default(0) @map("ngr_amount") @db.Decimal(20, 8)
+  revshareRate    Decimal                   @map("revshare_rate") @db.Decimal(5, 4)
+  commissionAmount Decimal                  @default(0) @map("commission_amount") @db.Decimal(20, 8)
+  status          AffiliateCommissionStatus @default(pending)
+  creditedAt      DateTime?                 @map("credited_at") @db.Timestamptz
+  ledgerEntryId   String?                   @map("ledger_entry_id") @db.Uuid
+  createdAt       DateTime                  @default(now()) @map("created_at") @db.Timestamptz
+  affiliate       Affiliate                 @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  player          User                      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  attribution     AffiliateAttribution?     @relation(fields: [attributionId], references: [id], onDelete: SetNull)
+
+  @@unique([affiliateId, playerId, periodStart, currency])
+  @@index([affiliateId, periodStart])
+  @@index([status])
+  @@map("affiliate_commissions")
+}
+enum AffiliateCommissionStatus {
+  pending
+  approved
+  paid
+  cancelled
+}
+
 model Notification {
   id        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String              @map("user_id") @db.Uuid

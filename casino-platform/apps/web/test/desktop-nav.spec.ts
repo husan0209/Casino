@@ -22,6 +22,7 @@ describe('GAP-54: десктоп-панель (§4.5)', () => {
       '/providers',
       '/wallet',
       '/history',
+      '/affiliate',
       '/support',
     ])
     expect(NAV_ITEMS.map((item) => item.label)).toEqual([
@@ -31,8 +32,19 @@ describe('GAP-54: десктоп-панель (§4.5)', () => {
       'Провайдеры',
       'Кошелёк',
       'История',
+      'Партнёрам',
       'Поддержка',
     ])
+  })
+
+  it('партнёрская программа не подписана как «рефералы» (ТЗ ч.8 §2)', () => {
+    // Игровая рефералка и партнёрская программа — разные сущности. Смешение
+    // подписей в меню привело бы к тому, что игрок пойдёт в кабинет партнёра
+    // и не найдёт свою реферальную статистику.
+    const affiliateItem = NAV_ITEMS.find((item) => item.href === '/affiliate')
+    expect(affiliateItem).toBeDefined()
+    expect(affiliateItem?.label).toBe('Партнёрам')
+    expect(affiliateItem?.label.toLowerCase()).not.toContain('реферал')
   })
 
   it('в панели нет разделов, запрещённых для релиза (ТЗ §24)', () => {

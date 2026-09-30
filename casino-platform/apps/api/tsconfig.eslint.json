@@ -1,5 +1,14 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Скрипты проверки в test/*.js (di-graph.check.js, affiliate-flow.check.js,
+    // di-inject-audit.js) — автономные Node-программы на CommonJS. Без allowJs
+    // парсер @typescript-eslint не может построить для них type information и
+    // падает с «The file was not found in any of the provided projects».
+    // allowJs действует только на этот файл: сборку (tsconfig.json) не трогает.
+    "allowJs": true,
+    "checkJs": false
+  },
   "include": ["src", "test"],
   "exclude": ["node_modules", "dist"]
 }
