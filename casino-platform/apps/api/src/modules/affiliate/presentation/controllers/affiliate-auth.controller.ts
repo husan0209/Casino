@@ -65,7 +65,17 @@ export class AffiliateAuthController {
     access_token: string
     message: string
   }> {
-    const result = await this.registerUseCase.execute(body)
+    // Явное сопоставление: DTO — snake_case (API_CONVENTIONS §1.2), вход
+    // use-case — camelCase. Без маппинга accept_terms/display_name не дойдут
+    // до домена и регистрация вернёт 400/неверные данные.
+    const result = await this.registerUseCase.execute({
+      email: body.email,
+      password: body.password,
+      displayName: body.display_name,
+      telegram: body.telegram,
+      website: body.website,
+      acceptTerms: body.accept_terms,
+    })
     return {
       affiliate_id: result.affiliateId,
       tracking_code: result.trackingCode,

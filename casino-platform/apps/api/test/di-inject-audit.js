@@ -59,10 +59,19 @@ const findings = []
 let scannedClasses = 0
 let scannedParams = 0
 
-/** Класс помечен @Injectable — только такие классы Nest инстанцирует через DI. */
-function isInjectableClass(node) {
+/**
+ * Классы, которые Nest инстанцирует через DI.
+ *
+ * ВАЖНО: @Controller ТОЖЕ входит. Первая версия аудита смотрела только на
+ * @Injectable и из-за этого пропустила AuthController: у него 10 зависимостей
+ * без @Inject, и весь /auth/* отдавал 500. Проверять надо всё, что Nest
+ * инстанцирует — и контроллеры в первую очередь.
+ */
+const DI_CLASS_DECORATORS = new Set(['Injectable', 'Controller'])
+
+function isDiClass(node) {
   const decorators = ts.canHaveDecorators(node) ? (ts.getDecorators(node) ?? []) : []
-  return decorators.some((decorator) => decoratorName(decorator) === 'Injectable')
+  return decorators.some((decorator) => DI_CLASS_DECORATORS.has(decoratorName(decorator) ?? ''))
 }
 
 function visitFile(file) {
@@ -75,7 +84,7 @@ function visitFile(file) {
   function walk(node) {
     // Только @Injectable-классы: у entity, классов ошибок и утилит конструктор
     // не является DI-зависимостью, и требование @Inject к нему неприменимо.
-    if (ts.isClassDeclaration(node) && isInjectableClass(node)) {
+    if (ts.isClassDeclaration(node) && isDiClass(node)) {
       const ctor = node.members.find((member) => ts.isConstructorDeclaration(member))
       if (ctor !== undefined && ctor.parameters.length > 0) {
         scannedClasses++

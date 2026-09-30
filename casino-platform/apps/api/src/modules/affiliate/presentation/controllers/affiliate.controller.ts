@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Кабинет партнёра (UC-AFF-12..16; ТЗ ч.8 §10.2, §12).
  *
  * OWNER-CHECK. Ни один метод не принимает affiliateId: он берётся ТОЛЬКО из
@@ -9,8 +9,9 @@
  * Это осознанное требование: ошибка в расчёте разрушает доверие быстрее, чем
  * низкая ставка (ТЗ ч.8 §3.9).
  */
-import { Controller, Get, Inject, Patch, Post, UseGuards, UsePipes } from '@nestjs/common'
+import { Controller, Get, Inject, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
 
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AffiliateActor } from '@/common/types/req-user'
 
@@ -71,7 +72,7 @@ export class AffiliateController {
    * «0.2000». Сырое значение тоже возвращается: оно попадает в расчёты.
    */
   @Get('me')
-  async me(actor: AffiliateActor): Promise<{
+  async me(@CurrentUser() actor: AffiliateActor): Promise<{
     affiliate_id: string
     email: string
     display_name: string | null
@@ -116,8 +117,8 @@ export class AffiliateController {
   @Get('dashboard')
   @UsePipes(new ZodValidationPipe(ClickQuerySchema))
   async dashboard(
-    actor: AffiliateActor,
-    query: ClickQueryDto,
+    @CurrentUser() actor: AffiliateActor,
+    @Query() query: ClickQueryDto,
   ): Promise<{
     period_days: number
     clicks: { total: number; converted: number; conversion_rate: string }
@@ -167,8 +168,8 @@ export class AffiliateController {
   @Get('commissions')
   @UsePipes(new ZodValidationPipe(CommissionListQuerySchema))
   async commissions(
-    actor: AffiliateActor,
-    query: CommissionListQueryDto,
+    @CurrentUser() actor: AffiliateActor,
+    @Query() query: CommissionListQueryDto,
   ): Promise<{
     data: Array<{
       id: string
@@ -223,7 +224,7 @@ export class AffiliateController {
 
   /** Приведённые игроки со статусами — партнёр видит качество своего трафика. */
   @Get('players')
-  async players(actor: AffiliateActor): Promise<{
+  async players(@CurrentUser() actor: AffiliateActor): Promise<{
     data: Array<{
       player_id: string
       status: string
@@ -257,7 +258,7 @@ export class AffiliateController {
 
   /** Промо-ссылки: базовая + deep-link на каталог/игру. */
   @Get('links')
-  async links(actor: AffiliateActor): Promise<{
+  async links(@CurrentUser() actor: AffiliateActor): Promise<{
     tracking_url: string
     cookie_days: number
     examples: Array<{ name: string; url: string }>
@@ -280,10 +281,15 @@ export class AffiliateController {
   @UsePipes(new ZodValidationPipe(UpdateAffiliateSelfSchema))
   async updateMe(
     body: UpdateAffiliateSelfDto,
-    actor: AffiliateActor,
+    @CurrentUser() actor: AffiliateActor,
   ): Promise<{ display_name: string | null; telegram: string | null; website: string | null }> {
     const affiliate = await this.requireAffiliate(actor.affiliateId)
-    const updated = await this.affiliates.updateSelf(affiliate.id, body)
+    // Явное сопоставление DTO (snake_case) -> репозиторий (camelCase).
+    const updated = await this.affiliates.updateSelf(affiliate.id, {
+      ...(body.display_name !== undefined ? { displayName: body.display_name } : {}),
+      ...(body.telegram !== undefined ? { telegram: body.telegram } : {}),
+      ...(body.website !== undefined ? { website: body.website } : {}),
+    })
     return {
       display_name: updated.displayName,
       telegram: updated.telegram,
@@ -299,7 +305,7 @@ export class AffiliateController {
    * это не санкция, а отказ от работы.
    */
   @Post('leave')
-  async leave(actor: AffiliateActor): Promise<{ status: string; message: string }> {
+  async leave(@CurrentUser() actor: AffiliateActor): Promise<{ status: string; message: string }> {
     const affiliate = await this.requireAffiliate(actor.affiliateId)
     await this.affiliates.update(affiliate.id, {
       status: 'suspended',

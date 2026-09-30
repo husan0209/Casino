@@ -178,11 +178,11 @@ export class AffiliateAdminController {
       passwordHash: '',
       trackingCode: await this.affiliates.generateUniqueTrackingCode(),
       revshareRate:
-        body.revshareRate !== undefined
-          ? parseRevShareRate(body.revshareRate)
+        body.revshare_rate !== undefined
+          ? parseRevShareRate(body.revshare_rate)
           : parseRevShareRate((await this.settings.get()).defaultRevshareRate),
-      payoutCurrency: body.payoutCurrency,
-      displayName: body.displayName ?? null,
+      payoutCurrency: body.payout_currency,
+      displayName: body.display_name ?? null,
       country: body.country ?? null,
       isAgreed: true,
     })
@@ -220,8 +220,21 @@ export class AffiliateAdminController {
   ): Promise<{ id: string; revshare_rate: string; status: string }> {
     const before = await this.requireAffiliate(id)
     const revshareRate =
-      body.revshareRate !== undefined ? parseRevShareRate(body.revshareRate) : undefined
-    const updated = await this.affiliates.update(id, { ...body, revshareRate })
+      body.revshare_rate !== undefined ? parseRevShareRate(body.revshare_rate) : undefined
+    // Явное сопоставление, а не {...body}: DTO в HTTP-контракте snake_case
+    // (API_CONVENTIONS §1.2), а вход репозитория — camelCase. Раскрытие
+    // привело бы к тому, что все поля молча игнорируются.
+    const updated = await this.affiliates.update(id, {
+      ...(body.status !== undefined ? { status: body.status } : {}),
+      ...(revshareRate !== undefined ? { revshareRate } : {}),
+      ...(body.display_name !== undefined ? { displayName: body.display_name } : {}),
+      ...(body.country !== undefined ? { country: body.country } : {}),
+      ...(body.telegram !== undefined ? { telegram: body.telegram } : {}),
+      ...(body.website !== undefined ? { website: body.website } : {}),
+      ...(body.payout_currency !== undefined ? { payoutCurrency: body.payout_currency } : {}),
+      ...(body.suspended_reason !== undefined ? { suspendedReason: body.suspended_reason } : {}),
+      ...(body.is_agreed !== undefined ? { isAgreed: body.is_agreed } : {}),
+    })
     await this.audit.log({
       actorType: 'admin',
       actorId: admin.id,
@@ -231,7 +244,7 @@ export class AffiliateAdminController {
       payload: {
         from: { revshareRate: before.revshareRate, status: before.status },
         to: { revshareRate: updated.revshareRate, status: updated.status },
-        reason: body.suspendedReason ?? null,
+        reason: body.suspended_reason ?? null,
       },
       ipAddress: request.ip,
     })
