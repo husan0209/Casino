@@ -59,10 +59,21 @@ const findings = []
 let scannedClasses = 0
 let scannedParams = 0
 
-/** Класс помечен @Injectable — только такие классы Nest инстанцирует через DI. */
+/**
+ * Класс, который инстанцирует Nest: помечен @Injectable ИЛИ @Controller.
+ *
+ * Раньше проверялись только @Injectable — и так пропускались все контроллеры.
+ * На этом слепом пятне не поймалось отсутствие @Inject в AdminAuthController:
+ * в этой сборке design:paramtypes не выдаётся, поэтому `private auth: X` без
+ * @Inject даёт в рантайме undefined, и `/admin/auth/login` отдавал 500.
+ * Контроллеры инстанцирует Nest точно так же, как @Injectable-классы.
+ */
 function isInjectableClass(node) {
   const decorators = ts.canHaveDecorators(node) ? (ts.getDecorators(node) ?? []) : []
-  return decorators.some((decorator) => decoratorName(decorator) === 'Injectable')
+  return decorators.some((decorator) => {
+    const name = decoratorName(decorator)
+    return name === 'Injectable' || name === 'Controller'
+  })
 }
 
 function visitFile(file) {
