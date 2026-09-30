@@ -5,17 +5,20 @@ import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 import type { Currency } from '@casino/shared-types'
 
 import { WithdrawalCancelForbiddenError } from '../../domain/errors'
-import { IPaymentRequestRepository, PAYMENT_REQUEST_REPOSITORY } from '../../domain/payments.ports'
+import {
+  type IPaymentRequestRepository,
+  PAYMENT_REQUEST_REPOSITORY,
+} from '../../domain/payments.ports'
 
 @Injectable()
 export class CancelWithdrawalUseCase {
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
-    private wallet: WalletFacade,
+    @Inject(WalletFacade) private wallet: WalletFacade,
   ) {}
   async execute(userId: string, id: string): Promise<{ ok: boolean }> {
     const pr = await this.repo.findById(id)
-    if (!pr || pr.userId !== userId) {
+    if (pr?.userId !== userId) {
       throw new WithdrawalCancelForbiddenError()
     }
     if (pr.status !== 'pending') {

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 
 import { GetGeoContextUseCase } from '../application/use-cases/get-geo-context.use-case'
 import { UpdateAfterDepositUseCase } from '../application/use-cases/update-after-deposit.use-case'
@@ -9,16 +9,20 @@ import type { UserGeoContext } from '../domain/repositories/user-profile.reposit
 @Injectable()
 export class UsersFacade {
   constructor(
-    private getGeoContextUseCase: GetGeoContextUseCase,
+    @Inject(GetGeoContextUseCase) private getGeoContextUseCase: GetGeoContextUseCase,
+    @Inject(UpdateCurrencyPreferenceUseCase)
     private updateCurrency: UpdateCurrencyPreferenceUseCase,
-    private updateAfterDeposit: UpdateAfterDepositUseCase,
+    @Inject(UpdateAfterDepositUseCase) private updateAfterDeposit: UpdateAfterDepositUseCase,
   ) {}
 
   getGeoContext(userId: string): Promise<UserGeoContext | null> {
     return this.getGeoContextUseCase.execute(userId)
   }
 
-  updateCurrencyPreference(userId: string, currency: string): Promise<{ currency_preference: string }> {
+  updateCurrencyPreference(
+    userId: string,
+    currency: string,
+  ): Promise<{ currency_preference: string }> {
     return this.updateCurrency.execute(userId, currency)
   }
 

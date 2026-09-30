@@ -9,14 +9,17 @@ import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 import { type Currency } from '@casino/shared-types'
 
 import { AmountTooLargeError, AmountTooSmallError } from '../../domain/errors'
-import { IPaymentRequestRepository, PAYMENT_REQUEST_REPOSITORY } from '../../domain/payments.ports'
+import {
+  type IPaymentRequestRepository,
+  PAYMENT_REQUEST_REPOSITORY,
+} from '../../domain/payments.ports'
 
 @Injectable()
 export class CreateWithdrawalUseCase {
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
-    private wallet: WalletFacade,
-    private kyc: KycFacade,
+    @Inject(WalletFacade) private wallet: WalletFacade,
+    @Inject(KycFacade) private kyc: KycFacade,
   ) {}
   async execute(
     userId: string,

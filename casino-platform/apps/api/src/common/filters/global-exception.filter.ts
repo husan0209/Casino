@@ -4,6 +4,7 @@ import {
   type ExceptionFilter,
   HttpException,
   HttpStatus,
+  Inject,
 } from '@nestjs/common'
 import * as Sentry from '@sentry/node'
 import { type Request, type Response } from 'express'
@@ -43,7 +44,7 @@ function payloadDetails(res: unknown, message: unknown): Record<string, unknown>
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   // GAP-23: PinoLogger вместо Nest Logger — структурные логи с redact.
-  constructor(private readonly pinoLogger: PinoLogger) {
+  constructor(@Inject(PinoLogger) private readonly pinoLogger: PinoLogger) {
     this.pinoLogger.setContext(GlobalExceptionFilter.name)
   }
 

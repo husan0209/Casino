@@ -2,7 +2,9 @@
   "extends": "@casino/tsconfig/nest.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "baseUrl": "./",
+    "rootDir": "../..",
+    "ignoreDeprecations": "6.0",
+    "types": ["vitest/globals"],
     "paths": {
       "@/*": ["./src/*"],
       "@modules/*": ["./src/modules/*"],

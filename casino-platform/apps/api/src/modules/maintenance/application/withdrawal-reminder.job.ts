@@ -7,8 +7,8 @@ import {
   MAINTENANCE_EMAIL_PORT,
   PAYMENT_MAINTENANCE_REPO,
   REMINDER_AUDIT_REPO,
-  IPaymentMaintenanceRepo,
-  IReminderAuditRepo,
+  type IPaymentMaintenanceRepo,
+  type IReminderAuditRepo,
   type ReminderResult,
 } from '../domain/maintenance.ports'
 
@@ -51,7 +51,9 @@ export class WithdrawalReminderJob {
     }
     const admins = await this.audit.activeAdminEmails()
     if (admins.length === 0) {
-      this.logger.warn(`withdrawal-reminder: ${stale.length} stale withdrawals, but no active admins`)
+      this.logger.warn(
+        `withdrawal-reminder: ${stale.length} stale withdrawals, but no active admins`,
+      )
       return { reminded: 0, skipped: stale.length, admins: 0 }
     }
 
@@ -75,7 +77,12 @@ export class WithdrawalReminderJob {
       let sent = 0
       for (const to of admins) {
         try {
-          await this.emailQueue.enqueue({ to, subject: mail.subject, text: mail.text, html: mail.html })
+          await this.emailQueue.enqueue({
+            to,
+            subject: mail.subject,
+            text: mail.text,
+            html: mail.html,
+          })
           sent++
         } catch (e) {
           // Письмо — side-effect: сбои фиксируем в сводке, не роняем задачу
@@ -85,7 +92,9 @@ export class WithdrawalReminderJob {
       await this.audit.recordReminder({ targetId: w.id, adminsNotified: sent, count: stale.length })
       reminded++
     }
-    this.logger.log(`withdrawal-reminder: stale=${stale.length} reminded=${reminded} skipped=${skipped} admins=${admins.length}`)
+    this.logger.log(
+      `withdrawal-reminder: stale=${stale.length} reminded=${reminded} skipped=${skipped} admins=${admins.length}`,
+    )
     return { reminded, skipped, admins: admins.length }
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 
 import { KycCheckService } from '../application/use-cases/kyc-check.service'
 
@@ -9,7 +9,7 @@ import { KycCheckService } from '../application/use-cases/kyc-check.service'
  */
 @Injectable()
 export class KycFacade {
-  constructor(private readonly check: KycCheckService) {}
+  constructor(@Inject(KycCheckService) private readonly check: KycCheckService) {}
 
   assertCanDeposit(userId: string, newDepositRub: string, limitRub?: string): Promise<void> {
     return this.check.assertCanDeposit(userId, newDepositRub, limitRub)

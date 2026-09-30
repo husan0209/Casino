@@ -2,10 +2,20 @@ import { randomBytes } from 'node:crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 
-import { IJwtTokenService, JWT_TOKEN_SERVICE } from '@modules/auth/domain/auth.ports'
-import { AUTH_PROVIDER_REPOSITORY, type AuthProviderKind, IAuthProviderRepository } from '@modules/auth/domain/repositories/auth-provider.repository'
-import { ISessionRepository, SESSION_REPOSITORY } from '@modules/auth/domain/repositories/session.repository'
-import { IUserRepository, USER_REPOSITORY } from '@modules/auth/domain/repositories/user.repository'
+import { type IJwtTokenService, JWT_TOKEN_SERVICE } from '@modules/auth/domain/auth.ports'
+import {
+  AUTH_PROVIDER_REPOSITORY,
+  type AuthProviderKind,
+  type IAuthProviderRepository,
+} from '@modules/auth/domain/repositories/auth-provider.repository'
+import {
+  type ISessionRepository,
+  SESSION_REPOSITORY,
+} from '@modules/auth/domain/repositories/session.repository'
+import {
+  type IUserRepository,
+  USER_REPOSITORY,
+} from '@modules/auth/domain/repositories/user.repository'
 
 import { type User } from '../../../domain/entities/user.entity'
 import { ReferralCodeGenerationError } from '../../../domain/errors'
@@ -69,18 +79,14 @@ export class OAuthUserProvisioningService {
     if (!user && input.email) {
       user = await this.users.findByEmail(input.email.toLowerCase().trim())
     }
-    if (!user) {
-      user = await this.provisionUser(input)
-    }
-    if (!link) {
-      link = await this.authProviders.create({
-        userId: user.id,
-        provider: input.provider,
-        providerUserId: input.providerUserId,
-        providerEmail: input.email ?? undefined,
-        providerData: input.displayName ? { display_name: input.displayName } : undefined,
-      })
-    }
+    user ??= await this.provisionUser(input)
+    link ??= await this.authProviders.create({
+      userId: user.id,
+      provider: input.provider,
+      providerUserId: input.providerUserId,
+      providerEmail: input.email ?? undefined,
+      providerData: input.displayName ? { display_name: input.displayName } : undefined,
+    })
 
     const { token: refreshToken, hash } = this.jwt.generateRefreshToken()
     const session = await this.sessions.create({

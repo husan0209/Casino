@@ -1,4 +1,14 @@
-import { Body, Controller, Headers, Logger, Param, Post, Res, HttpCode } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Headers,
+  Inject,
+  Logger,
+  Param,
+  Post,
+  Res,
+  HttpCode,
+} from '@nestjs/common'
 import { SkipThrottle } from '@nestjs/throttler'
 import { type Response } from 'express'
 
@@ -27,8 +37,8 @@ export class ProviderCallbackController {
   private readonly logger = new Logger(ProviderCallbackController.name)
 
   constructor(
-    private adapters: ProviderAdapterFactory,
-    private cb: GameCallbackService,
+    @Inject(ProviderAdapterFactory) private adapters: ProviderAdapterFactory,
+    @Inject(GameCallbackService) private cb: GameCallbackService,
   ) {}
 
   @Post(':providerSlug/:op')

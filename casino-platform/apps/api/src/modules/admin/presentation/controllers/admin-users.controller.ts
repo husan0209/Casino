@@ -1,24 +1,131 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common'
 import { type Request } from 'express'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
 
-import { type KycDocumentType, type KycStatus, prisma, type Prisma, type UserRole, type UserStatus } from '@casino/database'
+import {
+  type KycDocumentType,
+  type KycStatus,
+  prisma,
+  type Prisma,
+  type UserRole,
+  type UserStatus,
+} from '@casino/database'
 
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { BlockUserSchema } from '../dto/admin-users.dto'
 
+type AdminUserDetail =
+  | ({
+      kycProfile: {
+        id: string
+        firstName: string | null
+        lastName: string | null
+        createdAt: Date
+        updatedAt: Date
+        userId: string
+        status: KycStatus
+        dateOfBirth: Date | null
+        country: string | null
+        documentType: KycDocumentType | null
+        documentNumber: string | null
+        documentExpiry: Date | null
+        rejectionReason: string | null
+        approvedAt: Date | null
+        rejectedAt: Date | null
+        submittedAt: Date | null
+        reviewedBy: string | null
+      } | null
+      profile: {
+        id: string
+        firstName: string | null
+        lastName: string | null
+        createdAt: Date
+        updatedAt: Date
+        userId: string
+        dateOfBirth: Date | null
+        country: string | null
+        phone: string | null
+        phoneVerified: boolean
+        city: string | null
+        avatarUrl: string | null
+        currencyPreference: string
+        lastPaymentMethod: string | null
+      } | null
+      settings: {
+        id: string
+        createdAt: Date
+        updatedAt: Date
+        userId: string
+        notificationsEmail: boolean
+        notificationsPush: boolean
+        twoFaEnabled: boolean
+        twoFaSecret: string | null
+        language: string
+        timezone: string
+        selfExcludedUntil: Date | null
+      } | null
+      walletAccounts: {
+        id: string
+        createdAt: Date
+        updatedAt: Date
+        userId: string
+        currency: string
+        balance: Prisma.Decimal
+        locked: Prisma.Decimal
+        version: bigint
+      }[]
+    } & {
+      id: string
+      email: string | null
+      passwordHash: string | null
+      role: UserRole
+      lastLoginAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+      emailVerified: boolean
+      username: string | null
+      status: UserStatus
+      referralCode: string
+      referredBy: string | null
+      failedLoginAttempts: number
+      lastFailedAt: Date | null
+      lockedUntil: Date | null
+    })
+  | null
+
 @UseGuards(AdminAuthGuard)
 @Controller('admin/users')
 export class AdminUsersController {
-  constructor(private readonly auditLogService: AuditLogService) {}
+  constructor(@Inject(AuditLogService) private readonly auditLogService: AuditLogService) {}
 
   @Get()
   async list(
     @Query() queryParams: { page?: string; per_page?: string; status?: string; search?: string },
-  ): Promise<{ items: { id: string; email: string | null; lastLoginAt: Date | null; createdAt: Date; status: UserStatus; referralCode: string; }[]; meta: { page: number; perPage: number; total: number; totalPages: number; }; }> {
+  ): Promise<{
+    items: {
+      id: string
+      email: string | null
+      lastLoginAt: Date | null
+      createdAt: Date
+      status: UserStatus
+      referralCode: string
+    }[]
+    meta: { page: number; perPage: number; total: number; totalPages: number }
+  }> {
     const page = parseInt(queryParams.page || '1', 10) || 1
     const perPage = Math.min(parseInt(queryParams.per_page || '20', 10) || 20, 100)
 
@@ -63,7 +170,7 @@ export class AdminUsersController {
   }
 
   @Get(':id')
-  async get(@Param('id') userId: string): Promise<({ kycProfile: { id: string; firstName: string | null; lastName: string | null; createdAt: Date; updatedAt: Date; userId: string; status: KycStatus; dateOfBirth: Date | null; country: string | null; documentType: KycDocumentType | null; documentNumber: string | null; documentExpiry: Date | null; rejectionReason: string | null; approvedAt: Date | null; rejectedAt: Date | null; submittedAt: Date | null; reviewedBy: string | null; } | null; profile: { id: string; firstName: string | null; lastName: string | null; createdAt: Date; updatedAt: Date; userId: string; dateOfBirth: Date | null; country: string | null; phone: string | null; phoneVerified: boolean; city: string | null; avatarUrl: string | null; currencyPreference: string; lastPaymentMethod: string | null; } | null; settings: { id: string; createdAt: Date; updatedAt: Date; userId: string; notificationsEmail: boolean; notificationsPush: boolean; twoFaEnabled: boolean; twoFaSecret: string | null; language: string; timezone: string; selfExcludedUntil: Date | null; } | null; walletAccounts: { id: string; createdAt: Date; updatedAt: Date; userId: string; currency: string; balance: Prisma.Decimal; locked: Prisma.Decimal; version: bigint; }[]; } & { id: string; email: string | null; passwordHash: string | null; role: UserRole; lastLoginAt: Date | null; createdAt: Date; updatedAt: Date; emailVerified: boolean; username: string | null; status: UserStatus; referralCode: string; referredBy: string | null; failedLoginAttempts: number; lastFailedAt: Date | null; lockedUntil: Date | null; }) | null> {
+  async get(@Param('id') userId: string): Promise<AdminUserDetail> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -78,7 +185,11 @@ export class AdminUsersController {
 
   @Post(':id/block')
   @UsePipes(new ZodValidationPipe(BlockUserSchema))
-  async block(@Param('id') userId: string, @Body() dto: { reason?: string }, @Req() req: Request): Promise<{ ok: boolean; }> {
+  async block(
+    @Param('id') userId: string,
+    @Body() dto: { reason?: string },
+    @Req() req: Request,
+  ): Promise<{ ok: boolean }> {
     await prisma.user.update({
       where: { id: userId },
       data: { status: 'blocked' },
@@ -101,7 +212,7 @@ export class AdminUsersController {
   }
 
   @Post(':id/unblock')
-  async unblock(@Param('id') userId: string, @Req() req: Request): Promise<{ ok: boolean; }> {
+  async unblock(@Param('id') userId: string, @Req() req: Request): Promise<{ ok: boolean }> {
     await prisma.user.update({
       where: { id: userId },
       data: { status: 'active' },

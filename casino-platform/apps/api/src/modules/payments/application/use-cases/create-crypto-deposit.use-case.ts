@@ -9,11 +9,19 @@ import { KycFacade } from '@modules/kyc/facade/kyc.facade'
 
 import { InvalidCurrencyError, PaymentProviderError } from '../../domain/errors'
 import {
-  INowPaymentsClient,
-  IPaymentRequestRepository,
+  type INowPaymentsClient,
+  type IPaymentRequestRepository,
   NOWPAYMENTS_CLIENT,
   PAYMENT_REQUEST_REPOSITORY,
 } from '../../domain/payments.ports'
+
+export interface CreateCryptoDepositResult {
+  payment_request_id: string
+  pay_address: string
+  pay_amount: string
+  pay_currency: string
+  expires_at: string
+}
 
 @Injectable()
 export class CreateCryptoDepositUseCase {
@@ -21,10 +29,14 @@ export class CreateCryptoDepositUseCase {
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(NOWPAYMENTS_CLIENT) private readonly np: INowPaymentsClient,
-    private kycCheck: KycFacade,
-    private config: ConfigService,
+    @Inject(KycFacade) private kycCheck: KycFacade,
+    @Inject(ConfigService) private config: ConfigService,
   ) {}
-  async execute(userId: string, amount: string, currency: string): Promise<{ payment_request_id: string; pay_address: string; pay_amount: string; pay_currency: string; expires_at: string; }> {
+  async execute(
+    userId: string,
+    amount: string,
+    currency: string,
+  ): Promise<CreateCryptoDepositResult> {
     const allowed = ['USDT_TRC20', 'BTC', 'TON', 'TRX', 'LTC']
     if (!allowed.includes(currency)) {
       throw new InvalidCurrencyError()

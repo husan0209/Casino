@@ -62,7 +62,7 @@ export interface GamesListDto {
 }
 
 /** Ответ GET /casino/games/:slug — та же игра + поле демо (hasDemo уже в GameDto). */
-export interface GameDetailsDto extends GameDto {}
+export type GameDetailsDto = GameDto
 
 /** Ответ POST /casino/games/:slug/launch. */
 export interface GameLaunchDto {
@@ -103,7 +103,7 @@ export interface HistoryDto {
 }
 
 /** Игра в списке «Продолжить играть» (GET /casino/recent — FavoriteWithGame['game']). */
-export interface RecentGameDto extends GameDto {}
+export type RecentGameDto = GameDto
 
 /**
  * Ответ GET /casino/recent: контроллер возвращает `{ data: Game[] }` внутри

@@ -17,5 +17,10 @@ export default defineConfig({
   test: {
     // Глобальные describe/it/expect — спеки не импортируют их из 'vitest'
     globals: true,
+    // Интеграционные спеки (LEDGER_INTEGRATION: ledger/referral-payout/kyc-limit-rates)
+    // гоняют Serializable-транзакции по одной БД — файловый параллелизм даёт
+    // write conflicts/deadlocks и флак (PR #100/#102/#104). Сериализуем файлы:
+    // цена — ~1-2 минуты CI, выигрыш — стабильность.
+    fileParallelism: false,
   },
 })

@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 
 import {
   USER_PROFILE_REPOSITORY,
-  IUserProfileRepository,
+  type IUserProfileRepository,
 } from '../../domain/repositories/user-profile.repository'
 
 interface UpdateSettingsInput {
@@ -15,10 +15,14 @@ interface UpdateSettingsInput {
 @Injectable()
 export class UpdateSettingsUseCase {
   constructor(@Inject(USER_PROFILE_REPOSITORY) private repo: IUserProfileRepository) {}
-  async execute(userId: string, input: UpdateSettingsInput): Promise<{ ok: boolean; }> {
+  async execute(userId: string, input: UpdateSettingsInput): Promise<{ ok: boolean }> {
     await this.repo.updateSettings(userId, {
-      ...(input.notifications_email !== undefined && { notificationsEmail: input.notifications_email }),
-      ...(input.notifications_push !== undefined && { notificationsPush: input.notifications_push }),
+      ...(input.notifications_email !== undefined && {
+        notificationsEmail: input.notifications_email,
+      }),
+      ...(input.notifications_push !== undefined && {
+        notificationsPush: input.notifications_push,
+      }),
       ...(input.language !== undefined && { language: input.language }),
       ...(input.timezone !== undefined && { timezone: input.timezone }),
     })

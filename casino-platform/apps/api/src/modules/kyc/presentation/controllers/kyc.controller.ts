@@ -4,6 +4,7 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
   Post,
   Query,
   UploadedFile,
@@ -41,9 +42,9 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 @Controller('kyc')
 export class KycController {
   constructor(
-    private submitUc: SubmitKycUseCase,
-    private statusUc: GetKycStatusUseCase,
-    private uploadUc: UploadKycDocumentUseCase,
+    @Inject(SubmitKycUseCase) private submitUc: SubmitKycUseCase,
+    @Inject(GetKycStatusUseCase) private statusUc: GetKycStatusUseCase,
+    @Inject(UploadKycDocumentUseCase) private uploadUc: UploadKycDocumentUseCase,
   ) {}
   @Get('status')
   status(

@@ -1,4 +1,4 @@
-import { Injectable, type OnModuleDestroy } from '@nestjs/common'
+import { Inject, Injectable, type OnModuleDestroy } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import Redis from 'ioredis'
 
@@ -13,7 +13,7 @@ const RATES_CACHE_KEY = 'exchange_rates:rub'
 export class PrismaExchangeRatesReader implements IExchangeRatesReader, OnModuleDestroy {
   private redis: Redis | null = null
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(@Inject(ConfigService) private readonly config: ConfigService) {}
 
   async getCachedRates(): Promise<Record<string, string> | null> {
     const redis = this.getRedis()
@@ -46,9 +46,7 @@ export class PrismaExchangeRatesReader implements IExchangeRatesReader, OnModule
     if (!url) {
       return null
     }
-    if (!this.redis) {
-      this.redis = new Redis(url, { maxRetriesPerRequest: null, lazyConnect: true })
-    }
+    this.redis ??= new Redis(url, { maxRetriesPerRequest: null, lazyConnect: true })
     return this.redis
   }
 }

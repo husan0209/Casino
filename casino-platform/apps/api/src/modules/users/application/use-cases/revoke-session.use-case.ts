@@ -2,14 +2,18 @@ import { Inject, Injectable } from '@nestjs/common'
 
 import { SessionRevokeForbiddenError } from '../../domain/errors'
 import {
-  IUserSessionRepository,
+  type IUserSessionRepository,
   USER_SESSION_REPOSITORY,
 } from '../../domain/repositories/user-session.repository'
 
 @Injectable()
 export class RevokeSessionUseCase {
   constructor(@Inject(USER_SESSION_REPOSITORY) private repo: IUserSessionRepository) {}
-  async execute(userId: string, sessionId: string, currentSessionId?: string): Promise<{ ok: boolean; }> {
+  async execute(
+    userId: string,
+    sessionId: string,
+    currentSessionId?: string,
+  ): Promise<{ ok: boolean }> {
     if (sessionId === currentSessionId) {
       throw new SessionRevokeForbiddenError('Cannot revoke current session, use logout')
     }
