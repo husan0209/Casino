@@ -70,9 +70,18 @@ export class AuthController {
     user: { id: string; email: string | null; role: UserRole }
     referralCode: string
   }> {
+    // Код партнёра из ?ref= (партнёрская программа, ТЗ ч.8 §7.3). Тот же
+    // параметр используется игровой рефералкой, но резолвится независимо:
+    // player-ref ищется в users.referral_code, affiliate-код — в
+    // affiliates.tracking_code. Совпадёт максимум один.
+    const affiliateCode = typeof req.query['ref'] === 'string' ? req.query['ref'] : undefined
     const result = await this.registerUc.execute(
       { email: body.email, password: body.password, referralCode: body.referral_code },
-      { ip: req.ip, userAgent: req.headers['user-agent'] },
+      {
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        affiliateCode,
+      },
     )
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user, referralCode: result.referralCode }

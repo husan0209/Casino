@@ -11,10 +11,16 @@ export interface NavItem {
 }
 
 /**
- * Пункты десктоп-панели — ровно список релиза ТЗ §4.5.
+ * Пункты десктоп-панели — список релиза ТЗ §4.5.
  * Live / Настольные / Быстрые / Бонусы не добавляем (ТЗ §24).
  * icon — ключ в маппинге NAV_ICONS (components/layout/nav-icon.tsx),
  * не эмодзи: иконки UI — только lucide (ТЗ ч.5.1 §6).
+ *
+ * «Партнёрам» — вход в партнёрскую программу для вебмастеров (ТЗ ч.8).
+ * Это НЕ игровая рефералка: другой контрагент (внешний вебмастер, а не
+ * пригласивший игрока) и другие правила — расчёт от NGR, кабинет отдельный.
+ * Поэтому в меню подписано «Партнёрам», а не «Рефералы», чтобы игроки не
+ * путали две разные программы.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   { href: '/', label: 'Главная', icon: 'home' },
@@ -23,6 +29,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { href: '/providers', label: 'Провайдеры', icon: 'puzzle' },
   { href: '/wallet', label: 'Кошелёк', icon: 'wallet' },
   { href: '/history', label: 'История', icon: 'history' },
+  { href: '/affiliate', label: 'Партнёрам', icon: 'handshake' },
   { href: '/support', label: 'Поддержка', icon: 'chat' },
 ]
 

@@ -1,13 +1,14 @@
 import { createParamDecorator, type ExecutionContext } from '@nestjs/common'
 
 import { getHttpRequest } from '@/common/types/express-context'
-import { type AdminActor, type UserActor } from '@/common/types/req-user'
+import { type AdminActor, type AffiliateActor, type UserActor } from '@/common/types/req-user'
 
 /**
  * req.user, который положил guard: UserAuthGuard/OptionalAuthGuard → UserActor,
- * AdminAuthGuard → AdminActor (типы в common/types/req-user.ts).
+ * AdminAuthGuard → AdminActor, AffiliateAuthGuard → AffiliateActor
+ * (типы в common/types/req-user.ts).
  */
 export const CurrentUser = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): UserActor | AdminActor | undefined =>
+  (_data: unknown, ctx: ExecutionContext): UserActor | AdminActor | AffiliateActor | undefined =>
     getHttpRequest(ctx).user,
 )

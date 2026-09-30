@@ -55,6 +55,37 @@ Module: ESNext  (для native ESM в Next.js),
 
 Если не получается типизировать — вынести в unknown + runtime check, **не через any**.
 
+### 1.4. DI: `@Inject` на КАЖДЫЙ параметр конструктора
+
+В этой сборке TypeScript 6 / tsgo **не выдаёт `design:paramtypes`**. Nest читает
+`SELF_DECLARED_DEPS_METADATA` (`self:paramtypes`), который наполняет только декоратор
+`@Inject`. Параметр без `@Inject` получает токен `undefined` **молча** — тип резолвится,
+а значения в рантайме нет.
+
+```typescript
+// ✅ Обязательно @Inject на каждом параметре
+constructor(
+  @Inject(WalletFacade) private readonly wallet: WalletFacade,
+  @Inject(USER_REPOSITORY) private readonly users: UserRepository,
+  private readonly settings: AffiliateSettingsService, // ❌ будет undefined
+) {}
+
+// ✅
+constructor(
+  @Inject(AffiliateSettingsService) private readonly settings: AffiliateSettingsService,
+) {}
+```
+
+Симптом в проде — `Cannot read properties of undefined` при первом обращении
+к зависимости. **Ни `tsc`, ни `eslint`, ни юнит-тесты это не ловят**: тип корректен,
+значение отсутствует. Обнаружено функциональным прогоном
+`pnpm --filter @casino/api check:affiliate-flow` (см. `README.md` модуля `affiliate`,
+ловушка 8).
+
+Проверка перед коммитом: `pnpm --filter @casino/api check:di-inject` — сканирует AST и
+падает, если хоть один параметр конструктора `@Injectable`-класса остался без `@Inject`.
+Единственное исключение — `@Optional()` (там `undefined` задуман).
+
 ---
 
 ## 2. Naming
@@ -132,10 +163,10 @@ import { UserRepository } from '../../../domain/repositories/user.repository'
 import { UserRepository } from '@modules/users/domain/repositories/user.repository'
 ```
 
-| Алиас | Куда | Когда использовать |
-|-------|------|--------------------|
+| Алиас              | Куда                  | Когда использовать                                          |
+| ------------------ | --------------------- | ----------------------------------------------------------- |
 | `@modules/<mod>/…` | `src/modules/<mod>/…` | Кросс-модульный импорт (чужой модуль: facade, guard, домен) |
-| `@/<seg>/…` | `src/<seg>/…` | Общий код вне модулей: `@/common/pipes/…`, `@/types/…` |
+| `@/<seg>/…`        | `src/<seg>/…`         | Общий код вне модулей: `@/common/pipes/…`, `@/types/…`      |
 
 Конфигурация `apps/api/tsconfig.json` (в `tsconfig.build.json` — то же, но `@casino/*` → `dist`):
 

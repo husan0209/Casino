@@ -11,6 +11,7 @@ import { ResponseFormatInterceptor } from './common/interceptors/response-format
 import { buildPinoHttpOptions } from './common/logger/logger.options'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 import { AdminModule } from './modules/admin/admin.module'
+import { AffiliateModule } from './modules/affiliate/affiliate.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { CasinoModule } from './modules/casino/casino.module'
 import { GeoModule } from './modules/geo/geo.module'
@@ -52,6 +53,9 @@ import { QueuesModule } from './queues/queues.module'
     CasinoModule,
     SupportModule,
     ReferralsModule,
+    // Партнёрская программа для внешних вебмастеров (ТЗ ч.8). Отдельный модуль
+    // от referrals: другой контрагент, своя ставка, расчёт от NGR.
+    AffiliateModule,
     NotificationsModule,
     MaintenanceModule,
     QueuesModule,
