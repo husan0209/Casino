@@ -51,12 +51,12 @@ last_updated: 2026-06-19
 
 ### 1.2. Почему именно Modular Monolith
 
-| Фактор | Решение |
-|--------|---------|
-| Над проектом работает AI-агент + владелец | Микросервисы слишком сложны для одиночной разработки |
-| Деплой на 1 VPS | Намного проще, чем оркестрация нескольких сервисов |
-| Единая кодовая база типов | Prisma client + shared-types без проблем с versioning |
-| Простая отладка платежей и KYC | Один stack trace, одна транзакция БД |
+| Фактор                                            | Решение                                                     |
+| ------------------------------------------------- | ----------------------------------------------------------- |
+| Над проектом работает AI-агент + владелец         | Микросервисы слишком сложны для одиночной разработки        |
+| Деплой на 1 VPS                                   | Намного проще, чем оркестрация нескольких сервисов          |
+| Единая кодовая база типов                         | Prisma client + shared-types без проблем с versioning       |
+| Простая отладка платежей и KYC                    | Один stack trace, одна транзакция БД                        |
 | Логика сильно связна (wallet ↔ payments ↔ casino) | Микросервисы добавили бы сетевые race conditions без выгоды |
 
 ### 1.3. Архитектурные влияния
@@ -74,19 +74,19 @@ last_updated: 2026-06-19
 
 ### 2.1. Что входит в MVP
 
-| Домен | Описание |
-|-------|----------|
-| **Auth** | Email/Google/Telegram login, refresh token rotation, sessions |
-| **Users** | Профиль, настройки, аватар, сессии |
-| **KYC** | Лимит 5000₽ без KYC, документы, статусы |
-| **Wallet** | Мультивалютный, ledger, optimistic locking |
-| **Payments** | Фиат (Rukassa) + крипто (NOWPayments), webhook |
-| **Casino Providers** | Seamless Wallet API, DemoProvider |
-| **Support** | Тикеты, переписка, internal notes |
-| **Referrals** | GGR-share, daily cron, статистика |
-| **Notifications** | Email-очередь, внутренние уведомления |
-| **Admin Panel** | Dashboard, users, KYC review, withdrawals, audit |
-| **Audit Logs** | Все admin-действия и критичные события |
+| Домен                | Описание                                                      |
+| -------------------- | ------------------------------------------------------------- |
+| **Auth**             | Email/Google/Telegram login, refresh token rotation, sessions |
+| **Users**            | Профиль, настройки, аватар, сессии                            |
+| **KYC**              | Лимит 5000₽ без KYC, документы, статусы                       |
+| **Wallet**           | Мультивалютный, ledger, optimistic locking                    |
+| **Payments**         | Фиат (Rukassa) + крипто (NOWPayments), webhook                |
+| **Casino Providers** | Seamless Wallet API, DemoProvider                             |
+| **Support**          | Тикеты, переписка, internal notes                             |
+| **Referrals**        | GGR-share, daily cron, статистика                             |
+| **Notifications**    | Email-очередь, внутренние уведомления                         |
+| **Admin Panel**      | Dashboard, users, KYC review, withdrawals, audit              |
+| **Audit Logs**       | Все admin-действия и критичные события                        |
 
 ### 2.2. Что НЕ входит в MVP
 
@@ -169,12 +169,12 @@ apps/api/src/modules/
 
 ### 4.2. Гранулярность модулей
 
-| Решение | Обоснование |
-|---------|-------------|
+| Решение                                                   | Обоснование                                                     |
+| --------------------------------------------------------- | --------------------------------------------------------------- |
 | **Отдельный модуль `game-sessions` отдельно от `casino`** | Casino — каталог игр (read-only), game-sessions — runtime state |
-| **`wallet` отдельно от `payments`** | Wallet — внутренний ledger, payments — внешние провайдеры |
-| **`kyc` отдельно от `users`** | KYC имеет свою жизненный цикл и workflows |
-| **`audit` отдельный модуль** | Используется из всех модулей через facade |
+| **`wallet` отдельно от `payments`**                       | Wallet — внутренний ledger, payments — внешние провайдеры       |
+| **`kyc` отдельно от `users`**                             | KYC имеет свою жизненный цикл и workflows                       |
+| **`audit` отдельный модуль**                              | Используется из всех модулей через facade                       |
 
 ---
 
@@ -242,6 +242,28 @@ mодуль A     → внутренности модуля B (только че
 - **Параллельная разработка**: разные слои могут писаться разными людьми
 - **AI-friendly**: каждый слой имеет предсказуемое место для кода
 
+### 5.3. DI в Nest: токен указываем явно
+
+**Правило.** Каждый внедряемый параметр конструктора получает `@Inject(Token)`; токен импортируется
+обычным (value) импортом, а не `type`.
+
+**Почему.** `packages/tsconfig/nest.json` держит `emitDecoratorMetadata: false` — нативный
+компилятор `tsgo` (`@typescript/native`) его не эмитит. Без метаданных `design:paramtypes` Nest
+не выводит зависимость по типу параметра: приложение собирается и поднимается, но первый же вызов
+даёт `Cannot read properties of undefined (reading 'execute')`. Ловится только прогоном API —
+ни `tsc`, ни ESLint такой конструктор не забракуют.
+
+```typescript
+// ❌ собирается, падает в рантайме
+constructor(private readonly login: LoginUseCase) {}
+
+// ✅ класс-провайдер
+constructor(@Inject(LoginUseCase) private readonly login: LoginUseCase) {}
+
+// ✅ symbol-порт (интерфейс токеном быть не может)
+constructor(@Inject(WALLET_REPOSITORY) private readonly repo: IWalletRepository) {}
+```
+
 ---
 
 ## 6. Общение между модулями
@@ -252,11 +274,12 @@ mодуль A     → внутренности модуля B (только че
 
 ```typescript
 // modules/wallet/application/wallet.facade.ts
+// @Inject — обязателен в каждом параметре, см. §5.3
 @Injectable()
 export class WalletFacade {
   constructor(
-    private creditUseCase: CreditWalletUseCase,
-    private debitUseCase: DebitWalletUseCase,
+    @Inject(CreditWalletUseCase) private creditUseCase: CreditWalletUseCase,
+    @Inject(DebitWalletUseCase) private debitUseCase: DebitWalletUseCase,
   ) {}
 
   async creditForDeposit(input: CreditInput): Promise<CreditResult> {
@@ -274,7 +297,8 @@ export class WalletFacade {
 @Injectable()
 export class ConfirmDepositUseCase {
   constructor(
-    private walletFacade: WalletFacade,  // ← из другого модуля, но через фасад
+    // ← из другого модуля, но через фасад
+    @Inject(WalletFacade) private walletFacade: WalletFacade,
   ) {}
 
   async execute(input: ConfirmDepositInput) {
@@ -308,12 +332,12 @@ export class ConfirmDepositUseCase {
 
 ### 6.3. Когда что использовать
 
-| Сценарий | Подход |
-|----------|--------|
+| Сценарий                                    | Подход                      |
+| ------------------------------------------- | --------------------------- |
 | Wallet.credit нужен сразу в payment confirm | **Sync через WalletFacade** |
-| После успешного депозита отправить email | **Async через BullMQ** |
-| KYC approved → снять лимиты | **Sync через KycFacade** |
-| Каждый день считать GGR рефералам | **Async BullMQ cron** |
+| После успешного депозита отправить email    | **Async через BullMQ**      |
+| KYC approved → снять лимиты                 | **Sync через KycFacade**    |
+| Каждый день считать GGR рефералам           | **Async BullMQ cron**       |
 
 ### 6.4. Запрещено
 
@@ -334,15 +358,15 @@ apps/web/                     apps/admin/
 │   │   └── register/         │       ├── users/
 │   ├── (main)/               │       ├── kyc/
 │   │   ├── casino/           │       └── ...
-│   │   ├── profile/          
-│   │   ├── wallet/           
-│   │   └── kyc/              
-├── components/              
+│   │   ├── profile/
+│   │   ├── wallet/
+│   │   └── kyc/
+├── components/
 │   ├── ui/                   (shadcn/ui-подобный набор)
-│   ├── layout/               
-│   ├── auth/                 
-│   └── casino/               
-├── hooks/                    
+│   ├── layout/
+│   ├── auth/
+│   └── casino/
+├── hooks/
 ├── stores/                   (Zustand)
 └── lib/                      (api client, utils)
 ```
@@ -370,13 +394,13 @@ Backups             → /home/deploy/backups/*.sql.gz (7 days retention)
 
 ### 8.2. Главные дизайн-решения
 
-| Решение | Где |
-|---------|-----|
+| Решение                        | Где                                                     |
+| ------------------------------ | ------------------------------------------------------- |
 | **Все деньги — DECIMAL(20,8)** | `wallet_accounts`, `ledger_entries`, `payment_requests` |
-| **Все FK с индексами** | Все user_id, status, created_at поля |
-| **Append-only ledger** | `ledger_entries` НИКОГДА не update/delete |
-| **Raw webhook storage** | `payment_callbacks` хранит ВСЁ до обработки |
-| **Idempotency key** | Уникальный constraint на каждой финансовой таблице |
+| **Все FK с индексами**         | Все user_id, status, created_at поля                    |
+| **Append-only ledger**         | `ledger_entries` НИКОГДА не update/delete               |
+| **Raw webhook storage**        | `payment_callbacks` хранит ВСЁ до обработки             |
+| **Idempotency key**            | Уникальный constraint на каждой финансовой таблице      |
 
 ### 8.3. Почему НЕ MongoDB / НЕ DynamoDB
 
@@ -391,6 +415,7 @@ Backups             → /home/deploy/backups/*.sql.gz (7 days retention)
 ### 9.1. На MVP — НЕТ WebSocket
 
 Все обновления через Polling:
+
 - Баланс обновляется при возврате на страницу / каждые 30 секунд
 - Уведомления polling при открытии / фокусе окна
 - Статус платежа polling каждые 10 секунд в модалке депозита
@@ -414,6 +439,7 @@ WebSocket добавляется **только если** появится ре
 ```
 
 Все jobs:
+
 - идемпотентны (можно повторно запустить);
 - логируют start/success/failure;
 - имеют retry с exponential backoff;
@@ -444,21 +470,22 @@ WebSocket добавляется **только если** появится ре
 ### 10.2. Admin flow
 
 Отдельный endpoint `/admin/auth/login`:
+
 - Своя JWT с `role: 'admin' | 'superadmin'`
 - Отдельные cookies/сессии (не пересекаются с user)
 - Admin JWT имеет `aud: 'admin'`, user JWT имеет `aud: 'user'`
 
 ### 10.3. Guards
 
-| Guard | Применяется к |
-|-------|---------------|
-| `JwtAuthGuard` | Любой авторизованный |
-| `OptionalJwtAuthGuard` | Endpoints с разным поведением для guest/auth |
-| `RolesGuard(['admin'])` | Admin endpoints |
-| `RolesGuard(['superadmin'])` | Superadmin endpoints |
-| `KycRequiredGuard` | Withdraw, high-value deposit |
-| `EmailVerifiedGuard` | Sensitive operations |
-| `InternalApiGuard` | Provider callbacks |
+| Guard                        | Применяется к                                |
+| ---------------------------- | -------------------------------------------- |
+| `JwtAuthGuard`               | Любой авторизованный                         |
+| `OptionalJwtAuthGuard`       | Endpoints с разным поведением для guest/auth |
+| `RolesGuard(['admin'])`      | Admin endpoints                              |
+| `RolesGuard(['superadmin'])` | Superadmin endpoints                         |
+| `KycRequiredGuard`           | Withdraw, high-value deposit                 |
+| `EmailVerifiedGuard`         | Sensitive operations                         |
+| `InternalApiGuard`           | Provider callbacks                           |
 
 ---
 
@@ -466,13 +493,13 @@ WebSocket добавляется **только если** появится ре
 
 ### 11.1. Фазы
 
-| Фаза | Что выносим |
-|------|-------------|
-| **MVP (текущая)** | Modular monolith |
-| **Фаза 2** | Вынести `notifications` worker в отдельный процесс |
-| **Фаза 3** | Вынести `provider-callback` в отдельный API |
-| **Фаза 4** | Вынести `payments` в отдельный микросервис (если появится 3+ провайдера) |
-| **Фаза 5** | Realtime gateway отдельным сервисом |
+| Фаза              | Что выносим                                                              |
+| ----------------- | ------------------------------------------------------------------------ |
+| **MVP (текущая)** | Modular monolith                                                         |
+| **Фаза 2**        | Вынести `notifications` worker в отдельный процесс                       |
+| **Фаза 3**        | Вынести `provider-callback` в отдельный API                              |
+| **Фаза 4**        | Вынести `payments` в отдельный микросервис (если появится 3+ провайдера) |
+| **Фаза 5**        | Realtime gateway отдельным сервисом                                      |
 
 ### 11.2. Что НЕ меняется
 
@@ -492,22 +519,22 @@ WebSocket добавляется **только если** появится ре
 
 ### 12.1. Известные ограничения MVP
 
-| Ограничение | Влияние | Когда решать |
-|-------------|---------|--------------|
-| Один VPS | Если ляжет — всё недоступно | На фазу 2 — multi-VPS |
-| Polling вместо WS | UX чуть хуже | На фазу 5 — WebSocket |
-| Manual user segmentation | Не удобно для маркетинга | На фазу 3 |
-| Нет A/B testing | Не тестируем гипотезы | На фазу 4 |
+| Ограничение              | Влияние                     | Когда решать          |
+| ------------------------ | --------------------------- | --------------------- |
+| Один VPS                 | Если ляжет — всё недоступно | На фазу 2 — multi-VPS |
+| Polling вместо WS        | UX чуть хуже                | На фазу 5 — WebSocket |
+| Manual user segmentation | Не удобно для маркетинга    | На фазу 3             |
+| Нет A/B testing          | Не тестируем гипотезы       | На фазу 4             |
 
 ### 12.2. Архитектурные риски
 
-| Риск | Митигация |
-|------|-----------|
-| Рост модулей до 20+ | Дробление по доменам, вынос в отдельные сервисы |
-| Provider callback flood | BullMQ + rate limit + queue depth alert |
-| DB становится узким местом | Реплики, connection pooling, partition по дате |
-| Tight coupling к Prisma | Repository pattern → можно мигрировать |
-| Race conditions в wallet | Optimistic locking + retry loop |
+| Риск                       | Митигация                                       |
+| -------------------------- | ----------------------------------------------- |
+| Рост модулей до 20+        | Дробление по доменам, вынос в отдельные сервисы |
+| Provider callback flood    | BullMQ + rate limit + queue depth alert         |
+| DB становится узким местом | Реплики, connection pooling, partition по дате  |
+| Tight coupling к Prisma    | Repository pattern → можно мигрировать          |
+| Race conditions в wallet   | Optimistic locking + retry loop                 |
 
 ---
 

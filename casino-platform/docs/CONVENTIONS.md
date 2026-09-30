@@ -132,10 +132,10 @@ import { UserRepository } from '../../../domain/repositories/user.repository'
 import { UserRepository } from '@modules/users/domain/repositories/user.repository'
 ```
 
-| Алиас | Куда | Когда использовать |
-|-------|------|--------------------|
+| Алиас              | Куда                  | Когда использовать                                          |
+| ------------------ | --------------------- | ----------------------------------------------------------- |
 | `@modules/<mod>/…` | `src/modules/<mod>/…` | Кросс-модульный импорт (чужой модуль: facade, guard, домен) |
-| `@/<seg>/…` | `src/<seg>/…` | Общий код вне модулей: `@/common/pipes/…`, `@/types/…` |
+| `@/<seg>/…`        | `src/<seg>/…`         | Общий код вне модулей: `@/common/pipes/…`, `@/types/…`      |
 
 Конфигурация `apps/api/tsconfig.json` (в `tsconfig.build.json` — то же, но `@casino/*` → `dist`):
 
@@ -179,7 +179,7 @@ import { UserRepository } from '@modules/users/domain/repositories/user.reposito
 
 ```typescript
 // 1. External packages
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { z } from 'zod'
 
 // 2. Internal packages (shared)
