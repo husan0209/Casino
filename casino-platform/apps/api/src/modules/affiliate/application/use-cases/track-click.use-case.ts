@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Трекинг кликов по ссылкам партнёров (UC-AFF-05, ТЗ ч.8 §7.2).
  *
  * Публичный endpoint без авторизации — единственная точка входа трафика.
@@ -61,7 +61,6 @@ const MAX_PATH_LENGTH = 255
 export class TrackClickUseCase {
   private readonly logger = new Logger(TrackClickUseCase.name)
 
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25, как в WalletFacade)
   constructor(
     @Inject(AFFILIATE_REPOSITORY) private readonly affiliates: AffiliateRepository,
     @Inject(AFFILIATE_CLICK_REPOSITORY) private readonly clicks: AffiliateClickRepository,

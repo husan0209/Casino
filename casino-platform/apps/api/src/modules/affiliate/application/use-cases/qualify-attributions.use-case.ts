@@ -41,7 +41,6 @@ export interface QualificationResult {
 export class QualifyAttributionsUseCase {
   private readonly logger = new Logger(QualifyAttributionsUseCase.name)
 
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(AFFILIATE_ATTRIBUTION_REPOSITORY)
     private readonly attributions: AffiliateAttributionRepository,
@@ -98,7 +97,6 @@ export class QualifyAttributionsUseCase {
    * Одна атрибуция: квалифицировать или зафиксировать причину ожидания.
    * Ошибка не пробрасывается — один битый id не должен останавливать тик.
    */
-  // eslint-disable-next-line max-params -- аргументы задаются предметной областью: id + условия + накопитель
   private async processOne(
     attributionId: string,
     minDeposit: Decimal,

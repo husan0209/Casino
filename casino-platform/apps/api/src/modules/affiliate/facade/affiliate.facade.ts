@@ -30,7 +30,6 @@ import {
 
 @Injectable()
 export class AffiliateFacade {
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(AttributePlayerUseCase) private readonly attributePlayerUseCase: AttributePlayerUseCase,
     @Inject(AffiliateDailyRunUseCase) private readonly dailyRunUseCase: AffiliateDailyRunUseCase,

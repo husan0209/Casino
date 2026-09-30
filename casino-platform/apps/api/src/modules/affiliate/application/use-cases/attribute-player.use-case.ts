@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Атрибуция игрока к партнёру (UC-AFF-06, ТЗ ч.8 §7.3, §13.2).
  *
  * Вызывается из auth-модуля при регистрации (email / Google / Telegram) ЧЕРЕЗ
@@ -56,7 +56,6 @@ export interface AttributePlayerResult {
 export class AttributePlayerUseCase {
   private readonly logger = new Logger(AttributePlayerUseCase.name)
 
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25, как в WalletFacade)
   constructor(
     @Inject(AFFILIATE_REPOSITORY) private readonly affiliates: AffiliateRepository,
     @Inject(AFFILIATE_ATTRIBUTION_REPOSITORY)
@@ -154,7 +153,6 @@ export class AttributePlayerUseCase {
    * сравнения молча перестанут совпадать. Поэтому порт IpFingerprinter
    * инъецируется, а не дублируется здесь.
    */
-  // eslint-disable-next-line max-params -- состав аргументов антифрод-проверки фиксирован правилами ТЗ §13.2
   private async detectFraud(
     affiliateId: string,
     lastClick: { ipHash: string | null; userAgent: string | null } | null,

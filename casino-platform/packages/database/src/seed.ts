@@ -1,8 +1,19 @@
-/* eslint-disable no-console -- CLI-скрипт сида: stdout/stderr здесь это интерфейс команды для оператора, а не production-логирование (AGENTS.md -> Pino) */
 import * as argon2 from 'argon2'
 
 import { prisma } from './index'
 import { assertSeedAdminConfig } from './seed-guard'
+
+/**
+ * Вывод в stdout для CLI.
+ *
+ * Пишем напрямую, а не через `console.log`: здесь stdout — интерфейс команды
+ * для оператора, а не production-логирование (AGENTS.md -> Pino), и
+ * `no-console` у правил включён. Обход через `process.stdout.write` избавляет
+ * от подавления правила на весь файл.
+ */
+function log(message: string): void {
+  process.stdout.write(`${message}\n`)
+}
 
 /**
  * GAP-38 fail-closed: в production сид отказывается создавать админа
@@ -42,7 +53,7 @@ async function seedAdmin(): Promise<void> {
       isActive: true,
     },
   })
-  console.log('Seeded admin', admin.email)
+  log(`Seeded admin ${admin.email}`)
 }
 
 const DEMO_GAMES = [
@@ -91,7 +102,7 @@ async function seedDemoGames(): Promise<void> {
     where: { id: demoProvider.id },
     data: { gameCount: DEMO_GAMES.length },
   })
-  console.log('Seeded demo games')
+  log('Seeded demo games')
 }
 
 type SettingSeed = {
@@ -146,7 +157,7 @@ async function seedSettings(): Promise<void> {
       create: setting,
     })
   }
-  console.log('Seed OK')
+  log('Seed OK')
 }
 
 async function main(): Promise<void> {

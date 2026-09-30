@@ -70,7 +70,6 @@ import type { AffiliateEntity } from '../../domain/entities/affiliate.entity'
 @UseGuards(AdminAuthGuard, RolesGuard)
 @Controller('admin/affiliate')
 export class AffiliateAdminController {
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(AFFILIATE_REPOSITORY) private readonly affiliates: AffiliateRepository,
     @Inject(AFFILIATE_COMMISSION_REPOSITORY)

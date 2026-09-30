@@ -60,7 +60,6 @@ export interface RegisterAffiliateResult {
 
 @Injectable()
 export class RegisterAffiliateUseCase {
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(AFFILIATE_REPOSITORY) private readonly affiliates: AffiliateRepository,
     @Inject(AFFILIATE_PLAYER_PROVISIONING_REPOSITORY)
