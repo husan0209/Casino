@@ -14,7 +14,9 @@ import {
   networkLabel,
 } from '@/lib/format/currency'
 import { amountDirection, formatTxAmount, txTypeLabel } from '@/lib/ui/history-filters'
+import { mergeWallets } from '@/lib/wallet/helpers'
 import { useAuth } from '@/stores/auth'
+import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 import type { WalletBalance } from '@/types/wallet'
@@ -148,6 +150,7 @@ export default function WalletPage(): React.JSX.Element {
   const { user } = useAuth()
   const { activeCurrency, setActiveCurrency } = useWalletStore()
   const { openDeposit, openWithdraw } = useUIStore()
+  const { config } = useGeoStore()
 
   const { data: balances } = useQuery({
     queryKey: ['wallet', 'balances'],
@@ -167,7 +170,8 @@ export default function WalletPage(): React.JSX.Element {
     return <div className="container-1 py-12 text-center text-muted">Войдите в аккаунт</div>
   }
 
-  const walletList = balances ?? []
+  const enabled = [...(config?.enabledFiat ?? ['RUB']), ...(config?.enabledCrypto ?? [])]
+  const walletList = mergeWallets(balances ?? [], enabled)
   const activeWallet = walletList.find((w) => w.currency === activeCurrency) ?? {
     currency: activeCurrency,
     balance: '0',
