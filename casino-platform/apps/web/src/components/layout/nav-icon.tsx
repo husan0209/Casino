@@ -3,6 +3,7 @@
 import {
   Clock,
   Gamepad2,
+  Handshake,
   Heart,
   Home,
   MessageCircle,
@@ -24,6 +25,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   wallet: Wallet,
   history: Clock,
   chat: MessageCircle,
+  handshake: Handshake,
 }
 
 export function NavIcon({ icon, size = 20 }: { icon: string; size?: number }): React.JSX.Element {

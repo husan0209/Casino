@@ -1,4 +1,5 @@
 import { GetKycStatusUseCase } from '../src/modules/kyc/application/use-cases/get-kyc-status.use-case'
+
 import type { IKycRepository } from '../src/modules/kyc/domain/repositories/kyc.repository'
 
 function makeRepo(status: { status: string } | null, total: string): IKycRepository {

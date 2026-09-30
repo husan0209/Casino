@@ -7,6 +7,10 @@ export const MAINTENANCE_JOBS = [
   'withdrawal-reminder',
   'referral-daily',
   'cleanup-sessions',
+  // Партнёрская программа (ТЗ ч.8 §15)
+  'affiliate-daily',
+  'affiliate-qualification',
+  'affiliate-clicks-cleanup',
 ] as const
 
 export type MaintenanceJobName = (typeof MAINTENANCE_JOBS)[number]

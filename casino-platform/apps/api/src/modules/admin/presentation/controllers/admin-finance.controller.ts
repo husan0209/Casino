@@ -23,6 +23,7 @@ import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.re
 import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import {
+  type LedgerEntry,
   type LedgerEntryType,
   type PaymentProvider,
   type PaymentStatus,
@@ -43,77 +44,6 @@ import {
   WalletAdjustSchema,
 } from '../dto/admin-finance.dto'
 
-type AdminPaymentDetail = {
-  payment_request:
-    | ({
-        user: { email: string | null }
-        callbacks: {
-          id: string
-          createdAt: Date
-          ipAddress: string | null
-          provider: string
-          externalId: string | null
-          paymentRequestId: string | null
-          rawHeaders: Prisma.JsonValue
-          rawBody: string | null
-          processed: boolean
-          processingResult: string | null
-        }[]
-      } & {
-        id: string
-        createdAt: Date
-        updatedAt: Date
-        type: PaymentType
-        amount: Prisma.Decimal
-        idempotencyKey: string
-        metadata: Prisma.JsonValue
-        userId: string
-        currency: string
-        status: PaymentStatus
-        provider: PaymentProvider
-        method: string | null
-        amountRub: Prisma.Decimal | null
-        fee: Prisma.Decimal
-        externalId: string | null
-        externalStatus: string | null
-        paymentUrl: string | null
-        destination: Prisma.JsonValue
-        errorMessage: string | null
-        expiresAt: Date | null
-        completedAt: Date | null
-      })
-    | null
-  callbacks:
-    | {
-        id: string
-        createdAt: Date
-        ipAddress: string | null
-        provider: string
-        externalId: string | null
-        paymentRequestId: string | null
-        rawHeaders: Prisma.JsonValue
-        rawBody: string | null
-        processed: boolean
-        processingResult: string | null
-      }[]
-    | undefined
-  ledger_entries:
-    | {
-        id: string
-        createdAt: Date
-        transactionId: string
-        walletAccountId: string
-        type: LedgerEntryType
-        amount: Prisma.Decimal
-        balanceBefore: Prisma.Decimal
-        balanceAfter: Prisma.Decimal
-        idempotencyKey: string | null
-        description: string | null
-        metadata: Prisma.JsonValue
-        userId: string | null
-      }[]
-    | never[]
-}
 
 export class WithdrawalInvalidStatusError extends AppError {
   readonly code = 'WITHDRAWAL_INVALID_STATUS'
@@ -121,6 +51,21 @@ export class WithdrawalInvalidStatusError extends AppError {
   constructor() {
     super('Заявка не найдена или уже обработана')
   }
+}
+
+/**
+ * UC-PAY-18: карточка платёжной заявки для админки. Типы ВЫВОДЯТСЯ из схемы
+ * Prisma по той же include/where-конфигурации, что и запросы: развёрнутые
+ * литералы молча расходились с реальными колонками и раздували метод до 83 строк.
+ */
+type PaymentRequestWithUser = Prisma.PaymentRequestGetPayload<{
+  include: { callbacks: true; user: { select: { email: true } } }
+}>
+
+type PaymentRequestDetailView = {
+  payment_request: PaymentRequestWithUser | null
+  callbacks: PaymentRequestWithUser['callbacks'] | undefined
+  ledger_entries: LedgerEntry[]
 }
 
 /** Пагинация, общая для списков админки (q.page/q.per_page + дефолты/кап). */
@@ -242,7 +187,7 @@ export class AdminFinanceController {
 
   // UC-PAY-18 details
   @Get('payment-requests/:id')
-  async paymentDetail(@Param('id') id: string): Promise<AdminPaymentDetail> {
+  async paymentDetail(@Param('id') id: string): Promise<PaymentRequestDetailView> {
     const pr = await prisma.paymentRequest.findUnique({
       where: { id },
       include: { callbacks: true, user: { select: { email: true } } },

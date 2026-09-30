@@ -15,6 +15,11 @@ const DEFAULTS: Record<MaintenanceJobName, number> = {
   'referral-daily': 86_400_000,
   // pre-launch hardening A1: мёртвые сессии — раз в час
   'cleanup-sessions': 3_600_000,
+  // Партнёрская программа (ТЗ ч.8 §15)
+  'affiliate-daily': 86_400_000,
+  // квалификация ловит гонку «депозит раньше KYC» — почасовой тик достаточен
+  'affiliate-qualification': 3_600_000,
+  'affiliate-clicks-cleanup': 86_400_000,
 }
 
 const ENV_KEYS: Record<MaintenanceJobName, string> = {
@@ -23,6 +28,9 @@ const ENV_KEYS: Record<MaintenanceJobName, string> = {
   'withdrawal-reminder': 'JOB_WITHDRAWAL_REMINDER_EVERY_MS',
   'referral-daily': 'JOB_REFERRAL_DAILY_EVERY_MS',
   'cleanup-sessions': 'JOB_CLEANUP_SESSIONS_EVERY_MS',
+  'affiliate-daily': 'JOB_AFFILIATE_DAILY_EVERY_MS',
+  'affiliate-qualification': 'JOB_AFFILIATE_QUALIFICATION_EVERY_MS',
+  'affiliate-clicks-cleanup': 'JOB_AFFILIATE_CLICKS_CLEANUP_EVERY_MS',
 }
 
 /**

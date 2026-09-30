@@ -141,13 +141,13 @@ Headers:
 
 Конвенции ключей:
 
-| Операция | Формат |
-|----------|--------|
-| Deposit | `dep_{payment_request_id}` |
-| Withdraw | `wd_{withdrawal_request_id}` |
-| Bet | `bet_{transaction_id}` |
-| Win | `win_{round_id}_{index}` |
-| Rollback | `rb_{original_transaction_id}` |
+| Операция        | Формат                                   |
+| --------------- | ---------------------------------------- |
+| Deposit         | `dep_{payment_request_id}`               |
+| Withdraw        | `wd_{withdrawal_request_id}`             |
+| Bet             | `bet_{transaction_id}`                   |
+| Win             | `win_{round_id}_{index}`                 |
+| Rollback        | `rb_{original_transaction_id}`           |
 | Referral reward | `ref_{referrer_id}_{referred_id}_{date}` |
 
 ---
@@ -214,33 +214,33 @@ Headers:
 
 ### 4.1. Success
 
-| Code | Когда |
-|------|-------|
-| `200 OK` | GET, PUT, PATCH — успех |
-| `201 Created` | POST создание ресурса |
-| `202 Accepted` | Async job queued |
-| `204 No Content` | DELETE (без body) |
+| Code             | Когда                   |
+| ---------------- | ----------------------- |
+| `200 OK`         | GET, PUT, PATCH — успех |
+| `201 Created`    | POST создание ресурса   |
+| `202 Accepted`   | Async job queued        |
+| `204 No Content` | DELETE (без body)       |
 
 ### 4.2. Client Errors (4xx)
 
-| Code | Когда |
-|------|-------|
-| `400 Bad Request` | Validation error, invalid syntax |
-| `401 Unauthorized` | Missing/invalid JWT |
-| `403 Forbidden` | Insufficient permissions |
-| `404 Not Found` | Resource doesn't exist |
-| `409 Conflict` | Duplicate request, constraint violation |
-| `422 Unprocessable Entity` | Business rule violation (KYC_REQUIRED) |
-| `429 Too Many Requests` | Rate limit exceeded |
+| Code                       | Когда                                   |
+| -------------------------- | --------------------------------------- |
+| `400 Bad Request`          | Validation error, invalid syntax        |
+| `401 Unauthorized`         | Missing/invalid JWT                     |
+| `403 Forbidden`            | Insufficient permissions                |
+| `404 Not Found`            | Resource doesn't exist                  |
+| `409 Conflict`             | Duplicate request, constraint violation |
+| `422 Unprocessable Entity` | Business rule violation (KYC_REQUIRED)  |
+| `429 Too Many Requests`    | Rate limit exceeded                     |
 
 ### 4.3. Server Errors (5xx)
 
-| Code | Когда |
-|------|-------|
-| `500 Internal Server Error` | Unhandled exception |
-| `502 Bad Gateway` | External service error (Rukassa down) |
-| `503 Service Unavailable` | Planned maintenance |
-| `504 Gateway Timeout` | External service timeout |
+| Code                        | Когда                                 |
+| --------------------------- | ------------------------------------- |
+| `500 Internal Server Error` | Unhandled exception                   |
+| `502 Bad Gateway`           | External service error (Rukassa down) |
+| `503 Service Unavailable`   | Planned maintenance                   |
+| `504 Gateway Timeout`       | External service timeout              |
 
 ---
 
@@ -299,7 +299,23 @@ INVALID_CURRENCY              422   Currency not supported
 RATE_LIMITED                  429   Too many requests
 ```
 
-### 5.6. Internal
+### 5.6. Affiliate (партнёрская программа, ТЗ ч.8 §10.4)
+
+```
+AFFILIATE_NOT_FOUND              404   Партнёр не найден (по id или tracking_code)
+AFFILIATE_NOT_ACTIVE             403   Партнёр suspended/rejected: клик не атрибутируется
+AFFILIATE_CODE_INVALID           400   Некорректный код в трекинг-ссылке
+AFFILIATE_ALREADY_EXISTS         409   Email уже зарегистрирован в программе
+AFFILIATE_CREDENTIALS_INVALID    401   Неверный email/пароль партнёра
+AFFILIATE_ALREADY_ATTRIBUTED     409   Игрок уже привязан к другому партнёру
+AFFILIATE_SELF_REFERRAL          422   Обнаружено самопривлечение (F1/F2)
+AFFILIATE_RATE_OUT_OF_RANGE      422   Ставка RevShare вне [0, 1]
+AFFILIATE_SETTINGS_INVALID       422   Некорректное значение настройки программы
+AFFILIATE_FRAUD_SUSPECTED        422   Фрод-скор выше порога (F3, ip_flood)
+AFFILIATE_CLAWBACK_NOT_ALLOWED   422   Отмена начисления вне допустимого статуса
+```
+
+### 5.7. Internal
 
 ```
 INTERNAL_ERROR                500   Generic server error
@@ -308,7 +324,7 @@ EXTERNAL_SERVICE_ERROR        502   Failed external call
 NOT_IMPLEMENTED               501   Feature not ready
 ```
 
-### 5.7. Расширение error codes
+### 5.8. Расширение error codes
 
 Добавлять новые коды только если **ни один существующий не подходит**. Код должен быть:
 
@@ -329,10 +345,10 @@ GET /api/v1/admin/users?page=1&per-page=50
 
 ### 6.2. Параметры
 
-| Param | Default | Max |
-|-------|---------|-----|
-| `page` | 1 | — |
-| `per-page` | 20 | 100 |
+| Param      | Default | Max |
+| ---------- | ------- | --- |
+| `page`     | 1       | —   |
+| `per-page` | 20      | 100 |
 
 ### 6.3. Cursor-based для больших списков (опционально)
 
@@ -389,12 +405,12 @@ Search работает по `ILIKE` для PostgreSQL на определённ
 
 ### 8.1. Default limits
 
-| Endpoint group | Limit |
-|----------------|-------|
-| **General API** | 60 req/min/IP |
-| **Auth (login, register)** | 10 req/min/IP |
-| **Withdrawals** | 5 req/min/user |
-| **Webhooks** | 100 req/min/provider |
+| Endpoint group             | Limit                |
+| -------------------------- | -------------------- |
+| **General API**            | 60 req/min/IP        |
+| **Auth (login, register)** | 10 req/min/IP        |
+| **Withdrawals**            | 5 req/min/user       |
+| **Webhooks**               | 100 req/min/provider |
 
 ### 8.2. Response при превышении
 
@@ -437,7 +453,7 @@ Retry-After: 30
 ```json
 {
   "amount": "1500.00",
-  "amount": "0.00010000",   // для crypto
+  "amount": "0.00010000", // для crypto
   "currency": "RUB"
 }
 ```
@@ -520,6 +536,7 @@ public_id: "usr_a1b2c3d4"   // first 8 chars of UUID
 ---
 
 > **Контроль качества:** каждый новый endpoint проверяется по этому чеклисту:
+>
 > - [ ] URL соответствует naming conventions
 > - [ ] Status code корректен
 > - [ ] Response в формате `{success, data|error}`

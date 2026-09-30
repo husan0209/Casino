@@ -1,4 +1,5 @@
 import { SubmitKycUseCase } from '../src/modules/kyc/application/use-cases/submit-kyc.use-case'
+
 import type { IKycRepository } from '../src/modules/kyc/domain/repositories/kyc.repository'
 
 describe('SubmitKycUseCase', () => {

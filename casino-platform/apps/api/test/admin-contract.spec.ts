@@ -19,8 +19,8 @@ vi.mock('@casino/database', () => ({
 }))
 
 import { AuditLogService } from '../src/modules/admin/application/audit-log.service'
-import { AdminAuthController } from '../src/modules/admin/presentation/controllers/admin-auth.controller'
 import { AdminAdminsController } from '../src/modules/admin/presentation/controllers/admin-admins.controller'
+import { AdminAuthController } from '../src/modules/admin/presentation/controllers/admin-auth.controller'
 
 const auditRepo = { log: vi.fn().mockResolvedValue(undefined) }
 const audit = new AuditLogService(

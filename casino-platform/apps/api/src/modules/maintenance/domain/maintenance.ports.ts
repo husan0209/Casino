@@ -60,7 +60,12 @@ export interface IReminderAuditRepo {
 
 /** Запись курсов (GAP-34 потребляет таблицу; здесь — только запись из cron). */
 export interface IExchangeRateWriter {
-  saveRate(input: { currencyFrom: string; currencyTo: string; rate: string; source: string }): Promise<void>
+  saveRate(input: {
+    currencyFrom: string
+    currencyTo: string
+    rate: string
+    source: string
+  }): Promise<void>
   /** best-effort Redis-кеш: сбой не роняет задачу */
   cacheRates(rates: Record<string, string>): Promise<void>
   /** Очистка истории курсов старше cutoff (deleteMany идемпотентен) */
@@ -82,6 +87,12 @@ export type MaintenanceHandlers = {
   'withdrawal-reminder': () => Promise<unknown>
   'referral-daily': () => Promise<unknown>
   'cleanup-sessions': () => Promise<unknown>
+  // Партнёрская программа (ТЗ ч.8 §15). Суточный расчёт RevShare считает
+  // индивидуальные ставки от NGR — это НЕ referral-daily (тот считает общие
+  // 5% от GGR для игроков).
+  'affiliate-daily': () => Promise<unknown>
+  'affiliate-qualification': () => Promise<unknown>
+  'affiliate-clicks-cleanup': () => Promise<unknown>
 }
 
 /** Токены-порты для Nest-DI. */

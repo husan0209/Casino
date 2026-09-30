@@ -22,10 +22,25 @@ export interface AdminActor {
   isAdmin: boolean
 }
 
+/**
+ * req.user после AffiliateAuthGuard (партнёрский JWT, aud=affiliate).
+ *
+ * Отдельная форма по ключевому полю `affiliateId`, а не `id`: в affiliate-кабинете
+ * id сущности — это affiliateId, а не userId. Смешивать их нельзя, иначе
+ * партнёрский токен можно будет спутать с игровым (у того userId).
+ */
+export interface AffiliateActor {
+  affiliateId: string
+  email: string
+}
+
 declare module 'express-serve-static-core' {
   interface Request {
-    /** Кладут UserAuthGuard/OptionalAuthGuard (UserActor) или AdminAuthGuard (AdminActor). */
-    user?: UserActor | AdminActor
+    /**
+     * Кладут UserAuthGuard/OptionalAuthGuard (UserActor), AdminAuthGuard
+     * (AdminActor) или AffiliateAuthGuard (AffiliateActor).
+     */
+    user?: UserActor | AdminActor | AffiliateActor
     /** Ставится RequestIdMiddleware (или pino genReqId раньше него). */
     id: string
   }

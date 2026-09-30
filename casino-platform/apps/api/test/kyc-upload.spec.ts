@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 
 import { UploadKycDocumentUseCase } from '../src/modules/kyc/application/use-cases/upload-kyc-document.use-case'
 import { KycFileError, KycNotSubmittedError } from '../src/modules/kyc/domain/errors'
+
 import type { IKycRepository } from '../src/modules/kyc/domain/repositories/kyc.repository'
 
 vi.mock('fs', () => ({

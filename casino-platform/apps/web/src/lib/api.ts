@@ -1,7 +1,9 @@
 'use client'
 import axios, { type AxiosError } from 'axios'
 
-export const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001/api/v1'
+import { API_BASE_URL as API_URL } from '@/lib/api-base'
+
+export { API_URL }
 
 /** P1 #11: withCredentials — httpOnly refresh-cookie уходит на /auth/refresh. */
 export const api = axios.create({ baseURL: API_URL, withCredentials: true })
@@ -71,11 +73,7 @@ export function errCode(e: unknown): string | undefined {
 export function errText(e: unknown): string {
   const ax = e as AxiosError<ApiResponse<unknown>> | null
   const respData = ax?.response?.data
-  return (
-    respData?.error?.message ??
-    respData?.message ??
-    ((e as Error).message || 'Ошибка')
-  )
+  return respData?.error?.message ?? respData?.message ?? ((e as Error).message || 'Ошибка')
 }
 
 /** HTTP-статус ответа (для маппинга ошибок запуска в экраны, ТЗ §8.4). */

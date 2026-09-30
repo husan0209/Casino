@@ -1,5 +1,12 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common'
 
+import { errorMessage } from '@/common/utils/error-message'
+
+import {
+  NoopResponsibleGamingHook,
+  RESPONSIBLE_GAMING_HOOK,
+  type ResponsibleGamingHook,
+} from '../../../../common/ports/responsible-gaming-hook'
 import { InvalidSelfExclusionPeriodError } from '../../domain/errors'
 import {
   USER_SETTINGS_REPOSITORY,
@@ -25,8 +32,15 @@ export class SelfExclusionCooloffError extends Error {
 
 @Injectable()
 export class SelfExclusionUseCase {
+  private readonly logger = new Logger(SelfExclusionUseCase.name)
+
   constructor(
     @Inject(USER_SETTINGS_REPOSITORY) private readonly settings: IUserSettingsRepository,
+    // Опционален: дефолт-заглушка, чтобы users-модуль не зависел от
+    // подключения affiliate-модуля (в т.ч. в изолированных тестах).
+    @Optional()
+    @Inject(RESPONSIBLE_GAMING_HOOK)
+    private readonly responsibleGamingHook: ResponsibleGamingHook = new NoopResponsibleGamingHook(),
   ) {}
 
   /**
@@ -53,7 +67,24 @@ export class SelfExclusionUseCase {
     // Revoke all active sessions immediately
     await this.settings.revokeActiveSessions(userId)
 
+    await this.notifyResponsibleGamingHook(userId)
+
     return { excludedUntil }
+  }
+
+  /**
+   * Уведомляет подписчиков (affiliate: clawback начислений).
+   *
+   * Ошибка хука НЕ пробрасывается: самоисключение уже записано, отзыв сессий
+   * выполнен. Откатывать из-за сбоя партнёрского контура нельзя — игрок,
+   * решивший бросить, должен остаться заблокированным в любом случае.
+   */
+  private async notifyResponsibleGamingHook(userId: string): Promise<void> {
+    try {
+      await this.responsibleGamingHook.onSelfExclusion(userId)
+    } catch (err) {
+      this.logger.error(`Responsible gaming hook failed for user=${userId}: ${errorMessage(err)}`)
+    }
   }
 
   /**

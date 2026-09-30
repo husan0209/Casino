@@ -31,6 +31,11 @@ export function SiteFooter(): React.JSX.Element {
           <Link href="/support" className="transition hover:text-white">
             Поддержка
           </Link>
+          {/* Партнёрская программа для вебмастеров (ТЗ ч.8). Отдельная от
+              игровой рефералки: другой контрагент и другие правила. */}
+          <Link href="/affiliate" className="transition hover:text-white">
+            Партнёрам
+          </Link>
         </nav>
 
         <div className="flex flex-wrap items-center gap-1.5">

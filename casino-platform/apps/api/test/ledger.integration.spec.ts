@@ -20,6 +20,7 @@ import { prisma } from '@casino/database'
 import { InsufficientFundsError } from '../src/modules/wallet/domain/errors'
 import { PrismaWalletTransactionRunner } from '../src/modules/wallet/infrastructure/ledger/wallet-transaction-runner.prisma'
 import { PrismaWalletLedger } from '../src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma'
+
 import type { CreditInput } from '../src/modules/wallet/domain/repositories/wallet.repository'
 
 const INTEGRATION = process.env['LEDGER_INTEGRATION'] === '1'
@@ -107,7 +108,7 @@ dDb('wallet ledger integration (real Postgres)', () => {
     const userId = await makeUser()
     await ledger.credit(creditInput(userId, { amount: '100' }))
     await expect(
-      txRunner.runInTransaction(async (tx) => {
+      txRunner.runInTransaction({ userId, currency: 'RUB' }, async (tx) => {
         await ledger.credit({
           userId,
           currency: 'RUB' as const,
@@ -139,7 +140,7 @@ dDb('wallet ledger integration (real Postgres)', () => {
   it('P0 #3: bet+win-подобный сценарий в одной транзакции фиксируется атомарно', async () => {
     const userId = await makeUser()
     await ledger.credit(creditInput(userId, { amount: '1000' }))
-    const res = await txRunner.runInTransaction(async (tx) => {
+    const res = await txRunner.runInTransaction({ userId, currency: 'RUB' }, async (tx) => {
       const bet = await ledger.debit({
         userId,
         currency: 'RUB' as const,
@@ -168,7 +169,7 @@ dDb('wallet ledger integration (real Postgres)', () => {
   it('P0 #3: дубликат-чек ВНУТРИ tx видит uncommitted записи той же транзакции', async () => {
     const userId = await makeUser()
     const key = 'dup_in_tx_' + randomUUID()
-    const res = await txRunner.runInTransaction(async (tx) => {
+    const res = await txRunner.runInTransaction({ userId, currency: 'RUB' }, async (tx) => {
       const a = await ledger.credit(creditInput(userId, { amount: '10', idempotencyKey: key, tx }))
       // тот же ключ в той же транзакции — duplicate, а не вторая запись
       const b = await ledger.credit(creditInput(userId, { amount: '10', idempotencyKey: key, tx }))
@@ -177,4 +178,48 @@ dDb('wallet ledger integration (real Postgres)', () => {
     expect(res.b.duplicate).toBe(true)
     expect(await prisma.ledgerEntry.count({ where: { userId, idempotencyKey: key } })).toBe(1)
   })
+
+  it('GAP-57: 20 параллельных списаний одного кошелька — все проходят, баланс сходится', async () => {
+    // Регрессия на реальном Postgres: до advisory-лока concurrent-ставки на один
+    // кошелёк откатывались по Serializable (P2034) и доходили до игрока ошибкой
+    // (69% отказов при 100 VU, прогон GAP-47). Здесь — тот же профиль в тесте:
+    // N одновременных debit одного кошелька обязаны ВСЕ завершиться успешно,
+    // а баланс — сойтись копейка в копейку (version == число списаний).
+    const userId = await makeUser()
+    await ledger.credit(creditInput(userId, { amount: '1000' }))
+    const parallel = 20
+    const amount = '10'
+
+    const results = await Promise.all(
+      Array.from({ length: parallel }, () =>
+        txRunner
+          .runInTransaction({ userId, currency: 'RUB' }, (tx) =>
+            ledger.debit({
+              userId,
+              currency: 'RUB' as const,
+              amount,
+              type: 'BET' as const,
+              idempotencyKey: 'it_conc_' + randomUUID(),
+              tx,
+            }),
+          )
+          .then((r) => ({ ok: true as const, r }))
+          .catch((e: unknown) => ({ ok: false as const, e })),
+      ),
+    )
+
+    const failed = results.filter((x) => !x.ok)
+    expect(failed).toEqual([])
+
+    // деньги целы: 1000 − 20×10
+    expect(await balanceOf(userId)).toBe('800')
+    const w = await prisma.walletAccount.findUnique({
+      where: { userId_currency: { userId, currency: 'RUB' } },
+    })
+    // version растёт на каждой мутации: кошелёк создан с version=0 (создание
+    // не инкрементит), далее 1 кредит + 20 списаний.
+    expect(w?.version).toBe(BigInt(parallel + 1))
+    expect(await prisma.ledgerEntry.count({ where: { userId } })).toBe(parallel + 1)
+  })
 })
+

@@ -1,3 +1,4 @@
+import { API_BASE_URL as API_URL } from '@/lib/api-base'
 import type { CatalogCategory } from '@/lib/ui/catalog-filters'
 import type { GameDto, ProviderDto } from '@/types/casino'
 
@@ -5,16 +6,15 @@ import type { GameDto, ProviderDto } from '@/types/casino'
  * GAP-55 (е) (ТЗ §20/§22: «каталог и главная — ISR», «ISR главной 60 секунд»).
  * Серверное чтение публичных данных для static/ISR-рендера главной.
  *
- * URL — NEXT_PUBLIC_API_URL: он же годится для серверного хода (в проде это
- * публичный https-адрес API). Свою переменную не заводим, чтобы не плодить
- * расхождение с docs-guard D3/D7 (каждый ключ env обязан быть в .env.example
- * и ENVIRONMENT_VARIABLES §22).
+ * URL — общий API_BASE_URL (lib/api-base.ts), в проде это NEXT_PUBLIC_API_URL:
+ * он же годится для серверного хода (публичный https-адрес API). Свою
+ * переменную не заводим, чтобы не плодить расхождение с docs-guard D3/D7
+ * (каждый ключ env обязан быть в .env.example и ENVIRONMENT_VARIABLES §22).
  *
  * Ошибки НЕ пробрасываем: страница с пустыми полками лучше страницы, на которой
  * `next build` упал на prerender (в CI API не поднят, и на деплое API может
  * отставать от фронта).
  */
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001/api/v1'
 
 /** §22: главная переживает себя раз в минуту. */
 export const HOME_REVALIDATE_SECONDS = 60
@@ -23,7 +23,10 @@ interface Envelope<T> {
   data: T
 }
 
-async function getJson<T>(path: string, params: Record<string, string | number> = {}): Promise<T | null> {
+async function getJson<T>(
+  path: string,
+  params: Record<string, string | number> = {},
+): Promise<T | null> {
   const query = new URLSearchParams(
     Object.entries({ ...params }).map(([key, value]) => [key, String(value)]),
   ).toString()
@@ -40,9 +43,17 @@ async function getJson<T>(path: string, params: Record<string, string | number> 
   }
 }
 
-export async function fetchGamesServer(params: Record<string, string | number>): Promise<GameDto[]> {
+export async function fetchGamesServer(
+  params: Record<string, string | number>,
+): Promise<GameDto[]> {
   const page = await getJson<{ data: GameDto[] }>('/casino/games', params)
   return page?.data ?? []
+}
+
+/** Размер каталога для финальной карты колоды «Ещё N игр в каталоге →» (ТЗ ч.5.1 §4.4). */
+export async function fetchCatalogTotalServer(): Promise<number> {
+  const page = await getJson<{ meta?: { total?: number } }>('/casino/games', { per_page: 1 })
+  return page?.meta?.total ?? 0
 }
 
 export async function fetchProvidersServer(): Promise<ProviderDto[]> {

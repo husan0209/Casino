@@ -36,6 +36,15 @@ export interface IWalletRepository {
   getBalance(userId: string, currency: Currency): Promise<WalletAccount | null>
   listBalances(userId: string): Promise<WalletAccount[]>
 }
+/**
+ * GAP-57: кошелёк, который сериализует денежная транзакция. Ключ advisory-лока
+ * строится из этих двух полей (userId+currency) — у одного игрока несколько
+ * кошельков (по валютам), и они не должны блокировать друг друга.
+ */
+export interface WalletLockTarget {
+  userId: string
+  currency: Currency
+}
 export const WALLET_REPOSITORY = Symbol('WALLET_REPOSITORY')
 
 /**
@@ -43,9 +52,17 @@ export const WALLET_REPOSITORY = Symbol('WALLET_REPOSITORY')
  * место с правом импорта prisma); application получает tx через колбэк и
  * передаёт его в ledger (CreditInput.tx) и в репозитории других модулей —
  * bet/win/rollback проводятся атомарно одной $transaction.
+ *
+ * GAP-57: вызывающий ОБЯЗАН указать кошелёк (userId + currency), который
+ * мутирует fn. По нему транзакция берёт advisory-лок и сериализует доступ —
+ * без этого профиль «много ставок в секунду на одного игрока» откатывался
+ * по Serializable (P2034) и 69% ставок доходили до игрока отказом.
  */
 export interface IWalletTransactionRunner {
-  runInTransaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T>
+  runInTransaction<T>(
+    target: WalletLockTarget,
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T>
 }
 export const WALLET_TRANSACTION_RUNNER = Symbol('WALLET_TRANSACTION_RUNNER')
 /** Общие аргументы операций блокировки/выплаты (GAP-25: ≤3 позиционных параметров). */

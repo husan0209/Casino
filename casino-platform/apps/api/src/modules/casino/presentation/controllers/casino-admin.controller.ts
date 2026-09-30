@@ -21,7 +21,6 @@ import { Roles, RolesGuard } from '@modules/auth/presentation/guards/roles.guard
 import {
   type GameCategory,
   type GameProviderType,
-  type GameRoundStatus,
   type GameSessionStatus,
   type GameTransactionType,
   type GameType,
@@ -34,6 +33,20 @@ import { CasinoEntityNotFoundError } from '../../domain/errors'
 import { type ProviderGameRow } from '../../domain/provider-adapter.interface'
 import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 import { UpdateGameSchema } from '../dto/admin-game.dto'
+
+/**
+ * Строки ответов админ-каталога. Типы ВЫВОДЯТСЯ из схемы Prisma по той же
+ * include-конфигурации, что и запросы: развёрнутые литералы молча расходились
+ * с реальными колонками (например, забывали поле, добавленное миграцией) и
+ * раздували методы до 98 строк.
+ */
+type AdminSessionDetail = Prisma.GameSessionGetPayload<{
+  include: {
+    game: true
+    user: { select: { email: true } }
+    gameRounds: { include: { gameTransactions: true } }
+  }
+}>
 
 /** Стабильный slug игры: читаемая база + хэш пары (provider, externalId). */
 function gameSlug(providerSlug: string, externalGameId: string, name?: string): string {
@@ -83,90 +96,7 @@ type AdminGamesPage = {
   meta: { page: number; perPage: number; total: number }
 }
 
-type AdminSessionDetail =
-  | ({
-      user: { email: string | null }
-      game: {
-        id: string
-        createdAt: Date
-        updatedAt: Date
-        name: string
-        type: GameType
-        metadata: Prisma.JsonValue
-        category: GameCategory
-        providerId: string
-        externalGameId: string
-        slug: string
-        nameRu: string | null
-        subcategory: string | null
-        thumbnailUrl: string | null
-        bannerUrl: string | null
-        isEnabled: boolean
-        isFeatured: boolean
-        isNew: boolean
-        isPopular: boolean
-        hasDemo: boolean
-        rtp: Prisma.Decimal | null
-        volatility: GameVolatility | null
-        maxWinMultiplier: Prisma.Decimal | null
-        minBet: Prisma.Decimal | null
-        maxBet: Prisma.Decimal | null
-        supportedCurrencies: Prisma.JsonValue
-        tags: Prisma.JsonValue
-        sortOrder: number
-        launchCount: number
-      }
-      gameRounds: ({
-        gameTransactions: {
-          id: string
-          createdAt: Date
-          type: GameTransactionType
-          amount: Prisma.Decimal
-          balanceAfter: Prisma.Decimal
-          metadata: Prisma.JsonValue
-          userId: string
-          currency: string
-          processed: boolean
-          providerId: string
-          sessionId: string
-          roundId: string
-          externalTransactionId: string
-          ledgerEntryId: string | null
-        }[]
-      } & {
-        id: string
-        createdAt: Date
-        userId: string
-        currency: string
-        status: GameRoundStatus
-        providerId: string
-        gameId: string
-        closedAt: Date | null
-        totalBet: Prisma.Decimal
-        totalWin: Prisma.Decimal
-        sessionId: string
-        externalRoundId: string
-      })[]
-    } & {
-      id: string
-      ipAddress: string | null
-      userAgent: string | null
-      metadata: Prisma.JsonValue
-      userId: string
-      currency: string
-      status: GameSessionStatus
-      providerId: string
-      gameId: string
-      sessionToken: string
-      isDemo: boolean
-      startedAt: Date
-      lastActivityAt: Date
-      closedAt: Date | null
-      totalBet: Prisma.Decimal
-      totalWin: Prisma.Decimal
-      roundsPlayed: number
-    })
-  | null
+
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
@@ -420,7 +350,7 @@ export class CasinoAdminController {
     return { items, meta: { page, perPage, total } }
   }
   @Get('game-sessions/:id')
-  async sessionDetail(@Param('id') id: string): Promise<AdminSessionDetail> {
+  async sessionDetail(@Param('id') id: string): Promise<AdminSessionDetail | null> {
     const session = await prisma.gameSession.findUnique({
       where: { id },
       include: {

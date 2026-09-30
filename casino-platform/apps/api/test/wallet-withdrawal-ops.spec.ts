@@ -1,8 +1,13 @@
+import { ConfirmWithdrawalUseCase } from '../src/modules/wallet/application/use-cases/confirm-withdrawal.use-case'
 import { LockFundsUseCase } from '../src/modules/wallet/application/use-cases/lock-funds.use-case'
 import { UnlockFundsUseCase } from '../src/modules/wallet/application/use-cases/unlock-funds.use-case'
-import { ConfirmWithdrawalUseCase } from '../src/modules/wallet/application/use-cases/confirm-withdrawal.use-case'
 import { UnlockExceedsLockedError } from '../src/modules/wallet/domain/errors'
-import type { CreditResult, IWalletLedger, WithdrawalOpArgs } from '../src/modules/wallet/domain/repositories/wallet.repository'
+
+import type {
+  CreditResult,
+  IWalletLedger,
+  WithdrawalOpArgs,
+} from '../src/modules/wallet/domain/repositories/wallet.repository'
 
 function makeLedger(): { ledger: IWalletLedger; calls: Array<{ op: string; args: unknown }> } {
   const calls: Array<{ op: string; args: unknown }> = []
@@ -23,13 +28,14 @@ function makeLedger(): { ledger: IWalletLedger; calls: Array<{ op: string; args:
   return { ledger, calls }
 }
 
-const args = (over: Partial<WithdrawalOpArgs> = {}): WithdrawalOpArgs => ({
-  userId: 'user-1',
-  currency: 'RUB',
-  amount: '10.00',
-  idempotencyKey: 'wd_test_1',
-  ...over,
-}) as WithdrawalOpArgs
+const args = (over: Partial<WithdrawalOpArgs> = {}): WithdrawalOpArgs =>
+  ({
+    userId: 'user-1',
+    currency: 'RUB',
+    amount: '10.00',
+    idempotencyKey: 'wd_test_1',
+    ...over,
+  }) as WithdrawalOpArgs
 
 describe('Wallet withdrawal use-cases (делегирование в ledger)', () => {
   it('LockFundsUseCase пробрасывает аргументы 1-в-1 в ledger.lock', async () => {

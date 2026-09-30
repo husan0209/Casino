@@ -77,8 +77,11 @@ describe('GAP-23 pino redact', () => {
       expect(opts.transport).toBeUndefined()
     } finally {
       process.env['NODE_ENV'] = prevNodeEnv
-      if (prevFormat === undefined) delete process.env['LOG_FORMAT']
-      else process.env['LOG_FORMAT'] = prevFormat
+      if (prevFormat === undefined) {
+delete process.env['LOG_FORMAT']
+} else {
+process.env['LOG_FORMAT'] = prevFormat
+}
     }
   })
 })

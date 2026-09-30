@@ -1,5 +1,9 @@
 import { ListGamesUseCase } from '../src/modules/casino/application/use-cases/list-games.use-case'
-import type { CatalogQuery, IGameCatalogRepository } from '../src/modules/casino/domain/repositories/casino.repository'
+
+import type {
+  CatalogQuery,
+  IGameCatalogRepository,
+} from '../src/modules/casino/domain/repositories/casino.repository'
 
 function makeCatalog(): { catalog: IGameCatalogRepository; calls: Array<Record<string, unknown>> } {
   const calls: Array<Record<string, unknown>> = []

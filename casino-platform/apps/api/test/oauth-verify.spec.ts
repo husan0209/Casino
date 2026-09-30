@@ -1,7 +1,7 @@
 import { createHash, createHmac } from 'node:crypto'
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigService } from '@nestjs/config'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
  * GAP-42: верификация OAuth-подписей не покрыта ни одним тестом.
@@ -31,8 +31,8 @@ import { ConfigService } from '@nestjs/config'
  * (конструктор), мок модуля не подменяет переданный инстанс.
  */
 
-import { TelegramLoginUseCase } from '../src/modules/auth/application/use-cases/oauth/telegram-login.use-case'
 import { GoogleOAuthUseCase } from '../src/modules/auth/application/use-cases/oauth/google-oauth.use-case'
+import { TelegramLoginUseCase } from '../src/modules/auth/application/use-cases/oauth/telegram-login.use-case'
 import {
   OAuthExchangeError,
   OAuthNotConfiguredError,
@@ -58,10 +58,18 @@ function buildTelegramPayload(overrides: {
     id: String(id),
     auth_date: String(authDate),
   }
-  if (overrides.first_name) fields.first_name = overrides.first_name
-  if (overrides.last_name) fields.last_name = overrides.last_name
-  if (overrides.username) fields.username = overrides.username
-  if (overrides.photo_url) fields.photo_url = overrides.photo_url
+  if (overrides.first_name) {
+fields.first_name = overrides.first_name
+}
+  if (overrides.last_name) {
+fields.last_name = overrides.last_name
+}
+  if (overrides.username) {
+fields.username = overrides.username
+}
+  if (overrides.photo_url) {
+fields.photo_url = overrides.photo_url
+}
 
   const dataCheckString = Object.keys(fields)
     .sort()

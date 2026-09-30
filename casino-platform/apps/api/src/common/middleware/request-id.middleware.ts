@@ -25,7 +25,8 @@ export class RequestIdMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction): void {
     // req.id может быть уже установлен pino-логгером (genReqId) — не перезатираем,
     // иначе id в логах и в ответе разъедутся. pino-http объявляет IncomingMessage.id
-    // обязательным, но мидлвар держим самодостаточным (тесты/свой bootstrap без pino).
+    // обязательным, но мидлвар держим самодостаточным (тесты/свой bootstrap без pino) —
+    // cast как в genReqId (logger.options.ts).
     const id = (req as { id?: string }).id ?? resolveRequestId(req.headers['x-request-id'])
     req.id = id
     res.setHeader('X-Request-Id', id)

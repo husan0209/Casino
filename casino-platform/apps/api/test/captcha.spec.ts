@@ -1,8 +1,8 @@
-import { ConfigService } from '@nestjs/config'
+import { type ConfigService } from '@nestjs/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { CaptchaService } from '../src/modules/auth/infrastructure/services/captcha.service'
 import { CaptchaFailedError, CaptchaRequiredError } from '../src/modules/auth/domain/errors'
+import { CaptchaService } from '../src/modules/auth/infrastructure/services/captcha.service'
 
 /**
  * GAP-55 (ж) §5.2: капча после 5 неудачных входов.

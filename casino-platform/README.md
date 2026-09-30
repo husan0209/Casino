@@ -55,6 +55,11 @@ Seed admin: superadmin@casino.example.com / dev_superadmin_password_123
 - [~] Часть 7 DevOps – ~85% – docker-compose.prod, nginx, GitHub Actions CI: 5 чеков (включая pnpm audit) + deploy-job (после зелёного CI, skip без VPS-секретов), migrate deploy на деплое (GAP-31), честный readiness + healthcheck на /health/ready (GAP-35), первичная инициализация админа задокументирована + seed fail-closed в production (GAP-38), resource-check.sh (GAP-37). Осталось: runtime-деплой на VPS с секретами
 
 > Подробнее см. `docs/IMPLEMENTATION_GAPS.md` (открытые блокеры запуска: GAP-46 runtime-приёмка, GAP-49 юридика) и раздел Money safety ниже.
+>
+> **GAP-57 закрыт 2026-09-30** — конкурентные мутации одного кошелька сериализованы
+> advisory-локом (`pg_advisory_xact_lock` + ReadCommitted): успех ставок на 100 VU
+> вырос с 30,6% до **100%**, деньги сошлись, кошельки не блокируют друг друга
+> (10 игроков → 165 rps). Отчёт — `docs/archive/load-test-2026-09-30.md`.
 
 ## Money safety
 - DB: `DECIMAL(20,8)`

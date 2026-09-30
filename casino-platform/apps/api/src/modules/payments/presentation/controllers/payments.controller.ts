@@ -35,6 +35,9 @@ import {
 @Controller('payments')
 export class PaymentsController {
   constructor(
+    // Логика вынесена в use-case'и (main) — по AGENTS.md правило 3 в контроллере
+    // её быть не должно. @Inject обязателен: design:paramtypes в этой сборке
+    // не выдаётся, инъекция «по типу» даёт undefined (CONVENTIONS §1.4).
     @Inject(CreateFiatDepositUseCase) private fiatDep: CreateFiatDepositUseCase,
     @Inject(CreateCryptoDepositUseCase) private cryptoDep: CreateCryptoDepositUseCase,
     @Inject(CreateWithdrawalUseCase) private createWd: CreateWithdrawalUseCase,

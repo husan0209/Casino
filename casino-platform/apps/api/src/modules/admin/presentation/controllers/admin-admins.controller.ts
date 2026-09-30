@@ -1,3 +1,6 @@
+// Inject обязателен в этой сборке: emitDecoratorMetadata не выдаёт
+// design:paramtypes, поэтому инъекция «по типу» молча даёт undefined
+// (CONVENTIONS §1.4). ForbiddenException убран — в теле файла не используется.
 import {
   Body,
   Controller,
@@ -23,7 +26,9 @@ import { AdminAuthGuard } from '../admin-auth.guard'
 import { CreateAdminSchema } from '../dto/admin-admins.dto'
 
 function isSuper(req: Request): boolean {
-  return req.user?.role === 'superadmin'
+  const user = req.user
+  // 'role' in user отсекает AffiliateActor: у партнёрского токена роли нет.
+  return user !== undefined && 'role' in user && user.role === 'superadmin'
 }
 @UseGuards(AdminAuthGuard)
 @Controller('admin/admins')

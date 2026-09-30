@@ -57,6 +57,10 @@ interface RequestWithCookies {
   },
 })
 export class AuthController {
+  // Явный @Inject на КАЖДОЙ зависимости обязателен (CONVENTIONS.md §1.4): в этой
+  // сборке TypeScript 6 не выдаёт design:paramtypes, поэтому инъекция «по типу»
+  // молча передаёт undefined — весь /auth/* отдавал 500. Тип-импорты выше
+  // заменены на обычные: для @Inject нужен рантайм-объект класса.
   constructor(
     @Inject(RegisterUseCase) private readonly registerUc: RegisterUseCase,
     @Inject(VerifyEmailUseCase) private readonly verifyUc: VerifyEmailUseCase,
@@ -81,9 +85,18 @@ export class AuthController {
     user: { id: string; email: string | null; role: UserRole }
     referralCode: string
   }> {
+    // Код партнёра из ?ref= (партнёрская программа, ТЗ ч.8 §7.3). Тот же
+    // параметр используется и игровой рефералкой, но резолвится независимо:
+    // player-ref ищется в users.referral_code, affiliate-код — в
+    // affiliates.tracking_code. Совпадёт максимум один.
+    const affiliateCode = typeof req.query['ref'] === 'string' ? req.query['ref'] : undefined
     const result = await this.registerUc.execute(
       { email: body.email, password: body.password, referralCode: body.referral_code },
-      { ip: req.ip, userAgent: req.headers['user-agent'] },
+      {
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        affiliateCode,
+      },
     )
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user, referralCode: result.referralCode }
@@ -121,6 +134,18 @@ export class AuthController {
   }
 
   @Post('refresh')
+  // P1 #11: refresh — это зонд восстановления сессии при КАЖДОЙ полной загрузке
+  // страницы (в том числе у гостя: наличие httpOnly-cookie клиенту не видно),
+  // поэтому классовый AUTH-лимит (10/мин, брутфорс login/register) ему тесен —
+  // NAT/офис выхватывает 429 на ровном месте. Брутфорсить здесь нечего: без
+  // валидного высокоэнтропийного refresh-токена запрос бесполезен. В проде
+  // внешним ограничителем остаётся nginx api_auth 10r/m.
+  @Throttle({
+    default: {
+      limit: Number(process.env['THROTTLE_REFRESH_LIMIT'] ?? 30),
+      ttl: Number(process.env['THROTTLE_TTL_MS'] ?? 60_000),
+    },
+  })
   async refresh(
     @Req() req: RequestWithCookies,
     @Res({ passthrough: true }) res: Response,

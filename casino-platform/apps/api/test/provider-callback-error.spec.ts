@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import type { Response } from 'express'
 
 // Моки ДО импорта SUT (hoisted). GAP-57: при неизвестной ошибке (например,
@@ -13,6 +14,7 @@ vi.mock('@casino/database', () => ({
 }))
 
 import { ProviderCallbackController } from '../src/modules/casino/presentation/controllers/provider-callback.controller'
+
 import type { GameCallbackService } from '../src/modules/casino/application/services/game-callback.service'
 import type { ProviderAdapterFactory } from '../src/modules/casino/infrastructure/providers/provider-adapter.factory'
 

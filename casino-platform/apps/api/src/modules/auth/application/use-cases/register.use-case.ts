@@ -1,7 +1,13 @@
 import { randomBytes } from 'crypto'
 
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common'
+import { type ModuleRef } from '@nestjs/core'
 
+import { errorMessage } from '@/common/utils/error-message'
+
+// Импорт ТОЛЬКО класса-токена для ModuleRef.get. Это не зависимость Nest-модулей:
+// affiliate.module по-прежнему не импортируется из AuthModule, цикла нет.
+import { AffiliateFacade as AffiliateFacadeRef } from '../../../affiliate/facade/affiliate.facade'
 import {
   EMAIL_QUEUE_SERVICE,
   type IEmailQueueService,
@@ -31,6 +37,8 @@ const CODE_LENGTH = 8
 
 @Injectable()
 export class RegisterUseCase {
+  private readonly logger = new Logger(RegisterUseCase.name)
+
   // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(USER_REPOSITORY) private users: IUserRepository,
@@ -39,7 +47,67 @@ export class RegisterUseCase {
     @Inject(PASSWORD_HASHER) private hasher: IPasswordHasher,
     @Inject(EMAIL_QUEUE_SERVICE) private email: IEmailQueueService,
     @Inject(JWT_TOKEN_SERVICE) private jwt: IJwtTokenService,
+    // Атрибуция к партнёру (партнёрская программа, ТЗ ч.8 §7.3).
+    //
+    // ПОЧЕМУ ModuleRef, А НЕ AffiliateFacade ЧЕРЕЗ ИМПОРТ: affiliate уже
+    // импортирует AuthModule (нужны AuthGuard/RolesGuard). Прямой импорт
+    // AffiliateModule в AuthModule создал бы цикл модулей, который
+    // MODULE_BOUNDARIES §16.4 запрещает. ModuleRef резолвит провайдер
+    // лениво по всему графу, без статической зависимости — стандартный
+    // приём Nest именно для таких случаев. Optional: если affiliate-модуль
+    // не подключён, регистрация всё равно должна работать.
+    @Optional() private moduleRef?: ModuleRef,
   ) {}
+
+  /**
+   * Привязывает нового игрока к партнёру по коду из ?ref=.
+   *
+   * Полностью best-effort: отсутствие affiliate-модуля, отсутствие кода или
+   * любая ошибка внутри — не влияют на успех регистрации. Игрок не должен
+   * терять регистрацию из-за партнёрского контура.
+   */
+  private async attributePlayerToAffiliate(input: {
+    playerId: string
+    trackingCode?: string | undefined
+    ip?: string | undefined
+    userAgent?: string | undefined
+  }): Promise<void> {
+    if (this.moduleRef === undefined || input.trackingCode === undefined) {
+      return
+    }
+    try {
+      // strict: false ищет провайдер по всему графу приложения, а не только
+      // в контейнере AuthModule.
+      const facade = this.moduleRef.get(AffiliateFacadeRef, { strict: false }) as {
+        attributePlayer: (args: typeof input) => Promise<unknown>
+      }
+      await facade.attributePlayer(input)
+    } catch (err) {
+      this.logger.warn(
+        `Affiliate attribution skipped for player=${input.playerId}: ${errorMessage(err)}`,
+      )
+    }
+  }
+
+  /**
+   * id реферера по коду из тела регистрации (игровая рефералка, не партнёрская).
+   * Неизвестный код игнорируется: регистрация не должна падать из-за мусора.
+   */
+  private async resolveReferrerId(referralCode: string | undefined): Promise<string | null> {
+    if (referralCode === undefined) {
+      return null
+    }
+    const referrer = await this.users.findByReferralCode(referralCode.toUpperCase().trim())
+    return referrer?.id ?? null
+  }
+
+  /** Токен подтверждения email + письмо (вынесено ради лимита 60 строк). */
+  private async sendVerification(userId: string, email: string): Promise<void> {
+    const token = randomBytes(32).toString('hex')
+    const expiresAt = new Date(Date.now() + 24 * 3600 * 1000)
+    await this.verif.create(userId, token, expiresAt)
+    await this.email.sendVerificationEmail(email, token)
+  }
 
   private async generateReferralCode(): Promise<string> {
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -57,7 +125,12 @@ export class RegisterUseCase {
 
   async execute(
     input: { email: string; password: string; referralCode?: string | undefined },
-    meta?: { ip?: string | undefined; userAgent?: string | undefined },
+    meta?: {
+      ip?: string | undefined
+      userAgent?: string | undefined
+      /** Код партнёра из ?ref= (партнёрская программа, ТЗ ч.8 §7.3). */
+      affiliateCode?: string | undefined
+    },
   ): Promise<{
     accessToken: string
     refreshToken: string
@@ -75,14 +148,7 @@ export class RegisterUseCase {
       throw new EmailAlreadyExistsError()
     }
 
-    let referredBy: string | null = null
-    if (input.referralCode) {
-      const referrer = await this.users.findByReferralCode(input.referralCode.toUpperCase().trim())
-      if (referrer) {
-        referredBy = referrer.id
-      }
-    }
-
+    const referredBy = await this.resolveReferrerId(input.referralCode)
     const passwordHash = await this.hasher.hash(input.password)
     const referralCode = await this.generateReferralCode()
     const user = await this.users.create({
@@ -92,19 +158,24 @@ export class RegisterUseCase {
       referredBy,
     })
 
-    const token = randomBytes(32).toString('hex')
-    const expiresAt = new Date(Date.now() + 24 * 3600 * 1000)
-    await this.verif.create(user.id, token, expiresAt)
-    await this.email.sendVerificationEmail(emailNormalized, token)
+    // Привязка к партнёру (партнёрская программа). Вызывается ПОСЛЕ создания
+    // игрока. Ошибка атрибуции не должна ломать регистрацию — игрок зарегистрировался
+    // в любом случае, просто без привязки к партнёру.
+    await this.attributePlayerToAffiliate({
+      playerId: user.id,
+      trackingCode: meta?.affiliateCode,
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
+    })
 
+    await this.sendVerification(user.id, emailNormalized)
     const { token: refreshToken, hash } = this.jwt.generateRefreshToken()
-    const sessionExpires = new Date(Date.now() + 30 * 24 * 3600 * 1000)
     const session = await this.sessions.create({
       userId: user.id,
       refreshTokenHash: hash,
       ipAddress: meta?.ip || null,
       userAgent: meta?.userAgent || null,
-      expiresAt: sessionExpires,
+      expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
       revokedAt: null,
     })
     const accessToken = this.jwt.signAccess(user.id, user.role, session.id)

@@ -1,12 +1,18 @@
-import { randomBytes } from 'crypto'
-
 import { LaunchGameUseCase } from '../src/modules/casino/application/use-cases/launch-game.use-case'
-import { GameDisabledError, GameNotFoundError, ProviderDisabledError } from '../src/modules/casino/domain/errors'
+import {
+  GameDisabledError,
+  GameNotFoundError,
+  ProviderDisabledError,
+} from '../src/modules/casino/domain/errors'
+
 import type { IProviderAdapterFactory } from '../src/modules/casino/domain/casino.ports'
-import type { IGameCatalogRepository, IGamePlayRepository } from '../src/modules/casino/domain/repositories/casino.repository'
+import type {
+  IGameCatalogRepository,
+  IGamePlayRepository,
+} from '../src/modules/casino/domain/repositories/casino.repository'
 import type { WalletFacade } from '../src/modules/wallet/facade/wallet.facade'
 
-function makeGame(over: Record<string, unknown> = {}) {
+function makeGame(over: Record<string, unknown> = {}): never {
   return {
     id: 'g1',
     slug: 'sweet-bonanza',
@@ -18,7 +24,10 @@ function makeGame(over: Record<string, unknown> = {}) {
   } as never
 }
 
-function makeUc(game: unknown, adapterUrl = 'https://launch.example') {
+function makeUc(
+  game: unknown,
+  adapterUrl = 'https://launch.example',
+): { uc: LaunchGameUseCase; getLaunchUrlCalls: unknown[] } {
   const getLaunchUrlCalls: unknown[] = []
   const catalog = { findBySlug: async () => game } as unknown as IGameCatalogRepository
   const adapters = {
@@ -37,7 +46,7 @@ function makeUc(game: unknown, adapterUrl = 'https://launch.example') {
   }
 }
 
-const input = (over: Record<string, unknown> = {}) =>
+const input = (over: Record<string, unknown> = {}): unknown =>
   ({
     gameSlug: 'sweet-bonanza',
     userId: undefined,
@@ -61,7 +70,9 @@ describe('LaunchGameUseCase', () => {
   })
 
   it('провайдер выключен → ProviderDisabledError', async () => {
-    const { uc } = makeUc(makeGame({ provider: { slug: 'demo-provider', isEnabled: false, config: null } }))
+    const { uc } = makeUc(
+      makeGame({ provider: { slug: 'demo-provider', isEnabled: false, config: null } }),
+    )
     await expect(uc.execute(input())).rejects.toBeInstanceOf(ProviderDisabledError)
   })
 

@@ -1,6 +1,7 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 
+import { AffiliateCodeCapture } from '@/components/affiliate/AffiliateCodeCapture'
 import { MainShell } from '@/components/layout/MainShell'
 import { Toaster } from '@/components/ui/toaster'
 
@@ -38,6 +39,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
     <html lang="ru" className={inter.variable}>
       <body className="font-sans">
         <Providers>
+          {/* Партнёрский код в localStorage — переживает ITP-усечение cookie */}
+          <AffiliateCodeCapture />
           <MainShell>{children}</MainShell>
           <Toaster />
         </Providers>

@@ -39,7 +39,17 @@ export class PaymentJobHandlers {
     @Inject(CleanupSessionsJob) private readonly cleanupSessions: CleanupSessionsJob,
   ) {}
 
-  get map(): Omit<MaintenanceHandlers, 'referral-daily'> {
+  /**
+   * Задачи, диспетчеризуемые из этого класса.
+   *
+   * `referral-daily` и три affiliate-задачи добавляются в MaintenanceModule
+   * через фабрику MAINTENANCE_HANDLERS — они требуют модулей, которые этот
+   * класс не тянет. Тип отражает реальность: здесь их нет.
+   */
+  get map(): Omit<
+    MaintenanceHandlers,
+    'referral-daily' | 'affiliate-daily' | 'affiliate-qualification' | 'affiliate-clicks-cleanup'
+  > {
     return {
       'expire-deposits': () => this.expire.execute(),
       'update-rates': () => this.rates.execute(),
@@ -176,6 +186,9 @@ export class PrismaExchangeRateWriter implements IExchangeRateWriter {
  */
 @Injectable()
 export class NowPaymentsRatesProvider implements IRatesProvider {
+  // PaymentsFacade, а не NOWPaymentsClient напрямую: межмодульный доступ только
+  // через фасад (AGENTS.md правило 4). @Inject обязателен — в этой сборке
+  // design:paramtypes не выдаётся (CONVENTIONS §1.4).
   constructor(@Inject(PaymentsFacade) private readonly facade: PaymentsFacade) {}
 
   async estimateRub(currency: string): Promise<{ rate: string; source: string } | null> {

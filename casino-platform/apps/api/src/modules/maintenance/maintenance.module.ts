@@ -1,8 +1,12 @@
 import { Inject, Module, type OnApplicationBootstrap } from '@nestjs/common'
 
 import { AdminModule } from '../admin/admin.module'
+import { AffiliateModule } from '../affiliate/affiliate.module'
 import { AuthModule } from '../auth/auth.module'
 import { ReferralsModule } from '../referrals/referrals.module'
+import { AffiliateClicksCleanupJob } from './application/affiliate-clicks-cleanup.job'
+import { AffiliateDailyJob } from './application/affiliate-daily.job'
+import { AffiliateQualificationJob } from './application/affiliate-qualification.job'
 import { CleanupSessionsJob } from './application/cleanup-sessions.job'
 import { ExpireDepositsJob } from './application/expire-deposits.job'
 import { ReferralDailyJob } from './application/referral-daily.job'
@@ -18,6 +22,7 @@ import {
   SESSION_MAINTENANCE_REPO,
   type MaintenanceHandlers,
 } from './domain/maintenance.ports'
+import { AffiliateJobHandlers } from './infrastructure/affiliate-job.handlers'
 import {
   NowPaymentsRatesProvider,
   PaymentJobHandlers,
@@ -51,7 +56,7 @@ import { PaymentsModule } from '../payments/payments.module'
  * напрямую PrismaReminderAuditRepo (audit_logs).
  */
 @Module({
-  imports: [AuthModule, AdminModule, PaymentsModule, ReferralsModule, QueuesModule],
+  imports: [AuthModule, AdminModule, PaymentsModule, ReferralsModule, AffiliateModule, QueuesModule],
   controllers: [MaintenanceAdminController],
   providers: [
     MaintenanceScheduler,
@@ -61,6 +66,12 @@ import { PaymentsModule } from '../payments/payments.module'
     WithdrawalReminderJob,
     ReferralDailyJob,
     CleanupSessionsJob,
+    // AffiliateModule подключён из AffiliateModule; курсы берутся через
+    // PaymentsFacade, поэтому NOWPaymentsClient в провайдерах больше не нужен.
+    AffiliateDailyJob,
+    AffiliateQualificationJob,
+    AffiliateClicksCleanupJob,
+    AffiliateJobHandlers,
     { provide: PAYMENT_MAINTENANCE_REPO, useClass: PrismaMaintenanceRepo },
     { provide: SESSION_MAINTENANCE_REPO, useClass: PrismaSessionMaintenanceRepo },
     { provide: REMINDER_AUDIT_REPO, useClass: PrismaReminderAuditRepo },
@@ -70,12 +81,18 @@ import { PaymentsModule } from '../payments/payments.module'
     PaymentJobHandlers,
     {
       provide: MAINTENANCE_HANDLERS,
-      // referral-daily добавлен к map из PaymentJobHandlers (3 payment-задачи)
-      useFactory: (h: PaymentJobHandlers, referral: ReferralDailyJob): MaintenanceHandlers => ({
-        ...h.map,
+      // referral-daily добавлен к map из PaymentJobHandlers (3 payment-задачи),
+      // affiliate-задачи — из AffiliateJobHandlers (ещё 3, ТЗ ч.8 §15).
+      useFactory: (
+        paymentHandlers: PaymentJobHandlers,
+        affiliateHandlers: AffiliateJobHandlers,
+        referral: ReferralDailyJob,
+      ): MaintenanceHandlers => ({
+        ...paymentHandlers.map,
+        ...affiliateHandlers.map,
         'referral-daily': () => referral.execute(),
       }),
-      inject: [PaymentJobHandlers, ReferralDailyJob],
+      inject: [PaymentJobHandlers, AffiliateJobHandlers, ReferralDailyJob],
     },
   ],
 })

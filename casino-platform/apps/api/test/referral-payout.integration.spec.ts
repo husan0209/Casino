@@ -17,10 +17,10 @@ import { randomUUID } from 'crypto'
 
 import { prisma } from '@casino/database'
 
+import { ReferralCalcService } from '../src/modules/referrals/application/referral-calc.service'
+import { PrismaReferralRepository } from '../src/modules/referrals/infrastructure/referral.prisma.repository'
 import { WalletFacade } from '../src/modules/wallet/facade/wallet.facade'
 import { PrismaWalletLedger } from '../src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma'
-import { PrismaReferralRepository } from '../src/modules/referrals/infrastructure/referral.prisma.repository'
-import { ReferralCalcService } from '../src/modules/referrals/application/referral-calc.service'
 
 const INTEGRATION = process.env['LEDGER_INTEGRATION'] === '1'
 const dDb = INTEGRATION ? describe : describe.skip

@@ -10,14 +10,16 @@
  *   константы DISPLAY_RUB_RATES (source='static'), задача не роняется;
  * - referral-daily: проксирует runDaily, возвращает сводку.
  */
+import { DISPLAY_RUB_RATES } from '@casino/shared-config'
+
 import { CleanupSessionsJob } from '../src/modules/maintenance/application/cleanup-sessions.job'
 import { ExpireDepositsJob } from '../src/modules/maintenance/application/expire-deposits.job'
 import { ReferralDailyJob } from '../src/modules/maintenance/application/referral-daily.job'
 import { UpdateRatesJob } from '../src/modules/maintenance/application/update-rates.job'
 import { WithdrawalReminderJob } from '../src/modules/maintenance/application/withdrawal-reminder.job'
 import { MaintenanceScheduler } from '../src/queues/infrastructure/maintenance.scheduler'
-import { DISPLAY_RUB_RATES } from '@casino/shared-config'
 import { MAINTENANCE_JOBS } from '../src/queues/queue.types'
+
 import type {
   IPaymentMaintenanceRepo,
   IReminderAuditRepo,
@@ -65,11 +67,18 @@ function makeAuditRepo(
   }
 }
 
-function makeEmailQueue() {
-  const enqueued: Array<{ to: string; subject: string; text: string }> = []
+type EmailJob = { to: string; subject: string; text: string }
+
+type FakeEmailQueue = {
+  enqueued: EmailJob[]
+  enqueue: (job: EmailJob) => Promise<'queued'>
+}
+
+function makeEmailQueue(): FakeEmailQueue {
+  const enqueued: EmailJob[] = []
   return {
     enqueued,
-    enqueue: async (job: { to: string; subject: string; text: string }) => {
+    enqueue: async (job: EmailJob) => {
       enqueued.push(job)
       return 'queued' as const
     },
@@ -137,7 +146,11 @@ describe('maintenance jobs (GAP-33)', () => {
 
   describe('WithdrawalReminderJob', () => {
     it('вывод pending >24ч: письмо каждому активному админу + запись в audit_log', async () => {
-      const stale = paymentRow({ createdAt: new Date(NOW.getTime() - 30 * 3_600_000), amount: '100', currency: 'RUB' })
+      const stale = paymentRow({
+        createdAt: new Date(NOW.getTime() - 30 * 3_600_000),
+        amount: '100',
+        currency: 'RUB',
+      })
       const repo = makePaymentsRepo([], [stale])
       const audit = makeAuditRepo(['a1@casino.dev', 'a2@casino.dev'])
       const email = makeEmailQueue()
@@ -183,8 +196,18 @@ describe('maintenance jobs (GAP-33)', () => {
   })
 
   describe('UpdateRatesJob', () => {
-    function makeWriter() {
-      const saved: Array<{ currencyFrom: string; currencyTo: string; rate: string; source: string }> = []
+    function makeWriter(): {
+      saved: Array<{ currencyFrom: string; currencyTo: string; rate: string; source: string }>
+      cached: Array<Record<string, string>>
+      pruned: Array<Date>
+      writer: IExchangeRateWriter
+    } {
+      const saved: Array<{
+        currencyFrom: string
+        currencyTo: string
+        rate: string
+        source: string
+      }> = []
       const cached: Array<Record<string, string>> = []
       const pruned: Array<Date> = []
       const writer: IExchangeRateWriter = {
@@ -210,10 +233,20 @@ describe('maintenance jobs (GAP-33)', () => {
       const res = await new UpdateRatesJob(writer, provider).execute(NOW)
 
       const usdt = saved.find((s) => s.currencyFrom === 'USDT_TRC20')
-      expect(usdt).toEqual({ currencyFrom: 'USDT_TRC20', currencyTo: 'RUB', rate: '100.5', source: 'np-dev-stub' })
+      expect(usdt).toEqual({
+        currencyFrom: 'USDT_TRC20',
+        currencyTo: 'RUB',
+        rate: '100.5',
+        source: 'np-dev-stub',
+      })
       // UAH/BYN/KZT/UZS/BTC — fallback на DISPLAY_RUB_RATES (source='static')
       const uah = saved.find((s) => s.currencyFrom === 'UAH')
-      expect(uah).toEqual({ currencyFrom: 'UAH', currencyTo: 'RUB', rate: DISPLAY_RUB_RATES['UAH'], source: 'static' })
+      expect(uah).toEqual({
+        currencyFrom: 'UAH',
+        currencyTo: 'RUB',
+        rate: DISPLAY_RUB_RATES['UAH'],
+        source: 'static',
+      })
       expect(res.source).toBe('np-dev-stub')
       expect(res.updated).toBe(saved.length)
       expect(cached).toHaveLength(1)
@@ -289,16 +322,20 @@ describe('maintenance jobs (GAP-33)', () => {
 
   describe('MaintenanceScheduler', () => {
     it('без REDIS_URL (dev) — repeatable не регистрируются, метод безопасен', async () => {
-      const scheduler = new MaintenanceScheduler(makeConfig({ REDIS_URL: undefined, NODE_ENV: undefined }))
+      const scheduler = new MaintenanceScheduler(
+        makeConfig({ REDIS_URL: undefined, NODE_ENV: undefined }),
+      )
       await expect(scheduler.registerRepeatableJobs()).resolves.toBeUndefined()
     })
 
     it('в NODE_ENV=test — тоже no-op (не мешает юнит-тестам/E2E-подключениям)', async () => {
-      const scheduler = new MaintenanceScheduler(makeConfig({ REDIS_URL: 'redis://x', NODE_ENV: 'test' }))
+      const scheduler = new MaintenanceScheduler(
+        makeConfig({ REDIS_URL: 'redis://x', NODE_ENV: 'test' }),
+      )
       await expect(scheduler.registerRepeatableJobs()).resolves.toBeUndefined()
     })
 
-    it('map хендлеров покрывает все 4 job name (тип-гарантия диспетчера)', () => {
+    it('map хендлеров покрывает все job name (тип-гарантия диспетчера)', () => {
       // Проверяем контракт: все имена из MAINTENANCE_JOBS имеют хендлер.
       // (worker dispatch при неизвестном имени бросит — см. интеграцию)
       const handlers: MaintenanceHandlers = {
@@ -307,6 +344,21 @@ describe('maintenance jobs (GAP-33)', () => {
         'withdrawal-reminder': async () => ({ reminded: 0, skipped: 0, admins: 0 }),
         'referral-daily': async () => ({ processed: 0, credited: 0 }),
         'cleanup-sessions': async () => ({ purged: 0 }),
+        // Партнёрская программа (ТЗ ч.8 §15)
+        'affiliate-daily': async () => ({
+          date: '2026-09-28',
+          processed: 0,
+          created: 0,
+          credited: 0,
+          errors: [],
+        }),
+        'affiliate-qualification': async () => ({
+          checked: 0,
+          qualified: 0,
+          stillPending: 0,
+          errors: [],
+        }),
+        'affiliate-clicks-cleanup': async () => ({ deleted: 0, retentionDays: 180 }),
       }
       for (const name of MAINTENANCE_JOBS) {
         expect(typeof handlers[name]).toBe('function')

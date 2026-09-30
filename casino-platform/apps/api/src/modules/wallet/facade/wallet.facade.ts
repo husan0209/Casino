@@ -21,6 +21,7 @@ import {
   WALLET_TRANSACTION_RUNNER,
   type CreditInput,
   type CreditResult,
+  type WalletLockTarget,
 } from '../domain/repositories/wallet.repository'
 
 import type { Prisma } from '@prisma/client'
@@ -62,8 +63,11 @@ export class WalletFacade {
    * его в credit/debit (CreditInput.tx) и в репозитории игровых транзакций,
    * чтобы ledger-запись и gameTransaction коммитились одним $transaction.
    */
-  runInTransaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-    return this.txRunner.runInTransaction(fn)
+  runInTransaction<T>(
+    target: WalletLockTarget,
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.txRunner.runInTransaction(target, fn)
   }
   credit(input: CreditInput): Promise<CreditResult> {
     return this.ledger.credit(input)

@@ -41,7 +41,9 @@ export class SmtpMailer implements MailerPort {
   private transport: SmtpTransport | null = null
 
   constructor(@Inject(ConfigService) private config: ConfigService) {
-    // пусто: ConfigService через DI
+    // Явный @Inject обязателен: в этой сборке emitDecoratorMetadata не выдаёт
+    // design:paramtypes, поэтому инъекция «по типу» передала бы undefined
+    // (см. CONVENTIONS.md §1.4).
   }
 
   /** nodemailer — optional peer: require ленивый, чтобы dev-среда без пакета собиралась. */

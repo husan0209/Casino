@@ -1,9 +1,12 @@
 'use client'
+
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { CaptchaField } from '@/components/auth/CaptchaField'
+import { OAuthButtons } from '@/components/auth/OAuthButtons'
+import { Logo } from '@/components/layout/Logo'
 import { toast } from '@/components/ui/toaster'
 import { errCode, errText } from '@/lib/api'
 import { type AuthState, useAuth } from '@/stores/auth'
@@ -12,11 +15,11 @@ export default function LoginPage(): React.JSX.Element {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  // GAP-55 (ж) §5.2: капча появляется только после CAPTCHA_REQUIRED от бэка
   const [captchaToken, setCaptchaToken] = useState('')
   const [captchaRequired, setCaptchaRequired] = useState(false)
   const login = useAuth((s: AuthState) => s.login)
   const router = useRouter()
+
   const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     setLoading(true)
@@ -40,44 +43,63 @@ export default function LoginPage(): React.JSX.Element {
       setLoading(false)
     }
   }
+
   return (
-    <div className="container-1 py-12 max-w-sm mx-auto">
-      <div className="card">
-        <h1 className="text-xl font-bold mb-4">Вход</h1>
-        <form onSubmit={submit} className="space-y-3">
-          <input
-            className="input"
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            className="input"
-            type="password"
-            placeholder="Пароль"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="card w-full max-w-sm">
+        <div className="mb-6 flex justify-center">
+          <Logo size={40} />
+        </div>
+        <h1 className="mb-4 text-center text-xl font-bold">Вход</h1>
+
+        <OAuthButtons />
+
+        <form onSubmit={submit} className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-xs text-muted">Email</label>
+            <input
+              className="input"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between text-xs text-muted">
+              <label>Пароль</label>
+              <Link href="/forgot-password" className="text-brand hover:underline">
+                Забыли пароль?
+              </Link>
+            </div>
+            <input
+              className="input"
+              type="password"
+              placeholder="Введите пароль"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
           {captchaRequired && (
-            <CaptchaField onToken={setCaptchaToken} />
+            <div className="my-2">
+              <CaptchaField onToken={setCaptchaToken} />
+            </div>
           )}
-          <button className="btn w-full" disabled={loading}>
-            {loading ? '...' : 'Войти'}
+
+          <button className="btn w-full py-3" disabled={loading}>
+            {loading ? 'Вход…' : 'Войти'}
           </button>
         </form>
-        <div className="text-sm text-muted mt-3 flex justify-between">
-          <Link href="/register" className="hover:text-white">
-            Регистрация
+
+        <div className="mt-4 text-center text-sm text-muted">
+          Нет аккаунта?{' '}
+          <Link href="/register" className="text-brand hover:underline">
+            Зарегистрироваться
           </Link>
-          <Link href="/forgot-password" className="hover:text-white">
-            Забыли пароль?
-          </Link>
-        </div>
-        <div className="text-xs text-muted mt-4">
-          Google / Telegram OAuth — подключается при наличии ключей (Часть 2)
         </div>
       </div>
     </div>
