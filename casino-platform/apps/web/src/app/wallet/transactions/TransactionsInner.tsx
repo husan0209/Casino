@@ -1,9 +1,11 @@
 'use client'
 
 import { useInfiniteQuery } from '@tanstack/react-query'
+import { ChevronDown } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useMemo, useState } from 'react'
 
+import { ErrorBanner } from '@/components/ui/error-banner'
 import { apiGet } from '@/lib/api'
 import { currencyLabel, formatAmount } from '@/lib/format/currency'
 import {
@@ -88,14 +90,23 @@ export function TransactionsInner(): React.JSX.Element {
   ]
 
   return (
-    <div className="container-1 py-8">
-      <h1 className="mb-4 text-2xl font-bold">История транзакций</h1>
+    <div className="container-1 py-6">
+      <div className="mb-4 flex items-end justify-between gap-3">
+        <div>
+          <p className="caps-label">ДВИЖЕНИЕ СРЕДСТВ</p>
+          <h1 className="page-title">История транзакций</h1>
+        </div>
+        <span className="pb-1 text-sm text-muted">
+          {isLoading ? 'Загрузка…' : `Записей: ${total}`}
+        </span>
+      </div>
 
-      <div className="card mb-5 flex flex-wrap items-center gap-3">
+      {/* Раскладку фильтра задаёт сетка (col-span), а не ширина самого `input`. */}
+      <div className="card mb-5 grid grid-cols-2 gap-2">
         <select
           value={filter.type}
           onChange={(e) => apply({ type: e.target.value })}
-          className="input w-auto"
+          className="input col-span-2"
           aria-label="Тип операции"
         >
           <option value="">Все типы</option>
@@ -108,7 +119,7 @@ export function TransactionsInner(): React.JSX.Element {
         <select
           value={filter.currency}
           onChange={(e) => apply({ currency: e.target.value })}
-          className="input w-auto"
+          className="input col-span-2"
           aria-label="Валюта"
         >
           <option value="">Все валюты</option>
@@ -122,36 +133,32 @@ export function TransactionsInner(): React.JSX.Element {
           type="date"
           value={filter.from}
           onChange={(e) => apply({ from: e.target.value })}
-          className="input w-auto"
+          className="input"
           aria-label="С даты"
         />
         <input
           type="date"
           value={filter.to}
           onChange={(e) => apply({ to: e.target.value })}
-          className="input w-auto"
+          className="input"
           aria-label="По дату"
         />
         {hasActiveTxParts(filter) && (
-          <button type="button" className="btn-ghost px-3 py-1.5 text-xs" onClick={() => router.replace('/wallet/transactions')}>
+          <button
+            type="button"
+            className="btn-ghost col-span-2 py-1.5 text-xs"
+            onClick={() => router.replace('/wallet/transactions')}
+          >
             Сбросить фильтры
           </button>
         )}
-        <div className="ml-auto text-sm text-muted">
-          {isLoading ? 'Загрузка…' : `${total} записей`}
-        </div>
       </div>
 
       {isError && (
-        <div className="mb-4 flex items-center justify-between rounded-xl border border-[#FF3D71]/30 bg-[#FF3D71]/5 px-4 py-3 text-sm">
-          Не удалось загрузить историю
-          <button type="button" className="btn-ghost px-3 py-1 text-xs" onClick={() => void refetch()}>
-            Повторить
-          </button>
-        </div>
+        <ErrorBanner text="Не удалось загрузить историю" onRetry={() => void refetch()} />
       )}
 
-      {rows.length === 0 && !isLoading ? (
+      {rows.length === 0 && !isLoading && !isError ? (
         <div className="py-12 text-center text-sm text-muted">Записей нет</div>
       ) : (
         <ul className="space-y-2">
@@ -204,10 +211,16 @@ function TxRow({
           {new Date(row.created_at).toLocaleDateString('ru')}
         </span>
         <span className="flex-1 truncate text-sm">{txTypeLabel(row.type)}</span>
-        <span className={`shrink-0 text-sm font-medium ${DIRECTION_CLASS[amountDirection(row.amount)]}`}>
+        <span
+          className={`shrink-0 text-sm font-medium ${DIRECTION_CLASS[amountDirection(row.amount)]}`}
+        >
           {formatTxAmount(row.amount, row.currency)}
         </span>
-        <span className="shrink-0 text-xs text-muted">{expanded ? '▲' : '▼'}</span>
+        <ChevronDown
+          size={14}
+          aria-hidden
+          className={`shrink-0 text-muted transition-transform ${expanded ? 'rotate-180' : ''}`}
+        />
       </button>
       {expanded && (
         <div className="mt-3 space-y-1 border-t border-[#2A2A4A] pt-3 text-xs text-muted">

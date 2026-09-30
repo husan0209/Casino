@@ -1,6 +1,7 @@
 import { HomeView } from '@/components/casino/HomeView'
 import {
   fetchCategoriesServer,
+  fetchCatalogTotalServer,
   fetchGamesServer,
   fetchProvidersServer,
   HOME_REVALIDATE_SECONDS,
@@ -31,14 +32,21 @@ export const metadata: Metadata = {
 }
 
 export default async function Home(): Promise<React.JSX.Element> {
-  const [popular, fresh, categories, providers] = await Promise.all([
+  const [popular, fresh, categories, providers, catalogTotal] = await Promise.all([
     fetchGamesServer({ per_page: 12, sort: 'popular' }),
     fetchGamesServer({ per_page: 12, sort: 'new' }),
     fetchCategoriesServer(),
     fetchProvidersServer(),
+    fetchCatalogTotalServer(),
   ])
 
   return (
-    <HomeView popular={popular} fresh={fresh} categories={categories} providers={providers} />
+    <HomeView
+      popular={popular}
+      fresh={fresh}
+      categories={categories}
+      providers={providers}
+      catalogTotal={catalogTotal}
+    />
   )
 }

@@ -55,7 +55,7 @@ afterEach(cleanup)
 describe('GAP-36/44: страница KYC — лимит из API', () => {
   it('показывает остаток из API (limit_remaining/limit_currency) без пересчёта', async () => {
     kycMock.mockResolvedValue({
-      status: 'not_submitted',
+      status: 'not_started',
       limit_remaining: '5000',
       limit_currency: 'RUB',
       deposit_limit_rub: '5000',
@@ -80,7 +80,7 @@ describe('GAP-36/44: страница KYC — лимит из API', () => {
 
   it('исчерпан: красный блок + CTA «Пройти верификацию» на анкор формы', async () => {
     kycMock.mockResolvedValue({
-      status: 'not_submitted',
+      status: 'not_started',
       limit_remaining: '0',
       limit_currency: 'RUB',
       deposit_limit_rub: '5000',
@@ -119,5 +119,24 @@ describe('GAP-36/44: страница KYC — лимит из API', () => {
     renderPage()
     const reason = await screen.findByText(/Причина:/, undefined, { timeout: 3000 })
     expect(reason.textContent).toContain('Документ нечитаем')
+  })
+
+  /**
+   * §13: заявка — «данные + загрузка документа + селфи» одним шагом. Раньше блок
+   * загрузки появлялся только на «на проверке», и у игрока, который KYC ещё не
+   * начинал, прикрепить документы было некуда.
+   */
+  it('not_started: форма данных и слоты документов на одном экране', async () => {
+    kycMock.mockResolvedValue({
+      status: 'not_started',
+      limit_remaining: '5000',
+      limit_currency: 'RUB',
+      deposit_limit_rub: '5000',
+      documents: [],
+    })
+    renderPage()
+    await screen.findByText(/Персональные данные/i)
+    expect(screen.getByText(/Загрузка документов/i)).toBeTruthy()
+    expect(screen.getByText(/Селфи с документом/i)).toBeTruthy()
   })
 })

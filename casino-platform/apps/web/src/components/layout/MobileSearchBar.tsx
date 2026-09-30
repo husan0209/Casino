@@ -1,5 +1,6 @@
 'use client'
 
+import { Search } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -25,12 +26,12 @@ export function MobileSearchBar(): React.JSX.Element {
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Поиск игр и провайдеров…"
+        placeholder="Найти игру или провайдера"
         aria-label="Поиск"
         className="input flex-1"
       />
       <button type="submit" className="btn px-4" aria-label="Найти">
-        🔍
+        <Search size={18} aria-hidden />
       </button>
     </form>
   )

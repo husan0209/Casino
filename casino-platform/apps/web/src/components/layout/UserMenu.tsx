@@ -9,7 +9,9 @@ import { useAuth } from '@/stores/auth'
 
 /**
  * ТЗ ч.5.1 §2 пр.9: тап по аватарке → dropdown-меню.
- * Пункты: Профиль · Мои кошельки · История игр · Настройки · Выйти.
+ * Пункты: Профиль · Мои кошельки · История ставок · Настройки · Выйти.
+ * Пр.9 называет пункт «История игр», но §5.3 и ч.5 §12 зовут тот же экран
+ * «История ставок» — оставил название самого экрана, чтобы пункт не врал.
  * KYC-пункт — только если статус блокирует вывод/лимит (не в MVP).
  */
 
@@ -22,7 +24,7 @@ interface MenuItem {
 const MENU_ITEMS: MenuItem[] = [
   { href: '/profile', label: 'Профиль', icon: <User size={16} aria-hidden /> },
   { href: '/wallet', label: 'Мои кошельки', icon: <Wallet size={16} aria-hidden /> },
-  { href: '/history', label: 'История игр', icon: <History size={16} aria-hidden /> },
+  { href: '/history', label: 'История ставок', icon: <History size={16} aria-hidden /> },
   { href: '/profile?tab=settings', label: 'Настройки', icon: <Settings size={16} aria-hidden /> },
 ]
 

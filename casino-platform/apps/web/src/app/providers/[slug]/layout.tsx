@@ -1,4 +1,5 @@
 import { API_BASE_URL as API_URL } from '@/lib/api-base'
+import { gameCountLabel } from '@/lib/format/plural'
 
 import type { Metadata } from 'next'
 
@@ -34,7 +35,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const provider = await fetchProviderMeta(params.slug)
   const name = provider?.name ?? params.slug
-  const count = provider?.game_count ? ` (${provider.game_count} игр)` : ''
+  const count = provider?.game_count ? ` (${gameCountLabel(provider.game_count)})` : ''
   return {
     title: `${name} — игры провайдера | Casino`,
     description: `Слоты провайдера ${name}: играть онлайн${count}.`,

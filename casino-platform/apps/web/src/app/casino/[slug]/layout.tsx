@@ -1,11 +1,13 @@
+import { API_BASE_URL as API_URL } from '@/lib/api-base'
+
 import type { Metadata } from 'next'
+
 
 /**
  * GAP-52 (ТЗ ч.5 §8.1/§20): SEO страницы игры — «{Название} — играть онлайн | Casino».
  * generateMetadata в layout получает params.slug и тянет название из API
  * (клиентская page.tsx не может экспортировать metadata).
  */
-const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001/api/v1'
 
 interface GameApiShape {
   name?: string
@@ -37,7 +39,7 @@ export async function generateMetadata({
   const provider = game?.provider?.name ? ` — ${game.provider.name}` : ''
   return {
     title: `${title}${provider} — играть онлайн | Casino`,
-    description: `${title}${provider}: RTP, демо и игра на реальные деньги.`,
+    description: `${title}${provider}: отдача, демо и игра на реальные деньги.`,
     openGraph: {
       title: `${title} — играть онлайн | Casino`,
       description: game?.provider?.name ? `Провайдер: ${game.provider.name}` : 'Онлайн слот',

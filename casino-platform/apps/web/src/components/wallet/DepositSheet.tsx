@@ -49,6 +49,24 @@ interface PaymentMethodDto {
   label: string
 }
 
+/** Подпись под названием метода (ТЗ ч.5.1 §4.9). Только то, что верно всегда. */
+function methodHint(label: string): string {
+  const lower = label.toLowerCase()
+  if (lower.includes('сбп')) {
+    return 'Зачисление мгновенно'
+  }
+  if (lower.includes('usdt')) {
+    return 'Сеть TRC20'
+  }
+  if (lower.includes('btc') || lower.includes('bitcoin')) {
+    return 'Сеть Bitcoin'
+  }
+  if (/(карт|visa|mastercard|мир)/.test(lower)) {
+    return 'Visa, Mastercard, МИР'
+  }
+  return ''
+}
+
 function MethodRow({
   method,
   selected,
@@ -58,17 +76,21 @@ function MethodRow({
   selected: boolean
   onSelect: (id: string) => void
 }): React.JSX.Element {
+  const hint = methodHint(method.label)
   return (
     <button
       type="button"
       onClick={() => onSelect(method.id)}
       aria-pressed={selected}
-      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium transition ${
+      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition ${
         selected ? 'border-[#6C63FF] bg-white/[0.04]' : 'border-[#2A2A4A] hover:border-[#6C63FF]/50'
       }`}
     >
       <span className="icon-tile">{methodIcon(method.label)}</span>
-      <span className="flex-1">{method.label}</span>
+      <span className="flex-1">
+        <span className="block text-sm font-medium">{method.label}</span>
+        {hint && <span className="block text-xs text-muted">{hint}</span>}
+      </span>
       {selected && <Check size={18} aria-hidden className="text-[#6C63FF]" />}
     </button>
   )

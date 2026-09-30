@@ -1,6 +1,7 @@
 'use client'
 
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
@@ -437,8 +438,13 @@ function SheetShell({
       <div className="sheet-panel">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Вывод средств</h2>
-          <button type="button" onClick={onClose} className="text-muted" aria-label="Закрыть">
-            ✕
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Закрыть"
+            className="rounded-lg p-1.5 text-muted transition hover:bg-white/5 hover:text-white"
+          >
+            <X size={18} aria-hidden />
           </button>
         </div>
         {children}

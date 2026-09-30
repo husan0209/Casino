@@ -66,7 +66,7 @@ export default function ProviderPage(): React.JSX.Element {
         </Link>{' '}
         / {provider?.name ?? slug}
       </div>
-      <h1 className="mb-4 text-2xl font-bold">{provider?.name ?? slug}</h1>
+      <h1 className="page-title mb-4">{provider?.name ?? slug}</h1>
       {provider && (
         <p className="mb-5 text-sm text-muted">Игр в каталоге: {provider.game_count}</p>
       )}

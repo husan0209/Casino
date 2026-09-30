@@ -31,11 +31,13 @@ export function HomeView({
   fresh,
   categories,
   providers,
+  catalogTotal,
 }: {
   popular: GameDto[]
   fresh: GameDto[]
   categories: CatalogCategory[]
   providers: ProviderDto[]
+  catalogTotal: number
 }): React.JSX.Element {
   const { user } = useAuth()
   const { favoriteGames, favoriteSlugs, toggleFavorite } = useFavorites()
@@ -56,7 +58,12 @@ export function HomeView({
 
       {/* §4.4: GameDeck у гостя (после Hero) */}
       {!user && (
-        <GameDeck games={popular} favoriteSlugs={favoriteSlugs} onToggleFavorite={toggleFavorite} />
+        <GameDeck
+          games={popular}
+          favoriteSlugs={favoriteSlugs}
+          onToggleFavorite={toggleFavorite}
+          catalogTotal={catalogTotal}
+        />
       )}
 
       {user && (
@@ -79,6 +86,7 @@ export function HomeView({
           recentGames={recent ?? []}
           favoriteSlugs={favoriteSlugs}
           onToggleFavorite={toggleFavorite}
+          catalogTotal={catalogTotal}
         />
       )}
 

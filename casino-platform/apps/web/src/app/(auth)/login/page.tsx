@@ -50,7 +50,10 @@ export default function LoginPage(): React.JSX.Element {
         <div className="mb-6 flex justify-center">
           <Logo size={40} />
         </div>
-        <h1 className="mb-4 text-center text-xl font-bold">Вход</h1>
+        <div className="mb-6 text-center">
+          <p className="caps-label">РАДЫ ВИДЕТЬ</p>
+          <h1 className="text-xl font-black text-white">Войдите, чтобы играть</h1>
+        </div>
 
         <OAuthButtons />
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Heart, Play, Sparkles } from 'lucide-react'
+import { Heart, Play } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
@@ -9,11 +9,19 @@ import { useEffect, useRef, useState } from 'react'
 import { GameCard } from '@/components/casino/GameCard'
 import { GameThumb } from '@/components/casino/GameThumb'
 import { LaunchErrorScreen } from '@/components/game/LaunchErrorScreen'
+import { useDemoLaunch } from '@/hooks/useDemoLaunch'
 import { useFavorites } from '@/hooks/useFavorites'
-import { apiGet, apiPost, errCode, errIsNetwork, errStatus } from '@/lib/api'
-import { fetchGamesPage } from '@/lib/api/casino.api'
+import { apiPost, errCode, errIsNetwork, errStatus } from '@/lib/api'
+import { fetchGameDetails, fetchGamesPage } from '@/lib/api/casino.api'
 import { EMPTY_FILTERS } from '@/lib/ui/catalog-filters'
-import { gameDisplayName, gameHasDemo, gameRtpLabel } from '@/lib/ui/game'
+import {
+  gameCategoryLabel,
+  gameDisplayName,
+  gameHasDemo,
+  gameMinBetLabel,
+  gameRtpLabel,
+  gameVolatilityLabel,
+} from '@/lib/ui/game'
 import {
   describeLaunchError,
   type LaunchErrorAction,
@@ -43,7 +51,7 @@ function SimilarGamesSection({
 
   return (
     <div className="mt-10">
-      <p className="caps-label">ПОХОЖИЕ СЛОТЫ</p>
+      <p className="caps-label">ИГРЫ ПРОВАЙДЕРА</p>
       <h2 className="section-title mb-4">Ещё от этого провайдера</h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {filtered.map((g) => (
@@ -59,24 +67,30 @@ function SimilarGamesSection({
   )
 }
 
-function GameSpecs({ rtp }: { rtp?: string | null }): React.JSX.Element {
+function GameSpecs({
+  game,
+  currency,
+}: {
+  game: GameDetailsDto
+  currency: string
+}): React.JSX.Element {
+  // §8.1: здесь RTP, волатильность и мин. ставка — и только реальные значения.
+  // Раньше третья ячейка рисовала «Высокая» всем слотам подряд, а «Оригинал»
+  // не брался ни откуда: превью выдавало выдуманные характеристики.
+  const specs = [
+    { label: 'RTP', value: gameRtpLabel(game.rtp) },
+    { label: 'Волатильность', value: gameVolatilityLabel(game.volatility) },
+    { label: 'Мин. ставка', value: gameMinBetLabel(game.minBet, currency) },
+  ]
+
   return (
-    <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-      <div className="rounded-xl bg-white/[0.03] p-3 border border-[#2A2A4A]/40">
-        <div className="text-[11px] font-medium text-muted">Отдача (RTP)</div>
-        <div className="mt-0.5 text-base font-bold text-[#00E676]">{rtp || '96.5%'}</div>
-      </div>
-      <div className="rounded-xl bg-white/[0.03] p-3 border border-[#2A2A4A]/40">
-        <div className="text-[11px] font-medium text-muted">Волатильность</div>
-        <div className="mt-0.5 text-base font-bold text-white">Высокая</div>
-      </div>
-      <div className="rounded-xl bg-white/[0.03] p-3 border border-[#2A2A4A]/40 col-span-2 sm:col-span-1">
-        <div className="text-[11px] font-medium text-muted">Лицензия</div>
-        <div className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-white/90">
-          <Sparkles size={14} className="text-[#FFB300]" />
-          Оригинал
+    <div className="mt-6 grid grid-cols-3 gap-3">
+      {specs.map((spec) => (
+        <div key={spec.label} className="rounded-xl border border-[#2A2A4A]/40 bg-white/[0.03] p-3">
+          <div className="text-[11px] font-medium text-muted">{spec.label}</div>
+          <div className="mt-0.5 text-base font-bold text-white">{spec.value ?? '—'}</div>
         </div>
-      </div>
+      ))}
     </div>
   )
 }
@@ -91,6 +105,7 @@ export default function GamePage(): React.JSX.Element {
   const { activeCurrency, fetchWallets, setLastPlayed } = useWalletStore()
   const { config, load } = useGeoStore()
   const { favoriteSlugs, toggleFavorite } = useFavorites()
+  const { startDemo, isRunning: demoLoading } = useDemoLaunch()
   const [failure, setFailure] = useState<{ view: LaunchErrorView; code?: string } | null>(null)
   const launchedKeyRef = useRef<string | null>(null)
 
@@ -98,7 +113,7 @@ export default function GamePage(): React.JSX.Element {
 
   const { data: game } = useQuery({
     queryKey: ['game', slug],
-    queryFn: () => apiGet<GameDetailsDto>(`/casino/games/${slug}`),
+    queryFn: () => fetchGameDetails(slug),
   })
 
   const providerSlug = game?.provider?.slug
@@ -137,7 +152,6 @@ export default function GamePage(): React.JSX.Element {
       void fetchWallets()
     }
   }, [user, load, fetchWallets])
-
   useEffect(() => {
     setFailure(null)
     launchedKeyRef.current = null
@@ -165,8 +179,8 @@ export default function GamePage(): React.JSX.Element {
 
   const displayName = gameDisplayName(game)
   const isFav = favoriteSlugs.has(game.slug)
-  const rtp = gameRtpLabel(game.rtp)
   const hasDemo = gameHasDemo(game.hasDemo)
+  const categoryLabel = gameCategoryLabel(game.category)
 
   return (
     <div className="container-1 py-6">
@@ -185,7 +199,7 @@ export default function GamePage(): React.JSX.Element {
       <div className="card overflow-hidden p-0 border-[#2A2A4A]/60">
         <div className="grid md:grid-cols-12">
           <div className="relative aspect-[4/3] bg-gradient-to-br from-[#22223a] to-[#111122] md:col-span-5 md:aspect-auto">
-            <GameThumb src={game.thumbnailUrl} alt={displayName} />
+            <GameThumb src={game.bannerUrl ?? game.thumbnailUrl} alt={displayName} />
             <div className="absolute inset-0 bg-gradient-to-t from-[#16213E] via-transparent to-transparent md:hidden" />
           </div>
 
@@ -198,10 +212,16 @@ export default function GamePage(): React.JSX.Element {
                   </h1>
                   <div className="mt-1 flex items-center gap-2 text-sm text-muted">
                     <span>{game.provider?.name || 'Провайдер'}</span>
-                    <span>•</span>
-                    <span className="rounded bg-white/5 px-2 py-0.5 text-xs font-semibold text-white/70">
-                      Слот
-                    </span>
+                    {/* Категория из enum GameCategory: «Слот» у всех игр подряд был
+                        выдумкой и для live/настольных врало (§8.1). */}
+                    {categoryLabel && (
+                      <>
+                        <span>•</span>
+                        <span className="rounded bg-white/5 px-2 py-0.5 text-xs font-semibold text-white/70">
+                          {categoryLabel}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -219,7 +239,7 @@ export default function GamePage(): React.JSX.Element {
                 </button>
               </div>
 
-              <GameSpecs rtp={rtp} />
+              <GameSpecs game={game} currency={currency} />
             </div>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -227,15 +247,15 @@ export default function GamePage(): React.JSX.Element {
                 <button
                   disabled={launch.isPending}
                   onClick={() => launch.mutate()}
-                  className="btn-money flex-1 py-3.5 text-base font-bold"
+                  className="btn flex-1 bg-gradient-to-r from-brand to-brand-light py-3.5 text-base font-bold"
                 >
-                  <Play size={18} className="fill-current" />
+                  <Play size={18} className="fill-current" aria-hidden />
                   {launch.isPending ? 'Запуск игры…' : 'Играть на деньги'}
                 </button>
               ) : (
                 <button
                   type="button"
-                  className="btn-money flex-1 py-3.5 text-base font-bold"
+                  className="btn flex-1 bg-gradient-to-r from-brand to-brand-light py-3.5 text-base font-bold"
                   onClick={() => openLogin(slug)}
                 >
                   Войти, чтобы играть
@@ -245,15 +265,9 @@ export default function GamePage(): React.JSX.Element {
               {hasDemo && (
                 <button
                   type="button"
-                  className="btn-ghost py-3.5 px-6 font-semibold"
-                  onClick={async () => {
-                    const res = await apiPost<GameLaunchDto>(`/casino/games/${slug}/demo`, {
-                      currency,
-                    })
-                    if (res.launch_url) {
-                      window.open(res.launch_url, '_blank')
-                    }
-                  }}
+                  className="btn-ghost px-6 py-3.5 font-semibold"
+                  disabled={demoLoading}
+                  onClick={() => void startDemo(slug, currency)}
                 >
                   Демо-режим
                 </button>

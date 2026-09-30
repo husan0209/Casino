@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 import { CaptchaField } from '@/components/auth/CaptchaField'
+import { OAuthButtons } from '@/components/auth/OAuthButtons'
 import { toast } from '@/components/ui/toaster'
 import { errCode, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
@@ -78,33 +79,10 @@ export function LoginSheet(): React.JSX.Element | null {
           </button>
         </div>
 
-        {/* OAuth кнопки — §4.8: Google и Telegram сверху */}
-        <div className="mt-4 space-y-2.5">
-          <Link
-            href="/google/callback"
-            className="flex w-full items-center justify-center gap-3 rounded-xl border border-[#2A2A4A] bg-white/[0.04] px-4 py-3 text-sm font-medium transition hover:bg-white/[0.07]"
-          >
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-white text-sm font-bold text-[#4285F4]">
-              G
-            </span>
-            Продолжить с Google
-          </Link>
-          <button
-            type="button"
-            className="flex w-full items-center justify-center gap-3 rounded-xl border border-[#2A2A4A] bg-white/[0.04] px-4 py-3 text-sm font-medium transition hover:bg-white/[0.07]"
-          >
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-[#0088CC] text-sm font-bold text-white">
-              ▶
-            </span>
-            Войти через Telegram
-          </button>
-        </div>
-
-        {/* Разделитель */}
-        <div className="my-4 flex items-center gap-3">
-          <div className="h-px flex-1 bg-[#2A2A4A]" />
-          <span className="text-xs text-muted">или по email</span>
-          <div className="h-px flex-1 bg-[#2A2A4A]" />
+        {/* §4.8: OAuth сверху, ниже — email-форма. Реальный поток у OAuthButtons;
+            свои кнопки здесь вели бы в несуществующий callback. */}
+        <div className="mt-4">
+          <OAuthButtons />
         </div>
 
         {captchaRequired && mode === 'login' && (
@@ -152,16 +130,9 @@ export function LoginSheet(): React.JSX.Element | null {
             </div>
           </div>
 
-          {mode === 'login' && (
-            <label className="flex items-center gap-2 text-xs text-muted">
-              <input
-                type="checkbox"
-                defaultChecked
-                className="rounded border-[#2A2A4A] bg-[#1A1A2E] accent-brand"
-              />
-              Запомнить меня
-            </label>
-          )}
+          {/* «Запомнить меня» здесь нечего обещать: refresh-токен живёт в памяти
+              (localStorage запрещён security-базлайном), сессия не переживает
+              перезагрузку ни при каком значении чекбокса. */}
 
           <button
             type="button"

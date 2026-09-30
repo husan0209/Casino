@@ -6,6 +6,7 @@
  * Логика вынесена сюда и покрыта тестами, чтобы контракт API был зафиксирован,
  * а не «на глаз».
  */
+import { formatAmount } from '@/lib/format/currency'
 
 export interface GameBadgeFields {
   isNew?: boolean | undefined
@@ -51,4 +52,65 @@ export function gameRtpLabel(rtp: number | string | null | undefined): string | 
 /** Демо-кнопка только когда провайдер реально отдаёт демо (§8.4). */
 export function gameHasDemo(hasDemo: boolean | undefined): boolean {
   return hasDemo === true
+}
+
+/** Подписи Prisma-enum GameVolatility. */
+const VOLATILITY_LABELS: Record<string, string> = {
+  low: 'Низкая',
+  medium: 'Средняя',
+  high: 'Высокая',
+  very_high: 'Очень высокая',
+}
+
+/**
+ * §8.1: волатильность показывается словом. Раньше на странице игры она была
+ * захардкожена «Высокая» у всех слотов — то есть врула для половины каталога.
+ */
+export function gameVolatilityLabel(volatility: string | null | undefined): string | null {
+  const key = volatility?.trim() ?? ''
+  if (key.length === 0) {
+    return null
+  }
+  // Неизвестное значение с бэка (новый enum) — лучше показать его, чем молчать.
+  return VOLATILITY_LABELS[key] ?? key
+}
+
+/**
+ * Мин. ставка: Decimal'ь приходит строкой («10.00000000»), валюта — активного
+ * кошелька, та же, что уходит в launch-запрос. Нуля и пустоты не показываем:
+ * «Мин. ставка 0 ₽» выглядит как данные, а не как их отсутствие.
+ */
+export function gameMinBetLabel(
+  minBet: number | string | null | undefined,
+  currency: string,
+): string | null {
+  if (minBet === null || minBet === undefined || minBet === '') {
+    return null
+  }
+  const value = Number(String(minBet))
+  if (!Number.isFinite(value) || value <= 0) {
+    return null
+  }
+  return formatAmount(String(minBet), currency)
+}
+
+/** Подписи Prisma-enum GameCategory — одна метка у подзаголовка страницы игры. */
+const CATEGORY_LABELS: Record<string, string> = {
+  slots: 'Слот',
+  live_casino: 'Live-казино',
+  table_games: 'Настольная',
+  instant_games: 'Мгновенная',
+  other: 'Игра',
+}
+
+/**
+ * Категория игры по-русски. Раньше метка была захардкожена «Слот» для всех
+ * игр страницы §8.1 — для live и настольных она врала.
+ */
+export function gameCategoryLabel(category: string | null | undefined): string | null {
+  const key = category?.trim() ?? ''
+  if (key.length === 0) {
+    return null
+  }
+  return CATEGORY_LABELS[key] ?? null
 }

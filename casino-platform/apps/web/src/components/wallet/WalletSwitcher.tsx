@@ -10,34 +10,14 @@ import {
   isCryptoCurrency,
   networkLabel,
 } from '@/lib/format/currency'
-import { sortWallets } from '@/lib/wallet/helpers'
+import { currencyIconClass } from '@/lib/ui/currency-icon'
+import { splitWalletsByKind } from '@/lib/wallet/helpers'
 import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 import type { WalletBalance } from '@/types/wallet'
 
 import { money } from '@casino/shared-utils'
-
-function mergeWallets(balances: WalletBalance[], enabled: string[]): WalletBalance[] {
-  const map = new Map(balances.map((w) => [w.currency, w]))
-  return enabled.map(
-    (currency) => map.get(currency) ?? { currency, balance: '0', locked: '0', available: '0' },
-  )
-}
-
-/** CSS-класс цветного кружка для валюты (как на скриншотах spinera). */
-function currencyIconClass(currency: string): string {
-  const map: Record<string, string> = {
-    RUB: 'currency-icon currency-icon-rub',
-    KZT: 'currency-icon currency-icon-kzt',
-    UAH: 'currency-icon currency-icon-uah',
-    BYN: 'currency-icon currency-icon-byn',
-    UZS: 'currency-icon currency-icon-uzs',
-    USDT_TRC20: 'currency-icon currency-icon-usdt',
-    BTC: 'currency-icon currency-icon-btc',
-  }
-  return map[currency] ?? 'currency-icon bg-white/[0.06] text-white'
-}
 
 /** Одна строка кошелька: цветная иконка, название, тег сети (крипта), баланс; нули — тусклые. */
 function WalletRow({
@@ -66,7 +46,7 @@ function WalletRow({
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium">{currencyFullName(wallet.currency)}</span>
         {isCryptoCurrency(wallet.currency) && (
-          <span className="inline-block rounded-md bg-[#00D2FF]/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#00D2FF]">
+          <span className="inline-block rounded-md bg-[#00D2FF]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#00D2FF]">
             {networkLabel(wallet.currency)}
           </span>
         )}
@@ -101,10 +81,11 @@ export function WalletSwitcher(): React.JSX.Element | null {
     return null
   }
 
-  const fiatEnabled = config?.enabledFiat ?? ['RUB']
-  const cryptoEnabled = config?.enabledCrypto ?? []
-  const fiat = sortWallets(mergeWallets(wallets, fiatEnabled), activeCurrency)
-  const crypto = sortWallets(mergeWallets(wallets, cryptoEnabled), activeCurrency)
+  const { fiat, crypto } = splitWalletsByKind(wallets, {
+    enabledFiat: config?.enabledFiat ?? ['RUB'],
+    enabledCrypto: config?.enabledCrypto ?? [],
+    activeCurrency,
+  })
 
   const pick = async (currency: string): Promise<void> => {
     await setActiveCurrency(currency)

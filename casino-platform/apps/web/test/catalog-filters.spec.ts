@@ -99,20 +99,21 @@ describe('GAP-55 пустые разделы и чипы (§6.1/§7)', () => {
     expect(nonEmptyCategories(categories).map((c) => c.slug)).toEqual(['slots'])
   })
 
-  it('чипы главной = непустые категории + Популярные/Новые, все ведут в каталог', () => {
+  it('чипы главной = Все + непустые категории + Новые/Популярные, все ведут в каталог', () => {
     const chips = buildHomeChips(categories)
-    expect(chips.map((chip) => chip.label)).toEqual(['Слоты', 'Популярные', 'Новые'])
+    expect(chips.map((chip) => chip.label)).toEqual(['Все', 'Слоты', 'Новые', 'Популярные'])
     expect(chips.map((chip) => chip.href)).toEqual([
+      '/casino',
       '/casino?category=slots',
-      '/casino?sort=popular',
       '/casino?sort=new',
+      '/casino?sort=popular',
     ])
     for (const chip of chips) {
       expect(chip.href.startsWith('/casino')).toBe(true)
     }
   })
 
-  it('при пустом списке категорий остаются только сортировочные чипы', () => {
-    expect(buildHomeChips([])).toHaveLength(2)
+  it('при пустом списке категорий остаются «Все» и сортировочные чипы', () => {
+    expect(buildHomeChips([])).toHaveLength(3)
   })
 })

@@ -6,7 +6,9 @@ import { apiDelete, apiGet, apiPost } from '@/lib/api'
 import { type CatalogCategory, filtersToApiParams, type CatalogFilters } from '@/lib/ui/catalog-filters'
 import type {
   FavoritesListDto,
+  GameDetailsDto,
   GamesListDto,
+  GameLaunchDto,
   ProviderDto,
   RecentGameDto,
   RecentGamesListDto,
@@ -33,6 +35,19 @@ export function fetchGamesPage(
 /** Каталог провайдеров (GET /casino/providers). */
 export function fetchProviders(): Promise<ProviderDto[]> {
   return apiGet<ProviderDto[]>('/casino/providers')
+}
+
+/**
+ * Детали игры (GET /casino/games/:slug). Листинг каталога отдаёт только
+ * `rtp`/`volatility`; широкая обложка и мин. ставка есть лишь здесь (§8.1).
+ */
+export function fetchGameDetails(slug: string): Promise<GameDetailsDto> {
+  return apiGet<GameDetailsDto>(`/casino/games/${slug}`)
+}
+
+/** Демо-запуск (§7: «Demo запускается с превью игры»), без списания денег. */
+export function launchDemo(slug: string, currency: string): Promise<GameLaunchDto> {
+  return apiPost<GameLaunchDto>(`/casino/games/${slug}/demo`, { currency })
 }
 
 /** Последние сыгранные игры (GET /casino/recent, до 20). Разворачивает { data: [...] } контроллера. */

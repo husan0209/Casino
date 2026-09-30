@@ -1,10 +1,14 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { X } from 'lucide-react'
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
 import { fetchCategories, fetchProviders } from '@/lib/api/casino.api'
 import {
+  CATALOG_SORT_CHIPS,
+  foundLabel,
   hasActiveFilters,
   nonEmptyCategories,
   SORT_OPTIONS,
@@ -19,6 +23,15 @@ import {
  * чтобы не дёргать API на каждый символ.
  */
 const SEARCH_DEBOUNCE_MS = 300
+
+/** Чип категории: активный — брендовая заливка, §4.6 «Все» всегда первым. */
+function chipClass(active: boolean): string {
+  return `shrink-0 rounded-full border px-3 py-1.5 text-xs transition ${
+    active
+      ? 'border-[#6C63FF] bg-[#6C63FF] font-semibold text-white'
+      : 'border-[#2A2A4A] text-muted hover:border-[#6C63FF]/40 hover:text-white'
+  }`
+}
 
 export function CatalogFilterBar({
   filters,
@@ -62,33 +75,55 @@ export function CatalogFilterBar({
   }, [draft, filters.q, onChange])
 
   const categoryChips = nonEmptyCategories(categories ?? [])
+  const allCount = total || categoryChips.reduce((sum, category) => sum + category.game_count, 0)
 
   return (
-    <div className="card mb-5 space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="mb-5 space-y-3">
+      {/* §4.6: чипы живым рядом, без рамки-панели; на телефоне — горизонтальный скролл */}
+      <div className="scrollbar-hide -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         <button
           type="button"
           onClick={() => onChange({ category: '' })}
-          className={`rounded-full px-3 py-1.5 text-xs ${
-            filters.category === '' ? 'bg-[#6C63FF] text-white' : 'text-muted hover:bg-white/5'
-          }`}
+          className={chipClass(filters.category === '')}
         >
           Все
+          <span className={filters.category === '' ? 'ml-1 text-white/70' : 'ml-1 text-white/30'}>
+            {allCount}
+          </span>
         </button>
-        {categoryChips.map((category) => (
-          <button
-            key={category.slug}
-            type="button"
-            onClick={() => onChange({ category: category.slug })}
-            className={`rounded-full px-3 py-1.5 text-xs ${
-              filters.category === category.slug
-                ? 'bg-[#6C63FF] text-white'
-                : 'text-muted hover:bg-white/5'
-            }`}
-          >
-            {category.name}
-          </button>
-        ))}
+        {categoryChips.map((category) => {
+          const active = filters.category === category.slug
+          return (
+            <button
+              key={category.slug}
+              type="button"
+              onClick={() => onChange({ category: category.slug })}
+              className={chipClass(active)}
+            >
+              {category.name}
+              <span className={active ? 'ml-1 text-white/70' : 'ml-1 text-white/30'}>
+                {category.game_count}
+              </span>
+            </button>
+          )
+        })}
+        {/* §4.6: после категорий — сортировочные чипы и «Избранное» */}
+        {CATALOG_SORT_CHIPS.map((chip) => {
+          const active = filters.sort === chip.sort
+          return (
+            <button
+              key={chip.sort}
+              type="button"
+              onClick={() => onChange({ sort: active ? '' : chip.sort })}
+              className={chipClass(active)}
+            >
+              {chip.label}
+            </button>
+          )
+        })}
+        <Link href="/favorites" className={chipClass(false)}>
+          Избранное
+        </Link>
       </div>
 
       {/* §7: на телефоне фильтры — чипы категорий + bottom-sheet «Фильтры» */}
@@ -105,8 +140,8 @@ export function CatalogFilterBar({
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Поиск…"
-          className="input w-56 flex-1 md:flex-none"
+          placeholder="Найти игру или провайдера"
+          className="input w-full min-w-40 flex-1 md:w-56 md:flex-none"
           aria-label="Поиск по каталогу"
         />
 
@@ -149,7 +184,7 @@ export function CatalogFilterBar({
           </button>
         )}
         <div className="ml-auto text-sm text-muted">
-          {loading ? 'Загрузка…' : `${total} игр`}
+          {loading ? 'Загрузка…' : foundLabel(total)}
         </div>
       </div>
 
@@ -159,8 +194,13 @@ export function CatalogFilterBar({
           <div className="sheet-panel space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Фильтры</h2>
-              <button type="button" onClick={() => setSheet(false)} aria-label="Закрыть" className="text-muted">
-                ✕
+              <button
+                type="button"
+                onClick={() => setSheet(false)}
+                aria-label="Закрыть"
+                className="rounded-lg p-1.5 text-muted transition hover:bg-white/5 hover:text-white"
+              >
+                <X size={18} aria-hidden />
               </button>
             </div>
             <label className="block space-y-1 text-sm">

@@ -135,15 +135,17 @@ export function SessionsTab(): React.JSX.Element {
 
   return (
     <div className="card space-y-3">
-      <div className="flex items-center justify-between">
+      {/* flex-wrap: на мобильном кнопка уходит на вторую строку целиком, вместо
+          того чтобы резать фразу «Завершить все, кроме текущей» пополам. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="font-semibold">Активные сессии</div>
         <button
           type="button"
-          className="btn-ghost px-3 py-1.5 text-xs"
+          className="btn-ghost shrink-0 whitespace-nowrap px-3 py-1.5 text-xs"
           disabled={revokeAll.isPending}
           onClick={() => revokeAll.mutate()}
         >
-          Завершить все кроме текущей
+          Завершить все, кроме текущей
         </button>
       </div>
       {!sessions ? (
@@ -182,8 +184,21 @@ export function SessionsTab(): React.JSX.Element {
 }
 
 /**
- * GAP-52 (ТЗ ч.5 §9): вкладка «Настройки» — email-уведомления, часовой
- * пояс. Push — disabled (нет бэка); язык RU — селект не показываем (ТЗ).
+ * На бэк уходит код IANA, человеку показываем город: «Asia/Almaty» в строке
+ * настроек читается как отладочный вывод, а смещение в скобках было бы ложью
+ * половину года из-за перехода на летнее время.
+ */
+const TIMEZONES: { value: string; label: string }[] = [
+  { value: 'Europe/Moscow', label: 'Москва' },
+  { value: 'Europe/Kiev', label: 'Киев' },
+  { value: 'Asia/Almaty', label: 'Алматы' },
+  { value: 'Asia/Tashkent', label: 'Ташкент' },
+  { value: 'Europe/Minsk', label: 'Минск' },
+]
+
+/**
+ * GAP-52 (ТЗ ч.5 §9): вкладка «Настройки» — ровно то, что перечисляет §9:
+ * email-уведомления и часовой пояс. Язык в релизе только русский, селекта нет.
  */
 export function SettingsTab({ me }: { me: MeDto }): React.JSX.Element {
   const [form, setForm] = useState<{ notifications_email?: boolean; timezone?: string }>({})
@@ -205,11 +220,8 @@ export function SettingsTab({ me }: { me: MeDto }): React.JSX.Element {
           type="checkbox"
           defaultChecked={s?.notificationsEmail ?? true}
           onChange={(e) => setForm((f) => ({ ...f, notifications_email: e.target.checked }))}
+          className="h-5 w-5 shrink-0 accent-brand"
         />
-      </label>
-      <label className="flex items-center justify-between gap-3 text-sm">
-        <span>Push-уведомления</span>
-        <input type="checkbox" defaultChecked={s?.notificationsPush ?? false} disabled className="opacity-50" />
       </label>
       <label className="block space-y-2 text-sm">
         <span className="text-muted">Часовой пояс</span>
@@ -218,13 +230,11 @@ export function SettingsTab({ me }: { me: MeDto }): React.JSX.Element {
           defaultValue={s?.timezone ?? 'Europe/Moscow'}
           onChange={(e) => setForm((f) => ({ ...f, timezone: e.target.value }))}
         >
-          {['Europe/Moscow', 'Europe/Kiev', 'Asia/Almaty', 'Asia/Tashkent', 'Europe/Minsk'].map(
-            (tz) => (
-              <option key={tz} value={tz}>
-                {tz}
-              </option>
-            ),
-          )}
+          {TIMEZONES.map((tz) => (
+            <option key={tz.value} value={tz.value}>
+              {tz.label}
+            </option>
+          ))}
         </select>
       </label>
       <button

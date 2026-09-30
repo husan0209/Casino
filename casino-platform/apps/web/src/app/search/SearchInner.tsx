@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { GameCard } from '@/components/casino/GameCard'
 import { apiGet } from '@/lib/api'
 import { fetchProviders, fetchRecentGames } from '@/lib/api/casino.api'
+import { gameCountLabel } from '@/lib/format/plural'
 import { searchHref } from '@/lib/ui/desktop-nav'
 import { useAuth } from '@/stores/auth'
 import type { GamesListDto, ProviderDto } from '@/types/casino'
@@ -164,7 +165,8 @@ export function SearchInner(): React.JSX.Element {
                 href={`/providers/${p.slug}`}
                 className="card px-3 py-2 text-sm hover:border-[#6C63FF]/40"
               >
-                {p.name} <span className="text-xs text-muted">· {p.game_count} игр</span>
+                {p.name}{' '}
+                <span className="text-xs text-muted">· {gameCountLabel(p.game_count)}</span>
               </Link>
             ))}
           </div>

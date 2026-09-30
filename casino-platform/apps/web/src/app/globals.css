@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 :root {
+  /* Нативные контролы (чекбоксы, календарь, всплывашки select) иначе рисуются
+     светлыми пятнами на тёмном фоне. */
+  color-scheme: dark;
+
   --bg: #0f0f1a;
   --surface: #1a1a2e;
   --surface2: #16213e;
@@ -29,67 +33,90 @@ body {
 
 /* Капс-лейбл секции: «ТВОЯ ИСТОРИЯ», «СВЕЖИЕ ПОСТУПЛЕНИЯ» */
 .caps-label {
-  @apply mb-1 text-[11px] font-bold uppercase tracking-[0.18em] text-muted;
+  @apply mb-1 text-[12px] font-bold uppercase tracking-[0.18em] text-muted;
 }
 
 /* Заголовок секции под капс-лейблом */
 .section-title {
-  @apply text-xl font-extrabold tracking-tight md:text-2xl;
+  @apply text-2xl font-extrabold tracking-tight md:text-[28px];
 }
 
-.text-muted {
-  color: var(--muted);
+/* Заголовок страницы: капс-лейбл + он же (ТЗ ч.5.1 §3) */
+.page-title {
+  @apply text-2xl font-black tracking-tight text-white md:text-3xl;
+}
+
+/* Подпись поля формы — тише капс-лейбла секции, но не пропадает при заполнении */
+.field-label {
+  @apply mb-1 block text-xs font-medium text-muted;
 }
 
 /* ── Поверхности ───────────────────────────────────────────────────── */
 
-.card {
-  @apply rounded-2xl border border-[#2A2A4A] bg-[#16213E] p-4;
-}
+/* Слой components, а не голое правило: иначе перебиваются утилиты на элементе —
+   `card p-0` не прижимает обложку к краям, `input pl-9` не отодвигает текст от
+   иконки, а `btn py-3 text-xs` остаётся базовым размером. Всё, что задаёт
+   отступы/размер шрифта, должно быть переопределяемым. */
+@layer components {
+  .card {
+    @apply rounded-2xl border border-[#2A2A4A] bg-[#16213E] p-4;
+  }
 
-/* Плитка-иконка метода/кошелька (касса, шторка) */
-.icon-tile {
-  @apply grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-white;
-}
+  /* Статусная метка: базовый нейтральный пилюля-стиль, цвет даёт утилита
+     (`badge text-[#00C853]`), поэтому класс лежит в components, а не снаружи. */
+  .badge {
+    @apply inline-flex shrink-0 items-center gap-1 rounded-full border border-[#2A2A4A] bg-[#1A1A2E] px-2 py-0.5 text-[11px] font-medium text-muted;
+  }
 
-/* ── Кнопки ────────────────────────────────────────────────────────── */
+  /* ── Кнопки ────────────────────────────────────────────────────────── */
 
-.btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600 active:scale-[0.98] disabled:opacity-50;
-  box-shadow: 0 8px 24px -10px rgba(108, 99, 255, 0.55);
-}
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600 active:scale-[0.98] disabled:opacity-50;
+    box-shadow: 0 8px 24px -10px rgba(108, 99, 255, 0.55);
+  }
 
-/* Деньги: зелёная CTA — только деньги и успех (ТЗ §2 пр.4) */
-.btn-money {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-[#00E676] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#00C853] active:scale-[0.98] disabled:opacity-50;
-  box-shadow: 0 8px 24px -10px rgba(0, 230, 118, 0.45);
-}
+  /* Деньги: зелёная CTA — только деньги и успех (ТЗ §2 пр.4).
+     Текст почти чёрный: белый на #00C853 читается как размытое пятно. */
+  .btn-money {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-[#00C853] px-4 py-2.5 text-sm font-extrabold text-[#03210E] transition hover:bg-[#20DA72] active:scale-[0.98] disabled:opacity-50;
+    box-shadow: 0 8px 24px -10px rgba(0, 200, 83, 0.55);
+  }
 
-.btn-ghost {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-[#2A2A4A] bg-transparent px-4 py-2.5 text-sm font-medium text-white transition hover:border-brand/50 hover:bg-white/5 active:scale-[0.98] disabled:opacity-50;
-}
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-[#2A2A4A] bg-transparent px-4 py-2.5 text-sm font-medium text-white transition hover:border-brand/50 hover:bg-white/5 active:scale-[0.98] disabled:opacity-50;
+  }
 
-/* ── Формы ─────────────────────────────────────────────────────────── */
+  /* ── Формы ─────────────────────────────────────────────────────────── */
 
-.input {
-  @apply w-full rounded-xl border border-[#2A2A4A] bg-[#1A1A2E] px-3 py-2.5 text-sm outline-none transition placeholder:text-muted/70 focus:border-brand focus:ring-2 focus:ring-brand/25;
+  .input {
+    @apply w-full rounded-xl border border-[#2A2A4A] bg-[#1A1A2E] px-3 py-2.5 text-sm outline-none transition placeholder:text-muted/70 focus:border-brand focus:ring-2 focus:ring-brand/25;
+  }
+
+  /* Плитка-иконка метода/кошелька (касса, шторка) */
+  .icon-tile {
+    @apply grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-white;
+  }
 }
 
 /* ── Шторки (sheets) ──────────────────────────────────────────────── */
 
-.sheet-backdrop {
-  @apply fixed inset-0 z-40 bg-black/60;
-  animation: sheet-fade 200ms ease-out;
-}
+/* Слой components (см. комментарий к `.card` выше): у превью игры обложка
+   уходит в край в край, и `sheet-panel p-0` обязан перебить базовый отступ. */
+@layer components {
+  .sheet-backdrop {
+    @apply fixed inset-0 z-40 bg-black/60;
+    animation: sheet-fade 200ms ease-out;
+  }
 
-.sheet-panel {
-  @apply fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-3xl border border-[#2A2A4A]/60 bg-[#1A1A2E] p-5 pb-8;
-  animation: sheet-up 260ms cubic-bezier(0.32, 0.72, 0, 1);
-}
+  .sheet-panel {
+    @apply fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-3xl border border-[#2A2A4A]/60 bg-[#1A1A2E] p-5 pb-8;
+    animation: sheet-up 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
 
-/* Ручка шторки (spinera-style) */
-.sheet-handle {
-  @apply mx-auto mb-3 h-1 w-10 rounded-full bg-white/20;
+  /* Ручка шторки (spinera-style) */
+  .sheet-handle {
+    @apply mx-auto mb-3 h-1 w-10 rounded-full bg-white/20;
+  }
 }
 
 @keyframes sheet-up {
@@ -136,7 +163,7 @@ body {
   @apply bg-[#3A3A5C]/60 text-white/80;
 }
 .currency-icon-uah {
-  @apply bg-[#00E676]/15 text-[#00E676];
+  @apply bg-[#00C853]/15 text-[#00C853];
 }
 .currency-icon-byn {
   @apply bg-[#8888AA]/15 text-[#8888AA];

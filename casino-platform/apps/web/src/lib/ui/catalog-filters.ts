@@ -90,8 +90,27 @@ export function nonEmptyCategories(categories: CatalogCategory[]): CatalogCatego
   return categories.filter((category) => category.game_count > 0)
 }
 
+/** Счётчик каталога (§4.6 «Найдено N») с русским склонением. */
+export function foundLabel(total: number): string {
+  const n = Math.abs(total) % 100
+  const last = n % 10
+  const form =
+    n > 10 && n < 20 ? 'игр' : last === 1 ? 'игра' : last > 1 && last < 5 ? 'игры' : 'игр'
+  return `Найдено ${total} ${form}`
+}
+
 /**
- * Чипы главной (§6.1 п.2): категории из API + сортировка Популярные/Новые.
+ * Сортировочные чипы (§4.6): идут после категорий, перед «Избранным».
+ * Одни и те же чипы живут в баре каталога и на главной — порядок держим в одном месте.
+ */
+export const CATALOG_SORT_CHIPS: readonly { label: string; sort: string }[] = [
+  { label: 'Новые', sort: 'new' },
+  { label: 'Популярные', sort: 'popular' },
+]
+
+/**
+ * Чипы главной (§6.1 п.2): «Все» первым (§6: порядок без «Все» — баг донора),
+ * затем непустые категории и сортировочные Новые/Популярные.
  * Пустые категории сюда не попадают (см. nonEmptyCategories).
  */
 export function buildHomeChips(categories: CatalogCategory[]): { label: string; href: string }[] {
@@ -99,9 +118,9 @@ export function buildHomeChips(categories: CatalogCategory[]): { label: string; 
     label: category.name,
     href: catalogHref({ category: category.slug }),
   }))
-  const sortChips = [
-    { label: 'Популярные', href: catalogHref({ sort: 'popular' }) },
-    { label: 'Новые', href: catalogHref({ sort: 'new' }) },
-  ]
-  return [...categoryChips, ...sortChips]
+  const sortChips = CATALOG_SORT_CHIPS.map((chip) => ({
+    label: chip.label,
+    href: catalogHref({ sort: chip.sort }),
+  }))
+  return [{ label: 'Все', href: catalogHref({}) }, ...categoryChips, ...sortChips]
 }

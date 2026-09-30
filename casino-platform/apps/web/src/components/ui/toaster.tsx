@@ -47,9 +47,9 @@ export function Toaster(): React.JSX.Element | null {
           key={t.id}
           className={`rounded-xl border px-4 py-2.5 text-sm shadow-lg ${
             t.kind === 'success'
-              ? 'bg-emerald-950/90 border-emerald-700 text-emerald-200'
+              ? 'bg-[#00C853]/15 border-[#00C853]/40 text-[#00C853]'
               : t.kind === 'error'
-                ? 'bg-red-950/90 border-red-700 text-red-200'
+                ? 'bg-[#FF3D71]/15 border-[#FF3D71]/40 text-[#FF3D71]'
                 : 'bg-[#141420] border-white/10 text-white'
           }`}
         >
