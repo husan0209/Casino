@@ -1,8 +1,8 @@
-import { Body, Controller, Headers, Post, Req, HttpCode } from '@nestjs/common'
+import { Body, Controller, Headers, Inject, Post, Req, HttpCode } from '@nestjs/common'
 import { SkipThrottle } from '@nestjs/throttler'
 
-import { type ProcessNOWPaymentsWebhookUseCase } from '../../application/use-cases/process-nowpayments-webhook.use-case'
-import { type ProcessRukassaWebhookUseCase } from '../../application/use-cases/process-rukassa-webhook.use-case'
+import { ProcessNOWPaymentsWebhookUseCase } from '../../application/use-cases/process-nowpayments-webhook.use-case'
+import { ProcessRukassaWebhookUseCase } from '../../application/use-cases/process-rukassa-webhook.use-case'
 
 /**
  * Webhook controller.
@@ -24,8 +24,8 @@ import { type ProcessRukassaWebhookUseCase } from '../../application/use-cases/p
 @SkipThrottle()
 export class PaymentsWebhookController {
   constructor(
-    private rukassa: ProcessRukassaWebhookUseCase,
-    private np: ProcessNOWPaymentsWebhookUseCase,
+    @Inject(ProcessRukassaWebhookUseCase) private rukassa: ProcessRukassaWebhookUseCase,
+    @Inject(ProcessNOWPaymentsWebhookUseCase) private np: ProcessNOWPaymentsWebhookUseCase,
   ) {}
 
   @Post('rukassa')

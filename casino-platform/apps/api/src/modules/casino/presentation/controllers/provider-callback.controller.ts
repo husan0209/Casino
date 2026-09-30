@@ -1,4 +1,14 @@
-import { Body, Controller, Headers, Logger, Param, Post, Res, HttpCode } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Headers,
+  Inject,
+  Logger,
+  Param,
+  Post,
+  Res,
+  HttpCode,
+} from '@nestjs/common'
 import { SkipThrottle } from '@nestjs/throttler'
 import { type Response } from 'express'
 
@@ -6,9 +16,9 @@ import { errorMessage } from '@/common/utils/error-message'
 
 import { prisma } from '@casino/database'
 
-import { type GameCallbackService } from '../../application/services/game-callback.service'
+import { GameCallbackService } from '../../application/services/game-callback.service'
 import { type ParsedProviderCallback } from '../../domain/provider-adapter.interface'
-import { type ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
+import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 
 /** Доменные ошибки -> коды результата GitSlotPark. */
 const CALLBACK_ERROR_CODES: Record<string, string> = {
@@ -27,8 +37,8 @@ export class ProviderCallbackController {
   private readonly logger = new Logger(ProviderCallbackController.name)
 
   constructor(
-    private adapters: ProviderAdapterFactory,
-    private cb: GameCallbackService,
+    @Inject(ProviderAdapterFactory) private adapters: ProviderAdapterFactory,
+    @Inject(GameCallbackService) private cb: GameCallbackService,
   ) {}
 
   @Post(':providerSlug/:op')
