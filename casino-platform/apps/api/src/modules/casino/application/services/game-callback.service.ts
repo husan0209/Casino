@@ -6,8 +6,16 @@ import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.re
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-import { type ParsedProviderCallback, type ProviderCallbackResponse } from '../../domain/provider-adapter.interface'
-import { GAME_PLAY_REPOSITORY, type GameRow, type GameSessionWithGame, IGamePlayRepository } from '../../domain/repositories/casino.repository'
+import {
+  type ParsedProviderCallback,
+  type ProviderCallbackResponse,
+} from '../../domain/provider-adapter.interface'
+import {
+  GAME_PLAY_REPOSITORY,
+  type GameRow,
+  type GameSessionWithGame,
+  type IGamePlayRepository,
+} from '../../domain/repositories/casino.repository'
 
 /**
  * Prisma-клиент транзакции, который отдаёт WalletFacade.runInTransaction.
@@ -27,14 +35,14 @@ interface AuthenticateResult {
 @Injectable()
 export class GameCallbackService {
   constructor(
-    private wallet: WalletFacade,
+    @Inject(WalletFacade) private wallet: WalletFacade,
     @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
   ) {}
 
   /** Стандартный seamless-ответ провайдеру (формат GitSlotPark). */
   async authenticate(sessionToken: string): Promise<AuthenticateResult> {
     const session = await this.play.findSessionByTokenWithUser(sessionToken)
-    if (!session || session.status !== 'active') {
+    if (session?.status !== 'active') {
       throw new Error('SESSION_INVALID')
     }
     if (session.user.status !== 'active') {
@@ -63,7 +71,10 @@ export class GameCallbackService {
     const session = await this.findActiveSession(cb.playerToken)
     const dup = await this.play.findTransactionByExternal(providerId, cb.transactionId)
     if (dup) {
-      return { balance: await this.getWalletBalance(session.userId, session.currency), duplicate: true }
+      return {
+        balance: await this.getWalletBalance(session.userId, session.currency),
+        duplicate: true,
+      }
     }
     // сужаем типы до замыкания (внутри колбэка narrowing не работает)
     const externalId = cb.transactionId!
@@ -73,7 +84,7 @@ export class GameCallbackService {
     // GAP-57: target — кошелёк игрока; по нему транзакция сериализуется.
     return this.wallet.runInTransaction(
       { userId: session.userId, currency: session.currency as Currency },
-      async (tx) => this.applyBet({ cb, providerId, session, externalId, betAmount, tx }),
+      (tx) => this.applyBet({ cb, providerId, session, externalId, betAmount, tx }),
     )
   }
 
@@ -138,7 +149,6 @@ export class GameCallbackService {
     return { balance: creditRes.balanceAfter, duplicate: false }
   }
 
-
   async win(cb: ParsedProviderCallback, providerId: string): Promise<ProviderCallbackResponse> {
     if (!cb.playerToken || !cb.transactionId) {
       throw new Error('INVALID_WIN_REQUEST')
@@ -149,14 +159,17 @@ export class GameCallbackService {
     }
     const dup = await this.play.findTransactionByExternal(providerId, cb.transactionId)
     if (dup) {
-      return { balance: await this.getWalletBalance(session.userId, session.currency), duplicate: true }
+      return {
+        balance: await this.getWalletBalance(session.userId, session.currency),
+        duplicate: true,
+      }
     }
     const winAmount = cb.winAmount || '0'
     // P0 #3: атомарно — credit + gameTransaction + закрытие раунда.
     // GAP-57: target — кошелёк игрока (тот же, что у bet).
     return this.wallet.runInTransaction(
       { userId: session.userId, currency: session.currency as Currency },
-      async (tx) => this.applyWin({ cb, providerId, session, winAmount, tx }),
+      (tx) => this.applyWin({ cb, providerId, session, winAmount, tx }),
     )
   }
 
@@ -220,8 +233,10 @@ export class GameCallbackService {
     return { balance: balanceAfter, duplicate: false }
   }
 
-
-  async rollback(cb: ParsedProviderCallback, providerId: string): Promise<ProviderCallbackResponse> {
+  async rollback(
+    cb: ParsedProviderCallback,
+    providerId: string,
+  ): Promise<ProviderCallbackResponse> {
     if (!cb.playerToken || !cb.rollbackTransactionId) {
       throw new Error('INVALID_ROLLBACK_REQUEST')
     }
@@ -235,11 +250,17 @@ export class GameCallbackService {
     )
     if (!originalTx) {
       // phantom rollback – return current balance
-      return { balance: await this.getWalletBalance(session.userId, session.currency), phantom: true }
+      return {
+        balance: await this.getWalletBalance(session.userId, session.currency),
+        phantom: true,
+      }
     }
     const already = await this.play.findRollbackOf(originalTx.roundId, originalTx.id)
     if (already) {
-      return { balance: await this.getWalletBalance(session.userId, session.currency), duplicate: true }
+      return {
+        balance: await this.getWalletBalance(session.userId, session.currency),
+        duplicate: true,
+      }
     }
     const rollbackAmount = originalTx.amount.toString()
     if (originalTx.type === 'rollback') {
@@ -253,8 +274,7 @@ export class GameCallbackService {
     // GAP-57: target — кошелёк игрока (компенсация трогает те же деньги).
     return this.wallet.runInTransaction(
       { userId: session.userId, currency: session.currency as Currency },
-      (tx) =>
-        this.applyRollback({ cb, providerId, session, originalTx, rollbackAmount, isBet, tx }),
+      (tx) => this.applyRollback({ cb, providerId, session, originalTx, rollbackAmount, isBet, tx }),
     )
   }
 
@@ -268,12 +288,15 @@ export class GameCallbackService {
     isBet: boolean
     /* Тип tx выводим из фасада — прямой импорт prisma в application запрещён (G1) */
     tx: WalletTx
-  }): Promise<{ balance: string; duplicate: boolean; } | { balance: string; duplicate?: never; }> {
+  }): Promise<{ balance: string; duplicate: boolean } | { balance: string; duplicate?: never }> {
     const { cb, providerId, session, originalTx, rollbackAmount, isBet, tx } = args
     // гонка двух одновременных rollback — перепроверка внутри транзакции
     const alreadyInTx = await this.play.findRollbackOf(originalTx.roundId, originalTx.id, tx)
     if (alreadyInTx) {
-      return { balance: await this.getWalletBalance(session.userId, session.currency), duplicate: true }
+      return {
+        balance: await this.getWalletBalance(session.userId, session.currency),
+        duplicate: true,
+      }
     }
     const entry = {
       userId: session.userId,
@@ -317,7 +340,7 @@ export class GameCallbackService {
   /** Активная сессия с игрой — общий вход bet/win. */
   private async findActiveSession(token: string): Promise<GameSessionWithGame> {
     const session = await this.play.findSessionByTokenWithGame(token)
-    if (!session || session.status !== 'active') {
+    if (session?.status !== 'active') {
       throw new Error('SESSION_INVALID')
     }
     return session

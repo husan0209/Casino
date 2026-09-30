@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards, UsePipes } from '@nestjs/common'
+import { Body, Controller, Inject, Post, UseGuards, UsePipes } from '@nestjs/common'
 import { z } from 'zod'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
@@ -33,8 +33,8 @@ export type RunDailyDto = z.infer<typeof RunDailySchema>
 @Controller('admin/referrals')
 export class MaintenanceAdminController {
   constructor(
-    private readonly referralCalc: ReferralCalcService,
-    private readonly audit: AuditLogService,
+    @Inject(ReferralCalcService) private readonly referralCalc: ReferralCalcService,
+    @Inject(AuditLogService) private readonly audit: AuditLogService,
   ) {}
 
   /**

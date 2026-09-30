@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module'
 
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { AppError } from '@casino/shared-utils'
@@ -32,8 +32,10 @@ export class SmtpMailer implements MailerPort {
   private readonly logger = new Logger(SmtpMailer.name)
   private transport: SmtpTransport | null = null
 
-  constructor(private config: ConfigService) {
-    // пусто: ConfigService через DI
+  constructor(@Inject(ConfigService) private config: ConfigService) {
+    // Явный @Inject обязателен: в этой сборке emitDecoratorMetadata не выдаёт
+    // design:paramtypes, поэтому инъекция «по типу» передала бы undefined
+    // (см. CONVENTIONS.md §1.4).
   }
 
   /** nodemailer — optional peer: require ленивый, чтобы dev-среда без пакета собиралась. */
@@ -66,7 +68,8 @@ export class SmtpMailer implements MailerPort {
       host,
       port: Number(this.config.get<string>('SMTP_PORT') || 587),
       secure: Number(this.config.get<string>('SMTP_PORT')) === 465,
-      ...(smtpUser !== undefined && smtpPassword !== undefined && { auth: { user: smtpUser, pass: smtpPassword } }),
+      ...(smtpUser !== undefined &&
+        smtpPassword !== undefined && { auth: { user: smtpUser, pass: smtpPassword } }),
     })
     return this.transport
   }
@@ -89,7 +92,7 @@ export class SmtpMailer implements MailerPort {
 @Injectable()
 export class DevLogMailer implements MailerPort {
   private readonly logger = new Logger(DevLogMailer.name)
-  constructor(config: ConfigService) {
+  constructor(@Inject(ConfigService) config: ConfigService) {
     void config
   }
   async send(msg: MailMessage): Promise<void> {

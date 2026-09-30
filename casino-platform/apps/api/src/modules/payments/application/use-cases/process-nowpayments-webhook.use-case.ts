@@ -8,8 +8,8 @@ import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 import type { Currency } from '@casino/shared-types'
 
 import {
-  INowPaymentsClient,
-  IPaymentRequestRepository,
+  type INowPaymentsClient,
+  type IPaymentRequestRepository,
   NOWPAYMENTS_CLIENT,
   PAYMENT_REQUEST_REPOSITORY,
 } from '../../domain/payments.ports'
@@ -29,8 +29,8 @@ export class ProcessNOWPaymentsWebhookUseCase {
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(NOWPAYMENTS_CLIENT) private readonly np: INowPaymentsClient,
-    private wallet: WalletFacade,
-    private users: UsersFacade,
+    @Inject(WalletFacade) private wallet: WalletFacade,
+    @Inject(UsersFacade) private users: UsersFacade,
   ) {}
   async execute(input: ProcessNowPaymentsWebhookInput): Promise<{ ok: boolean }> {
     const { rawHeaders, body, rawBody, ip } = input

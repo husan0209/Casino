@@ -1,9 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { IPasswordHasher, PASSWORD_HASHER } from '../../domain/auth.ports'
-import { InvalidCredentialsError, PasswordNotSetError, WeakPasswordError } from '../../domain/errors'
-import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
-import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { type IPasswordHasher, PASSWORD_HASHER } from '../../domain/auth.ports'
+import {
+  InvalidCredentialsError,
+  PasswordNotSetError,
+  WeakPasswordError,
+} from '../../domain/errors'
+import {
+  type ISessionRepository,
+  SESSION_REPOSITORY,
+} from '../../domain/repositories/session.repository'
+import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 
 /**
  * GAP-52 (ТЗ ч.5 §9 «Безопасность»): смена пароля из профиля залогиненным

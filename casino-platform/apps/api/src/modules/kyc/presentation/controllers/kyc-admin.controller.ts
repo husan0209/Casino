@@ -1,11 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
+import { Body, Controller, Get, Inject, Param, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
 
 import { AdminAuthGuard } from '@modules/admin/presentation/admin-auth.guard'
-import { type KycAdminService } from '@modules/kyc/application/use-cases/kyc-admin.service'
+import { KycAdminService } from '@modules/kyc/application/use-cases/kyc-admin.service'
 
 import { type KycProfileRow } from '@casino/shared-types'
 
@@ -14,7 +14,7 @@ import { KycDecisionReasonSchema } from '../dto/kyc.dto'
 @UseGuards(AdminAuthGuard)
 @Controller('admin/kyc')
 export class KycAdminController {
-  constructor(private svc: KycAdminService) {}
+  constructor(@Inject(KycAdminService) private svc: KycAdminService) {}
   @Get() list(
     @Query('status') status?: string,
     @Query('page') page = '1',

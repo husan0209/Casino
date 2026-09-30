@@ -1,4 +1,15 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, Req, UseGuards, UsePipes } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Inject,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common'
 import { type Request } from 'express'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -12,14 +23,16 @@ import { AdminAuthGuard } from '../admin-auth.guard'
 import { CreateAdminSchema } from '../dto/admin-admins.dto'
 
 function isSuper(req: Request): boolean {
-  return req.user?.role === 'superadmin'
+  const user = req.user
+  // 'role' in user отсекает AffiliateActor: у партнёрского токена роли нет.
+  return user !== undefined && 'role' in user && user.role === 'superadmin'
 }
 @UseGuards(AdminAuthGuard)
 @Controller('admin/admins')
 export class AdminAdminsController {
   constructor(
-    private svc: AdminUsersService,
-    private audit: AuditLogService,
+    @Inject(AdminUsersService) private svc: AdminUsersService,
+    @Inject(AuditLogService) private audit: AuditLogService,
   ) {}
   @Get() async list(): Promise<AdminUserRow[]> {
     const r = await this.svc.list(1, 100)
@@ -47,7 +60,7 @@ export class AdminAdminsController {
     return admin
   }
   @Post(':id/deactivate')
-  async deactivate(@Param('id') id: string, @Req() req: Request): Promise<{ ok: boolean; }> {
+  async deactivate(@Param('id') id: string, @Req() req: Request): Promise<{ ok: boolean }> {
     if (!isSuper(req)) {
       throw new ForbiddenException('superadmin only')
     }

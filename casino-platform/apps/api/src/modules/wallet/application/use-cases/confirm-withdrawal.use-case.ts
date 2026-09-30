@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 
 import {
-  IWalletLedger,
+  type IWalletLedger,
   WALLET_LEDGER,
   type CreditResult,
   type WithdrawalOpArgs,

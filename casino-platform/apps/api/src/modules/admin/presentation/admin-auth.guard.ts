@@ -1,6 +1,7 @@
 import {
   type CanActivate,
   type ExecutionContext,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common'
@@ -12,7 +13,7 @@ import { AdminAuthService } from '../infrastructure/admin-jwt.service'
 
 @Injectable()
 export class AdminAuthGuard implements CanActivate {
-  constructor(private auth: AdminAuthService) {}
+  constructor(@Inject(AdminAuthService) private auth: AdminAuthService) {}
   canActivate(ctx: ExecutionContext): boolean {
     const req = getHttpRequest(ctx)
     const h = req.headers.authorization ?? ''

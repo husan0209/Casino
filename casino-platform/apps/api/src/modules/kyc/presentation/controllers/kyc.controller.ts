@@ -4,6 +4,7 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
   Post,
   Query,
   UploadedFile,
@@ -19,14 +20,14 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
-import { type UploadKycDocumentUseCase } from '@modules/kyc/application/use-cases/upload-kyc-document.use-case'
+import { UploadKycDocumentUseCase } from '@modules/kyc/application/use-cases/upload-kyc-document.use-case'
 import { KycFileError } from '@modules/kyc/domain/errors'
 
 import { type DisplayCurrency } from '@casino/shared-config'
 import { type KycProfileRow } from '@casino/shared-types'
 
-import { type GetKycStatusUseCase } from '../../application/use-cases/get-kyc-status.use-case'
-import { type SubmitKycUseCase } from '../../application/use-cases/submit-kyc.use-case'
+import { GetKycStatusUseCase } from '../../application/use-cases/get-kyc-status.use-case'
+import { SubmitKycUseCase } from '../../application/use-cases/submit-kyc.use-case'
 import { KycDocumentTypeSchema, SubmitKycSchema } from '../dto/kyc.dto'
 
 // SECURITY_BASELINE.md §7.1 — KYC documents whitelist.
@@ -41,9 +42,9 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 @Controller('kyc')
 export class KycController {
   constructor(
-    private submitUc: SubmitKycUseCase,
-    private statusUc: GetKycStatusUseCase,
-    private uploadUc: UploadKycDocumentUseCase,
+    @Inject(SubmitKycUseCase) private submitUc: SubmitKycUseCase,
+    @Inject(GetKycStatusUseCase) private statusUc: GetKycStatusUseCase,
+    @Inject(UploadKycDocumentUseCase) private uploadUc: UploadKycDocumentUseCase,
   ) {}
   @Get('status')
   status(

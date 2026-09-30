@@ -3,14 +3,16 @@ import { Inject, Injectable } from '@nestjs/common'
 import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-
-import { ConfirmWithdrawalUseCase, type ConfirmWithdrawalInput } from './use-cases/confirm-withdrawal.use-case'
+import {
+  ConfirmWithdrawalUseCase,
+  type ConfirmWithdrawalInput,
+} from './use-cases/confirm-withdrawal.use-case'
 import { LockFundsUseCase, type LockFundsInput } from './use-cases/lock-funds.use-case'
 import { UnlockFundsUseCase, type UnlockFundsInput } from './use-cases/unlock-funds.use-case'
 import {
-  IWalletLedger,
-  IWalletRepository,
-  IWalletTransactionRunner,
+  type IWalletLedger,
+  type IWalletRepository,
+  type IWalletTransactionRunner,
   WALLET_LEDGER,
   WALLET_REPOSITORY,
   WALLET_TRANSACTION_RUNNER,
@@ -49,9 +51,9 @@ export class WalletFacade {
     @Inject(WALLET_LEDGER) private ledger: IWalletLedger,
     @Inject(WALLET_REPOSITORY) private repo: IWalletRepository,
     @Inject(WALLET_TRANSACTION_RUNNER) private txRunner: IWalletTransactionRunner,
-    private lockFunds: LockFundsUseCase,
-    private unlockFunds: UnlockFundsUseCase,
-    private confirmWithdrawalUc: ConfirmWithdrawalUseCase,
+    @Inject(LockFundsUseCase) private lockFunds: LockFundsUseCase,
+    @Inject(UnlockFundsUseCase) private unlockFunds: UnlockFundsUseCase,
+    @Inject(ConfirmWithdrawalUseCase) private confirmWithdrawalUc: ConfirmWithdrawalUseCase,
   ) {}
   /**
    * P0 #3: атомарный денежный сценарий. Колбэк получает Prisma tx — передавайте
@@ -61,10 +63,7 @@ export class WalletFacade {
    * GAP-57: `target` — кошелёк, который мутирует fn. По нему транзакция берёт
    * advisory-лок (очередь вместо abort-волн при конкурентных ставках).
    */
-  runInTransaction<T>(
-    target: WalletLockTarget,
-    fn: (tx: Prisma.TransactionClient) => Promise<T>,
-  ): Promise<T> {
+  runInTransaction<T>(target: WalletLockTarget, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
     return this.txRunner.runInTransaction(target, fn)
   }
   credit(input: CreditInput): Promise<CreditResult> {

@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { type GameCategory, type GameType, type GameVolatility, type Prisma } from '@prisma/client'
 
-import { GAME_CATALOG_REPOSITORY, IGameCatalogRepository } from '../../domain/repositories/casino.repository'
-
-
+import {
+  GAME_CATALOG_REPOSITORY,
+  type IGameCatalogRepository,
+} from '../../domain/repositories/casino.repository'
 
 interface CatalogQuery {
   page?: string
@@ -18,13 +19,47 @@ interface CatalogQuery {
   sort?: string
 }
 
+/**
+ * Карточка каталога в ответе витрины и постраничная мета-обвязка.
+ * Именованные типы вместо развёрнутого литерала: сигнатура use-case не должна
+ * расти на 25 строк из-за формы ответа (max-lines-per-function).
+ */
+export interface CatalogGameItem {
+  id: string
+  name: string
+  type: GameType
+  provider: { name: string; slug: string }
+  category: GameCategory
+  slug: string
+  nameRu: string | null
+  thumbnailUrl: string | null
+  isFeatured: boolean
+  isNew: boolean
+  isPopular: boolean
+  hasDemo: boolean
+  rtp: Prisma.Decimal | null
+  volatility: GameVolatility | null
+}
+
+export interface CatalogPageMeta {
+  page: number
+  perPage: number
+  total: number
+  totalPages: number
+  hasNext: boolean
+  hasPrev: boolean
+}
+
+export interface CatalogPage {
+  items: CatalogGameItem[]
+  meta: CatalogPageMeta
+}
+
 @Injectable()
 export class ListGamesUseCase {
-  constructor(
-    @Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository,
-  ) {}
+  constructor(@Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository) {}
 
-  async execute(q: CatalogQuery): Promise<{ items: { id: string; name: string; type: GameType; provider: { name: string; slug: string; }; category: GameCategory; slug: string; nameRu: string | null; thumbnailUrl: string | null; isFeatured: boolean; isNew: boolean; isPopular: boolean; hasDemo: boolean; rtp: Prisma.Decimal | null; volatility: GameVolatility | null; }[]; meta: { page: number; perPage: number; total: number; totalPages: number; hasNext: boolean; hasPrev: boolean; }; }> {
+  async execute(q: CatalogQuery): Promise<CatalogPage> {
     const page = parseInt(q.page ?? '') || 1
     const perPage = Math.min(parseInt(q.per_page ?? '') || 24, 100)
     const where = this.buildWhere(q)
