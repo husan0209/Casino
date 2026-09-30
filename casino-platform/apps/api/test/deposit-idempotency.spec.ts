@@ -30,7 +30,12 @@ function fakeRepo(prs: Array<Record<string, any>>) {
 const fakeWallet = (calls: CreditCall[]) => ({
   credit: async (input: CreditCall) => {
     calls.push(input)
-    return { balanceBefore: '0', balanceAfter: input.amount, ledgerEntryId: 'le_1', duplicate: false }
+    return {
+      balanceBefore: '0',
+      balanceAfter: input.amount,
+      ledgerEntryId: 'le_1',
+      duplicate: false,
+    }
   },
 })
 
@@ -40,8 +45,22 @@ describe('GAP-28: идемпотентность депозита по external_
   it('NOWPayments: ключ проводки от payment_id, а не от id платёжки', async () => {
     // Две РАЗНЫЕ платёжки с одним внешним платежом (рассинхрон маппинга).
     const prs = [
-      { id: 'pr_1', externalId: '42', userId: 'u1', status: 'pending', currency: 'USDT', amount: { toString: () => '10' } },
-      { id: 'pr_2', externalId: '42', userId: 'u1', status: 'pending', currency: 'USDT', amount: { toString: () => '10' } },
+      {
+        id: 'pr_1',
+        externalId: '42',
+        userId: 'u1',
+        status: 'pending',
+        currency: 'USDT',
+        amount: { toString: () => '10' },
+      },
+      {
+        id: 'pr_2',
+        externalId: '42',
+        userId: 'u1',
+        status: 'pending',
+        currency: 'USDT',
+        amount: { toString: () => '10' },
+      },
     ]
     const calls: CreditCall[] = []
     const uc = new ProcessNOWPaymentsWebhookUseCase(
@@ -65,7 +84,14 @@ describe('GAP-28: идемпотентность депозита по external_
 
   it('NOWPayments: повторная доставка на ту же платёжку не доходит до credit (pr.completed)', async () => {
     const prs = [
-      { id: 'pr_1', externalId: 'pay_7', userId: 'u1', status: 'completed', currency: 'USDT', amount: { toString: () => '10' } },
+      {
+        id: 'pr_1',
+        externalId: 'pay_7',
+        userId: 'u1',
+        status: 'completed',
+        currency: 'USDT',
+        amount: { toString: () => '10' },
+      },
     ]
     const calls: CreditCall[] = []
     const uc = new ProcessNOWPaymentsWebhookUseCase(
@@ -85,8 +111,24 @@ describe('GAP-28: идемпотентность депозита по external_
 
   it('Rukassa: ключ проводки от order_id, а не от id платёжки', async () => {
     const prs = [
-      { id: 'pr_a', externalId: 'ord-100', userId: 'u2', status: 'pending', currency: 'RUB', amount: { toString: () => '500' }, method: 'card' },
-      { id: 'pr_b', externalId: 'ord-100', userId: 'u2', status: 'pending', currency: 'RUB', amount: { toString: () => '500' }, method: 'card' },
+      {
+        id: 'pr_a',
+        externalId: 'ord-100',
+        userId: 'u2',
+        status: 'pending',
+        currency: 'RUB',
+        amount: { toString: () => '500' },
+        method: 'card',
+      },
+      {
+        id: 'pr_b',
+        externalId: 'ord-100',
+        userId: 'u2',
+        status: 'pending',
+        currency: 'RUB',
+        amount: { toString: () => '500' },
+        method: 'card',
+      },
     ]
     const calls: CreditCall[] = []
     const uc = new ProcessRukassaWebhookUseCase(

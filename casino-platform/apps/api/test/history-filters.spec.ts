@@ -25,9 +25,9 @@ function harness(): { useCase: FavoritesUseCase; spy: RepoSpy } {
   const spy: RepoSpy = {
     findRoundsWithGame: vi.fn().mockResolvedValue([]),
     countRounds: vi.fn().mockResolvedValue(0),
-    roundStats: vi.fn().mockResolvedValue([
-      { currency: 'RUB', rounds: 7, turnover: null, wins: null },
-    ]),
+    roundStats: vi
+      .fn()
+      .mockResolvedValue([{ currency: 'RUB', rounds: 7, turnover: null, wins: null }]),
   }
   const favorites = {
     upsert: vi.fn(),

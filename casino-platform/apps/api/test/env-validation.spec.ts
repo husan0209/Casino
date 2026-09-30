@@ -88,9 +88,7 @@ describe('Environment Validation', () => {
           NOWPAYMENTS_IPN_SECRET: 'real_production_secret_1234567890abcdef',
         }
 
-        expect(() => validateEnv(env)).toThrow(
-          /appears to be a placeholder/,
-        )
+        expect(() => validateEnv(env)).toThrow(/appears to be a placeholder/)
       }
     })
 

@@ -35,7 +35,10 @@ describe('GAP-55 период (§11/§12)', () => {
       from: '2026-09-01',
       to: '2026-09-07',
     })
-    expect(readDateRange(new URLSearchParams('from=вчера&to=07.09.2026'))).toEqual({ from: '', to: '' })
+    expect(readDateRange(new URLSearchParams('from=вчера&to=07.09.2026'))).toEqual({
+      from: '',
+      to: '',
+    })
   })
 })
 
@@ -118,7 +121,9 @@ describe('GAP-55 фильтры ставок (§12)', () => {
       '/history?provider=demo',
     )
     expect(betHref({ gameId: '', provider: '', currency: '', from: '', to: '' })).toBe('/history')
-    expect(hasActiveBetParts({ gameId: '', provider: '', currency: '', from: '', to: '' })).toBe(false)
+    expect(hasActiveBetParts({ gameId: '', provider: '', currency: '', from: '', to: '' })).toBe(
+      false,
+    )
   })
 })
 

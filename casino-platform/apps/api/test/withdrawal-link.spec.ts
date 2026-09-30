@@ -26,7 +26,9 @@ interface Harness {
 
 function harness(): Harness {
   const lock = vi.fn().mockResolvedValue({ duplicate: false })
-  const create = vi.fn().mockImplementation((data: { id: string }) => Promise.resolve({ id: data.id }))
+  const create = vi
+    .fn()
+    .mockImplementation((data: { id: string }) => Promise.resolve({ id: data.id }))
   const assertCanWithdraw = vi.fn().mockResolvedValue(undefined)
   const repo = { create } as never
   const wallet = { lock } as never

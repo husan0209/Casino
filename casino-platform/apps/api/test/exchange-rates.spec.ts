@@ -91,7 +91,9 @@ describe('ExchangeRatesService (GAP-34)', () => {
   it('некорректный кеш (<=0) → идём в БД', async () => {
     const fakeReader = {
       getCachedRates: vi.fn().mockResolvedValue({ USDT_TRC20: '0' }),
-      getLatestRate: vi.fn().mockResolvedValue({ rate: '94.4', fetchedAt: new Date(), source: 'db' }),
+      getLatestRate: vi
+        .fn()
+        .mockResolvedValue({ rate: '94.4', fetchedAt: new Date(), source: 'db' }),
     }
     const svc = new ExchangeRatesService(fakeReader as never)
     const res = await svc.getRubRate('USDT_TRC20')
@@ -115,7 +117,10 @@ describe('критерий 3: курс меняет limit_remaining в отве�
         ? vi.fn().mockResolvedValue({ rate, fetchedAt: new Date(), source: 'test' })
         : vi.fn().mockResolvedValue(null),
     }
-    const facade = new GeoFacade(new GetGeoConfigUseCase({} as never), new ExchangeRatesService(reader as never))
+    const facade = new GeoFacade(
+      new GetGeoConfigUseCase({} as never),
+      new ExchangeRatesService(reader as never),
+    )
     return new GetKycStatusUseCase(makeKycRepo(), facade, { get: () => '5000' } as never)
   }
 

@@ -1,7 +1,7 @@
 import { createHash, createHmac } from 'node:crypto'
 
 import { ConfigService } from '@nestjs/config'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 /**
  * GAP-42: верификация OAuth-подписей не покрыта ни одним тестом.
@@ -42,16 +42,18 @@ import {
 // -------------------- Telegram helpers --------------------
 
 /** Формирует валидный data-check-string + hex-HMAC для TelegramLoginWidget. */
-function buildTelegramPayload(overrides: {
-  id?: number
-  auth_date?: number
-  first_name?: string
-  username?: string
-  last_name?: string
-  photo_url?: string
-  /** если задано — подделываем финальный hash (полезно для негативных кейсов) */
-  tamperHash?: (expected: string) => string
-} = {}) {
+function buildTelegramPayload(
+  overrides: {
+    id?: number
+    auth_date?: number
+    first_name?: string
+    username?: string
+    last_name?: string
+    photo_url?: string
+    /** если задано — подделываем финальный hash (полезно для негативных кейсов) */
+    tamperHash?: (expected: string) => string
+  } = {},
+) {
   const id = overrides.id ?? 12345
   const authDate = overrides.auth_date ?? Math.floor(Date.now() / 1000)
   const fields: Record<string, string> = {
@@ -59,17 +61,17 @@ function buildTelegramPayload(overrides: {
     auth_date: String(authDate),
   }
   if (overrides.first_name) {
-fields.first_name = overrides.first_name
-}
+    fields.first_name = overrides.first_name
+  }
   if (overrides.last_name) {
-fields.last_name = overrides.last_name
-}
+    fields.last_name = overrides.last_name
+  }
   if (overrides.username) {
-fields.username = overrides.username
-}
+    fields.username = overrides.username
+  }
   if (overrides.photo_url) {
-fields.photo_url = overrides.photo_url
-}
+    fields.photo_url = overrides.photo_url
+  }
 
   const dataCheckString = Object.keys(fields)
     .sort()
@@ -142,7 +144,9 @@ describe('GAP-42 TelegramLoginUseCase.verify', () => {
       tamperHash: (expected) => {
         // меняем ровно один символ в середине, оставляя длину
         const mid = Math.floor(expected.length / 2)
-        return expected.slice(0, mid) + (expected[mid] === 'a' ? 'b' : 'a') + expected.slice(mid + 1)
+        return (
+          expected.slice(0, mid) + (expected[mid] === 'a' ? 'b' : 'a') + expected.slice(mid + 1)
+        )
       },
     })
 
@@ -233,19 +237,14 @@ describe('GAP-42 GoogleOAuthUseCase', () => {
     expect(state).toMatch(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/)
     expect(url).toContain('accounts.google.com')
     expect(url).toContain(`state=${encodeURIComponent(state)}`)
-    expect(url).toContain(
-      'client_id=google-client-id.apps.googleusercontent.com',
-    )
+    expect(url).toContain('client_id=google-client-id.apps.googleusercontent.com')
   })
 
   it('buildAuthUrl → verifyState round-trip: валидный state проходит (execute падает на credentials/fetch, но НЕ на state)', async () => {
     // credentials() оба ключа проверит ОК, verifyState примет state ДО fetch.
     // fetch замокан в failed — execute бросит OAuthExchangeError (а не OAuthStateError).
     // Это подтверждает, что verifyState пропустил валидный state.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockRejectedValue(new Error('network unreachable in test')),
-    )
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network unreachable in test')))
 
     const { useCase } = makeGoogleUseCase()
     const { state } = useCase.buildAuthUrl()
@@ -287,9 +286,9 @@ describe('GAP-42 GoogleOAuthUseCase', () => {
     const { useCase } = makeGoogleUseCase()
 
     // Генерируем state напрямую с timestamp 10 минут + 1 секунда в прошлом.
-    const body = Buffer.from(
-      JSON.stringify({ t: Date.now() - (10 * 60 * 1000 + 1000) }),
-    ).toString('base64url')
+    const body = Buffer.from(JSON.stringify({ t: Date.now() - (10 * 60 * 1000 + 1000) })).toString(
+      'base64url',
+    )
     const sig = createHmac('sha256', 'test-jwt-secret-for-oauth-state')
       .update(body)
       .digest('base64url')

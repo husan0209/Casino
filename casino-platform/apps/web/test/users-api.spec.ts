@@ -18,8 +18,14 @@ vi.mock('axios', () => ({
   },
 }))
 
-const { listSessions, revokeSession, revokeAllSessions, changePassword, updateSettings, uploadAvatar } =
-  await import('../src/lib/api/users.api')
+const {
+  listSessions,
+  revokeSession,
+  revokeAllSessions,
+  changePassword,
+  updateSettings,
+  uploadAvatar,
+} = await import('../src/lib/api/users.api')
 
 function ok<T>(data: T): { data: { data: T } } {
   return { data: { data } }
@@ -35,7 +41,15 @@ beforeEach(() => {
 describe('GAP-52 users.api — контракты путей/методов', () => {
   it('listSessions → GET /users/me/sessions', async () => {
     mockedApi.get.mockResolvedValueOnce(
-      ok([{ id: 's1', isCurrent: true, createdAt: '2026-01-01', ipAddress: '1.2.3.4', userAgent: 'iPhone' }]),
+      ok([
+        {
+          id: 's1',
+          isCurrent: true,
+          createdAt: '2026-01-01',
+          ipAddress: '1.2.3.4',
+          userAgent: 'iPhone',
+        },
+      ]),
     )
     const res = await listSessions()
     expect(mockedApi.get).toHaveBeenCalledWith('/users/me/sessions', { params: undefined })

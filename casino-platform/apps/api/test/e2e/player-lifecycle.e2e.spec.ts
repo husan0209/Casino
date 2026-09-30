@@ -91,7 +91,6 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     // { success, data } — разворачиваем. NB: provider-callback использует @Res()
     // и идёт мимо интерсептора (у него success/balance на верхнем уровне — не трогаем).
     if (
-      json &&
       typeof json === 'object' &&
       'success' in json &&
       'data' in json &&
@@ -263,7 +262,7 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     })
     expect(res.status).toBe(200)
     const bal = await api('GET', '/wallet/balances', { token: playerToken })
-    const rub = (bal.json as Array<{ currency: string; balance: string; locked: string }>)?.find(
+    const rub = (bal.json as Array<{ currency: string; balance: string; locked: string }>).find(
       (b) => b.currency === 'RUB',
     )
     expect(rub?.balance).toBe('1000')
@@ -277,7 +276,7 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     })
     expect(res.status).toBe(200)
     const bal = await api('GET', '/wallet/balances', { token: playerToken })
-    const rub = (bal.json as Array<{ currency: string; balance: string }>)?.find(
+    const rub = (bal.json as Array<{ currency: string; balance: string }>).find(
       (b) => b.currency === 'RUB',
     )
     expect(rub?.balance).toBe('1000')
@@ -331,7 +330,7 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     expect(res.status).toBe(201)
     withdrawalPrId = res.json?.['payment_request_id'] as string
     const bal = await api('GET', '/wallet/balances', { token: playerToken })
-    const rub = (bal.json as Array<{ currency: string; balance: string; locked: string }>)?.find(
+    const rub = (bal.json as Array<{ currency: string; balance: string; locked: string }>).find(
       (b) => b.currency === 'RUB',
     )
     expect(rub?.balance).toBe('1150')
@@ -349,7 +348,7 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     })
     expect(approve.status).toBe(201)
     const bal = await api('GET', '/wallet/balances', { token: playerToken })
-    const rub = (bal.json as Array<{ currency: string; balance: string; locked: string }>)?.find(
+    const rub = (bal.json as Array<{ currency: string; balance: string; locked: string }>).find(
       (b) => b.currency === 'RUB',
     )
     expect(rub?.balance).toBe('650')
@@ -361,12 +360,6 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
       select: { type: true },
     })
     const types = ledger.map((l) => l.type).sort()
-    expect(types).toEqual([
-      'BET',
-      'DEPOSIT',
-      'WIN',
-      'WITHDRAWAL_CONFIRM',
-      'WITHDRAWAL_LOCK',
-    ])
+    expect(types).toEqual(['BET', 'DEPOSIT', 'WIN', 'WITHDRAWAL_CONFIRM', 'WITHDRAWAL_LOCK'])
   })
 })

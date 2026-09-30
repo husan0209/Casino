@@ -20,8 +20,15 @@ import {
 
 describe('GAP-55 parseFilters (§7 фильтры в URL)', () => {
   it('читает category/provider/sort/q', () => {
-    const parsed = parseFilters(new URLSearchParams('category=slots&provider=pragmatic&sort=popular&q=sweet'))
-    expect(parsed).toEqual({ category: 'slots', provider: 'pragmatic', sort: 'popular', q: 'sweet' })
+    const parsed = parseFilters(
+      new URLSearchParams('category=slots&provider=pragmatic&sort=popular&q=sweet'),
+    )
+    expect(parsed).toEqual({
+      category: 'slots',
+      provider: 'pragmatic',
+      sort: 'popular',
+      q: 'sweet',
+    })
   })
 
   it('без параметров — пустые фильтры (не undefined)', () => {
@@ -67,7 +74,9 @@ describe('GAP-55 сборка URL', () => {
   })
 
   it('кириллица и пробелы кодируются канонично (%20, а не +)', () => {
-    expect(catalogHref({ q: 'книга мёртвых' })).toBe(`/casino?q=${encodeURIComponent('книга мёртвых')}`)
+    expect(catalogHref({ q: 'книга мёртвых' })).toBe(
+      `/casino?q=${encodeURIComponent('книга мёртвых')}`,
+    )
     expect(catalogHref({ q: 'book of dead' })).toBe('/casino?q=book%20of%20dead')
   })
 

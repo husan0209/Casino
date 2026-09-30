@@ -1,4 +1,3 @@
-
 import { GameCallbackService } from '../src/modules/casino/application/services/game-callback.service'
 
 import type { ParsedProviderCallback } from '../src/modules/casino/domain/provider-adapter.interface'
@@ -8,7 +7,11 @@ import type {
   GameTransactionRow,
   IGamePlayRepository,
 } from '../src/modules/casino/domain/repositories/casino.repository'
-import type { CreditInput, CreditResult, WalletLockTarget } from '../src/modules/wallet/domain/repositories/wallet.repository'
+import type {
+  CreditInput,
+  CreditResult,
+  WalletLockTarget,
+} from '../src/modules/wallet/domain/repositories/wallet.repository'
 import type { WalletFacade } from '../src/modules/wallet/facade/wallet.facade'
 import type { Prisma } from '@prisma/client'
 
@@ -45,7 +48,10 @@ class FakePlay implements IGamePlayRepository {
   txSeen: Record<string, unknown[]> = {}
 
   private record(method: string, tx: Prisma.TransactionClient | undefined) {
-    (this.txSeen[method] ??= []).push(tx)
+    // `(this.txSeen[m] ??= []).push(tx)` короче, но при semi:false требует `;(`,
+    // а no-extra-semi считает такой разделитель лишним — prettier и eslint спорят
+    const seen = (this.txSeen[method] ??= [])
+    seen.push(tx)
   }
 
   async findSessionByTokenWithUser(token: string) {
@@ -99,11 +105,7 @@ class FakePlay implements IGamePlayRepository {
     this.record('findTransactionByExternal', tx)
     return this.transactions.get(`${providerId}:${externalTransactionId}`) ?? null
   }
-  async findRollbackOf(
-    roundId: string,
-    rollbackOfId: string,
-    tx?: Prisma.TransactionClient,
-  ) {
+  async findRollbackOf(roundId: string, rollbackOfId: string, tx?: Prisma.TransactionClient) {
     this.record('findRollbackOf', tx)
     return this.rollbacks.find((r) => r.roundId === roundId) ?? null
   }
@@ -115,8 +117,8 @@ class FakePlay implements IGamePlayRepository {
     const row = { id: 'gt-1', ...data } as unknown as GameTransactionRow
     this.transactions.set(`${data.providerId}:${data.externalTransactionId}`, row)
     if (data.type === 'rollback') {
-this.rollbacks.push(row)
-}
+      this.rollbacks.push(row)
+    }
     return row
   }
 }

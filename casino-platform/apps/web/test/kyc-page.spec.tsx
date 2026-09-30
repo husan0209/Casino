@@ -30,8 +30,7 @@ vi.mock('@/components/ui/toaster', () => ({
 const userMock = vi.hoisted(() => ({ id: 'u1', email: 't@t.t', role: 'user' }))
 
 vi.mock('@/stores/auth', () => ({
-  useAuth: (sel?: (s: unknown) => unknown) =>
-    sel ? sel({ user: userMock }) : { user: userMock },
+  useAuth: (sel?: (s: unknown) => unknown) => (sel ? sel({ user: userMock }) : { user: userMock }),
   useAuthStore: { getState: () => ({ user: userMock }) },
 }))
 
@@ -63,18 +62,22 @@ describe('GAP-36/44: страница KYC — лимит из API', () => {
     renderPage()
     // остаток — как отдал API (limit_remaining + limit_currency), без пересчёта;
     // «…» = query ещё pending — ждём замены на фактическое значение из API
-    const deepest = (marker: string) => (_: unknown, el: Element | null): boolean => {
-      if (!el || !el.textContent) {
-        return false
+    const deepest =
+      (marker: string) =>
+      (_: unknown, el: Element | null): boolean => {
+        if (!el?.textContent) {
+          return false
+        }
+        const own = el.textContent.includes(marker) && el.textContent.includes('5 000')
+        if (!own) {
+          return false
+        }
+        // самый глубокий узел: дети не содержат marker (иначе матчились бы предки)
+        return !Array.from(el.children).some((ch) => ch.textContent.includes(marker))
       }
-      const own = el.textContent.includes(marker) && el.textContent.includes('5 000')
-      if (!own) {
-        return false
-      }
-      // самый глубокий узел: дети не содержат marker (иначе матчились бы предки)
-      return !Array.from(el.children).some((ch) => ch.textContent?.includes(marker))
-    }
-    const rest = await screen.findByText(deepest('Остаток лимита без KYC'), undefined, { timeout: 3000 })
+    const rest = await screen.findByText(deepest('Остаток лимита без KYC'), undefined, {
+      timeout: 3000,
+    })
     expect(rest.textContent).toContain('5 000')
   })
 

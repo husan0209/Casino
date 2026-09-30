@@ -21,7 +21,7 @@ const transactionMock = vi.mocked(prisma.$transaction)
 
 const P2034 = Object.assign(
   new Error(
-    "Invalid `tx.walletAccount.updateMany()` invocation in D:\\projects\\Casino\\casino-platform\\apps\\api\\src: Transaction failed due to a write conflict or a deadlock (P2034)",
+    'Invalid `tx.walletAccount.updateMany()` invocation in D:\\projects\\Casino\\casino-platform\\apps\\api\\src: Transaction failed due to a write conflict or a deadlock (P2034)',
   ),
   { code: 'P2034' },
 )

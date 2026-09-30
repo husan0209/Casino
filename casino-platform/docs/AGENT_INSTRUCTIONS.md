@@ -177,7 +177,7 @@ Frontend:   Next.js 14 App Router + Tailwind + TanStack Query + Zustand + React 
 -   pnpm dev             run api + web + admin in parallel
 -   pnpm build           build all
 -   pnpm typecheck       tsc --noEmit across workspace
--   pnpm lint            per-project (api: eslint src, web/admin: next lint), fails on warnings
+-   pnpm lint            per-project (api: eslint src test, web/admin: next lint --dir src --dir test), fails on warnings
 -   pnpm test            vitest (unit tests)
 -   pnpm db:generate     prisma generate
 -   pnpm db:migrate      prisma migrate dev
@@ -196,6 +196,7 @@ Frontend:   Next.js 14 App Router + Tailwind + TanStack Query + Zustand + React 
 # casino-platform — Claude / Cline Instructions
 
 ## Контекст проекта
+
 Online casino платформа для рынка СНГ. MVP на русском языке.
 Монорепо: NestJS backend + Next.js frontend (web + admin).
 Архитектура: modular monolith, 4-layer modules (domain/application/infrastructure/presentation).
@@ -230,88 +231,95 @@ Online casino платформа для рынка СНГ. MVP на русско
 ## Типичные задачи
 
 ### Создать новый модуль
+
 → открой `docs/MODULE_TEMPLATE.md`, следуй 10 шагам.
 → После создания обнови `docs/MODULE_BOUNDARIES.md` (добавь модуль в карту).
 
 ### Добавить новый API endpoint
+
 → Найти существующий controller в `apps/api/src/modules/<name>/presentation/controllers/`
 → Если бизнес-логика > 30 строк → создать/дополнить `application/use-cases/<action>.use-case.ts`
 → Никогда не добавлять логику прямо в controller
 → Использовать `successResponse()` в controller, exceptions — `throw new XxxError()`
 
 ### Добавить новую задачу в очередь (BullMQ)
+
 → Добавить тип job в `apps/api/src/queues/queue.types.ts`
 → Продюсер — через Queue-адаптер в `apps/api/src/queues/infrastructure/`
 → Консьюмер — worker в `apps/api/src/queues/application/`
 → Документировать в `MODULE_BOUNDARIES.md` как cross-module связь
 
 ### Добавить новую таблицу
+
 → Schema: `packages/database/prisma/schema.prisma` (единый файл)
 → Создать миграцию: `pnpm db:migrate --name <name>`
 → Обновить seed если данные фиксированные
 
 ### Добавить новый платёжный провайдер
+
 → Создать адаптер в `modules/payments/infrastructure/adapters/`
 → Реализовать `PaymentProvider` interface из `modules/payments/domain/`
 → Зарегистрировать в `PaymentsModule` через DI
 → Подробнее: `docs/PAYMENT_OVERVIEW.md`
 
 ### Добавить нового game-провайдера
+
 → Создать `ProviderAdapter` в `modules/game-sessions/infrastructure/adapters/`
 → Подробнее: `docs/PROVIDER_INTEGRATION_STRATEGY.md`
 
 ## Команды для разработки
 
-| Команда                  | Что делает                                 |
-|--------------------------|--------------------------------------------|
-| `pnpm install`           | Установить зависимости                     |
-| `pnpm dev`               | Запустить api + web + admin локально       |
-| `pnpm build`             | Собрать всё                                |
-| `pnpm typecheck`         | Проверить TypeScript по всему монорепо     |
-| `pnpm lint`              | ESLint по всем проектам; warnings = падение  |
-| `pnpm test`              | Vitest (unit тесты)                        |
-| `pnpm test:e2e`          | E2E тесты (требует поднятую БД)            |
-| `pnpm db:generate`       | Prisma generate                            |
-| `pnpm db:migrate`        | Создать миграцию (dev)                     |
-| `pnpm db:deploy`         | Применить миграции (prod)                  |
-| `pnpm db:studio`         | GUI для БД                                 |
-| `pnpm --filter @casino/api <cmd>` | Запустить команду в одном пакете |
+| Команда                           | Что делает                                  |
+| --------------------------------- | ------------------------------------------- |
+| `pnpm install`                    | Установить зависимости                      |
+| `pnpm dev`                        | Запустить api + web + admin локально        |
+| `pnpm build`                      | Собрать всё                                 |
+| `pnpm typecheck`                  | Проверить TypeScript по всему монорепо      |
+| `pnpm lint`                       | ESLint по всем проектам; warnings = падение |
+| `pnpm test`                       | Vitest (unit тесты)                         |
+| `pnpm test:e2e`                   | E2E тесты (требует поднятую БД)             |
+| `pnpm db:generate`                | Prisma generate                             |
+| `pnpm db:migrate`                 | Создать миграцию (dev)                      |
+| `pnpm db:deploy`                  | Применить миграции (prod)                   |
+| `pnpm db:studio`                  | GUI для БД                                  |
+| `pnpm --filter @casino/api <cmd>` | Запустить команду в одном пакете            |
 
 ## Когда СПРОСИТЬ пользователя
 
 Прежде чем действовать, если:
--   Не описано в TZ архитектурное решение (например, новая подсистема)
--   Выбор между двумя валидными подходами с разными trade-off (например, sync vs async)
--   Изменение схемы БД, не описанное в `tz-part-*.md`
--   Бизнес-правило для edge case, не покрытого в TZ
+
+- Не описано в TZ архитектурное решение (например, новая подсистема)
+- Выбор между двумя валидными подходами с разными trade-off (например, sync vs async)
+- Изменение схемы БД, не описанное в `tz-part-*.md`
+- Бизнес-правило для edge case, не покрытого в TZ
 
 → Остановись и спроси пользователя. Не угадывай.
 
 ## Что НЕ делать
 
--   Не пиши `number` для денег — пиши `string`
--   Не делай `prisma.x.update()` напрямую вне `infrastructure/repositories/`
--   Не импортируй Facade одного модуля в Domain слой другого
--   Не возвращай объект напрямую из controller — используй `successResponse()`
--   Не используй `console.log` для production-логирования — используй Pino
--   Не создавай новый enum/type — сначала проверь `packages/shared-types`
--   Не игнорируй Promise (`this.sendEmail()` без `await`)
--   Не делай HTTP-запрос из контроллера к другому контроллеру
+- Не пиши `number` для денег — пиши `string`
+- Не делай `prisma.x.update()` напрямую вне `infrastructure/repositories/`
+- Не импортируй Facade одного модуля в Domain слой другого
+- Не возвращай объект напрямую из controller — используй `successResponse()`
+- Не используй `console.log` для production-логирования — используй Pino
+- Не создавай новый enum/type — сначала проверь `packages/shared-types`
+- Не игнорируй Promise (`this.sendEmail()` без `await`)
+- Не делай HTTP-запрос из контроллера к другому контроллеру
 ```
 
 ---
 
 ## 3. Когда какой формат использовать
 
-| IDE / Agent                  | Файл в корне проекта     | Какую секцию копировать      |
-|------------------------------|--------------------------|-----------------------------|
-| Cursor                       | `.cursorrules`           | § 1 (`.cursorrules section`) |
-| Windsurf                     | `.windsurfrules`         | § 1 (`.cursorrules section`) |
-| Cline (VS Code extension)    | `.clinerules`            | § 2 (`CLAUDE.md section`)   |
-| Claude Code (CLI)            | `CLAUDE.md`              | § 2 (`CLAUDE.md section`)   |
-| Aider                        | `.aider.conf.yml` + `CONVENTIONS.md` | § 1 + ссылка на CONVENTIONS |
-| Continue.dev                 | `.continue/config.json`  | Вручную из § 1 или § 2      |
-| Другое AI IDE                | Свой формат              | Адаптировать из § 1 или § 2 |
+| IDE / Agent               | Файл в корне проекта                 | Какую секцию копировать      |
+| ------------------------- | ------------------------------------ | ---------------------------- |
+| Cursor                    | `.cursorrules`                       | § 1 (`.cursorrules section`) |
+| Windsurf                  | `.windsurfrules`                     | § 1 (`.cursorrules section`) |
+| Cline (VS Code extension) | `.clinerules`                        | § 2 (`CLAUDE.md section`)    |
+| Claude Code (CLI)         | `CLAUDE.md`                          | § 2 (`CLAUDE.md section`)    |
+| Aider                     | `.aider.conf.yml` + `CONVENTIONS.md` | § 1 + ссылка на CONVENTIONS  |
+| Continue.dev              | `.continue/config.json`              | Вручную из § 1 или § 2       |
+| Другое AI IDE             | Свой формат                          | Адаптировать из § 1 или § 2  |
 
 ---
 
@@ -319,14 +327,14 @@ Online casino платформа для рынка СНГ. MVP на русско
 
 Это короткие правила, не документация. Если нужны подробности — читай:
 
--   Обоснование выбора стека → [STACK.md](./STACK.md)
--   Полный API контракт → [API_CONVENTIONS.md](./API_CONVENTIONS.md)
--   Безопасность → [SECURITY_BASELINE.md](./SECURITY_BASELINE.md)
--   Деньги / ошибки / idempotency детально → [AI_DEVELOPMENT_RULES.md](./AI_DEVELOPMENT_RULES.md)
--   Карта модулей → [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md)
--   Шаблон нового модуля → [MODULE_TEMPLATE.md](./MODULE_TEMPLATE.md)
--   Конвенции кода → [CONVENTIONS.md](./CONVENTIONS.md)
--   High-level обзор → [README.md](../README.md)
+- Обоснование выбора стека → [STACK.md](./STACK.md)
+- Полный API контракт → [API_CONVENTIONS.md](./API_CONVENTIONS.md)
+- Безопасность → [SECURITY_BASELINE.md](./SECURITY_BASELINE.md)
+- Деньги / ошибки / idempotency детально → [AI_DEVELOPMENT_RULES.md](./AI_DEVELOPMENT_RULES.md)
+- Карта модулей → [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md)
+- Шаблон нового модуля → [MODULE_TEMPLATE.md](./MODULE_TEMPLATE.md)
+- Конвенции кода → [CONVENTIONS.md](./CONVENTIONS.md)
+- High-level обзор → [README.md](../README.md)
 
 ---
 

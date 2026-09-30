@@ -29,14 +29,13 @@
  * только в одном месте (CALLBACK_MESSAGE_BUILDERS), и тесты + этот k6
  * синхронизируются.
  */
-import http from 'k6/http'
 import { check } from 'k6'
 import crypto from 'k6/crypto'
+import http from 'k6/http'
 
 const AGENT_ID = __ENV.GITSLOTPARK_AGENT_ID || 'AGENT_LOAD_TEST'
 const SECRET = __ENV.GITSLOTPARK_SECRET_KEY || 'load_test_secret_deterministic_only'
 const USER_ID = __ENV.USER_ID || '00000000-0000-0000-0000-000000000001'
-const CURRENCY = __ENV.CURRENCY || 'RUB'
 const AMT = (v) => Number(v).toFixed(2)
 const API_URL = __ENV.API_URL || 'http://localhost:3001'
 
@@ -138,11 +137,7 @@ export default function () {
     },
   }
 
-  const res = http.post(
-    `${API_URL}/api/v1/provider-callback/gitslotpark/withdraw`,
-    payload,
-    params,
-  )
+  const res = http.post(`${API_URL}/api/v1/provider-callback/gitslotpark/withdraw`, payload, params)
 
   // Ответ GitSlotPark: HTTP 200 + {status: 0, balance: "..."} (ok)
   //                   HTTP 200 + {status: 6, ...} (insufficient funds)
@@ -177,7 +172,9 @@ export default function () {
 
   if (!ok) {
     // eslint-disable-next-line no-console
-    console.error(`VU=${vu} iter=${iter} failed: ${res.status} ${res.body && res.body.slice(0, 100)}`)
+    console.error(
+      `VU=${vu} iter=${iter} failed: ${res.status} ${res.body && res.body.slice(0, 100)}`,
+    )
   }
 
   // Без sleep — ramping-vus управляет нагрузкой. Если нужно «реалистичное» —

@@ -154,6 +154,40 @@ module.exports = {
         complexity: 'off',
         'max-depth': 'off',
         '@typescript-eslint/no-explicit-any': 'off',
+        // Money-правило (§ Money as string) бьёт и по ключу `total`, а в спеках
+        // `total` — счётчик пагинации из конверта {items, meta}: {page, perPage,
+        // total: 41} (apps/admin/test/api-get-full.spec.ts). AST-селектор контекст
+        // не различает, поэтому в тестах те же два селектора без `total`: число как
+        // деньги по-прежнему error, число как пагинация — нет. В src правило не тронуто.
+        'no-restricted-syntax': [
+          'error',
+          {
+            selector:
+              "Property[key.name=/^(amount|balance|price|fee|sum|profit|reward|locked)$/][value.type='Literal'][value.raw=/^\\d+(\\.\\d+)?(?!n)/]",
+            message:
+              'Monetary values must be MoneyAmount (string). Use money.* helpers from @casino/shared-utils.',
+          },
+          {
+            selector:
+              "VariableDeclarator[id.name=/^(amount|balance|price|fee|sum|profit|reward|locked)$/][init.type='Literal'][init.raw=/^\\d+(\\.\\d+)?(?!n)/]",
+            message:
+              'Monetary values must be MoneyAmount (string). Use money.* helpers from @casino/shared-utils.',
+          },
+        ],
+      },
+    },
+    {
+      // ── k6-скрипты нагрузочных тестов (infra/load-tests) ──
+      // Их исполняет k6, а не Node: модулей `k6/*` нет в node_modules (резолвер
+      // import/no-unresolved их не находит), а `__ENV`/`__VU`/`__ITER` — рантайм-globals
+      // k6. `buildWithdrawMessage(agentID, userID, amount, transactionID, roundID)`
+      // повторяет порядок полей подписи провайдера 1-в-1 (GAP-43, gitslotpark.adapter.ts),
+      // поэтому пятый параметр — контракт, а не раздувание функции.
+      files: ['infra/load-tests/**/*.js'],
+      globals: { __ENV: 'readonly', __VU: 'readonly', __ITER: 'readonly' },
+      rules: {
+        'import/no-unresolved': 'off',
+        'max-params': 'off',
       },
     },
     {

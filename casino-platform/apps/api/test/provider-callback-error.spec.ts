@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { Response } from 'express'
-
 // Моки ДО импорта SUT (hoisted). GAP-57: при неизвестной ошибке (например,
 // Prisma P2034) провайдер получает нейтральный INTERNAL_ERROR, а не текст
 // внутренней ошибки с путями машины.
@@ -17,6 +15,7 @@ import { ProviderCallbackController } from '../src/modules/casino/presentation/c
 
 import type { GameCallbackService } from '../src/modules/casino/application/services/game-callback.service'
 import type { ProviderAdapterFactory } from '../src/modules/casino/infrastructure/providers/provider-adapter.factory'
+import type { Response } from 'express'
 
 function makeAdapter() {
   return {
@@ -58,7 +57,9 @@ describe('GAP-57: provider-callback не отдаёт текст внутрен�
     vi.clearAllMocks()
     adapter = makeAdapter()
     cbBet = vi.fn()
-    const adapters = { getAdapter: vi.fn().mockReturnValue(adapter) } as unknown as ProviderAdapterFactory
+    const adapters = {
+      getAdapter: vi.fn().mockReturnValue(adapter),
+    } as unknown as ProviderAdapterFactory
     const cb = { bet: cbBet } as unknown as GameCallbackService
     controller = new ProviderCallbackController(adapters, cb)
   })

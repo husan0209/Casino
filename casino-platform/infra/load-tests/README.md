@@ -31,12 +31,12 @@ docker run --rm -i grafana/k6 run - <infra/load-tests/wallet-concurrency.js
 
 ### Профили нагрузки
 
-| Ступень | VU | Длительность |
-|---------|-----|--------------|
-| warm-up | 10 | 15s ramp + 30s |
-| middle | 50 | 15s ramp + 30s |
-| peak | 100 | 15s ramp + 30s |
-| cool-down | 0 | 15s ramp-down |
+| Ступень   | VU  | Длительность   |
+| --------- | --- | -------------- |
+| warm-up   | 10  | 15s ramp + 30s |
+| middle    | 50  | 15s ramp + 30s |
+| peak      | 100 | 15s ramp + 30s |
+| cool-down | 0   | 15s ramp-down  |
 
 ### Метрики (thresholds)
 
@@ -108,7 +108,6 @@ docker run --rm -i grafana/k6 run - <infra/load-tests/wallet-concurrency.js
    export USER_ID='00000000-0000-0000-0000-000000000001'
    export GITSLOTPARK_AGENT_ID='AGENT_LOAD_TEST'
    export GITSLOTPARK_SECRET_KEY='load_test_secret_deterministic_only'
-   export CURRENCY='RUB'
    export API_URL='http://localhost:3001'
    ```
 
