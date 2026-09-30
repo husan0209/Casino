@@ -9,7 +9,7 @@ import type {
 } from '../src/modules/casino/domain/repositories/casino.repository'
 import type { ParsedProviderCallback } from '../src/modules/casino/domain/provider-adapter.interface'
 import type { WalletFacade } from '../src/modules/wallet/application/wallet.facade'
-import type { CreditInput, CreditResult } from '../src/modules/wallet/domain/repositories/wallet.repository'
+import type { CreditInput, CreditResult, WalletLockTarget } from '../src/modules/wallet/domain/repositories/wallet.repository'
 
 /** Маркер транзакции: в тестах вместо Prisma.TransactionClient. */
 const TX = { __tx: 'outer-transaction' } as unknown as Prisma.TransactionClient
@@ -140,7 +140,10 @@ class FakeWallet {
     return { currency: 'RUB', balance: '100', locked: '0', available: '100' }
   }
   /** Тот же контракт, что WalletFacade.runInTransaction: один tx на весь колбэк. */
-  async runInTransaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  async runInTransaction<T>(
+    _target: WalletLockTarget,
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
     return fn(TX)
   }
 }

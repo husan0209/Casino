@@ -6,8 +6,9 @@ import { type LedgerEntryType, prisma, type Prisma } from '@casino/database'
 import { type Currency, type MoneyAmount, ZERO } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
+import { runWalletTransaction } from './wallet-transaction-lock'
 import { InsufficientFundsError, OptimisticLockError } from '../../domain/errors'
-import { type CreditInput, type CreditResult, type IWalletLedger, type IWalletRepository, type WalletAccount, type WithdrawalOpArgs } from '../../domain/repositories/wallet.repository'
+import { type CreditInput, type CreditResult, type IWalletLedger, type IWalletRepository, type WalletAccount, type WalletLockTarget, type WithdrawalOpArgs } from '../../domain/repositories/wallet.repository'
 
 /**
  * Architecture (AUDIT_REPORT.md §A1, GAP-22): семантика операций — в
@@ -84,25 +85,16 @@ export class PrismaWalletLedger implements IWalletLedger {
     }
     // P0 #3: внутри внешней транзакции свой $transaction открыть нельзя
     // (Prisma запрещает вложенные) — мутация идёт на переданном клиенте;
-    // атомарность и Serializable обеспечивает запустивший транзакцию.
+    // атомарность и сериализацию по кошельку обеспечивает запустивший транзакцию.
     if (input.tx) {
       return this.applyCreditDebit(input.tx, input, sign)
     }
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        return await prisma.$transaction(
-          async (tx) => this.applyCreditDebit(tx, input, sign),
-          { isolationLevel: 'Serializable' },
-        )
-      } catch (e) {
-        if (e instanceof OptimisticLockError && attempt < 3) {
-          await new Promise((r) => setTimeout(r, 50 * attempt * attempt))
-          continue
-        }
-        throw e
-      }
-    }
-    throw new OptimisticLockError()
+    // GAP-57: solo-путь (депозит/реферальная выплата/admin) идёт через ту же
+    // примитиву, что и bet/win — advisory-лок + ReadCommitted + повтор.
+    return runWalletTransaction(
+      { userId: input.userId, currency: input.currency },
+      (tx) => this.applyCreditDebit(tx, input, sign),
+    )
   }
 
   /** Гет-ор-крейт кошелька — общий для credit/debit; разбивка runCreditDebit (GAP-22). */
@@ -189,26 +181,16 @@ export class PrismaWalletLedger implements IWalletLedger {
     }
   }
 
-  /** Serializable-транзакция с optimistic-retry (3 попытки, backoff 50·n²) — общий скелет. */
-  private async withRetry(txBody: (tx: Prisma.TransactionClient) => Promise<CreditResult>): Promise<CreditResult> {
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        return await prisma.$transaction(txBody, { isolationLevel: 'Serializable' })
-      } catch (e) {
-        // GAP-57 (найдено прогоном GAP-47, 2026-09-27): конфликт Serializable на
-        // уровне Postgres приходит как Prisma P2034 (write conflict) — транзакция
-        // откатывается СУБД ДО app-кода, OptimisticLockError не бросается. Без
-        // ретрая профиль «много ставок/сек на один кошелёк» падал на первом же
-        // конфликте: 28 из 30 параллельных bets завершались ошибкой.
-        const code = (e as { code?: string } | null)?.code
-        if ((e instanceof OptimisticLockError || code === 'P2034') && attempt < 3) {
-          await new Promise((r) => setTimeout(r, 50 * attempt * attempt))
-          continue
-        }
-        throw e
-      }
-    }
-    throw new OptimisticLockError()
+  /**
+   * GAP-57: транзакция блокировки/разблокировки/выплаты — advisory-лок на
+   * кошелёк + ReadCommitted + повтор при конфликте (общая примитива).
+   * Мутируется ровно один кошелёк, поэтому ключ лока однозначен.
+   */
+  private withRetry(
+    args: WalletLockTarget,
+    txBody: (tx: Prisma.TransactionClient) => Promise<CreditResult>,
+  ): Promise<CreditResult> {
+    return runWalletTransaction(args, txBody)
   }
 
   private async findWalletOrThrow(
@@ -250,7 +232,7 @@ export class PrismaWalletLedger implements IWalletLedger {
     if (duplicate) {
       return duplicate
     }
-    return this.withRetry(async (tx) => {
+    return this.withRetry({ userId, currency }, async (tx) => {
       const wallet = await this.findWalletOrThrow(tx, userId, currency)
       const balance = toMoney(wallet.balance)
       const currentLocked = toMoney(wallet.locked)
@@ -286,7 +268,7 @@ export class PrismaWalletLedger implements IWalletLedger {
     if (duplicate) {
       return duplicate
     }
-    return this.withRetry(async (tx) => {
+    return this.withRetry({ userId, currency }, async (tx) => {
       const wallet = await this.findWalletOrThrow(tx, userId, currency)
       const currentLocked = toMoney(wallet.locked)
       // Prevent negative locked balance. If unlock amount > currently locked,
@@ -324,7 +306,7 @@ export class PrismaWalletLedger implements IWalletLedger {
     if (duplicate) {
       return duplicate
     }
-    return this.withRetry(async (tx) => {
+    return this.withRetry({ userId, currency }, async (tx) => {
       const wallet = await this.findWalletOrThrow(tx, userId, currency)
       const balanceBefore = toMoney(wallet.balance)
       const currentLocked = toMoney(wallet.locked)

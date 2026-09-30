@@ -1,45 +1,26 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
-
-import { type IWalletTransactionRunner } from '../../domain/repositories/wallet.repository'
-
-import type { Prisma } from '@prisma/client'
+import { runWalletTransaction } from './wallet-transaction-lock'
+import { type IWalletTransactionRunner, type WalletLockTarget } from '../../domain/repositories/wallet.repository'
 
 /**
  * P0 #3: единственная точка открытия внешних денежных транзакций.
- * Serializable — тот же уровень, что раньше использовал каждый внутренний
- * $transaction ledger'а; при передаче tx в CreditInput внутренние транзакции
- * не открываются (Prisma запрещает вложенные).
+ *
+ * GAP-57: транзакция сериализуется advisory-локом на кошелёк и работает на
+ * ReadCommitted — реализация в runWalletTransaction (общая примитива с ledger'ом,
+ * чтобы оба пути «деньги» вели себя одинаково). Здесь — только адаптер под
+ * доменный интерфейс: вызывающий передаёт кошелёк, который транзакция мутирует.
+ *
+ * Контракт для вызывающего: указать userId+currency, которые меняет fn, и
+ * передать fn тот же tx в credit/debit (CreditInput.tx) и репозитории
+ * игровых транзакций — тогда ledger-запись и gameTransaction коммитятся одной
+ * транзакцией.
  */
-
-/** GAP-57: Serializable-конфликт Postgres приходит как Prisma P2034. */
-const MAX_ATTEMPTS = 3
-const BACKOFF_BASE_MS = 50
-
-function isSerializationConflict(e: unknown): boolean {
-  return (e as { code?: string } | null)?.code === 'P2034'
-}
-
 @Injectable()
 export class PrismaWalletTransactionRunner implements IWalletTransactionRunner {
-  async runInTransaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-    // GAP-57 (найдено прогоном GAP-47, 2026-09-27): конфликт Serializable откатывает
-    // транзакцию СУБД ДО app-кода — здесь он не был ретраен вовсе, и профиль
-    // «много ставок/сек на один кошелёк» падал на первом же конфликте (28 из 30
-    // параллельных bets). Тело внешней транзакции идемпотентно по дизайну (дедуп
-    // по внешним id/idempotencyKey — раунд, проводка и gameTransaction), поэтому
-    // повторный прогон не даёт двойного эффекта; семантика — как у withRetry в
-    // wallet.ledger.prisma.
-    for (let attempt = 1; ; attempt++) {
-      try {
-        return await prisma.$transaction(fn, { isolationLevel: 'Serializable' })
-      } catch (e) {
-        if (!isSerializationConflict(e) || attempt >= MAX_ATTEMPTS) {
-          throw e
-        }
-        await new Promise((r) => setTimeout(r, BACKOFF_BASE_MS * attempt * attempt))
-      }
-    }
+  runInTransaction<T>(target: WalletLockTarget, fn: (tx: TransactionClient) => Promise<T>): Promise<T> {
+    return runWalletTransaction(target, fn)
   }
 }
+
+type TransactionClient = Parameters<Parameters<typeof runWalletTransaction>[1]>[0]
