@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 
 import {
-  IUserSessionRepository,
+  type IUserSessionRepository,
   USER_SESSION_REPOSITORY,
 } from '../../domain/repositories/user-session.repository'
 
@@ -12,7 +12,10 @@ import {
 @Injectable()
 export class RevokeAllSessionsUseCase {
   constructor(@Inject(USER_SESSION_REPOSITORY) private repo: IUserSessionRepository) {}
-  async execute(userId: string, currentSessionId: string): Promise<{ ok: boolean; revoked: number }> {
+  async execute(
+    userId: string,
+    currentSessionId: string,
+  ): Promise<{ ok: boolean; revoked: number }> {
     const revoked = await this.repo.revokeAllExceptCurrent(userId, currentSessionId)
     return { ok: true, revoked }
   }

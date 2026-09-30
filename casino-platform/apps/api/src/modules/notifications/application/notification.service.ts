@@ -1,12 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 
-import { EMAIL_QUEUE_PORT, EmailQueuePort } from '@/queues/queue.types'
+import { EMAIL_QUEUE_PORT, type EmailQueuePort } from '@/queues/queue.types'
 import { renderNotificationEmail } from '@/queues/templates'
 
 import {
   NOTIFICATION_REPOSITORY,
   type CreateNotificationInput,
-  INotificationRepository,
+  type INotificationRepository,
   type NotificationRow,
 } from '../domain/notification.repository'
 

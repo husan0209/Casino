@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
@@ -14,7 +24,7 @@ import { KycDecisionReasonSchema } from '../dto/kyc.dto'
 @UseGuards(AdminAuthGuard)
 @Controller('admin/kyc')
 export class KycAdminController {
-  constructor(private svc: KycAdminService) {}
+  constructor(@Inject(KycAdminService) private svc: KycAdminService) {}
   @Get() list(
     @Query('status') status?: string,
     @Query('page') page = '1',

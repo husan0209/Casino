@@ -14,8 +14,8 @@ import { money } from '@casino/shared-utils'
 
 import { AmountTooLargeError, AmountTooSmallError, PaymentProviderError } from '../../domain/errors'
 import {
-  IRukassaClient,
-  IPaymentRequestRepository,
+  type IRukassaClient,
+  type IPaymentRequestRepository,
   PAYMENT_REQUEST_REPOSITORY,
   RUKASSA_CLIENT,
 } from '../../domain/payments.ports'
@@ -26,19 +26,26 @@ export interface CreateFiatDepositInput {
   method: string
 }
 
+export interface CreateFiatDepositResult {
+  payment_request_id: string
+  payment_url: string
+  currency: string
+  method: string
+}
+
 @Injectable()
 export class CreateFiatDepositUseCase {
   // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(RUKASSA_CLIENT) private readonly rukassa: IRukassaClient,
-    private kycCheck: KycFacade,
-    private config: ConfigService,
-    private geo: GeoFacade,
-    private users: UsersFacade,
+    @Inject(KycFacade) private kycCheck: KycFacade,
+    @Inject(ConfigService) private config: ConfigService,
+    @Inject(GeoFacade) private geo: GeoFacade,
+    @Inject(UsersFacade) private users: UsersFacade,
   ) {}
 
-  async execute(userId: string, input: CreateFiatDepositInput): Promise<{ payment_request_id: string; payment_url: string; currency: string; method: string; }> {
+  async execute(userId: string, input: CreateFiatDepositInput): Promise<CreateFiatDepositResult> {
     const { amount, currency, method } = input
 
     const userContext = await this.users.getGeoContext(userId)

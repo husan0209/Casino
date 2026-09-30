@@ -1,12 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { IJwtTokenService, JWT_TOKEN_SERVICE } from '../../domain/auth.ports'
+import { type IJwtTokenService, JWT_TOKEN_SERVICE } from '../../domain/auth.ports'
 import { SessionInvalidError, SessionExpiredError, AccountBlockedError } from '../../domain/errors'
 import {
-  ISessionRepository,
+  type ISessionRepository,
   SESSION_REPOSITORY,
 } from '../../domain/repositories/session.repository'
-import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 
 @Injectable()
 export class RefreshUseCase {
@@ -15,7 +15,7 @@ export class RefreshUseCase {
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(JWT_TOKEN_SERVICE) private jwt: IJwtTokenService,
   ) {}
-  async execute(refreshToken: string): Promise<{ accessToken: string; refreshToken: string; }> {
+  async execute(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
     const hash = this.jwt.hashRefreshToken(refreshToken)
     const session = await this.sessions.findByRefreshTokenHash(hash)
     if (!session || session.revokedAt) {
@@ -25,7 +25,7 @@ export class RefreshUseCase {
       throw new SessionExpiredError()
     }
     const user = await this.users.findById(session.userId)
-    if (!user || user.status !== 'active') {
+    if (user?.status !== 'active') {
       throw new AccountBlockedError()
     }
     await this.sessions.revoke(session.id)

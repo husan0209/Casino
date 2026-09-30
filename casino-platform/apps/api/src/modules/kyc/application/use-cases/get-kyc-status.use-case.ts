@@ -6,17 +6,29 @@ import { GeoFacade } from '@modules/geo/facade/geo.facade'
 import type { DisplayCurrency } from '@casino/shared-config'
 import { money } from '@casino/shared-utils'
 
-import { IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
+import { type IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
 
 @Injectable()
 export class GetKycStatusUseCase {
   constructor(
     @Inject(KYC_REPOSITORY) private repo: IKycRepository,
-    private geo: GeoFacade,
-    private config: ConfigService,
+    @Inject(GeoFacade) private geo: GeoFacade,
+    @Inject(ConfigService) private config: ConfigService,
   ) {}
 
-  async execute(userId: string, currency = 'RUB'): Promise<{ deposit_limit_rub: string; total_deposited_rub: string; limit_remaining: string; limit_currency: DisplayCurrency; status?: string; submittedAt?: Date | null; rejectionReason?: string | null; documents?: string[]; }> {
+  async execute(
+    userId: string,
+    currency = 'RUB',
+  ): Promise<{
+    deposit_limit_rub: string
+    total_deposited_rub: string
+    limit_remaining: string
+    limit_currency: DisplayCurrency
+    status?: string
+    submittedAt?: Date | null
+    rejectionReason?: string | null
+    documents?: string[]
+  }> {
     const status = await this.repo.getStatus(userId)
     const limitRub = this.config.get<string>('KYC_DEPOSIT_LIMIT_RUB') || '5000'
     const totalRub = (await this.repo.getTotalDepositedRub(userId)) || '0'

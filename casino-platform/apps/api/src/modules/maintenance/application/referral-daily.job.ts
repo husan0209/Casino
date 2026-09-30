@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 
 import { ReferralCalcService } from '../../referrals/application/referral-calc.service'
 
@@ -15,9 +15,9 @@ import { ReferralCalcService } from '../../referrals/application/referral-calc.s
 export class ReferralDailyJob {
   private readonly logger = new Logger(ReferralDailyJob.name)
 
-  constructor(private readonly referralCalc: ReferralCalcService) {}
+  constructor(@Inject(ReferralCalcService) private readonly referralCalc: ReferralCalcService) {}
 
-  async execute(dateStr?: string): Promise<{ processed: number; credited: number; date: Date; }> {
+  async execute(dateStr?: string): Promise<{ processed: number; credited: number; date: Date }> {
     const res = await this.referralCalc.runDaily(dateStr)
     this.logger.log(
       `referral-daily: date=${res.date.toISOString().slice(0, 10)} processed=${res.processed} credited=${res.credited}`,

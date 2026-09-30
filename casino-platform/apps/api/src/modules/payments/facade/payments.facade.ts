@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common'
 
 import {
-  INowPaymentsClient,
-  IPaymentRequestRepository,
+  type INowPaymentsClient,
+  type IPaymentRequestRepository,
   NOWPAYMENTS_CLIENT,
   PAYMENT_REQUEST_REPOSITORY,
   type PaymentRequest,
@@ -20,9 +20,7 @@ export class PaymentsFacade {
   ) {}
 
   /** Оценка 1 единицы currency → RUB (используется maintenance/update-rates). */
-  estimateRub(
-    currency: string,
-  ): Promise<{ estimatedAmount: string; source: string } | null> {
+  estimateRub(currency: string): Promise<{ estimatedAmount: string; source: string } | null> {
     return this.np.estimate({ amount: '1', currencyFrom: currency, currencyTo: 'RUB' })
   }
 

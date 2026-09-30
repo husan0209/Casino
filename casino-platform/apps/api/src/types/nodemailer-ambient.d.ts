@@ -12,7 +12,9 @@ declare module 'nodemailer' {
     secure: boolean
     auth?: { user: string; pass: string }
   }
-  function createTransport(options: TransportOptions): Transport
-  const nodemailer: { createTransport: typeof createTransport }
+  interface Nodemailer {
+    createTransport(options: TransportOptions): Transport
+  }
+  const nodemailer: Nodemailer
   export = nodemailer
 }

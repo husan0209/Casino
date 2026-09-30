@@ -1,9 +1,10 @@
 import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  SetMetadata,
   type CanActivate,
   type ExecutionContext,
-  Injectable,
-  ForbiddenException,
-  SetMetadata,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
@@ -13,7 +14,7 @@ export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
   SetMetadata('roles', roles)
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(@Inject(Reflector) private reflector: Reflector) {}
   canActivate(ctx: ExecutionContext): boolean {
     // getAllAndOverride по [handler, class]: class-level @Roles применялся ранее
     // только через get(handler) и ИГНОРИРОВАЛСЯ — любой авторизованный user

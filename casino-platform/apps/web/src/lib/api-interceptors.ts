@@ -12,25 +12,26 @@ let refreshPromise: Promise<boolean> | null = null
  * стора (refresh-cookie ротируется сервером). Возвращает успех.
  */
 function trySilentRefresh(): Promise<boolean> {
-  if (!refreshPromise) {
-    refreshPromise = axios
-      // отдельный запрос без interceptor'ов — иначе зациклится на собственном 401
-      .post<ApiResponse<{ accessToken: string }>>(`${API_URL}/auth/refresh`, null, {
-        withCredentials: true,
-      })
-      .then((r) => {
-        const token: string | undefined = r.data.data.accessToken
-        if (!token) {
-          return false
-        }
-        useAuthStore.setState({ token })
-        return true
-      })
-      .catch(() => false)
-      .finally(() => {
-        refreshPromise = null
-      })
+  if (refreshPromise !== null) {
+    return refreshPromise
   }
+  refreshPromise = axios
+    // отдельный запрос без interceptor'ов — иначе зациклится на собственном 401
+    .post<ApiResponse<{ accessToken: string }>>(`${API_URL}/auth/refresh`, null, {
+      withCredentials: true,
+    })
+    .then((r) => {
+      const token: string | undefined = r.data.data.accessToken
+      if (!token) {
+        return false
+      }
+      useAuthStore.setState({ token })
+      return true
+    })
+    .catch(() => false)
+    .finally(() => {
+      refreshPromise = null
+    })
   return refreshPromise
 }
 
@@ -56,7 +57,13 @@ export function setupApiInterceptors(): void {
       // retry-запросы и вызовы /auth/* не ретраим (иначе цикл)
       const config = err.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined
       const isAuthCall = url.includes('/auth/')
-      if (status === 401 && config && !config._retry && !isAuthCall && typeof window !== 'undefined') {
+      if (
+        status === 401 &&
+        config &&
+        !config._retry &&
+        !isAuthCall &&
+        typeof window !== 'undefined'
+      ) {
         config._retry = true
         const ok = await trySilentRefresh()
         if (ok) {

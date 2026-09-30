@@ -5,7 +5,7 @@ import { Worker } from 'bullmq'
 import { prisma } from '@casino/database'
 
 import { queueConnection } from '../infrastructure/email.queue'
-import { MailerPort } from '../infrastructure/mailer.port'
+import { type MailerPort } from '../infrastructure/mailer.port'
 import { type EmailJobData, MAILER_PORT, QUEUES } from '../queue.types'
 
 /** Воркер: разбирает очередь `email` и шлёт через MailerPort (SMTP/dev-log). */
@@ -15,7 +15,7 @@ export class EmailWorker implements OnModuleDestroy {
   private readonly worker?: Worker<EmailJobData>
 
   constructor(
-    config: ConfigService,
+    @Inject(ConfigService) config: ConfigService,
     @Inject(MAILER_PORT) private readonly mailer: MailerPort,
   ) {
     const hasRedis = Boolean(config.get<string>('REDIS_URL'))

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { IPasswordHasher, PASSWORD_HASHER } from '../../domain/auth.ports'
+import { type IPasswordHasher, PASSWORD_HASHER } from '../../domain/auth.ports'
 import {
   TokenInvalidError,
   TokenExpiredError,
@@ -8,12 +8,12 @@ import {
   WeakPasswordError,
 } from '../../domain/errors'
 import {
-  IPasswordResetRepository,
+  type IPasswordResetRepository,
   PASSWORD_RESET_REPOSITORY,
-  ISessionRepository,
+  type ISessionRepository,
   SESSION_REPOSITORY,
 } from '../../domain/repositories'
-import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 
 @Injectable()
 export class ResetPasswordUseCase {
@@ -24,7 +24,7 @@ export class ResetPasswordUseCase {
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,
     @Inject(PASSWORD_HASHER) private hasher: IPasswordHasher,
   ) {}
-  async execute(token: string, newPassword: string): Promise<{ ok: boolean; }> {
+  async execute(token: string, newPassword: string): Promise<{ ok: boolean }> {
     if (newPassword.length < 8) {
       throw new WeakPasswordError()
     }

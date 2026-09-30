@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 
 import {
   USER_PROFILE_REPOSITORY,
-  IUserProfileRepository,
+  type IUserProfileRepository,
 } from '../../domain/repositories/user-profile.repository'
 
 @Injectable()
@@ -17,7 +17,7 @@ export class UpdateProfileUseCase {
       country?: string
       city?: string
     },
-  ): Promise<{ ok: boolean; }> {
+  ): Promise<{ ok: boolean }> {
     await this.repo.updateProfile(userId, {
       firstName: input.first_name,
       lastName: input.last_name,

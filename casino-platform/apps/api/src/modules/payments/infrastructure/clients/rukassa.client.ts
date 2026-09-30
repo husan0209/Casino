@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 
-import { Injectable, Logger } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
@@ -47,7 +47,7 @@ function pickPaymentFields(data: Record<string, unknown>): {
 @Injectable()
 export class RukassaClient implements IRukassaClient {
   private readonly logger = new Logger(RukassaClient.name)
-  constructor(private config: ConfigService) {}
+  constructor(@Inject(ConfigService) private config: ConfigService) {}
 
   private isProd(): boolean {
     return this.config.get<string>('NODE_ENV') === 'production'
@@ -99,7 +99,9 @@ export class RukassaClient implements IRukassaClient {
       const data = (await res.json()) as Record<string, unknown>
       const { paymentId, paymentUrl } = pickPaymentFields(data)
       if (!paymentId || !paymentUrl) {
-        throw new PaymentProviderError(`unexpected response shape: ${JSON.stringify(data).slice(0, 200)}`)
+        throw new PaymentProviderError(
+          `unexpected response shape: ${JSON.stringify(data).slice(0, 200)}`,
+        )
       }
       this.logger.log(`Rukassa order created: ${paymentId}`)
       return { paymentId, paymentUrl }
