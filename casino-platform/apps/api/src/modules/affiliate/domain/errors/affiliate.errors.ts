@@ -175,6 +175,28 @@ export class PlayerReferralCodeGenerationError extends AppError {
 }
 
 /**
+ * Запрос к партнёрскому эндпоинту без действующего токена партнёра.
+ *
+ * Отличается от `AffiliateCredentialsInvalidError`: там отказ входных данных
+ * на странице логина (здесь клиент сам предъявил неверные логин/пароль), а
+ * здесь — заголовок `Authorization` отсутствует либо токен не прошёл
+ * проверку подписи. Наружу оба случая дают 401, но коды разные: оператор
+ * различает «пловой пароль» и «битый/чужой токен».
+ */
+export class AffiliateUnauthorizedError extends AppError {
+  readonly code = 'AFFILIATE_UNAUTHORIZED'
+  readonly httpStatus = 401
+
+  constructor(public readonly reason: 'missing_token' | 'invalid_token') {
+    super(
+      reason === 'missing_token'
+        ? 'Affiliate access token is missing'
+        : 'Affiliate access token is invalid or expired',
+    )
+  }
+}
+
+/**
  * AFFILIATE_JWT_SECRET отсутствует или короче минимальной длины.
  *
  * Fail-closed по решению из ТЗ ч.8 §14.1: выпускать токены партнёра со слабым
