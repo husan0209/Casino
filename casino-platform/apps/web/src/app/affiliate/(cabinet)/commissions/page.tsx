@@ -43,7 +43,7 @@ export default function AffiliateCommissionsPage(): React.JSX.Element {
 
       {isLoading && <div className="text-muted text-sm py-6">Загрузка…</div>}
 
-      {data && data.data.length === 0 && (
+      {data?.data.length === 0 && (
         <div className="card text-muted text-sm">
           Начислений пока нет. Они появляются после того, как приведённые игроки начнут играть.
         </div>
