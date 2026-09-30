@@ -5,26 +5,29 @@
  * по [handler, class] — class-level применяется ко всем методам, method-level
  * (@Roles('superadmin') на run-daily) переопределяет.
  */
-import { ForbiddenException } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
 import { RolesGuard, Roles } from '../src/modules/auth/presentation/guards/roles.guard'
 
 @Roles('admin', 'superadmin')
 class ClassOnly {
-  handler() {}
+  handler(): void {}
 }
 
 class MethodOverrides {
   @Roles('superadmin')
-  handler() {}
+  handler(): void {}
 }
 
 class NoRoles {
-  handler() {}
+  handler(): void {}
 }
 
-function guardContext(user: { role: string } | undefined, handler: Function, target: object) {
+function guardContext(
+  user: { role: string } | undefined,
+  handler: () => void,
+  target: object,
+): boolean {
   const guard = new RolesGuard(new Reflector())
   return guard.canActivate({
     switchToHttp: () => ({ getRequest: () => ({ user }) }),
@@ -38,14 +41,20 @@ describe('RolesGuard (class-level metadata fix, GAP-32)', () => {
     const { handler } = ClassOnly.prototype
     expect(guardContext({ role: 'admin' }, handler, ClassOnly)).toBe(true)
     expect(guardContext({ role: 'superadmin' }, handler, ClassOnly)).toBe(true)
-    expect(() => guardContext({ role: 'user' }, handler, ClassOnly)).toThrow(ForbiddenException)
+    expect(() => guardContext({ role: 'user' }, handler, ClassOnly)).toThrow(
+      expect.objectContaining({ code: 'INSUFFICIENT_PERMISSIONS' }),
+    )
   })
 
   it('method-level @Roles переопределяет class-level (run-daily только superadmin)', () => {
     const { handler } = MethodOverrides.prototype
     expect(guardContext({ role: 'superadmin' }, handler, MethodOverrides)).toBe(true)
-    expect(() => guardContext({ role: 'admin' }, handler, MethodOverrides)).toThrow(ForbiddenException)
-    expect(() => guardContext({ role: 'user' }, handler, MethodOverrides)).toThrow(ForbiddenException)
+    expect(() => guardContext({ role: 'admin' }, handler, MethodOverrides)).toThrow(
+      expect.objectContaining({ code: 'INSUFFICIENT_PERMISSIONS' }),
+    )
+    expect(() => guardContext({ role: 'user' }, handler, MethodOverrides)).toThrow(
+      expect.objectContaining({ code: 'INSUFFICIENT_PERMISSIONS' }),
+    )
   })
 
   it('без метаданных guard пропускает (роли не заданы)', () => {
@@ -55,6 +64,8 @@ describe('RolesGuard (class-level metadata fix, GAP-32)', () => {
 
   it('неавторизованный (нет user) — Forbidden при заданных ролях', () => {
     const { handler } = ClassOnly.prototype
-    expect(() => guardContext(undefined, handler, ClassOnly)).toThrow(ForbiddenException)
+    expect(() => guardContext(undefined, handler, ClassOnly)).toThrow(
+      expect.objectContaining({ code: 'INSUFFICIENT_PERMISSIONS' }),
+    )
   })
 })

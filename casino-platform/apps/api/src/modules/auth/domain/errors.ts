@@ -28,10 +28,9 @@ export class AccountLockedError extends AppError {
   readonly code = 'ACCOUNT_LOCKED'
   readonly httpStatus = 423
   constructor(public readonly lockedUntil: Date) {
-    super(
-      `Слишком много неудачных попыток входа. Повторите после ${lockedUntil.toISOString()}`,
-      { lockedUntil },
-    )
+    super(`Слишком много неудачных попыток входа. Повторите после ${lockedUntil.toISOString()}`, {
+      lockedUntil,
+    })
   }
 }
 
@@ -153,12 +152,7 @@ export class SelfExcludedError extends AppError {
 // ── JWT-верификация (Волна 3в, G17): message = прежний код строки —
 // обработчики разбирают текст, поэтому он сохранён 1-в-1.
 export type JwtTokenErrorCode =
-  | 'BAD_TOKEN'
-  | 'BAD_ALGORITHM'
-  | 'BAD_SIGNATURE'
-  | 'BAD_ISSUER'
-  | 'BAD_AUDIENCE'
-  | 'TOKEN_EXPIRED'
+  'BAD_TOKEN' | 'BAD_ALGORITHM' | 'BAD_SIGNATURE' | 'BAD_ISSUER' | 'BAD_AUDIENCE' | 'TOKEN_EXPIRED'
 
 export class JwtTokenError extends AppError {
   readonly code: string
@@ -201,5 +195,21 @@ export class CaptchaUpstreamError extends AppError {
   readonly httpStatus = 502
   constructor(m: string) {
     super(m)
+  }
+}
+
+/**
+ * Токен есть, но ролей недостаточно: пользователь не админ, либо роль не входит
+ * в требуемый набор @Roles.
+ *
+ * Отдельный код вместо встроенного исключения NestJS — по правилу 6 ошибки
+ * оформляются кастомным классом, а код стабилен и попадает в контракт API.
+ * Код и HTTP-статус сохранены один в один, так что клиенты ничего не замечают.
+ */
+export class InsufficientPermissionsError extends AppError {
+  readonly code = 'INSUFFICIENT_PERMISSIONS'
+  readonly httpStatus = 403
+  constructor() {
+    super('INSUFFICIENT_PERMISSIONS')
   }
 }

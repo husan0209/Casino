@@ -3,12 +3,13 @@ import {
   type ExecutionContext,
   Inject,
   Injectable,
-  ForbiddenException,
   SetMetadata,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 
 import { getHttpRequest } from '@/common/types/express-context'
+
+import { InsufficientPermissionsError } from '../../domain/errors'
 
 export const Roles = (...roles: string[]): MethodDecorator & ClassDecorator =>
   SetMetadata('roles', roles)
@@ -28,13 +29,13 @@ export class RolesGuard implements CanActivate {
     }
     const user = getHttpRequest(ctx).user
     if (user === undefined) {
-      throw new ForbiddenException('INSUFFICIENT_PERMISSIONS')
+      throw new InsufficientPermissionsError()
     }
     // AffiliateActor поля role не имеет — партнёр не админ ни при каких условиях.
     // Отсутствие роли само по себе отсекает партнёрский токен от admin-эндпоинтов.
     const role = 'role' in user ? user.role : null
     if (role === null || !roles.includes(role)) {
-      throw new ForbiddenException('INSUFFICIENT_PERMISSIONS')
+      throw new InsufficientPermissionsError()
     }
     return true
   }
