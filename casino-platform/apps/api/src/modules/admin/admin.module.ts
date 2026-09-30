@@ -8,6 +8,7 @@ import {
   AUDIT_LOG_REPOSITORY,
   DASHBOARD_REPOSITORY,
 } from './domain/admin.repository'
+import { AdminFacade } from './facade/admin.facade'
 import { AdminAuthService } from './infrastructure/admin-jwt.service'
 import {
   PrismaAdminUserRepository,
@@ -41,12 +42,15 @@ import { PaymentRequestRepository } from '../payments/infrastructure/repositorie
     { provide: AUDIT_LOG_REPOSITORY, useClass: PrismaAuditLogRepository },
     { provide: DASHBOARD_REPOSITORY, useClass: PrismaDashboardRepository },
     AuditLogService,
+    AdminFacade,
     AdminUsersService,
     DashboardService,
     PaymentRequestRepository,
   ],
   // AdminAuthService экспортируем вместе с AdminAuthGuard: guard инжектит его,
   // и без экспорта импортирующие модули (KycModule) падали на DI (E2E, PR #15)
-  exports: [AuditLogService, AdminAuthGuard, AdminAuthService],
+  // наружу отдаём фасад: прямой доступ к AuditLogService из других модулей
+  // считается межмодульным долгом (гвард G16, AGENTS.md правило 4).
+  exports: [AdminFacade, AdminAuthGuard, AdminAuthService],
 })
 export class AdminModule {}

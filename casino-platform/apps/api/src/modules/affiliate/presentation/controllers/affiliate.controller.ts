@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Кабинет партнёра (UC-AFF-12..16; ТЗ ч.8 §10.2, §12).
  *
  * OWNER-CHECK. Ни один метод не принимает affiliateId: он берётся ТОЛЬКО из
@@ -14,7 +14,7 @@ import { Controller, Get, Inject, Patch, Post, UseGuards, UsePipes } from '@nest
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AffiliateActor } from '@/common/types/req-user'
 
-import { WalletFacade } from '../../../wallet/application/wallet.facade'
+import { WalletFacade } from '../../../wallet/facade/wallet.facade'
 import { AffiliateSettingsService } from '../../application/affiliate-settings.service'
 import { AffiliateNotFoundError } from '../../domain/errors/affiliate.errors'
 import {

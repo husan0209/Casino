@@ -6,7 +6,7 @@ import { ConfigService } from '@nestjs/config'
 import { errorMessage } from '@/common/utils/error-message'
 
 import { GeoFacade } from '@modules/geo/facade/geo.facade'
-import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
+import { KycFacade } from '@modules/kyc/facade/kyc.facade'
 import { UsersFacade } from '@modules/users/facade/users.facade'
 
 import type { DisplayCurrency } from '@casino/shared-config'
@@ -32,7 +32,10 @@ export class CreateFiatDepositUseCase {
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(RUKASSA_CLIENT) private readonly rukassa: IRukassaClient,
-    @Inject(KycCheckService) private kycCheck: KycCheckService,
+    // KycFacade, а не KycCheckService напрямую: межмодульный доступ только
+    // через фасад (AGENTS.md правило 4). @Inject обязателен — design:paramtypes
+    // в этой сборке не выдаётся (CONVENTIONS §1.4).
+    @Inject(KycFacade) private kycCheck: KycFacade,
     @Inject(ConfigService) private config: ConfigService,
     @Inject(GeoFacade) private geo: GeoFacade,
     @Inject(UsersFacade) private users: UsersFacade,

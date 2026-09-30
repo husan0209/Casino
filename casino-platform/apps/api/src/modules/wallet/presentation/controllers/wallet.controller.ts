@@ -4,10 +4,7 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
-import {
-  type WalletBalanceView,
-  WalletFacade,
-} from '@modules/wallet/application/wallet.facade'
+import { type WalletBalanceView, WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import { type LedgerEntryType, prisma, type Prisma } from '@casino/database'
 import { type Currency } from '@casino/shared-types'

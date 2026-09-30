@@ -3,14 +3,15 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common'
 import { errorMessage } from '@/common/utils/error-message'
 
 import {
-  USER_SETTINGS_REPOSITORY,
-  type IUserSettingsRepository,
-} from '../../domain/repositories/user-settings.repository'
-import {
   NoopResponsibleGamingHook,
   RESPONSIBLE_GAMING_HOOK,
   type ResponsibleGamingHook,
-} from '../../domain/responsible-gaming-hook'
+} from '../../../../common/ports/responsible-gaming-hook'
+import { InvalidSelfExclusionPeriodError } from '../../domain/errors'
+import {
+  USER_SETTINGS_REPOSITORY,
+  type IUserSettingsRepository,
+} from '../../domain/repositories/user-settings.repository'
 
 // Minimum cooloff before self-exclusion can be lifted (72 hours)
 const MIN_COOLOFF_MS = 72 * 60 * 60 * 1000
@@ -48,7 +49,7 @@ export class SelfExclusionUseCase {
    */
   async exclude(userId: string, periodHours: number): Promise<{ excludedUntil: Date | null }> {
     if (periodHours < 0) {
-      throw new Error('INVALID_PERIOD')
+      throw new InvalidSelfExclusionPeriodError()
     }
     // Minimum 24 hours — we enforce this server-side regardless of client input
     if (periodHours > 0 && periodHours < 24) {

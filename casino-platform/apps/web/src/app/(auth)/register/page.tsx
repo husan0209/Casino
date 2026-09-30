@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 
+import { getAffiliateCode } from '@/components/affiliate/AffiliateCodeCapture'
 import { OAuthButtons } from '@/components/auth/OAuthButtons'
 import { Logo } from '@/components/layout/Logo'
 import { toast } from '@/components/ui/toaster'
@@ -51,7 +52,14 @@ export default function RegisterPage(): React.JSX.Element {
   const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     try {
-      await register(email, password, ref || undefined)
+      // Два независимых кода: `ref` из формы — игровая рефералка,
+      // affiliate — партнёрская программа (ТЗ ч.8 §7.3), которую
+      // AffiliateCodeCapture положил в localStorage при переходе по
+      // /go/<code>. Сервер резолвит каждый в своей таблице, оба можно передать.
+      await register(email, password, {
+        referral: ref === '' ? undefined : ref,
+        affiliate: getAffiliateCode() ?? undefined,
+      })
       setSent(true)
       toast.success('Письмо отправлено на email')
     } catch (err: unknown) {

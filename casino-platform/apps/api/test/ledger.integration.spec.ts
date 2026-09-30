@@ -20,6 +20,7 @@ import { prisma } from '@casino/database'
 import { InsufficientFundsError } from '../src/modules/wallet/domain/errors'
 import { PrismaWalletTransactionRunner } from '../src/modules/wallet/infrastructure/ledger/wallet-transaction-runner.prisma'
 import { PrismaWalletLedger } from '../src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma'
+
 import type { CreditInput } from '../src/modules/wallet/domain/repositories/wallet.repository'
 
 const INTEGRATION = process.env['LEDGER_INTEGRATION'] === '1'

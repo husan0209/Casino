@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
 import { ConfigService } from '@nestjs/config'
+import { describe, it, expect, vi } from 'vitest'
 
 import {
   DevLogMailer,
@@ -72,13 +72,27 @@ function mockRequireNodemailer(): { createTransport: ReturnType<typeof vi.fn>; r
 function buildConfig(env: SmtpEnvShape): ConfigService {
   const config = new ConfigService()
   vi.spyOn(config, 'get').mockImplementation(((key: string) => {
-    if (key === 'NODE_ENV') return env.NODE_ENV
-    if (key === 'SMTP_HOST') return env.SMTP_HOST
-    if (key === 'SMTP_PORT') return env.SMTP_PORT
-    if (key === 'SMTP_USER') return env.SMTP_USER
-    if (key === 'SMTP_PASSWORD') return env.SMTP_PASSWORD
-    if (key === 'SMTP_PASS') return env.SMTP_PASS
-    if (key === 'SMTP_FROM_EMAIL') return env.SMTP_FROM_EMAIL ?? 'no-reply@casino.local'
+    if (key === 'NODE_ENV') {
+return env.NODE_ENV
+}
+    if (key === 'SMTP_HOST') {
+return env.SMTP_HOST
+}
+    if (key === 'SMTP_PORT') {
+return env.SMTP_PORT
+}
+    if (key === 'SMTP_USER') {
+return env.SMTP_USER
+}
+    if (key === 'SMTP_PASSWORD') {
+return env.SMTP_PASSWORD
+}
+    if (key === 'SMTP_PASS') {
+return env.SMTP_PASS
+}
+    if (key === 'SMTP_FROM_EMAIL') {
+return env.SMTP_FROM_EMAIL ?? 'no-reply@casino.local'
+}
     return undefined
   }) as never)
   return config

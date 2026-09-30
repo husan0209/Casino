@@ -13,9 +13,9 @@
  */
 import { Module } from '@nestjs/common'
 
+import { RESPONSIBLE_GAMING_HOOK } from '../../common/ports/responsible-gaming-hook'
 import { AdminModule } from '../admin/admin.module'
 import { AuthModule } from '../auth/auth.module'
-import { RESPONSIBLE_GAMING_HOOK } from '../users/domain/responsible-gaming-hook'
 import { UsersModule } from '../users/users.module'
 import { WalletModule } from '../wallet/wallet.module'
 import { AffiliateClicksCleanupService } from './application/affiliate-clicks-cleanup.service'

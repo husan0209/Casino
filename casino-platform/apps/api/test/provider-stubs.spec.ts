@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ConfigService } from '@nestjs/config'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-import { RukassaClient } from '../src/modules/payments/infrastructure/clients/rukassa.client'
-import { NOWPaymentsClient } from '../src/modules/payments/infrastructure/clients/nowpayments.client'
 import { DemoProviderAdapter } from '../src/modules/casino/infrastructure/providers/demo/demo-provider.adapter'
 import { ProviderAdapterFactory } from '../src/modules/casino/infrastructure/providers/provider-adapter.factory'
+import { NOWPaymentsClient } from '../src/modules/payments/infrastructure/clients/nowpayments.client'
+import { RukassaClient } from '../src/modules/payments/infrastructure/clients/rukassa.client'
 
 /**
  * Прямое инстанцирование вместо DI (@nestjs/testing): тест проверяет
@@ -30,7 +30,9 @@ describe('Provider Stubs Security', () => {
   describe('Rukassa Client', () => {
     it('fails closed in production when keys are not configured', async () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
-        if (key === 'NODE_ENV') return 'production'
+        if (key === 'NODE_ENV') {
+return 'production'
+}
         return undefined
       })
 
@@ -48,7 +50,9 @@ describe('Provider Stubs Security', () => {
 
     it('fails closed in production when verifying callback without secret', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
-        if (key === 'NODE_ENV') return 'production'
+        if (key === 'NODE_ENV') {
+return 'production'
+}
         return undefined
       })
 
@@ -59,8 +63,12 @@ describe('Provider Stubs Security', () => {
 
     it('returns false in development when secret is not configured', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
-        if (key === 'NODE_ENV') return 'development'
-        if (key === 'RUKASSA_SECRET_KEY') return undefined
+        if (key === 'NODE_ENV') {
+return 'development'
+}
+        if (key === 'RUKASSA_SECRET_KEY') {
+return undefined
+}
         return undefined
       })
 
@@ -76,7 +84,9 @@ describe('Provider Stubs Security', () => {
   describe('NOWPayments Client', () => {
     it('fails closed in production when keys are not configured', async () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
-        if (key === 'NODE_ENV') return 'production'
+        if (key === 'NODE_ENV') {
+return 'production'
+}
         return undefined
       })
 
@@ -93,7 +103,9 @@ describe('Provider Stubs Security', () => {
 
     it('fails closed in production when verifying IPN without secret', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
-        if (key === 'NODE_ENV') return 'production'
+        if (key === 'NODE_ENV') {
+return 'production'
+}
         return undefined
       })
 
@@ -107,8 +119,12 @@ describe('Provider Stubs Security', () => {
 
     it('returns false in development when secret is not configured', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
-        if (key === 'NODE_ENV') return 'development'
-        if (key === 'NOWPAYMENTS_IPN_SECRET') return undefined
+        if (key === 'NODE_ENV') {
+return 'development'
+}
+        if (key === 'NOWPAYMENTS_IPN_SECRET') {
+return undefined
+}
         return undefined
       })
 
@@ -124,7 +140,9 @@ describe('Provider Stubs Security', () => {
   describe('Demo Provider Adapter', () => {
     it('throws in production when verifying callback', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
-        if (key === 'NODE_ENV') return 'production'
+        if (key === 'NODE_ENV') {
+return 'production'
+}
         return undefined
       })
 
@@ -133,7 +151,9 @@ describe('Provider Stubs Security', () => {
 
     it('returns true in development', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
-        if (key === 'NODE_ENV') return 'development'
+        if (key === 'NODE_ENV') {
+return 'development'
+}
         return undefined
       })
 
@@ -145,8 +165,12 @@ describe('Provider Stubs Security', () => {
   describe('Provider Adapter Factory', () => {
     it('throws when requesting demo provider in production', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
-        if (key === 'NODE_ENV') return 'production'
-        if (key === 'DEMO_PROVIDER_ENABLED') return false
+        if (key === 'NODE_ENV') {
+return 'production'
+}
+        if (key === 'DEMO_PROVIDER_ENABLED') {
+return false
+}
         return undefined
       })
 
@@ -157,8 +181,12 @@ describe('Provider Stubs Security', () => {
 
     it('throws when demo provider is disabled', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
-        if (key === 'NODE_ENV') return 'development'
-        if (key === 'DEMO_PROVIDER_ENABLED') return false
+        if (key === 'NODE_ENV') {
+return 'development'
+}
+        if (key === 'DEMO_PROVIDER_ENABLED') {
+return false
+}
         return undefined
       })
 
@@ -169,8 +197,12 @@ describe('Provider Stubs Security', () => {
 
     it('returns demo adapter when enabled in development', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
-        if (key === 'NODE_ENV') return 'development'
-        if (key === 'DEMO_PROVIDER_ENABLED') return true
+        if (key === 'NODE_ENV') {
+return 'development'
+}
+        if (key === 'DEMO_PROVIDER_ENABLED') {
+return true
+}
         return undefined
       })
 

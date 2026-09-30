@@ -16,7 +16,9 @@ function signPythonStyle(rawBody: string): string {
   const marked = markNumbers(rawBody)
   const obj = JSON.parse(marked) as Record<string, unknown>
   const sorted: Record<string, unknown> = {}
-  for (const k of Object.keys(obj).sort()) sorted[k] = obj[k]
+  for (const k of Object.keys(obj).sort()) {
+sorted[k] = obj[k]
+}
   const s = pyDumps(JSON.stringify(sorted).replace(/"\\u0000NUM:([^"\\]*)\\u0000"/g, '$1'))
   return createHmac('sha512', SECRET).update(s, 'utf8').digest('hex')
 }
@@ -29,7 +31,9 @@ function pyDumps(s: string): string {
     if (code === undefined || code < 0x80) {
       out += ch
     } else {
-      for (const unit of ch) out += '\\u' + unit.charCodeAt(0).toString(16).padStart(4, '0')
+      for (const unit of ch) {
+out += '\\u' + unit.charCodeAt(0).toString(16).padStart(4, '0')
+}
     }
   }
   return out
@@ -49,7 +53,9 @@ function markNumbers(raw: string): string {
         i += 2
         continue
       }
-      if (ch === '"') inStr = false
+      if (ch === '"') {
+inStr = false
+}
       out += ch
       i++
       continue
@@ -139,7 +145,9 @@ describe('P0 #4: NOWPayments IPN canonical-sorted-JSON HMAC (dual-check)', () =>
     const marked = markNumbers(raw)
     const obj = JSON.parse(marked) as Record<string, unknown>
     const sorted: Record<string, unknown> = {}
-    for (const k of Object.keys(obj).sort()) sorted[k] = obj[k]
+    for (const k of Object.keys(obj).sort()) {
+sorted[k] = obj[k]
+}
     const s = pyDumps(JSON.stringify(sorted).replace(/"\\u0000NUM:([^"\\]*)\\u0000"/g, '$1'))
     const sig = createHmac('sha512', SECRET).update(s.split('/').join('\\/'), 'utf8').digest('hex')
     expect(client().verifyIPN(raw, sig)).toBe(true)

@@ -11,7 +11,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 
 import { AffiliateFacade } from '../../affiliate/facade/affiliate.facade'
 
-import type { QualificationResult } from '../../affiliate/application/use-cases/qualify-attributions.use-case'
+import type { QualificationResult } from '../../affiliate/facade/affiliate.facade'
 
 @Injectable()
 export class AffiliateQualificationJob {

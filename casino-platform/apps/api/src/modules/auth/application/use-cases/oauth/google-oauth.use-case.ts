@@ -9,6 +9,7 @@ import {
   OAuthNotConfiguredError,
   OAuthStateError,
   OAuthExchangeError,
+  OAuthUpstreamError,
 } from '@modules/auth/domain/errors'
 
 import {
@@ -116,23 +117,23 @@ export class GoogleOAuthUseCase {
         }),
       })
       if (!tokenRes.ok) {
-        throw new Error(`token ${tokenRes.status}`)
+        throw new OAuthUpstreamError(`token ${tokenRes.status}`)
       }
       const { access_token } = (await tokenRes.json()) as { access_token?: string }
       if (!access_token) {
-        throw new Error('no access_token')
+        throw new OAuthUpstreamError('no access_token')
       }
 
       const uiRes = await fetch(USERINFO_URL, {
         headers: { Authorization: `Bearer ${access_token}` },
       })
       if (!uiRes.ok) {
-        throw new Error(`userinfo ${uiRes.status}`)
+        throw new OAuthUpstreamError(`userinfo ${uiRes.status}`)
       }
       const ui = (await uiRes.json()) as { sub: string; email?: string; email_verified?: boolean }
       providerUserId = ui.sub
       if (!ui.email || ui.email_verified === false) {
-        throw new Error('email not available/verified')
+        throw new OAuthUpstreamError('email not available/verified')
       }
       email = ui.email
     } catch (e) {

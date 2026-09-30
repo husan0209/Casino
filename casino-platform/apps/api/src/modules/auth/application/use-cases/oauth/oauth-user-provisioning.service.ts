@@ -18,6 +18,7 @@ import {
 } from '@modules/auth/domain/repositories/user.repository'
 
 import { type User } from '../../../domain/entities/user.entity'
+import { ReferralCodeGenerationError } from '../../../domain/errors'
 
 /** Результат OAuth-входа: access/refresh + данные игрока. */
 export interface OAuthSignInResult {
@@ -67,7 +68,7 @@ export class OAuthUserProvisioningService {
         return code
       }
     }
-    throw new Error('REFERRAL_CODE_GENERATION_FAILED')
+    throw new ReferralCodeGenerationError()
   }
 
   async signIn(input: ProviderSignInInput): Promise<OAuthSignInResult> {

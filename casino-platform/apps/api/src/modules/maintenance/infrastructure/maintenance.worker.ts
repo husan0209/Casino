@@ -4,6 +4,7 @@ import { Worker } from 'bullmq'
 
 import { queueConnection } from '../../../queues/infrastructure/email.queue'
 import { QUEUES } from '../../../queues/queue.types'
+import { UnknownMaintenanceJobError } from '../domain/errors'
 import { type MaintenanceHandlers, MAINTENANCE_HANDLERS } from '../domain/maintenance.ports'
 
 /**
@@ -32,7 +33,7 @@ export class MaintenanceWorker implements OnModuleDestroy {
         const handler = this.handlers[job.name as keyof MaintenanceHandlers] as
           (() => Promise<unknown>) | undefined
         if (!handler) {
-          throw new Error(`Unknown maintenance job: ${job.name}`)
+          throw new UnknownMaintenanceJobError(job.name)
         }
         return handler()
       },

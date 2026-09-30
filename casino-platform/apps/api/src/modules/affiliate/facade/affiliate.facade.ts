@@ -6,6 +6,7 @@
  * auth-вызывает attributePlayer при регистрации, maintenance — запускает
  * суточный расчёт. Внутренние use cases наружу не выставляются.
  */
+export type { QualificationResult } from '../application/use-cases/qualify-attributions.use-case'
 import { Inject, Injectable } from '@nestjs/common'
 
 import { AffiliateClicksCleanupService } from '../application/affiliate-clicks-cleanup.service'

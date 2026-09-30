@@ -3,12 +3,10 @@ import { Inject, Injectable } from '@nestjs/common'
 import type { Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-import {
-  ConfirmWithdrawalUseCase,
-  type ConfirmWithdrawalInput,
-} from './use-cases/confirm-withdrawal.use-case'
-import { LockFundsUseCase, type LockFundsInput } from './use-cases/lock-funds.use-case'
-import { UnlockFundsUseCase, type UnlockFundsInput } from './use-cases/unlock-funds.use-case'
+
+import { ConfirmWithdrawalUseCase, type ConfirmWithdrawalInput } from '../application/use-cases/confirm-withdrawal.use-case'
+import { LockFundsUseCase, type LockFundsInput } from '../application/use-cases/lock-funds.use-case'
+import { UnlockFundsUseCase, type UnlockFundsInput } from '../application/use-cases/unlock-funds.use-case'
 import {
   type IWalletLedger,
   type IWalletRepository,
@@ -59,11 +57,11 @@ export class WalletFacade {
    * P0 #3: атомарный денежный сценарий. Колбэк получает Prisma tx — передавайте
    * его в credit/debit (CreditInput.tx) и в репозитории игровых транзакций,
    * чтобы ledger-запись и gameTransaction коммитились одним $transaction.
-   *
-   * GAP-57: `target` — кошелёк, который мутирует fn. По нему транзакция берёт
-   * advisory-лок (очередь вместо abort-волн при конкурентных ставках).
    */
-  runInTransaction<T>(target: WalletLockTarget, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  runInTransaction<T>(
+    target: WalletLockTarget,
+    fn: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
     return this.txRunner.runInTransaction(target, fn)
   }
   credit(input: CreditInput): Promise<CreditResult> {

@@ -70,7 +70,9 @@ describe('sentry.options (GAP-50)', () => {
 
       // глубже 6 уровней — замена на [deep], не бесконечная рекурсия
       let v: unknown = { password: 'x' }
-      for (let i = 0; i < 10; i++) v = { nested: v }
+      for (let i = 0; i < 10; i++) {
+v = { nested: v }
+}
       const flat = JSON.stringify(scrubPII(v))
       expect(flat).toContain('[deep]')
     })
