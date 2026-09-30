@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+import { NavIcon } from '@/components/layout/nav-icon'
 import { isNavActive, NAV_ITEMS } from '@/lib/ui/desktop-nav'
 
 /**
@@ -33,11 +34,11 @@ export function DesktopNav({
               key={item.href}
               href={item.href}
               className={`group relative mx-2 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition hover:bg-white/5 ${
-                active ? 'bg-[#6C63FF]/15 text-white' : 'text-muted'
+                active ? 'bg-[#6C63FF]/15 text-white font-medium' : 'text-muted hover:text-white'
               }`}
             >
-              <span className="w-5 shrink-0 text-center text-base" aria-hidden>
-                {item.icon}
+              <span className="w-5 shrink-0" aria-hidden>
+                <NavIcon icon={item.icon} />
               </span>
               {pinned && <span className="truncate">{item.label}</span>}
               {/* подпись по hover, когда панель свёрнута (§4.5) */}

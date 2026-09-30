@@ -1,10 +1,19 @@
 import './globals.css'
+import { Inter } from 'next/font/google'
+
 import { MainShell } from '@/components/layout/MainShell'
 import { Toaster } from '@/components/ui/toaster'
 
 import { Providers } from './providers'
 
 import type { Metadata, Viewport } from 'next'
+
+/** ТЗ ч.5.1: единая фирменная типографика; cyrillic — обязательный сабсет. */
+const inter = Inter({
+  subsets: ['latin', 'cyrillic'],
+  variable: '--font-inter',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: {
@@ -26,8 +35,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    <html lang="ru">
-      <body>
+    <html lang="ru" className={inter.variable}>
+      <body className="font-sans">
         <Providers>
           <MainShell>{children}</MainShell>
           <Toaster />

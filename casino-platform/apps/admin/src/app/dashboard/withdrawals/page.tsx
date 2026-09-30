@@ -180,13 +180,13 @@ export default function WithdrawalsPage(): React.JSX.Element {
   const rows = data?.data ?? []
   const toggle = (id: string): void =>
     setSelected((prev) => {
-      const n = new Set(prev)
-      if (n.has(id)) {
-        n.delete(id)
+      const nextSelected = new Set(prev)
+      if (nextSelected.has(id)) {
+        nextSelected.delete(id)
       } else {
-        n.add(id)
+        nextSelected.add(id)
       }
-      return n
+      return nextSelected
     })
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.id))
 

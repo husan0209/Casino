@@ -2,7 +2,9 @@
 
 import { useQuery } from '@tanstack/react-query'
 
+import { GameDeck } from '@/components/casino/GameDeck'
 import { GameSection } from '@/components/casino/GameSection'
+import { GuestHero } from '@/components/casino/GuestHero'
 import { HomeChips } from '@/components/casino/HomeChips'
 import { ProviderStrip } from '@/components/casino/ProviderStrip'
 import { MobileSearchBar } from '@/components/layout/MobileSearchBar'
@@ -49,18 +51,32 @@ export function HomeView({
     <div className="container-1 py-4">
       <MobileSearchBar />
 
+      {/* §4.2: герой гостя — spinera; залогиненному маркетингового героя нет (§4.3) */}
+      {!user && <GuestHero games={popular} />}
+
+      {/* §4.4: GameDeck у гостя (после Hero) */}
       {!user && (
-        <section className="mb-5 rounded-2xl border border-[#2A2A4A] bg-gradient-to-br from-[#16213E] to-[#1A1A2E] p-4">
-          <h1 className="text-xl font-bold">Слоты онлайн</h1>
-          <p className="mt-1 text-sm text-muted">Тап по игре — и в дело</p>
-        </section>
+        <GameDeck games={popular} favoriteSlugs={favoriteSlugs} onToggleFavorite={toggleFavorite} />
       )}
 
       {user && (
         <GameSection
           title="Продолжить играть"
+          capsLabel="ТВОЯ ИСТОРИЯ"
+          actionHref="/history"
+          actionLabel="Вся история"
           games={recent ?? []}
           variant="row"
+          favoriteSlugs={favoriteSlugs}
+          onToggleFavorite={toggleFavorite}
+        />
+      )}
+
+      {/* §4.4: GameDeck у залогиненного (после «Продолжить играть») */}
+      {user && (
+        <GameDeck
+          games={popular}
+          recentGames={recent ?? []}
           favoriteSlugs={favoriteSlugs}
           onToggleFavorite={toggleFavorite}
         />
@@ -69,14 +85,20 @@ export function HomeView({
       {user && <HomeChips categories={categories} />}
 
       <GameSection
-        title={user ? 'Популярные' : 'Популярные слоты'}
+        title={user ? 'Популярное сейчас' : 'Популярные'}
+        capsLabel="ГОРЯЧО СЕЙЧАС"
+        actionHref="/casino"
+        actionLabel="Весь каталог"
         games={popular}
         favoriteSlugs={favoriteSlugs}
         onToggleFavorite={toggleFavorite}
       />
 
       <GameSection
-        title="Новые"
+        title="Новые игры"
+        capsLabel="СВЕЖИЕ ПОСТУПЛЕНИЯ"
+        actionHref="/casino?sort=new"
+        actionLabel="Все новые"
         games={fresh}
         favoriteSlugs={favoriteSlugs}
         onToggleFavorite={toggleFavorite}
@@ -85,6 +107,9 @@ export function HomeView({
       {user && (
         <GameSection
           title="Избранное"
+          capsLabel="ТВОЙ СПИСОК"
+          actionHref="/favorites"
+          actionLabel="Смотреть все"
           games={favoriteGames}
           favoriteSlugs={favoriteSlugs}
           onToggleFavorite={toggleFavorite}

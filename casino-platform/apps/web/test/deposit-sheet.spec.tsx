@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  *   1) остаток лимита — ИЗ API (limit_remaining в валюте шита), без пересчёта;
  *   2) при исчерпании CTA = «Лимит исчерпан — пройти верификацию» и ведёт
  *      на /kyc ДО отправки формы (не 422 после);
- *   3) approved → лимит снят, обычная кнопка «Пополнить».
+ *   3) approved → лимит снят, обычная кнопка «Перейти к оплате».
  */
 
 const pushMock = vi.hoisted(() => vi.fn())
@@ -73,23 +73,20 @@ const geoConfig = {
 
 vi.mock('@/stores/geo', () => ({
   useGeoStore: (sel?: (s: unknown) => unknown) =>
-    sel
-      ? sel({ config: geoConfig, load: vi.fn() })
-      : { config: geoConfig, load: vi.fn() },
+    sel ? sel({ config: geoConfig, load: vi.fn() }) : { config: geoConfig, load: vi.fn() },
 }))
 
 vi.mock('@/stores/wallet', () => ({
   useWalletStore: (sel?: (s: unknown) => unknown) =>
     sel
-      ? sel({ activeCurrency: 'RUB', setActiveCurrency: vi.fn() })
-      : { activeCurrency: 'RUB', setActiveCurrency: vi.fn() },
+      ? sel({ activeCurrency: 'RUB', setActiveCurrency: vi.fn(), getActiveWallet: () => undefined })
+      : { activeCurrency: 'RUB', setActiveCurrency: vi.fn(), getActiveWallet: () => undefined },
 }))
 
 const userMock = vi.hoisted(() => ({ id: 'u1', email: 't@t.t', role: 'user' }))
 
 vi.mock('@/stores/auth', () => ({
-  useAuth: (sel?: (s: unknown) => unknown) =>
-    sel ? sel({ user: userMock }) : { user: userMock },
+  useAuth: (sel?: (s: unknown) => unknown) => (sel ? sel({ user: userMock }) : { user: userMock }),
   useAuthStore: { getState: () => ({ user: userMock }) },
 }))
 
@@ -122,12 +119,17 @@ describe('GAP-36/44: DepositSheet — KYC-лимит из API', () => {
     renderSheet()
     // значение — как отдал API, без клиентской арифметики; пресет-кнопки «5 000 ₽»
     // не считаем — берём именно параграф остатка целиком (текст в двух узлах:
-    // «Остаток лимита: » + «5 000 ₽»), матчим самый глубокий узел с маркером
+    // «Без верификации осталось » + «5 000 ₽»), матчим самый глубокий узел с маркером
     const deepest = (_: unknown, el: Element | null): boolean => {
-      if (!el?.textContent?.includes('Остаток лимита') || !el.textContent.includes('5 000')) {
+      if (
+        !el?.textContent?.includes('Без верификации осталось') ||
+        !el.textContent.includes('5 000')
+      ) {
         return false
       }
-      return !Array.from(el.children).some((ch) => ch.textContent?.includes('Остаток лимита'))
+      return !Array.from(el.children).some((ch) =>
+        ch.textContent?.includes('Без верификации осталось'),
+      )
     }
     const rest = await screen.findByText(deepest, undefined, { timeout: 3000 })
     expect(rest.textContent).toContain('5 000')
@@ -149,7 +151,7 @@ describe('GAP-36/44: DepositSheet — KYC-лимит из API', () => {
     expect(pushMock).toHaveBeenCalledWith('/kyc')
   })
 
-  it('approved: лимит снят — обычная кнопка «Пополнить»', async () => {
+  it('approved: лимит снят — обычная кнопка «Перейти к оплате»', async () => {
     kycMock.mockResolvedValue({
       status: 'approved',
       limit_remaining: '0',
@@ -157,7 +159,7 @@ describe('GAP-36/44: DepositSheet — KYC-лимит из API', () => {
       deposit_limit_rub: '5000',
     })
     renderSheet()
-    const cta = await screen.findByRole('button', { name: 'Пополнить' })
+    const cta = await screen.findByRole('button', { name: 'Перейти к оплате' })
     cta.click()
     expect(pushMock).not.toHaveBeenCalledWith('/kyc')
   })

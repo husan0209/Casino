@@ -13,15 +13,17 @@ export interface NavItem {
 /**
  * Пункты десктоп-панели — ровно список релиза ТЗ §4.5.
  * Live / Настольные / Быстрые / Бонусы не добавляем (ТЗ §24).
+ * icon — ключ в маппинге NAV_ICONS (components/layout/nav-icon.tsx),
+ * не эмодзи: иконки UI — только lucide (ТЗ ч.5.1 §6).
  */
 export const NAV_ITEMS: readonly NavItem[] = [
-  { href: '/', label: 'Главная', icon: '🏠' },
-  { href: '/casino', label: 'Казино', icon: '🎰' },
-  { href: '/favorites', label: 'Избранное', icon: '♥' },
-  { href: '/providers', label: 'Провайдеры', icon: '🧩' },
-  { href: '/wallet', label: 'Кошелёк', icon: '👛' },
-  { href: '/history', label: 'История', icon: '🕘' },
-  { href: '/support', label: 'Поддержка', icon: '💬' },
+  { href: '/', label: 'Главная', icon: 'home' },
+  { href: '/casino', label: 'Казино', icon: 'casino' },
+  { href: '/favorites', label: 'Избранное', icon: 'heart' },
+  { href: '/providers', label: 'Провайдеры', icon: 'puzzle' },
+  { href: '/wallet', label: 'Кошелёк', icon: 'wallet' },
+  { href: '/history', label: 'История', icon: 'history' },
+  { href: '/support', label: 'Поддержка', icon: 'chat' },
 ]
 
 /**

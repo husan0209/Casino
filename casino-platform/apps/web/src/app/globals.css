@@ -8,7 +8,12 @@
   --surface2: #16213e;
   --border: #2a2a4a;
   --brand: #6c63ff;
-  --money: #00c853;
+  --brand-light: #8b7fff;
+  --accent2: #00d2ff;
+  --money: #00e676;
+  --money-dark: #00c853;
+  --danger: #ff3d71;
+  --warn: #ffb300;
   --muted: #8888aa;
 }
 
@@ -20,36 +25,141 @@ body {
   @apply max-w-6xl mx-auto px-4;
 }
 
-.card {
-  @apply rounded-2xl border border-[#2A2A4A] bg-[#16213E] p-4;
+/* ── Типографика сборки (ТЗ ч.5.1 §3) ─────────────────────────────── */
+
+/* Капс-лейбл секции: «ТВОЯ ИСТОРИЯ», «СВЕЖИЕ ПОСТУПЛЕНИЯ» */
+.caps-label {
+  @apply mb-1 text-[11px] font-bold uppercase tracking-[0.18em] text-muted;
 }
 
-.btn {
-  @apply inline-flex items-center justify-center rounded-xl bg-[#6C63FF] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50;
-}
-
-.btn-money {
-  @apply inline-flex items-center justify-center rounded-xl bg-[#00C853] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50;
-}
-
-.btn-ghost {
-  @apply inline-flex items-center justify-center rounded-xl border border-[#2A2A4A] bg-transparent px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/5;
-}
-
-.input {
-  @apply w-full rounded-xl border border-[#2A2A4A] bg-[#1A1A2E] px-3 py-2.5 text-sm outline-none focus:border-[#6C63FF];
+/* Заголовок секции под капс-лейблом */
+.section-title {
+  @apply text-xl font-extrabold tracking-tight md:text-2xl;
 }
 
 .text-muted {
   color: var(--muted);
 }
 
+/* ── Поверхности ───────────────────────────────────────────────────── */
+
+.card {
+  @apply rounded-2xl border border-[#2A2A4A] bg-[#16213E] p-4;
+}
+
+/* Плитка-иконка метода/кошелька (касса, шторка) */
+.icon-tile {
+  @apply grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-white;
+}
+
+/* ── Кнопки ────────────────────────────────────────────────────────── */
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-600 active:scale-[0.98] disabled:opacity-50;
+  box-shadow: 0 8px 24px -10px rgba(108, 99, 255, 0.55);
+}
+
+/* Деньги: зелёная CTA — только деньги и успех (ТЗ §2 пр.4) */
+.btn-money {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl bg-[#00E676] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#00C853] active:scale-[0.98] disabled:opacity-50;
+  box-shadow: 0 8px 24px -10px rgba(0, 230, 118, 0.45);
+}
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl border border-[#2A2A4A] bg-transparent px-4 py-2.5 text-sm font-medium text-white transition hover:border-brand/50 hover:bg-white/5 active:scale-[0.98] disabled:opacity-50;
+}
+
+/* ── Формы ─────────────────────────────────────────────────────────── */
+
+.input {
+  @apply w-full rounded-xl border border-[#2A2A4A] bg-[#1A1A2E] px-3 py-2.5 text-sm outline-none transition placeholder:text-muted/70 focus:border-brand focus:ring-2 focus:ring-brand/25;
+}
+
+/* ── Шторки (sheets) ──────────────────────────────────────────────── */
+
 .sheet-backdrop {
   @apply fixed inset-0 z-40 bg-black/60;
+  animation: sheet-fade 200ms ease-out;
 }
 
 .sheet-panel {
-  @apply fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-2xl border border-[#2A2A4A] bg-[#1A1A2E] p-4 pb-8;
+  @apply fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-3xl border border-[#2A2A4A]/60 bg-[#1A1A2E] p-5 pb-8;
+  animation: sheet-up 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Ручка шторки (spinera-style) */
+.sheet-handle {
+  @apply mx-auto mb-3 h-1 w-10 rounded-full bg-white/20;
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-backdrop,
+  .sheet-panel {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Иконки валют (цветные кружки как на скриншотах spinera) ─────── */
+
+.currency-icon {
+  @apply grid h-10 w-10 shrink-0 place-items-center rounded-xl text-xs font-bold;
+}
+.currency-icon-rub {
+  @apply bg-[#6C63FF]/20 text-[#6C63FF];
+}
+.currency-icon-kzt {
+  @apply bg-[#3A3A5C]/60 text-white/80;
+}
+.currency-icon-uah {
+  @apply bg-[#00E676]/15 text-[#00E676];
+}
+.currency-icon-byn {
+  @apply bg-[#8888AA]/15 text-[#8888AA];
+}
+.currency-icon-uzs {
+  @apply bg-[#3A3A5C]/40 text-white/70;
+}
+.currency-icon-usdt {
+  @apply bg-[#26A17B]/20 text-[#26A17B];
+}
+.currency-icon-btc {
+  @apply bg-[#F7931A]/15 text-[#F7931A];
+}
+
+/* ── Утилиты ───────────────────────────────────────────────────────── */
+
+/* Ряды карточек: скролл без полосы */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 /*

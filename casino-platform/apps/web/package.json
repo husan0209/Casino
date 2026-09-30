@@ -20,6 +20,7 @@
     "@tanstack/react-query": "^5.51.1",
     "zustand": "^4.5.4",
     "axios": "^1.7.2",
+    "lucide-react": "^1.48.0",
     "react-hook-form": "^7.52.1",
     "zod": "^3.23.8",
     "@hookform/resolvers": "^3.9.0"
