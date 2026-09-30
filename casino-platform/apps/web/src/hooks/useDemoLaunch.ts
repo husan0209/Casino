@@ -1,0 +1,35 @@
+'use client'
+
+import { useState } from 'react'
+
+import { toast } from '@/components/ui/toaster'
+import { errText } from '@/lib/api'
+import { launchDemo } from '@/lib/api/casino.api'
+
+/**
+ * Демо-запуск (ТЗ ч.5 §7: «Demo запускается с превью игры»). Идёт мимо
+ * launch-мутации, поэтому ошибку провайдера показываем сами: без catch промис
+ * падал молча, и кнопка выглядела сломанной.
+ */
+export function useDemoLaunch(): {
+  startDemo: (slug: string, currency: string) => Promise<void>
+  isRunning: boolean
+} {
+  const [isRunning, setRunning] = useState(false)
+
+  const startDemo = async (slug: string, currency: string): Promise<void> => {
+    setRunning(true)
+    try {
+      const res = await launchDemo(slug, currency)
+      if (res.launch_url) {
+        window.open(res.launch_url, '_blank')
+      }
+    } catch (e) {
+      toast.error(errText(e) || 'Не удалось запустить демо')
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return { startDemo, isRunning }
+}

@@ -1,6 +1,7 @@
 /**
- * Лого сборки (ТЗ ч.5.1 §4.1): иконка-фишка в брендовом фиолетовом +
- * вордмарк «spinera»-стиля. Тот же мотив, что в public/favicon.svg.
+ * Лого сборки (ТЗ ч.5.1 §4.1): иконка-фишка в брендовом фиолетовом + вордмарк.
+ * «spinera» — имя мока-донора, под своим брендом оно не продаётся.
+ * Тот же мотив, что в public/favicon.svg.
  */
 export function Logo({
   size = 32,
@@ -39,7 +40,7 @@ export function Logo({
         <circle cx="32" cy="32" r="6" fill="#FFFFFF" />
         <circle cx="32" cy="32" r="2.5" fill="#6C63FF" />
       </svg>
-      {withWordmark && <span className="text-lg font-extrabold tracking-tight">spinera</span>}
+      {withWordmark && <span className="text-lg font-extrabold tracking-tight">Casino</span>}
     </span>
   )
 }

@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { LoginSheet } from '@/components/auth/LoginSheet'
+import { GamePreviewSheet } from '@/components/casino/GamePreviewSheet'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { DesktopNav } from '@/components/layout/DesktopNav'
@@ -93,6 +94,7 @@ export function MainShell({ children }: { children: React.ReactNode }): React.JS
       </div>
       <BottomNav />
       <LoginSheet />
+      <GamePreviewSheet />
       <DepositSheet />
       <WithdrawSheet />
       <WalletSwitcher />

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { CatalogFilterBar } from '@/components/casino/CatalogFilterBar'
 import { GameCard } from '@/components/casino/GameCard'
+import { useFavorites } from '@/hooks/useFavorites'
 import { fetchGamesPage } from '@/lib/api/casino.api'
 import { catalogHref, parseFilters, type CatalogFilters } from '@/lib/ui/catalog-filters'
 
@@ -20,6 +21,7 @@ export function CasinoInner(): React.JSX.Element {
   const search = useSearchParams()
 
   const filters: CatalogFilters = useMemo(() => parseFilters(search), [search])
+  const { favoriteSlugs, toggleFavorite } = useFavorites()
 
   const applyFilters = useCallback(
     (patch: Partial<CatalogFilters>): void => {
@@ -58,14 +60,26 @@ export function CasinoInner(): React.JSX.Element {
   const total = data?.pages[0]?.meta.total ?? games.length
 
   return (
-    <div className="container-1 py-8">
-      <h1 className="mb-4 text-2xl font-bold">Каталог игр</h1>
-      <CatalogFilterBar filters={filters} total={total} loading={isLoading} onChange={applyFilters} />
+    <div className="container-1 py-6">
+      <div className="mb-4">
+        <p className="caps-label">ВСЕ ИГРЫ</p>
+        <h1 className="page-title">Каталог игр</h1>
+      </div>
+      <CatalogFilterBar
+        filters={filters}
+        total={total}
+        loading={isLoading}
+        onChange={applyFilters}
+      />
 
       {isLoading ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {Array.from({ length: 12 }).map((_, index) => (
-            <div key={index} className="card aspect-[4/5] animate-pulse" />
+            <div
+              key={index}
+              className="card aspect-[1.05/1] animate-pulse"
+              style={{ animationDelay: `${index * 60}ms` }}
+            />
           ))}
         </div>
       ) : isError ? (
@@ -88,9 +102,14 @@ export function CasinoInner(): React.JSX.Element {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
             {games.map((game) => (
-              <GameCard key={game.slug} game={game} />
+              <GameCard
+                key={game.slug}
+                game={game}
+                isFavorite={favoriteSlugs.has(game.slug)}
+                onToggleFavorite={toggleFavorite}
+              />
             ))}
           </div>
           <div ref={sentinelRef} className="h-1" />

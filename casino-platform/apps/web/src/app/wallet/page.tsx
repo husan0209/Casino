@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowDownLeft, ArrowUpRight, Check, Plus, ShieldCheck, Wallet } from 'lucide-react'
 import Link from 'next/link'
+import { useEffect } from 'react'
 
 import { apiGet } from '@/lib/api'
 import {
@@ -10,30 +11,19 @@ import {
   currencyLabel,
   formatAmount,
   formatBalance,
-  isCryptoCurrency,
   networkLabel,
 } from '@/lib/format/currency'
+import { currencyIconClass } from '@/lib/ui/currency-icon'
 import { amountDirection, formatTxAmount, txTypeLabel } from '@/lib/ui/history-filters'
+import { splitWalletsByKind } from '@/lib/wallet/helpers'
 import { useAuth } from '@/stores/auth'
+import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 import type { WalletBalance } from '@/types/wallet'
 import type { WalletTxDto, WalletTxListDto } from '@/types/wallet-tx'
 
 import { money } from '@casino/shared-utils'
-
-function currencyIconClass(currency: string): string {
-  const map: Record<string, string> = {
-    RUB: 'currency-icon currency-icon-rub',
-    KZT: 'currency-icon currency-icon-kzt',
-    UAH: 'currency-icon currency-icon-uah',
-    BYN: 'currency-icon currency-icon-byn',
-    UZS: 'currency-icon currency-icon-uzs',
-    USDT_TRC20: 'currency-icon currency-icon-usdt',
-    BTC: 'currency-icon currency-icon-btc',
-  }
-  return map[currency] ?? 'currency-icon bg-white/[0.06] text-white'
-}
 
 function ActiveWalletCard({
   wallet,
@@ -53,7 +43,7 @@ function ActiveWalletCard({
       <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
         <div>
           <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-[#00E676]" />
+            <span className="flex h-2 w-2 rounded-full bg-[#00C853]" />
             <span className="text-xs font-bold uppercase tracking-wider text-muted">
               Основной игровой счёт
             </span>
@@ -102,7 +92,7 @@ function TxRow({ t }: { t: WalletTxDto }): React.JSX.Element {
         <span
           className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
             dir === 'in'
-              ? 'bg-[#00E676]/10 text-[#00E676]'
+              ? 'bg-[#00C853]/10 text-[#00C853]'
               : dir === 'out'
                 ? 'bg-[#FF3D71]/10 text-[#FF3D71]'
                 : 'bg-white/5 text-muted'
@@ -131,7 +121,7 @@ function TxRow({ t }: { t: WalletTxDto }): React.JSX.Element {
       <div className="text-right">
         <div
           className={`font-bold ${
-            dir === 'in' ? 'text-[#00E676]' : dir === 'out' ? 'text-[#FF3D71]' : 'text-muted'
+            dir === 'in' ? 'text-[#00C853]' : dir === 'out' ? 'text-[#FF3D71]' : 'text-muted'
           }`}
         >
           {formatTxAmount(t.amount, t.currency)}
@@ -144,10 +134,71 @@ function TxRow({ t }: { t: WalletTxDto }): React.JSX.Element {
   )
 }
 
+/** Пустую группу не показываем: заголовок без карточек выглядит сломанным. */
+const GROUPS = [
+  { title: 'ФИАТНЫЕ СЧЕТА', crypto: false },
+  { title: 'КРИПТОВАЛЮТНЫЕ СЧЕТА', crypto: true },
+] as const
+
+/** Строка кошелька в группе (ТЗ ч.5.1 §5.1): тусклый ноль, у крипты — тег сети. */
+function WalletTile({
+  wallet,
+  isActive,
+  withNetwork,
+  onPick,
+}: {
+  wallet: WalletBalance
+  isActive: boolean
+  withNetwork: boolean
+  onPick: () => void
+}): React.JSX.Element {
+  const empty = !money.isPositive(wallet.available)
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className={`card flex items-center justify-between p-4 text-left transition hover:border-[#6C63FF]/50 ${
+        isActive ? 'border-[#6C63FF] bg-[#16213E]/90' : 'bg-[#16213E]/40'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <span className={currencyIconClass(wallet.currency)}>
+          {currencyLabel(wallet.currency)}
+        </span>
+        <div>
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
+            <span>{currencyFullName(wallet.currency)}</span>
+            {withNetwork && (
+              <span className="rounded bg-[#00D2FF]/10 px-1 py-0.5 text-[9px] font-bold text-[#00D2FF]">
+                {networkLabel(wallet.currency)}
+              </span>
+            )}
+          </div>
+          <div className={`text-sm font-bold ${empty ? 'text-muted/60' : 'text-white'}`}>
+            {formatBalance(wallet.available, wallet.currency)}
+          </div>
+        </div>
+      </div>
+      {isActive ? (
+        <span className="grid h-6 w-6 place-items-center rounded-full bg-[#6C63FF]/20 text-[#6C63FF]">
+          <Check size={14} />
+        </span>
+      ) : (
+        <span className="text-xs text-muted hover:text-white">Выбрать</span>
+      )}
+    </button>
+  )
+}
+
 export default function WalletPage(): React.JSX.Element {
   const { user } = useAuth()
   const { activeCurrency, setActiveCurrency } = useWalletStore()
+  const { config, load } = useGeoStore()
   const { openDeposit, openWithdraw } = useUIStore()
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   const { data: balances } = useQuery({
     queryKey: ['wallet', 'balances'],
@@ -175,15 +226,19 @@ export default function WalletPage(): React.JSX.Element {
     available: '0',
   }
 
-  const fiatWallets = walletList.filter((w) => !isCryptoCurrency(w.currency))
-  const cryptoWallets = walletList.filter((w) => isCryptoCurrency(w.currency))
+  // Тот же источник списка, что у шторки: включённые гео-конфигом валюты видны и с нулём.
+  const { fiat: fiatWallets, crypto: cryptoWallets } = splitWalletsByKind(walletList, {
+    enabledFiat: config?.enabledFiat ?? ['RUB'],
+    enabledCrypto: config?.enabledCrypto ?? [],
+    activeCurrency,
+  })
 
   return (
     <div className="container-1 py-6 max-w-4xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <p className="caps-label">УПРАВЛЕНИЕ СРЕДСТВАМИ</p>
-          <h1 className="text-2xl font-black text-white md:text-3xl">Мои кошельки</h1>
+          <h1 className="page-title">Мои кошельки</h1>
         </div>
       </div>
 
@@ -194,96 +249,28 @@ export default function WalletPage(): React.JSX.Element {
       />
 
       <div className="mb-8 space-y-6">
-        <div>
-          <p className="caps-label mb-2">ФИАТНЫЕ СЧЕТА</p>
-          <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-            {fiatWallets.map((w) => {
-              const isActive = w.currency === activeCurrency
-              const empty = !money.isPositive(w.available)
-              return (
-                <button
-                  key={w.currency}
-                  type="button"
-                  onClick={() => void setActiveCurrency(w.currency)}
-                  className={`card flex items-center justify-between p-4 text-left transition hover:border-[#6C63FF]/50 ${
-                    isActive ? 'border-[#6C63FF] bg-[#16213E]/90' : 'bg-[#16213E]/40'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={currencyIconClass(w.currency)}>
-                      {currencyLabel(w.currency)}
-                    </span>
-                    <div>
-                      <div className="text-xs font-semibold text-white">
-                        {currencyFullName(w.currency)}
-                      </div>
-                      <div
-                        className={`text-sm font-bold ${empty ? 'text-muted/60' : 'text-white'}`}
-                      >
-                        {formatBalance(w.available, w.currency)}
-                      </div>
-                    </div>
-                  </div>
-                  {isActive ? (
-                    <span className="grid h-6 w-6 place-items-center rounded-full bg-[#6C63FF]/20 text-[#6C63FF]">
-                      <Check size={14} />
-                    </span>
-                  ) : (
-                    <span className="text-xs text-muted hover:text-white">Выбрать</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {cryptoWallets.length > 0 && (
-          <div>
-            <p className="caps-label mb-2">КРИПТОВАЛЮТНЫЕ СЧЕТА</p>
-            <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-              {cryptoWallets.map((w) => {
-                const isActive = w.currency === activeCurrency
-                const empty = !money.isPositive(w.available)
-                return (
-                  <button
+        {GROUPS.map((group) => {
+          const list = group.crypto ? cryptoWallets : fiatWallets
+          if (list.length === 0) {
+            return null
+          }
+          return (
+            <div key={group.title}>
+              <p className="caps-label mb-2">{group.title}</p>
+              <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                {list.map((w) => (
+                  <WalletTile
                     key={w.currency}
-                    type="button"
-                    onClick={() => void setActiveCurrency(w.currency)}
-                    className={`card flex items-center justify-between p-4 text-left transition hover:border-[#6C63FF]/50 ${
-                      isActive ? 'border-[#6C63FF] bg-[#16213E]/90' : 'bg-[#16213E]/40'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={currencyIconClass(w.currency)}>
-                        {currencyLabel(w.currency)}
-                      </span>
-                      <div>
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
-                          <span>{currencyFullName(w.currency)}</span>
-                          <span className="rounded bg-[#00D2FF]/10 px-1 py-0.2 text-[9px] font-bold text-[#00D2FF]">
-                            {networkLabel(w.currency)}
-                          </span>
-                        </div>
-                        <div
-                          className={`text-sm font-bold ${empty ? 'text-muted/60' : 'text-white'}`}
-                        >
-                          {formatBalance(w.available, w.currency)}
-                        </div>
-                      </div>
-                    </div>
-                    {isActive ? (
-                      <span className="grid h-6 w-6 place-items-center rounded-full bg-[#6C63FF]/20 text-[#6C63FF]">
-                        <Check size={14} />
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted hover:text-white">Выбрать</span>
-                    )}
-                  </button>
-                )
-              })}
+                    wallet={w}
+                    isActive={w.currency === activeCurrency}
+                    withNetwork={group.crypto}
+                    onPick={() => void setActiveCurrency(w.currency)}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })}
       </div>
 
       <div className="mb-8">
@@ -313,7 +300,7 @@ export default function WalletPage(): React.JSX.Element {
       </div>
 
       <div className="flex items-center justify-center gap-2 text-center text-xs text-muted/80">
-        <ShieldCheck size={16} className="text-[#00E676]" />
+        <ShieldCheck size={16} className="text-[#00C853]" />
         <span>Отдельные балансы. Без скрытой конвертации и комиссий.</span>
       </div>
     </div>

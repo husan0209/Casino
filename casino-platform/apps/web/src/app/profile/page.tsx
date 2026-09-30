@@ -5,9 +5,11 @@ import { useRef, useState } from 'react'
 
 import { UserAvatar } from '@/components/layout/UserAvatar'
 import { SecurityTab, SessionsTab, SettingsTab } from '@/components/profile/ProfileTabs'
+import { Field } from '@/components/ui/field'
 import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost, errText } from '@/lib/api'
 import { uploadAvatar } from '@/lib/api/users.api'
+import { kycStatusLabel } from '@/lib/ui/kyc'
 import { useAuth } from '@/stores/auth'
 import type { MeDto } from '@/types/user'
 
@@ -91,30 +93,38 @@ function DataTab({ me, onSaved }: { me: MeDto; onSaved: () => void }): React.JSX
           }}
         />
       </div>
-      <input
-        className="input"
-        placeholder="Имя"
-        defaultValue={p?.firstName ?? ''}
-        onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
-      />
-      <input
-        className="input"
-        placeholder="Фамилия"
-        defaultValue={p?.lastName ?? ''}
-        onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
-      />
-      <input
-        className="input"
-        placeholder="Страна (RU)"
-        defaultValue={p?.country ?? ''}
-        onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
-      />
-      <input
-        className="input"
-        placeholder="Город"
-        defaultValue={p?.city ?? ''}
-        onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-      />
+      <Field label="Имя">
+        <input
+          className="input"
+          placeholder="Как к вам обращаться"
+          defaultValue={p?.firstName ?? ''}
+          onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
+        />
+      </Field>
+      <Field label="Фамилия">
+        <input
+          className="input"
+          placeholder="Фамилия"
+          defaultValue={p?.lastName ?? ''}
+          onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
+        />
+      </Field>
+      <Field label="Страна">
+        <input
+          className="input"
+          placeholder="Например, RU"
+          defaultValue={p?.country ?? ''}
+          onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
+        />
+      </Field>
+      <Field label="Город">
+        <input
+          className="input"
+          placeholder="Город"
+          defaultValue={p?.city ?? ''}
+          onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+        />
+      </Field>
       <button onClick={() => void save()} className="btn w-full">
         Сохранить
       </button>
@@ -137,8 +147,9 @@ export default function ProfilePage(): React.JSX.Element {
   }
 
   return (
-    <div className="container-1 py-8 max-w-3xl">
-      <h1 className="text-2xl font-bold mb-6">Профиль</h1>
+    <div className="container-1 py-6 max-w-3xl">
+      <p className="caps-label">ЛИЧНЫЙ КАБИНЕТ</p>
+      <h1 className="page-title mb-6">Профиль</h1>
       {isLoading || !data ? (
         'Загрузка…'
       ) : (
@@ -149,14 +160,19 @@ export default function ProfilePage(): React.JSX.Element {
               avatarUrl={data.profile?.avatarUrl ?? null}
               size={48}
             />
-            <div className="flex-1">
-              <div className="font-medium">{data.user.email || 'Игрок'}</div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">{data.user.email || 'Игрок'}</div>
               <div className="text-sm text-muted">
-                KYC: <span className="badge">{data.kycStatus}</span> · с{' '}
-                {new Date(data.user.createdAt).toLocaleDateString('ru')}
+                Верификация: {kycStatusLabel(data.kycStatus)}
+              </div>
+              <div className="text-xs text-muted">
+                В игре с {new Date(data.user.createdAt).toLocaleDateString('ru')}
               </div>
             </div>
-            <div className="text-xs text-muted font-mono">{data.user.referralCode}</div>
+            <div className="shrink-0 text-right">
+              <span className="field-label mb-0.5">Код</span>
+              <span className="font-mono text-xs text-white/80">{data.user.referralCode}</span>
+            </div>
           </div>
 
           <div className="mb-5 flex gap-2 overflow-x-auto">

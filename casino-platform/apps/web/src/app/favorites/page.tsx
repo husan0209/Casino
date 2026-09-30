@@ -30,8 +30,9 @@ export default function FavoritesPage(): React.JSX.Element {
   }
 
   return (
-    <div className="container-1 py-8">
-      <h1 className="mb-4 text-2xl font-bold">Избранное</h1>
+    <div className="container-1 py-6">
+      <p className="caps-label">ТВОЙ СПИСОК</p>
+      <h1 className="page-title mb-4">Избранное</h1>
 
       {favoriteGames.length > 0 ? (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">

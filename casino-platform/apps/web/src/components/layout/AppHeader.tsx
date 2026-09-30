@@ -2,7 +2,7 @@
 
 import { ChevronDown, Plus, Search } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { Logo } from '@/components/layout/Logo'
@@ -28,6 +28,7 @@ export function AppHeader(): React.JSX.Element {
   const { config, load } = useGeoStore()
   const { openDeposit, openLogin, openWalletSwitcher } = useUIStore()
   const router = useRouter()
+  const pathname = usePathname()
   const [query, setQuery] = useState('')
 
   useEffect(() => {
@@ -53,20 +54,23 @@ export function AppHeader(): React.JSX.Element {
           <Logo size={30} />
         </Link>
 
-        <form onSubmit={submitSearch} className="relative hidden max-w-md flex-1 md:block">
-          <Search
-            size={16}
-            aria-hidden
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-          />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Поиск игр и провайдеров…"
-            aria-label="Поиск"
-            className="input pl-9"
-          />
-        </form>
+        {/* §4.6: одно поле поиска на экран — в каталоге поиск живёт в баре фильтров */}
+        {pathname !== '/casino' && (
+          <form onSubmit={submitSearch} className="relative hidden max-w-md flex-1 md:block">
+            <Search
+              size={16}
+              aria-hidden
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+            />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Найти игру или провайдера"
+              aria-label="Поиск"
+              className="input pl-9"
+            />
+          </form>
+        )}
 
         <div className="ml-auto flex items-center gap-2">
           <Link
@@ -92,7 +96,7 @@ export function AppHeader(): React.JSX.Element {
                 type="button"
                 onClick={() => openDeposit(displayCurrency)}
                 aria-label="Пополнить"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#00E676] text-white shadow-lg shadow-[#00E676]/25 transition hover:bg-[#00C853] active:scale-95"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#00C853] text-[#03210E] shadow-lg shadow-[#00C853]/30 transition hover:bg-[#20DA72] active:scale-95"
               >
                 <Plus size={20} strokeWidth={2.4} aria-hidden />
               </button>

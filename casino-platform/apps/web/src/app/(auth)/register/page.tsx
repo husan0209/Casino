@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 
+import { getAffiliateCode } from '@/components/affiliate/AffiliateCodeCapture'
 import { OAuthButtons } from '@/components/auth/OAuthButtons'
 import { Logo } from '@/components/layout/Logo'
 import { toast } from '@/components/ui/toaster'
@@ -34,7 +35,7 @@ function getStrength(pass: string): { label: string; score: number; color: strin
   if (score <= 2) {
     return { label: 'Средний пароль', score: 2, color: 'bg-[#FFB300]' }
   }
-  return { label: 'Надёжный пароль', score: 3, color: 'bg-[#00E676]' }
+  return { label: 'Надёжный пароль', score: 3, color: 'bg-[#00C853]' }
 }
 
 export default function RegisterPage(): React.JSX.Element {
@@ -51,7 +52,13 @@ export default function RegisterPage(): React.JSX.Element {
   const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
     try {
-      await register(email, password, ref || undefined)
+      // Два независимых кода: `ref` — игровая рефералка (поле формы),
+      // affiliate — партнёрская программа (ТЗ ч.8 §7.3). Сервер резолвит каждый
+      // в своей таблице, поэтому передавать можно оба.
+      await register(email, password, {
+        referral: ref || undefined,
+        affiliate: getAffiliateCode() ?? undefined,
+      })
       setSent(true)
       toast.success('Письмо отправлено на email')
     } catch (err: unknown) {
@@ -79,7 +86,10 @@ export default function RegisterPage(): React.JSX.Element {
         <div className="mb-6 flex justify-center">
           <Logo size={40} />
         </div>
-        <h1 className="mb-4 text-center text-xl font-bold">Регистрация</h1>
+        <div className="mb-6 text-center">
+          <p className="caps-label">НОВЫЙ АККАУНТ</p>
+          <h1 className="text-xl font-black text-white">Регистрация</h1>
+        </div>
 
         <OAuthButtons referralCode={ref} />
 
@@ -147,7 +157,7 @@ export default function RegisterPage(): React.JSX.Element {
           <label className="flex items-start gap-2 text-xs text-muted">
             <input
               type="checkbox"
-              className="mt-0.5 accent-[#6C63FF]"
+              className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
               checked={adult}
               onChange={(e) => setAdult(e.target.checked)}
               required

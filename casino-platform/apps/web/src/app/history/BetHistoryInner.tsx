@@ -1,9 +1,11 @@
 'use client'
 
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { ChevronDown } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useMemo, useState } from 'react'
 
+import { ErrorBanner } from '@/components/ui/error-banner'
 import { apiGet } from '@/lib/api'
 import { fetchProviders } from '@/lib/api/casino.api'
 import { currencyLabel, formatAmount } from '@/lib/format/currency'
@@ -54,26 +56,27 @@ export function BetHistoryInner(): React.JSX.Element {
     [filter, router],
   )
 
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: [
-      'bet-history',
-      filter.gameId,
-      filter.provider,
-      filter.currency,
-      filter.from,
-      filter.to,
-    ],
-    queryFn: ({ pageParam }) =>
-      apiGet<HistoryDto>('/casino/history', {
-        page: pageParam,
-        per_page: PAGE_SIZE,
-        ...betApiParams(filter),
-      }),
-    enabled: Boolean(user),
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) =>
-      lastPage.meta.page < lastPage.meta.total_pages ? lastPage.meta.page + 1 : undefined,
-  })
+  const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery({
+      queryKey: [
+        'bet-history',
+        filter.gameId,
+        filter.provider,
+        filter.currency,
+        filter.from,
+        filter.to,
+      ],
+      queryFn: ({ pageParam }) =>
+        apiGet<HistoryDto>('/casino/history', {
+          page: pageParam,
+          per_page: PAGE_SIZE,
+          ...betApiParams(filter),
+        }),
+      enabled: Boolean(user),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage) =>
+        lastPage.meta.page < lastPage.meta.total_pages ? lastPage.meta.page + 1 : undefined,
+    })
 
   const { data: providers } = useQuery({
     queryKey: ['providers-page'],
@@ -94,14 +97,16 @@ export function BetHistoryInner(): React.JSX.Element {
   const singleCurrencyStats = statsForCurrency(stats, filter.currency)
 
   return (
-    <div className="container-1 py-8">
-      <h1 className="mb-4 text-2xl font-bold">История ставок</h1>
+    <div className="container-1 py-6">
+      <p className="caps-label">ТВОЯ ИСТОРИЯ</p>
+      <h1 className="page-title mb-4">История ставок</h1>
 
-      <div className="card mb-5 flex flex-wrap items-center gap-3">
+      {/* Раскладку фильтра задаёт сетка (col-span), а не ширина самого `input`. */}
+      <div className="card mb-5 grid grid-cols-2 gap-2">
         <select
           value={filter.gameId}
           onChange={(e) => apply({ gameId: e.target.value })}
-          className="input w-auto max-w-[220px]"
+          className="input col-span-2"
           aria-label="Игра"
         >
           <option value="">Все игры</option>
@@ -111,10 +116,12 @@ export function BetHistoryInner(): React.JSX.Element {
             </option>
           ))}
         </select>
+        {/* Провайдер и валюта — во всю ширину: нативный select не переносит текст,
+            а в половине контейнера «Все провайдеры» обрезается до «Все провайдер». */}
         <select
           value={filter.provider}
           onChange={(e) => apply({ provider: e.target.value })}
-          className="input w-auto"
+          className="input col-span-2"
           aria-label="Провайдер"
         >
           <option value="">Все провайдеры</option>
@@ -127,7 +134,7 @@ export function BetHistoryInner(): React.JSX.Element {
         <select
           value={filter.currency}
           onChange={(e) => apply({ currency: e.target.value })}
-          className="input w-auto"
+          className="input col-span-2"
           aria-label="Валюта"
         >
           <option value="">Все валюты</option>
@@ -141,20 +148,20 @@ export function BetHistoryInner(): React.JSX.Element {
           type="date"
           value={filter.from}
           onChange={(e) => apply({ from: e.target.value })}
-          className="input w-auto"
+          className="input"
           aria-label="С даты"
         />
         <input
           type="date"
           value={filter.to}
           onChange={(e) => apply({ to: e.target.value })}
-          className="input w-auto"
+          className="input"
           aria-label="По дату"
         />
         {hasActiveBetParts(filter) && (
           <button
             type="button"
-            className="btn-ghost px-3 py-1.5 text-xs"
+            className="btn-ghost col-span-2 py-1.5 text-xs"
             onClick={() => router.replace('/history')}
           >
             Сбросить фильтры
@@ -162,48 +169,22 @@ export function BetHistoryInner(): React.JSX.Element {
         )}
       </div>
 
-      <div className="mb-5 flex flex-wrap gap-4 text-sm">
-        <div className="card flex-1 px-4 py-3">
-          <div className="text-xs text-muted">Ставок</div>
-          <div className="text-lg font-semibold">{isLoading ? '…' : totalRounds(stats)}</div>
-        </div>
-        {singleCurrencyStats ? (
-          <>
-            <div className="card flex-1 px-4 py-3">
-              <div className="text-xs text-muted">Оборот</div>
-              <div className="text-lg font-semibold">
-                {formatAmount(singleCurrencyStats.turnover, singleCurrencyStats.currency)}
-              </div>
-            </div>
-            <div className="card flex-1 px-4 py-3">
-              <div className="text-xs text-muted">Выигрыши</div>
-              <div className="text-lg font-semibold text-[#00C853]">
-                {formatAmount(singleCurrencyStats.wins, singleCurrencyStats.currency)}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="card flex-1 px-4 py-3">
-            <div className="text-xs text-muted">
-              Оборот и выигрыши — по валютам (₽ и USDT не суммируем). Выберите одну валюту.
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {stats.map((row) => (
-                <button
-                  key={row.currency}
-                  type="button"
-                  className="rounded-lg border border-[#2A2A4A] px-2 py-1 text-xs hover:border-[#6C63FF]/40"
-                  onClick={() => apply({ currency: row.currency })}
-                >
-                  {currencyLabel(row.currency)}: {formatAmount(row.turnover, row.currency)}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Ошибка ≠ пустая выборка: иначе ниже показывался бы ноль ставок и
+          «Ставок в этом периоде нет» вместо упавшего запроса. */}
+      {isError && (
+        <ErrorBanner text="Не удалось загрузить историю" onRetry={() => void refetch()} />
+      )}
 
-      {rows.length === 0 && !isLoading ? (
+      {!isError && (
+        <BetStats
+          stats={stats}
+          single={singleCurrencyStats}
+          loading={isLoading}
+          onPick={(currency) => apply({ currency })}
+        />
+      )}
+
+      {rows.length === 0 && !isLoading && !isError ? (
         <div className="py-12 text-center text-sm text-muted">Ставок в этом периоде нет</div>
       ) : (
         <ul className="space-y-2">
@@ -237,7 +218,67 @@ export function BetHistoryInner(): React.JSX.Element {
 }
 
 /**
- * Строка ставки: игра, валюта, ставка, выигрыш, дата. P/L — только в детали
+ * Сводка над списком (§12): число ставок, а оборот/выигрыши — только когда
+ * выбрана одна валюта. В смешанной выборке ₽ и ₸ не суммируются, поэтому
+ * показываем оборот по кошелькам и даём выбрать один кликом.
+ */
+function BetStats({
+  stats,
+  single,
+  loading,
+  onPick,
+}: {
+  stats: BetStatsRow[]
+  single: BetStatsRow | null
+  loading: boolean
+  onPick: (currency: string) => void
+}): React.JSX.Element {
+  return (
+    <div className="mb-5 flex flex-wrap items-start gap-3 text-sm">
+      <div className="card flex-1 px-4 py-3">
+        <div className="text-xs text-muted">Ставок</div>
+        <div className="text-lg font-semibold">{loading ? '…' : totalRounds(stats)}</div>
+      </div>
+      {single ? (
+        <>
+          <div className="card flex-1 px-4 py-3">
+            <div className="text-xs text-muted">Оборот</div>
+            <div className="text-lg font-semibold">
+              {formatAmount(single.turnover, single.currency)}
+            </div>
+          </div>
+          <div className="card flex-1 px-4 py-3">
+            <div className="text-xs text-muted">Выигрыши</div>
+            <div className="text-lg font-semibold text-[#00C853]">
+              {formatAmount(single.wins, single.currency)}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="card flex-1 px-4 py-3">
+          <div className="text-xs text-muted">Оборот по валютам — выберите одну</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {stats.map((row) => (
+              <button
+                key={row.currency}
+                type="button"
+                className="rounded-lg border border-[#2A2A4A] px-2 py-1 text-xs hover:border-[#6C63FF]/40"
+                onClick={() => onPick(row.currency)}
+              >
+                {formatAmount(row.turnover, row.currency)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Строка ставки: дата, игра, ставка, выигрыш (символ валюты уже в `formatAmount`,
+ * отдельная колонка не нужна). Выигрыш зелёный только при реальной прибыли, иначе
+ * нейтральный — ноль не должен выглядеть как успех. P/L — только в детали
  * (§12: «прибыль/убыток» не героем страницы).
  */
 function BetRow({
@@ -258,12 +299,23 @@ function BetRow({
           {new Date(row.created_at).toLocaleDateString('ru')}
         </span>
         <span className="flex-1 truncate text-sm">{row.game.name}</span>
-        <span className="shrink-0 text-xs text-muted">{currencyLabel(row.currency)}</span>
-        <span className="shrink-0 text-sm">{formatAmount(row.total_bet, row.currency)}</span>
-        <span className="shrink-0 text-sm text-[#00C853]">
+        <span className="shrink-0 text-right text-sm">
+          {formatAmount(row.total_bet, row.currency)}
+        </span>
+        <span
+          className={
+            money.isPositive(profit)
+              ? 'shrink-0 text-right text-sm text-[#00C853]'
+              : 'shrink-0 text-right text-sm text-muted'
+          }
+        >
           {formatAmount(row.total_win, row.currency)}
         </span>
-        <span className="shrink-0 text-xs text-muted">{expanded ? '▲' : '▼'}</span>
+        <ChevronDown
+          size={14}
+          aria-hidden
+          className={`shrink-0 text-muted transition-transform ${expanded ? 'rotate-180' : ''}`}
+        />
       </button>
       {expanded && (
         <div className="mt-3 space-y-1 border-t border-[#2A2A4A] pt-3 text-xs text-muted">

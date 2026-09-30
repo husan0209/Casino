@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 
 import { fetchProviders } from '@/lib/api/casino.api'
+import { gameCountLabel } from '@/lib/format/plural'
 
 /**
  * GAP-53 (ТЗ ч.5 §2.9): страница провайдеров — сетка карточек
@@ -19,8 +20,9 @@ export default function ProvidersPage(): React.JSX.Element {
   const list = providers ?? []
 
   return (
-    <div className="container-1 py-8">
-      <h1 className="mb-4 text-2xl font-bold">Провайдеры</h1>
+    <div className="container-1 py-6">
+      <p className="caps-label">ПРОВЕРЕННЫЕ СТУДИИ</p>
+      <h1 className="page-title mb-4">Провайдеры</h1>
       {isLoading ? (
         <div className="py-8 text-center text-sm text-muted">Загрузка…</div>
       ) : list.length === 0 ? (
@@ -49,7 +51,7 @@ export default function ProvidersPage(): React.JSX.Element {
               )}
               <div>
                 <div className="text-sm font-medium">{provider.name}</div>
-                <div className="text-xs text-muted">{provider.game_count} игр</div>
+                <div className="text-xs text-muted">{gameCountLabel(provider.game_count)}</div>
               </div>
             </Link>
           ))}

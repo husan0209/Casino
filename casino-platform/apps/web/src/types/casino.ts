@@ -35,8 +35,12 @@ export interface GameDto {
   name: string
   nameRu?: string | null
   thumbnailUrl?: string | null
+  /** Широкая обложка для превью (§8.1); в листинге её нет, только в деталях. */
+  bannerUrl?: string | null
   category?: string | null
   rtp?: number | string | null
+  /** Мин. ставка провайдера, Decimal → строка в JSON. Только в деталях игры. */
+  minBet?: number | string | null
   isFeatured?: boolean
   isNew?: boolean
   isPopular?: boolean
@@ -61,7 +65,10 @@ export interface GamesListDto {
   meta: GamesMetaDto
 }
 
-/** Ответ GET /casino/games/:slug — та же игра + поле демо (hasDemo уже в GameDto). */
+/**
+ * Ответ GET /casino/games/:slug — карточка каталога плюс то, что листинг не
+ * отдаёт: `bannerUrl` и `minBet` (нужны превью, ТЗ ч.5 §8.1).
+ */
 export type GameDetailsDto = GameDto
 
 /** Ответ POST /casino/games/:slug/launch. */
