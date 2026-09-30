@@ -5,9 +5,9 @@ import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
 
-import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
+import { KycFacade } from '@modules/kyc/facade/kyc.facade'
 
-import { PaymentProviderError } from '../../domain/errors'
+import { InvalidCurrencyError, PaymentProviderError } from '../../domain/errors'
 import {
   type INowPaymentsClient,
   type IPaymentRequestRepository,
@@ -21,7 +21,10 @@ export class CreateCryptoDepositUseCase {
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(NOWPAYMENTS_CLIENT) private readonly np: INowPaymentsClient,
-    @Inject(KycCheckService) private kycCheck: KycCheckService,
+    // KycFacade, а не KycCheckService напрямую: межмодульный доступ только
+    // через фасад (AGENTS.md правило 4, MODULE_BOUNDARIES). @Inject обязателен
+    // в этой сборке — design:paramtypes не выдаётся (CONVENTIONS §1.4).
+    @Inject(KycFacade) private kycCheck: KycFacade,
     @Inject(ConfigService) private config: ConfigService,
   ) {}
   async execute(
@@ -37,7 +40,7 @@ export class CreateCryptoDepositUseCase {
   }> {
     const allowed = ['USDT_TRC20', 'BTC', 'TON', 'TRX', 'LTC']
     if (!allowed.includes(currency)) {
-      throw new Error('INVALID_CURRENCY')
+      throw new InvalidCurrencyError()
     }
     // estimate RUB for KYC
     const est = await this.np.getEstimatePrice({

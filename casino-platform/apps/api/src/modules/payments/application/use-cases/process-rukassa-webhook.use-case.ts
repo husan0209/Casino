@@ -3,7 +3,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 import { errorMessage } from '@/common/utils/error-message'
 
 import { UsersFacade } from '@modules/users/facade/users.facade'
-import { WalletFacade } from '@modules/wallet/application/wallet.facade'
+import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import { type Currency } from '@casino/shared-types'
 

@@ -7,9 +7,10 @@ vi.mock('@casino/database', () => ({
   prisma: { $transaction: vi.fn() },
 }))
 
-import { runWalletTransaction } from '../src/modules/wallet/infrastructure/ledger/wallet-transaction-lock'
-import { OptimisticLockError } from '../src/modules/wallet/domain/errors'
 import { prisma } from '@casino/database'
+
+import { OptimisticLockError } from '../src/modules/wallet/domain/errors'
+import { runWalletTransaction } from '../src/modules/wallet/infrastructure/ledger/wallet-transaction-lock'
 
 const transactionMock = vi.mocked(prisma.$transaction)
 

@@ -4,12 +4,12 @@ import { AuthModule } from '../auth/auth.module'
 import { ConfirmWithdrawalUseCase } from './application/use-cases/confirm-withdrawal.use-case'
 import { LockFundsUseCase } from './application/use-cases/lock-funds.use-case'
 import { UnlockFundsUseCase } from './application/use-cases/unlock-funds.use-case'
-import { WalletFacade } from './application/wallet.facade'
 import {
   WALLET_REPOSITORY,
   WALLET_LEDGER,
   WALLET_TRANSACTION_RUNNER,
 } from './domain/repositories/wallet.repository'
+import { WalletFacade } from './facade/wallet.facade'
 import { PrismaWalletTransactionRunner } from './infrastructure/ledger/wallet-transaction-runner.prisma'
 import {
   PrismaWalletRepository,

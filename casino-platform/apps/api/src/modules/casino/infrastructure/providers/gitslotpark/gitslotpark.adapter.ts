@@ -11,7 +11,8 @@ import {
   type ParsedProviderCallback,
   type ProviderGameRow,
 } from '@modules/casino/domain/provider-adapter.interface'
-import { PaymentProviderNotConfiguredError } from '@modules/payments/infrastructure/clients/rukassa.client'
+
+import { CasinoProviderError, CasinoProviderNotConfiguredError } from '../../../domain/errors'
 
 const has = (v: unknown): boolean => v !== null && v !== undefined
 
@@ -110,7 +111,7 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
     const apiToken = this.config.get<string>('GITSLOTPARK_API_TOKEN')
     const secret = this.config.get<string>('GITSLOTPARK_SECRET_KEY')
     if (!agentId || !apiToken || !secret) {
-      throw new PaymentProviderNotConfiguredError(
+      throw new CasinoProviderNotConfiguredError(
         'GitSlotPark',
         'GITSLOTPARK_AGENT_ID, GITSLOTPARK_API_TOKEN, GITSLOTPARK_SECRET_KEY',
       )
@@ -141,14 +142,14 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
       signal: AbortSignal.timeout(30_000),
     })
     if (!res.ok) {
-      throw new Error(`userAuth HTTP ${res.status}`)
+      throw new CasinoProviderError(`userAuth HTTP ${res.status}`)
     }
     // external PSP payload — defensive parsing неизвестной формы
     const d = (await res.json()) as Record<string, unknown>
     // ответ: {status:0, game_url|url|launch_url} — парсим defensively
     const url = String(d.game_url ?? d.url ?? d.launch_url ?? '')
     if (String(d.status ?? '0') !== '0' || !url) {
-      throw new Error(`userAuth failed: ${JSON.stringify(d).slice(0, 200)}`)
+      throw new CasinoProviderError(`userAuth failed: ${JSON.stringify(d).slice(0, 200)}`)
     }
     return { url }
   }
@@ -161,7 +162,7 @@ export class GitslotparkProviderAdapter implements GameProviderAdapter {
       signal: AbortSignal.timeout(30_000),
     })
     if (!res.ok) {
-      throw new Error(`gamelist HTTP ${res.status}`)
+      throw new CasinoProviderError(`gamelist HTTP ${res.status}`)
     }
     // Внешний API без контракта — ответ читается через unknown-индексацию с фолбэками
     const d = (await res.json()) as GameListEnvelope

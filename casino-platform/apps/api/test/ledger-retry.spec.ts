@@ -13,8 +13,9 @@ vi.mock('@casino/database', () => ({
   },
 }))
 
-import { PrismaWalletLedger } from '../src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma'
 import { prisma } from '@casino/database'
+
+import { PrismaWalletLedger } from '../src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma'
 
 const transactionMock = vi.mocked(prisma.$transaction)
 

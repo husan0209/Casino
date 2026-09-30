@@ -10,6 +10,8 @@ import { CancelWithdrawalUseCase } from './application/use-cases/cancel-withdraw
 import { CreateCryptoDepositUseCase } from './application/use-cases/create-crypto-deposit.use-case'
 import { CreateFiatDepositUseCase } from './application/use-cases/create-fiat-deposit.use-case'
 import { CreateWithdrawalUseCase } from './application/use-cases/create-withdrawal.use-case'
+import { GetDepositStatusUseCase } from './application/use-cases/get-deposit-status.use-case'
+import { ListWithdrawalsUseCase } from './application/use-cases/list-withdrawals.use-case'
 import { ProcessNOWPaymentsWebhookUseCase } from './application/use-cases/process-nowpayments-webhook.use-case'
 import { ProcessRukassaWebhookUseCase } from './application/use-cases/process-rukassa-webhook.use-case'
 import {
@@ -17,6 +19,7 @@ import {
   PAYMENT_REQUEST_REPOSITORY,
   RUKASSA_CLIENT,
 } from './domain/payments.ports'
+import { PaymentsFacade } from './facade/payments.facade'
 import { NOWPaymentsClient } from './infrastructure/clients/nowpayments.client'
 import { RukassaClient } from './infrastructure/clients/rukassa.client'
 import { PaymentRequestRepository } from './infrastructure/repositories/payment-request.repository'
@@ -41,6 +44,11 @@ import { PaymentsController } from './presentation/controllers/payments.controll
     ProcessNOWPaymentsWebhookUseCase,
     CreateWithdrawalUseCase,
     CancelWithdrawalUseCase,
+    GetDepositStatusUseCase,
+    ListWithdrawalsUseCase,
+    PaymentsFacade,
   ],
+  // PaymentsFacade — публичный API модуля (MODULE_TEMPLATE Шаг 8).
+  exports: [PaymentsFacade],
 })
 export class PaymentsModule {}

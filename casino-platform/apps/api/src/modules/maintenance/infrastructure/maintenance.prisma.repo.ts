@@ -4,11 +4,12 @@ import Redis from 'ioredis'
 
 import { prisma } from '@casino/database'
 
-import { NOWPaymentsClient } from '../../payments/infrastructure/clients/nowpayments.client'
+import { PaymentsFacade } from '../../payments/facade/payments.facade'
 import { CleanupSessionsJob } from '../application/cleanup-sessions.job'
 import { ExpireDepositsJob } from '../application/expire-deposits.job'
 import { UpdateRatesJob } from '../application/update-rates.job'
 import { WithdrawalReminderJob } from '../application/withdrawal-reminder.job'
+import { PaymentRequestNotPendingError } from '../domain/errors'
 import {
   type IExchangeRateWriter,
   type IPaymentMaintenanceRepo,
@@ -98,7 +99,7 @@ export class PrismaMaintenanceRepo implements IPaymentMaintenanceRepo {
       data: { status: 'expired' },
     })
     if (res.count === 0) {
-      throw new Error(`payment_request ${id} is not pending anymore`)
+      throw new PaymentRequestNotPendingError(id)
     }
   }
 }
@@ -180,19 +181,18 @@ export class PrismaExchangeRateWriter implements IExchangeRateWriter {
 }
 
 /**
- * Провайдер курсов через NOWPayments /estimate (1 единица валюты → RUB).
+ * Провайдер курсов через PaymentsFacade → NOWPayments /estimate (1 единица валюты → RUB).
  * В dev без ключа NOWPaymentsClient вернёт dev-stub по константам DISPLAY_RUB_RATES.
  */
 @Injectable()
 export class NowPaymentsRatesProvider implements IRatesProvider {
-  constructor(@Inject(NOWPaymentsClient) private readonly client: NOWPaymentsClient) {}
+  // PaymentsFacade, а не NOWPaymentsClient напрямую: межмодульный доступ только
+  // через фасад (AGENTS.md правило 4). @Inject обязателен — в этой сборке
+  // design:paramtypes не выдаётся (CONVENTIONS §1.4).
+  constructor(@Inject(PaymentsFacade) private readonly facade: PaymentsFacade) {}
 
   async estimateRub(currency: string): Promise<{ rate: string; source: string } | null> {
-    const res = await this.client.estimate({
-      amount: '1',
-      currencyFrom: currency,
-      currencyTo: 'RUB',
-    })
+    const res = await this.facade.estimateRub(currency)
     if (!res) {
       return null
     }

@@ -8,6 +8,7 @@ import { errorMessage } from '@/common/utils/error-message'
 import { DISPLAY_RUB_RATES } from '@casino/shared-config'
 
 import { PaymentProviderNotConfiguredError } from './rukassa.client'
+import { PaymentProviderError } from '../../domain/errors'
 
 import type { INowPaymentsClient } from '../../domain/payments.ports'
 
@@ -160,12 +161,12 @@ export class NOWPaymentsClient implements INowPaymentsClient {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       })
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
+        throw new PaymentProviderError(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
       }
       const d = asPspResponse<NOWPaymentsCreatePaymentResponse>(await res.json())
       const { paymentId, payAddress } = parseCreateResponse(d)
       if (!paymentId || !payAddress) {
-        throw new Error(
+        throw new PaymentProviderError(
           `unexpected shape: ${JSON.stringify({ paymentId, payAddress }).slice(0, 200)}`,
         )
       }
@@ -194,7 +195,7 @@ export class NOWPaymentsClient implements INowPaymentsClient {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`)
+      throw new PaymentProviderError(`HTTP ${res.status}`)
     }
     const d = asPspResponse<NOWPaymentsPaymentStatusResponse>(await res.json())
     return {
@@ -234,12 +235,12 @@ export class NOWPaymentsClient implements INowPaymentsClient {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       })
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`)
+        throw new PaymentProviderError(`HTTP ${res.status}`)
       }
       const d = asPspResponse<NOWPaymentsEstimateResponse>(await res.json())
       const v = Number(d.estimated_amount)
       if (!Number.isFinite(v) || v <= 0) {
-        throw new Error(`bad estimate shape: ${JSON.stringify(d).slice(0, 120)}`)
+        throw new PaymentProviderError(`bad estimate shape: ${JSON.stringify(d).slice(0, 120)}`)
       }
       return { estimatedAmount: String(v), source: 'nowpayments' }
     } catch (e) {
@@ -283,7 +284,7 @@ export class NOWPaymentsClient implements INowPaymentsClient {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
     if (!res.ok) {
-      throw new Error(`estimate HTTP ${res.status}`)
+      throw new PaymentProviderError(`estimate HTTP ${res.status}`)
     }
     const d = asPspResponse<NOWPaymentsEstimateResponse>(await res.json())
     return { estimatedAmount: String(d.estimated_amount ?? params.amount) }
@@ -382,7 +383,7 @@ export function canonicalizeForNOWPayments(rawBody: string): string {
   // маркеров (вставили N, а нашли N+k) — значит часть «маркеров» пришла от
   // отправителя. Каноническую ветку пропускаем (verifyIPN проверит raw-HMAC).
   if (countMarkers(parsed) !== marked.inserted) {
-    throw new Error('marker collision')
+    throw new PaymentProviderError('marker collision')
   }
   const obj = parsed as Record<string, unknown>
   const sorted: Record<string, unknown> = {}

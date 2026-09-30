@@ -1,7 +1,9 @@
+// Inject обязателен в этой сборке: emitDecoratorMetadata не выдаёт
+// design:paramtypes, поэтому инъекция «по типу» молча даёт undefined
+// (CONVENTIONS §1.4). ForbiddenException убран — в теле файла не используется.
 import {
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Inject,
   Param,
@@ -17,8 +19,10 @@ import { type AdminActor } from '@/common/types/req-user'
 
 import { type AdminUserRow } from '@modules/admin/domain/admin.repository'
 
+
 import { AdminUsersService } from '../../application/admin-users.service'
 import { AuditLogService } from '../../application/audit-log.service'
+import { SuperadminOnlyError } from '../../domain/errors'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { CreateAdminSchema } from '../dto/admin-admins.dto'
 
@@ -44,7 +48,7 @@ export class AdminAdminsController {
     // Аудит контрактов 2026-09-26: раньше {success:false, error} с HTTP 200 —
     // клиент уходил в onSuccess и рапортовал об успехе. 403 + error-конверт.
     if (!isSuper(req)) {
-      throw new ForbiddenException('superadmin only')
+      throw new SuperadminOnlyError('superadmin only')
     }
     const admin = await this.svc.create(
       body as unknown as Parameters<typeof this.svc.create>[0],
@@ -62,7 +66,7 @@ export class AdminAdminsController {
   @Post(':id/deactivate')
   async deactivate(@Param('id') id: string, @Req() req: Request): Promise<{ ok: boolean }> {
     if (!isSuper(req)) {
-      throw new ForbiddenException('superadmin only')
+      throw new SuperadminOnlyError('superadmin only')
     }
     await this.svc.block(id)
     await this.audit.log({

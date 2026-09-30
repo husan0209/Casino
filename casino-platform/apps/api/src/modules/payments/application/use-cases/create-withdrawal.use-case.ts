@@ -3,23 +3,20 @@ import { randomUUID } from 'crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import { Decimal } from 'decimal.js'
 
-import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
-import { WalletFacade } from '@modules/wallet/application/wallet.facade'
+import { KycFacade } from '@modules/kyc/facade/kyc.facade'
+import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import { type Currency } from '@casino/shared-types'
 
 import { AmountTooLargeError, AmountTooSmallError } from '../../domain/errors'
-import {
-  type IPaymentRequestRepository,
-  PAYMENT_REQUEST_REPOSITORY,
-} from '../../domain/payments.ports'
+import { type IPaymentRequestRepository, PAYMENT_REQUEST_REPOSITORY } from '../../domain/payments.ports'
 
 @Injectable()
 export class CreateWithdrawalUseCase {
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(WalletFacade) private wallet: WalletFacade,
-    @Inject(KycCheckService) private kyc: KycCheckService,
+    @Inject(KycFacade) private kyc: KycFacade,
   ) {}
   async execute(
     userId: string,

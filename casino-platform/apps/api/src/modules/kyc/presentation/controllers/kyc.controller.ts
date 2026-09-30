@@ -42,6 +42,9 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 @Controller('kyc')
 export class KycController {
   constructor(
+    // @Inject обязателен: в этой сборке emitDecoratorMetadata не выдаёт
+    // design:paramtypes, поэтому инъекция «по типу» даёт undefined
+    // (CONVENTIONS §1.4).
     @Inject(SubmitKycUseCase) private submitUc: SubmitKycUseCase,
     @Inject(GetKycStatusUseCase) private statusUc: GetKycStatusUseCase,
     @Inject(UploadKycDocumentUseCase) private uploadUc: UploadKycDocumentUseCase,

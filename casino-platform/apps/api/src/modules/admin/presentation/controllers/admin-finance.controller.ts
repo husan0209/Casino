@@ -8,8 +8,9 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
 
 import { PaymentRequestRepository } from '@modules/payments/infrastructure/repositories/payment-request.repository'
-import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
+import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
+
 
 import {
   type LedgerEntry,
@@ -24,6 +25,7 @@ import { type Currency } from '@casino/shared-types'
 import { AppError } from '@casino/shared-utils'
 
 import { AuditLogService } from '../../application/audit-log.service'
+import { AdminForbiddenError } from '../../domain/errors'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import {
   BatchApproveSchema,
@@ -401,7 +403,7 @@ export class AdminFinanceController {
     @Req() req: Request,
   ): Promise<CreditResult> {
     if (admin.role !== 'superadmin') {
-      throw new Error('FORBIDDEN')
+      throw new AdminForbiddenError()
     }
     const res = await this.wallet.credit({
       userId,
@@ -434,7 +436,7 @@ export class AdminFinanceController {
     @Req() req: Request,
   ): Promise<CreditResult> {
     if (admin.role !== 'superadmin') {
-      throw new Error('FORBIDDEN')
+      throw new AdminForbiddenError()
     }
     const res = await this.wallet.debit({
       userId,

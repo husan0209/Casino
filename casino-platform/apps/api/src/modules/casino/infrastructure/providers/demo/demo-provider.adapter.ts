@@ -9,6 +9,9 @@ import {
   type ProviderGameRow,
 } from '@modules/casino/domain/provider-adapter.interface'
 
+import { DemoProviderDisabledError } from '../../../domain/errors'
+
+
 @Injectable()
 export class DemoProviderAdapter implements GameProviderAdapter {
   constructor(@Inject(ConfigService) private config: ConfigService) {}
@@ -48,7 +51,7 @@ export class DemoProviderAdapter implements GameProviderAdapter {
   verifyCallback(): boolean {
     const env = this.config.get<string>('NODE_ENV')
     if (env === 'production') {
-      throw new Error('DEMO_PROVIDER_DISABLED. Demo provider cannot be used in production.')
+      throw new DemoProviderDisabledError('DEMO_PROVIDER_DISABLED. Demo provider cannot be used in production.')
     }
     return true
   }

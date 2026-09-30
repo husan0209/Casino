@@ -28,6 +28,7 @@ import {
   type Prisma,
 } from '@casino/database'
 
+import { CasinoEntityNotFoundError } from '../../domain/errors'
 import { type ProviderGameRow } from '../../domain/provider-adapter.interface'
 import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 import { UpdateGameSchema } from '../dto/admin-game.dto'
@@ -109,7 +110,7 @@ export class CasinoAdminController {
   ): Promise<{ added: number; updated: number; total: number; note: string }> {
     const provider = await prisma.gameProvider.findUnique({ where: { id } })
     if (!provider) {
-      throw new Error('NOT_FOUND')
+      throw new CasinoEntityNotFoundError('NOT_FOUND')
     }
     const adapter = this.adapters.getAdapter(provider.slug)
     const list = await adapter.fetchGameList()

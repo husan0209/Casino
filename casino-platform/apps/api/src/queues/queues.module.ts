@@ -1,10 +1,21 @@
 import { Module } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import { AppError } from '@casino/shared-utils'
+
 import { EmailWorker } from './application/email.worker'
 import { BullMqEmailQueue, DevLogEmailQueue } from './infrastructure/email.queue'
 import { mailerFactory } from './infrastructure/smtp.mailer'
 import { EMAIL_QUEUE_PORT, MAILER_PORT, type EmailQueuePort } from './queue.types'
+
+/** Волна 3в (G17): был raw Error в фабрике очереди. */
+export class RedisUrlRequiredError extends AppError {
+  readonly code = 'REDIS_URL_REQUIRED_IN_PRODUCTION'
+  readonly httpStatus = 500
+  constructor() {
+    super('REDIS_URL_REQUIRED_IN_PRODUCTION')
+  }
+}
 
 
 /**
@@ -30,7 +41,7 @@ import { EMAIL_QUEUE_PORT, MAILER_PORT, type EmailQueuePort } from './queue.type
           return new BullMqEmailQueue(config)
         }
         if (config.get<string>('NODE_ENV') === 'production') {
-          throw new Error('REDIS_URL_REQUIRED_IN_PRODUCTION')
+          throw new RedisUrlRequiredError()
         }
         return new DevLogEmailQueue()
       },

@@ -14,6 +14,7 @@ import {
   PasswordNotSetError,
   WeakPasswordError,
 } from '../src/modules/auth/domain/errors'
+
 import type { ISessionRepository } from '../src/modules/auth/domain/repositories/session.repository'
 import type { IUserRepository } from '../src/modules/auth/domain/repositories/user.repository'
 import type { PasswordHasher } from '../src/modules/auth/infrastructure/services/password-hasher.service'

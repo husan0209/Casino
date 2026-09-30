@@ -1,15 +1,16 @@
-import type { Prisma } from '@prisma/client'
 
 import { GameCallbackService } from '../src/modules/casino/application/services/game-callback.service'
+
+import type { ParsedProviderCallback } from '../src/modules/casino/domain/provider-adapter.interface'
 import type {
   GameRow,
   GameSessionWithGame,
   GameTransactionRow,
   IGamePlayRepository,
 } from '../src/modules/casino/domain/repositories/casino.repository'
-import type { ParsedProviderCallback } from '../src/modules/casino/domain/provider-adapter.interface'
-import type { WalletFacade } from '../src/modules/wallet/application/wallet.facade'
 import type { CreditInput, CreditResult, WalletLockTarget } from '../src/modules/wallet/domain/repositories/wallet.repository'
+import type { WalletFacade } from '../src/modules/wallet/facade/wallet.facade'
+import type { Prisma } from '@prisma/client'
 
 /** Маркер транзакции: в тестах вместо Prisma.TransactionClient. */
 const TX = { __tx: 'outer-transaction' } as unknown as Prisma.TransactionClient
@@ -44,7 +45,7 @@ class FakePlay implements IGamePlayRepository {
   txSeen: Record<string, unknown[]> = {}
 
   private record(method: string, tx: Prisma.TransactionClient | undefined) {
-    ;(this.txSeen[method] ??= []).push(tx)
+    (this.txSeen[method] ??= []).push(tx)
   }
 
   async findSessionByTokenWithUser(token: string) {
@@ -113,7 +114,9 @@ class FakePlay implements IGamePlayRepository {
     this.record('createTransaction', tx)
     const row = { id: 'gt-1', ...data } as unknown as GameTransactionRow
     this.transactions.set(`${data.providerId}:${data.externalTransactionId}`, row)
-    if (data.type === 'rollback') this.rollbacks.push(row)
+    if (data.type === 'rollback') {
+this.rollbacks.push(row)
+}
     return row
   }
 }
