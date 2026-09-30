@@ -210,7 +210,7 @@ import { UserRepository } from '@modules/users/domain/repositories/user.reposito
 
 ```typescript
 // 1. External packages
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
 import { z } from 'zod'
 
 // 2. Internal packages (shared)

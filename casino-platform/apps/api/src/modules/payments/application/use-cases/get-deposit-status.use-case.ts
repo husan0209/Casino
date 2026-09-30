@@ -10,7 +10,9 @@ import {
 /** Статус депозита для владельца заявки (В3: контроллер без репозитория). */
 @Injectable()
 export class GetDepositStatusUseCase {
-  constructor(@Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository) {}
+  constructor(
+    @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
+  ) {}
 
   async execute(
     userId: string,

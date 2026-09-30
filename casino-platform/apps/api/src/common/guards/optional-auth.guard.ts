@@ -1,4 +1,4 @@
-import { type CanActivate, type ExecutionContext, Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, type CanActivate, type ExecutionContext } from '@nestjs/common'
 import { type Request } from 'express'
 
 import { JwtTokenService } from '../../modules/auth/infrastructure/services/jwt.service'

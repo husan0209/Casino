@@ -21,7 +21,9 @@ export class ProviderAdapterFactory implements IProviderAdapterFactory {
 
         if (env === 'production') {
           this.logger.error('Demo provider requested in production. DEMO_PROVIDER_DISABLED.')
-          throw new DemoProviderDisabledError('DEMO_PROVIDER_DISABLED. Demo provider is not available in production.')
+          throw new DemoProviderDisabledError(
+            'DEMO_PROVIDER_DISABLED. Demo provider is not available in production.',
+          )
         }
 
         if (!demoEnabled) {

@@ -1,9 +1,9 @@
 import {
-  type CanActivate,
-  type ExecutionContext,
   Inject,
   Injectable,
   SetMetadata,
+  type CanActivate,
+  type ExecutionContext,
 } from '@nestjs/common'
 import { Reflector } from '@nestjs/core'
 

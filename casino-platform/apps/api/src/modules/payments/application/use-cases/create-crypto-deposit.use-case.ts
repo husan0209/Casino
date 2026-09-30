@@ -15,6 +15,14 @@ import {
   PAYMENT_REQUEST_REPOSITORY,
 } from '../../domain/payments.ports'
 
+export interface CreateCryptoDepositResult {
+  payment_request_id: string
+  pay_address: string
+  pay_amount: string
+  pay_currency: string
+  expires_at: string
+}
+
 @Injectable()
 export class CreateCryptoDepositUseCase {
   // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
@@ -31,13 +39,7 @@ export class CreateCryptoDepositUseCase {
     userId: string,
     amount: string,
     currency: string,
-  ): Promise<{
-    payment_request_id: string
-    pay_address: string
-    pay_amount: string
-    pay_currency: string
-    expires_at: string
-  }> {
+  ): Promise<CreateCryptoDepositResult> {
     const allowed = ['USDT_TRC20', 'BTC', 'TON', 'TRX', 'LTC']
     if (!allowed.includes(currency)) {
       throw new InvalidCurrencyError()

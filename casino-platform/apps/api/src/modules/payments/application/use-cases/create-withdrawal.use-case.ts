@@ -9,7 +9,10 @@ import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 import { type Currency } from '@casino/shared-types'
 
 import { AmountTooLargeError, AmountTooSmallError } from '../../domain/errors'
-import { type IPaymentRequestRepository, PAYMENT_REQUEST_REPOSITORY } from '../../domain/payments.ports'
+import {
+  type IPaymentRequestRepository,
+  PAYMENT_REQUEST_REPOSITORY,
+} from '../../domain/payments.ports'
 
 @Injectable()
 export class CreateWithdrawalUseCase {

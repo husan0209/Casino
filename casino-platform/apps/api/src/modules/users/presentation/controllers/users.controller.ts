@@ -53,7 +53,8 @@ export class UsersController {
     @Inject(RevokeSessionUseCase) private revokeSession: RevokeSessionUseCase,
     @Inject(RevokeAllSessionsUseCase) private revokeAllSessions: RevokeAllSessionsUseCase,
     @Inject(SelfExclusionUseCase) private selfExclusion: SelfExclusionUseCase,
-    @Inject(UpdateCurrencyPreferenceUseCase) private updateCurrency: UpdateCurrencyPreferenceUseCase,
+    @Inject(UpdateCurrencyPreferenceUseCase)
+    private updateCurrency: UpdateCurrencyPreferenceUseCase,
   ) {}
 
   @Get('me')

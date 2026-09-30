@@ -99,7 +99,9 @@ export class RukassaClient implements IRukassaClient {
       const data = (await res.json()) as Record<string, unknown>
       const { paymentId, paymentUrl } = pickPaymentFields(data)
       if (!paymentId || !paymentUrl) {
-        throw new PaymentProviderError(`unexpected response shape: ${JSON.stringify(data).slice(0, 200)}`)
+        throw new PaymentProviderError(
+          `unexpected response shape: ${JSON.stringify(data).slice(0, 200)}`,
+        )
       }
       this.logger.log(`Rukassa order created: ${paymentId}`)
       return { paymentId, paymentUrl }

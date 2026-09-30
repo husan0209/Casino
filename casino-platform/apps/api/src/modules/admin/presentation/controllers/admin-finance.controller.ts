@@ -1,6 +1,17 @@
 import { randomUUID } from 'crypto'
 
-import { Body, Controller, Get, Inject, Param, Post, Query, Req, UseGuards, UsePipes } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common'
 import { type Request } from 'express'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
@@ -10,7 +21,6 @@ import { type AdminActor } from '@/common/types/req-user'
 import { PaymentRequestRepository } from '@modules/payments/infrastructure/repositories/payment-request.repository'
 import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
-
 
 import {
   type LedgerEntry,
@@ -33,6 +43,7 @@ import {
   RejectWithdrawalSchema,
   WalletAdjustSchema,
 } from '../dto/admin-finance.dto'
+
 
 export class WithdrawalInvalidStatusError extends AppError {
   readonly code = 'WITHDRAWAL_INVALID_STATUS'
@@ -75,9 +86,7 @@ export class AdminFinanceController {
 
   // UC-PAY-16 transactions
   @Get('transactions')
-  async transactions(
-    @Query() q: Record<string, string | undefined>,
-  ): Promise<{
+  async transactions(@Query() q: Record<string, string | undefined>): Promise<{
     items: ({ user: { email: string | null } | null; walletAccount: { currency: string } } & {
       id: string
       createdAt: Date
@@ -123,9 +132,7 @@ export class AdminFinanceController {
 
   // UC-PAY-17 payment_requests
   @Get('payment-requests')
-  async paymentRequests(
-    @Query() q: Record<string, string | undefined>,
-  ): Promise<{
+  async paymentRequests(@Query() q: Record<string, string | undefined>): Promise<{
     items: ({ user: { email: string | null } } & {
       id: string
       createdAt: Date
@@ -193,9 +200,7 @@ export class AdminFinanceController {
 
   // UC-PAY-10 withdrawals list
   @Get('withdrawals')
-  async withdrawals(
-    @Query() q: Record<string, string | undefined>,
-  ): Promise<{
+  async withdrawals(@Query() q: Record<string, string | undefined>): Promise<{
     items: ({ user: { email: string | null } } & {
       id: string
       createdAt: Date

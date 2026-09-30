@@ -10,7 +10,9 @@ import { GetReadinessUseCase } from '../application/use-cases/get-readiness.use-
  */
 @Controller('health')
 export class HealthController {
-  constructor(@Inject(GetReadinessUseCase) private readonly readinessUseCase: GetReadinessUseCase) {}
+  constructor(
+    @Inject(GetReadinessUseCase) private readonly readinessUseCase: GetReadinessUseCase,
+  ) {}
 
   @Get()
   getHealth(): { status: string; timestamp: string } {

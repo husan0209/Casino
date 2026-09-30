@@ -24,6 +24,7 @@ import {
   type GameSessionStatus,
   type GameTransactionType,
   type GameType,
+  type GameVolatility,
   prisma,
   type Prisma,
 } from '@casino/database'
@@ -39,10 +40,6 @@ import { UpdateGameSchema } from '../dto/admin-game.dto'
  * с реальными колонками (например, забывали поле, добавленное миграцией) и
  * раздували методы до 98 строк.
  */
-type AdminGameRow = Prisma.GameGetPayload<{
-  include: { provider: { select: { slug: true; name: true } } }
-}>
-
 type AdminSessionDetail = Prisma.GameSessionGetPayload<{
   include: {
     game: true
@@ -64,6 +61,42 @@ function gameSlug(providerSlug: string, externalGameId: string, name?: string): 
     .slice(0, 6)
   return `${slugBase}-${hash}`
 }
+
+type AdminGamesPage = {
+  items: ({ provider: { name: string; slug: string } } & {
+    id: string
+    createdAt: Date
+    updatedAt: Date
+    name: string
+    type: GameType
+    metadata: Prisma.JsonValue
+    category: GameCategory
+    providerId: string
+    externalGameId: string
+    slug: string
+    nameRu: string | null
+    subcategory: string | null
+    thumbnailUrl: string | null
+    bannerUrl: string | null
+    isEnabled: boolean
+    isFeatured: boolean
+    isNew: boolean
+    isPopular: boolean
+    hasDemo: boolean
+    rtp: Prisma.Decimal | null
+    volatility: GameVolatility | null
+    maxWinMultiplier: Prisma.Decimal | null
+    minBet: Prisma.Decimal | null
+    maxBet: Prisma.Decimal | null
+    supportedCurrencies: Prisma.JsonValue
+    tags: Prisma.JsonValue
+    sortOrder: number
+    launchCount: number
+  })[]
+  meta: { page: number; perPage: number; total: number }
+}
+
+
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
@@ -175,9 +208,7 @@ export class CasinoAdminController {
 
   // games
   @Get('games')
-  async games(
-    @Query() q: Record<string, string | undefined>,
-  ): Promise<{ items: AdminGameRow[]; meta: { page: number; perPage: number; total: number } }> {
+  async games(@Query() q: Record<string, string | undefined>): Promise<AdminGamesPage> {
     const page = parseInt(q.page ?? '') || 1,
       perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
     const where: Prisma.GameWhereInput = {}
@@ -261,9 +292,7 @@ export class CasinoAdminController {
 
   // game sessions
   @Get('game-sessions')
-  async sessions(
-    @Query() q: Record<string, string | undefined>,
-  ): Promise<{
+  async sessions(@Query() q: Record<string, string | undefined>): Promise<{
     items: ({
       user: { email: string | null }
       game: { name: string; slug: string }
@@ -333,9 +362,7 @@ export class CasinoAdminController {
     return session
   }
   @Get('game-transactions')
-  async gameTx(
-    @Query() q: Record<string, string | undefined>,
-  ): Promise<{
+  async gameTx(@Query() q: Record<string, string | undefined>): Promise<{
     items: {
       id: string
       createdAt: Date

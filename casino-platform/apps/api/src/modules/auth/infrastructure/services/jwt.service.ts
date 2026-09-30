@@ -6,7 +6,6 @@ import { ConfigService } from '@nestjs/config'
 import { type IJwtTokenService } from '../../domain/auth.ports'
 import { JwtSecretWeakError, JwtTokenError } from '../../domain/errors'
 
-
 const b64url = (buf: Buffer): string => buf.toString('base64url')
 
 function expiresToSeconds(v: string | undefined, fallback: number): number {

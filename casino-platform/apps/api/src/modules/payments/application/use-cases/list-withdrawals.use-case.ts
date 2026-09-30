@@ -9,7 +9,9 @@ import {
 /** Список выводов пользователя (В3: контроллер без репозитория). */
 @Injectable()
 export class ListWithdrawalsUseCase {
-  constructor(@Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository) {}
+  constructor(
+    @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
+  ) {}
 
   async execute(
     userId: string,

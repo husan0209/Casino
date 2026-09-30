@@ -10,7 +10,8 @@ import type { UserGeoContext } from '../domain/repositories/user-profile.reposit
 export class UsersFacade {
   constructor(
     @Inject(GetGeoContextUseCase) private getGeoContextUseCase: GetGeoContextUseCase,
-    @Inject(UpdateCurrencyPreferenceUseCase) private updateCurrency: UpdateCurrencyPreferenceUseCase,
+    @Inject(UpdateCurrencyPreferenceUseCase)
+    private updateCurrency: UpdateCurrencyPreferenceUseCase,
     @Inject(UpdateAfterDepositUseCase) private updateAfterDeposit: UpdateAfterDepositUseCase,
   ) {}
 

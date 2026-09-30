@@ -19,7 +19,6 @@ import { type AdminActor } from '@/common/types/req-user'
 
 import { type AdminUserRow } from '@modules/admin/domain/admin.repository'
 
-
 import { AdminUsersService } from '../../application/admin-users.service'
 import { AuditLogService } from '../../application/audit-log.service'
 import { SuperadminOnlyError } from '../../domain/errors'

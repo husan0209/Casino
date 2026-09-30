@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Inject, Post, Query, Req, Res, UseGuards, UsePipes } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { type Request, type Response } from 'express'
 
@@ -75,7 +86,7 @@ export class AuthController {
     referralCode: string
   }> {
     // Код партнёра из ?ref= (партнёрская программа, ТЗ ч.8 §7.3). Тот же
-    // параметр используется игровой рефералкой, но резолвится независимо:
+    // параметр используется и игровой рефералкой, но резолвится независимо:
     // player-ref ищется в users.referral_code, affiliate-код — в
     // affiliates.tracking_code. Совпадёт максимум один.
     const affiliateCode = typeof req.query['ref'] === 'string' ? req.query['ref'] : undefined

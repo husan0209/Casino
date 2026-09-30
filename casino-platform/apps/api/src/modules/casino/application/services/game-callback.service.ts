@@ -14,7 +14,10 @@ import {
   RollbackOfRollbackError,
   SessionInvalidError,
 } from '../../domain/errors'
-import { type ParsedProviderCallback, type ProviderCallbackResponse } from '../../domain/provider-adapter.interface'
+import {
+  type ParsedProviderCallback,
+  type ProviderCallbackResponse,
+} from '../../domain/provider-adapter.interface'
 import {
   GAME_PLAY_REPOSITORY,
   type GameRow,
@@ -76,10 +79,7 @@ export class GameCallbackService {
     const session = await this.findActiveSession(cb.playerToken)
     const dup = await this.play.findTransactionByExternal(providerId, cb.transactionId)
     if (dup) {
-      return {
-        balance: await this.getWalletBalance(session.userId, session.currency),
-        duplicate: true,
-      }
+      return this.duplicateResponse(session)
     }
     // сужаем типы до замыкания (внутри колбэка narrowing не работает)
     const externalId = cb.transactionId!
@@ -101,15 +101,12 @@ export class GameCallbackService {
     externalId: string
     betAmount: string
     tx: WalletTx
-  }): Promise<{ balance: string; duplicate: boolean }> {
+  }): Promise<ProviderCallbackResponse> {
     const { cb, providerId, session, externalId, betAmount, tx } = args
     // повторная проверка дубликата внутри транзакции (гонка двух одновременных bet)
     const dupInTx = await this.play.findTransactionByExternal(providerId, externalId, tx)
     if (dupInTx) {
-      return {
-        balance: await this.getWalletBalance(session.userId, session.currency),
-        duplicate: true,
-      }
+      return this.duplicateResponse(session)
     }
     const round = await this.findOrCreateRound({
       providerId,
@@ -133,22 +130,18 @@ export class GameCallbackService {
       },
       tx,
     })
-    await this.play.createTransaction(
-      {
-        roundId: round.id,
-        sessionId: session.id,
-        userId: session.userId,
-        providerId,
-        type: 'bet',
-        externalTransactionId: externalId,
-        amount: betAmount,
-        currency: session.currency,
-        balanceAfter: creditRes.balanceAfter,
-        ledgerEntryId: creditRes.ledgerEntryId,
-        metadata: cb.rawRequest ?? {},
-      },
+    await this.recordGameTransaction({
+      roundId: round.id,
+      session,
+      providerId,
+      type: 'bet',
+      externalId,
+      amount: betAmount,
+      balanceAfter: creditRes.balanceAfter,
+      ledgerEntryId: creditRes.ledgerEntryId,
+      raw: cb.rawRequest,
       tx,
-    )
+    })
     await this.play.updateRound(round.id, { totalBet: { increment: betAmount } }, tx)
     await this.play.addSessionBet(session.id, betAmount, tx)
     return { balance: creditRes.balanceAfter, duplicate: false }
@@ -164,10 +157,7 @@ export class GameCallbackService {
     }
     const dup = await this.play.findTransactionByExternal(providerId, cb.transactionId)
     if (dup) {
-      return {
-        balance: await this.getWalletBalance(session.userId, session.currency),
-        duplicate: true,
-      }
+      return this.duplicateResponse(session)
     }
     const winAmount = cb.winAmount || '0'
     // P0 #3: атомарно — credit + gameTransaction + закрытие раунда.
@@ -185,14 +175,11 @@ export class GameCallbackService {
     session: GameSessionWithGame
     winAmount: string
     tx: WalletTx
-  }): Promise<{ balance: string; duplicate: boolean }> {
+  }): Promise<ProviderCallbackResponse> {
     const { cb, providerId, session, winAmount, tx } = args
     const dupInTx = await this.play.findTransactionByExternal(providerId, cb.transactionId!, tx)
     if (dupInTx) {
-      return {
-        balance: await this.getWalletBalance(session.userId, session.currency),
-        duplicate: true,
-      }
+      return this.duplicateResponse(session)
     }
     const round = await this.findOrCreateRound({
       providerId,
@@ -211,22 +198,18 @@ export class GameCallbackService {
     } else {
       balanceAfter = await this.getWalletBalance(session.userId, session.currency)
     }
-    await this.play.createTransaction(
-      {
-        roundId: round.id,
-        sessionId: session.id,
-        userId: session.userId,
-        providerId,
-        type: 'win',
-        externalTransactionId: cb.transactionId!,
-        amount: winAmount,
-        currency: session.currency,
-        balanceAfter,
-        ledgerEntryId,
-        metadata: cb.rawRequest ?? {},
-      },
+    await this.recordGameTransaction({
+      roundId: round.id,
+      session,
+      providerId,
+      type: 'win',
+      externalId: cb.transactionId!,
+      amount: winAmount,
+      balanceAfter,
+      ledgerEntryId,
+      raw: cb.rawRequest,
       tx,
-    )
+    })
     if (isWin) {
       await this.play.updateRound(
         round.id,
@@ -262,10 +245,7 @@ export class GameCallbackService {
     }
     const already = await this.play.findRollbackOf(originalTx.roundId, originalTx.id)
     if (already) {
-      return {
-        balance: await this.getWalletBalance(session.userId, session.currency),
-        duplicate: true,
-      }
+      return this.duplicateResponse(session)
     }
     const rollbackAmount = originalTx.amount.toString()
     if (originalTx.type === 'rollback') {
@@ -293,15 +273,12 @@ export class GameCallbackService {
     isBet: boolean
     /* Тип tx выводим из фасада — прямой импорт prisma в application запрещён (G1) */
     tx: WalletTx
-  }): Promise<{ balance: string; duplicate: boolean } | { balance: string; duplicate?: never }> {
+  }): Promise<ProviderCallbackResponse> {
     const { cb, providerId, session, originalTx, rollbackAmount, isBet, tx } = args
     // гонка двух одновременных rollback — перепроверка внутри транзакции
     const alreadyInTx = await this.play.findRollbackOf(originalTx.roundId, originalTx.id, tx)
     if (alreadyInTx) {
-      return {
-        balance: await this.getWalletBalance(session.userId, session.currency),
-        duplicate: true,
-      }
+      return this.duplicateResponse(session)
     }
     const entry = {
       userId: session.userId,
@@ -349,6 +326,49 @@ export class GameCallbackService {
       throw new SessionInvalidError()
     }
     return session
+  }
+
+  /** Повторный колбэк: отдаём баланс, вторую проводку не делаем. */
+  private async duplicateResponse(session: {
+    userId: string
+    currency: string
+  }): Promise<ProviderCallbackResponse> {
+    return {
+      balance: await this.getWalletBalance(session.userId, session.currency),
+      duplicate: true,
+    }
+  }
+
+  /** gameTransaction — зеркало провайдерской операции раунда (вынос из bet/win). */
+  private async recordGameTransaction(args: {
+    roundId: string
+    session: { id: string; userId: string; currency: string }
+    providerId: string
+    type: 'bet' | 'win'
+    externalId: string
+    amount: string
+    balanceAfter: string
+    ledgerEntryId: string | null
+    raw: ParsedProviderCallback['rawRequest']
+    tx: WalletTx
+  }): Promise<void> {
+    const { roundId, session, providerId, type, externalId, amount, balanceAfter, raw, tx } = args
+    await this.play.createTransaction(
+      {
+        roundId,
+        sessionId: session.id,
+        userId: session.userId,
+        providerId,
+        type,
+        externalTransactionId: externalId,
+        amount,
+        currency: session.currency,
+        balanceAfter,
+        ledgerEntryId: args.ledgerEntryId,
+        metadata: raw ?? {},
+      },
+      tx,
+    )
   }
 
   private async findOrCreateRound(args: {

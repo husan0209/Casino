@@ -46,12 +46,12 @@ AI-агент при начале работы **ДОЛЖЕН** прочитат
 
 ### 1.2. Где
 
-| Слой | Тип |
-|------|-----|
-| База данных | `DECIMAL(20, 8)` |
-| Backend код | `string` + `decimal.js` / `big.js` |
-| API request/response | `string` (например `"1500.00"`) |
-| Frontend state | `string` (BigInt для отображения) |
+| Слой                 | Тип                                |
+| -------------------- | ---------------------------------- |
+| База данных          | `DECIMAL(20, 8)`                   |
+| Backend код          | `string` + `decimal.js` / `big.js` |
+| API request/response | `string` (например `"1500.00"`)    |
+| Frontend state       | `string` (BigInt для отображения)  |
 
 ### 1.3. Запрещено
 
@@ -110,17 +110,17 @@ Webhooks от payment-провайдеров могут приходить **2+ 
 
 ### 2.3. Формат ключей
 
-| Операция | Формат |
-|----------|--------|
-| Deposit | `dep_{payment_request.id}` |
-| Withdrawal | `wd_{withdrawal_request.id}` |
-| Bet | `bet_{provider_transaction_id}` |
-| Win | `win_{provider_round_id}_{index}` |
-| Rollback | `rb_{original_transaction_id}` |
-| Referral reward | `ref_{referrer_id}_{referred_id}_{YYYY-MM-DD}` |
-| Admin credit | `adm_credit_{actor_id}_{timestamp}` |
-| Admin debit | `adm_debit_{actor_id}_{timestamp}` |
-| KYC status change | `kyc_{kyc_id}_{old_status}_to_{new_status}` |
+| Операция          | Формат                                         |
+| ----------------- | ---------------------------------------------- |
+| Deposit           | `dep_{payment_request.id}`                     |
+| Withdrawal        | `wd_{withdrawal_request.id}`                   |
+| Bet               | `bet_{provider_transaction_id}`                |
+| Win               | `win_{provider_round_id}_{index}`              |
+| Rollback          | `rb_{original_transaction_id}`                 |
+| Referral reward   | `ref_{referrer_id}_{referred_id}_{YYYY-MM-DD}` |
+| Admin credit      | `adm_credit_{actor_id}_{timestamp}`            |
+| Admin debit       | `adm_debit_{actor_id}_{timestamp}`             |
+| KYC status change | `kyc_{kyc_id}_{old_status}_to_{new_status}`    |
 
 ### 2.4. Реализация
 
@@ -146,9 +146,9 @@ async execute(input: CreditInput): Promise<CreditResult> {
     while (attempts < 3) {
       try {
         const wallet = await this.walletRepo.findByUserAndCurrency(tx, input.userId, input.currency)
-        
+
         const newBalance = money.add(wallet.balance, input.amount)
-        
+
         const updated = await tx.walletAccount.updateMany({
           where: {
             userId: input.userId,
@@ -160,11 +160,11 @@ async execute(input: CreditInput): Promise<CreditResult> {
             version: { increment: 1 },
           },
         })
-        
+
         if (updated.count === 0) {
           throw new OptimisticLockError()  // retry
         }
-        
+
         const ledgerEntry = await tx.ledgerEntry.create({
           data: {
             userId: input.userId,
@@ -178,7 +178,7 @@ async execute(input: CreditInput): Promise<CreditResult> {
             referenceId: input.referenceId,
           },
         })
-        
+
         return {
           balanceBefore: wallet.balance,
           balanceAfter: newBalance,
@@ -243,12 +243,23 @@ module/
 
 ### 3.2. Правила зависимостей
 
-| Слой | Может импортировать | Не может импортировать |
-|------|---------------------|------------------------|
-| `presentation` | `application` (DTOs), shared types | `domain` напрямую, `infrastructure` |
-| `application` | `domain`, `infrastructure` (только через DI/интерфейсы) | `presentation` |
-| `infrastructure` | `domain` (entities для mapper) | `application`, `presentation` |
-| `domain` | НИЧЕГО | всё остальное |
+| Слой             | Может импортировать                                     | Не может импортировать              |
+| ---------------- | ------------------------------------------------------- | ----------------------------------- |
+| `presentation`   | `application` (DTOs), shared types                      | `domain` напрямую, `infrastructure` |
+| `application`    | `domain`, `infrastructure` (только через DI/интерфейсы) | `presentation`                      |
+| `infrastructure` | `domain` (entities для mapper)                          | `application`, `presentation`       |
+| `domain`         | НИЧЕГО                                                  | всё остальное                       |
+
+**DI: токен указываем явно в каждом параметре конструктора.** `packages/tsconfig/nest.json`
+держит `emitDecoratorMetadata: false` (нативный компилятор `tsgo` его не эмитит), поэтому Nest
+не выводит зависимость по типу параметра: такой конструктор собирается и падает в рантайме на
+`Cannot read properties of undefined (reading 'execute')`. Пишем `@Inject(...)` всегда — и для
+провайдера-класса (`@Inject(LoginUseCase) private readonly login: LoginUseCase`), и для symbol-порта
+(`@Inject(WALLET_REPOSITORY)`). Импорт токена при этом обычный (value), а не `type` — иначе декоратор
+теряет ссылку на класс.
+
+Неявный DI ловит машиной — guard **G22** (`scripts/check-explicit-di.mjs`) роняет CI до рантайма.
+Владелец правила: `docs/ARCHITECTURE.md` §5.3.
 
 ### 3.3. Бизнес-логика — ТОЛЬКО в application
 
@@ -260,12 +271,12 @@ module/
 async register(@Body() body: RegisterDto) {
   const existing = await this.prisma.user.findUnique({ where: { email: body.email } })
   if (existing) throw new ConflictException()
-  
+
   const hashed = await argon2id(body.password)
   const user = await this.prisma.user.create({
     data: { email: body.email, passwordHash: hashed },
   })
-  
+
   await this.emailService.sendVerification(user.email, 'token')
   return { success: true, data: user }
 }
@@ -332,8 +343,8 @@ export function errorResponse(
 @UseInterceptors(ResponseFormatInterceptor)
 export class AuthController {
   constructor(
-    private readonly registerUseCase: RegisterUseCase,
-    private readonly loginUseCase: LoginUseCase,
+    @Inject(RegisterUseCase) private readonly registerUseCase: RegisterUseCase,
+    @Inject(LoginUseCase) private readonly loginUseCase: LoginUseCase,
   ) {}
 
   @Post('register')
@@ -372,7 +383,7 @@ export class AuthController {
 export abstract class AppError extends Error {
   abstract readonly code: string
   abstract readonly httpStatus: number
-  
+
   constructor(
     message: string,
     public readonly context?: Record<string, unknown>,
@@ -380,7 +391,7 @@ export abstract class AppError extends Error {
     super(message)
     this.name = this.constructor.name
   }
-  
+
   toJSON() {
     return {
       code: this.code,
@@ -399,7 +410,7 @@ export abstract class AppError extends Error {
 export class InsufficientFundsError extends AppError {
   readonly code = 'INSUFFICIENT_FUNDS'
   readonly httpStatus = 422
-  
+
   constructor(
     public readonly required: MoneyAmount,
     public readonly available: MoneyAmount,
@@ -411,8 +422,11 @@ export class InsufficientFundsError extends AppError {
 export class WalletNotFoundError extends AppError {
   readonly code = 'WALLET_NOT_FOUND'
   readonly httpStatus = 404
-  
-  constructor(public readonly userId: string, public readonly currency: Currency) {
+
+  constructor(
+    public readonly userId: string,
+    public readonly currency: Currency,
+  ) {
     super(`Wallet not found for user ${userId} in ${currency}`)
   }
 }
@@ -420,7 +434,7 @@ export class WalletNotFoundError extends AppError {
 export class DuplicateRequestError extends AppError {
   readonly code = 'DUPLICATE_REQUEST'
   readonly httpStatus = 409
-  
+
   constructor(public readonly idempotencyKey: string) {
     super(`Duplicate request: ${idempotencyKey}`)
   }
@@ -429,7 +443,7 @@ export class DuplicateRequestError extends AppError {
 export class KycRequiredError extends AppError {
   readonly code = 'KYC_REQUIRED'
   readonly httpStatus = 422
-  
+
   constructor(message: string = 'KYC verification required') {
     super(message)
   }
@@ -437,8 +451,8 @@ export class KycRequiredError extends AppError {
 
 export class OptimisticLockError extends AppError {
   readonly code = 'OPTIMISTIC_LOCK_CONFLICT'
-  readonly httpStatus = 500  // silent retry, then 500
-  
+  readonly httpStatus = 500 // silent retry, then 500
+
   constructor() {
     super('Optimistic lock conflict, retry needed')
   }
@@ -469,37 +483,27 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp()
     const response = ctx.getResponse<Response>()
     const request = ctx.getRequest<Request>()
-    
+
     if (exception instanceof AppError) {
       // Domain error — convert to API response
-      response.status(exception.httpStatus).json(
-        errorResponse(
-          exception.code,
-          exception.message,
-          exception.context,
-          request.id,
-        )
-      )
+      response
+        .status(exception.httpStatus)
+        .json(errorResponse(exception.code, exception.message, exception.context, request.id))
       return
     }
-    
+
     if (exception instanceof HttpException) {
       // NestJS HTTP exception (ValidationPipe, etc)
       const status = exception.getStatus()
-      response.status(status).json(
-        errorResponse(
-          this.codeFromStatus(status),
-          exception.message,
-        )
-      )
+      response.status(status).json(errorResponse(this.codeFromStatus(status), exception.message))
       return
     }
-    
+
     // Unknown — log and return generic 500
     logger.error('Unhandled exception', { err: exception, requestId: request.id })
-    response.status(500).json(
-      errorResponse('INTERNAL_ERROR', 'Something went wrong', undefined, request.id)
-    )
+    response
+      .status(500)
+      .json(errorResponse('INTERNAL_ERROR', 'Something went wrong', undefined, request.id))
   }
 }
 ```
@@ -583,18 +587,18 @@ const logger = pino({
 ```typescript
 async execute(input: CreditInput): Promise<CreditResult> {
   let lastError: Error | undefined
-  
+
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       return await this.prisma.$transaction(async (tx) => {
         const wallet = await tx.walletAccount.findUnique({
           where: { userId_currency: { userId: input.userId, currency: input.currency } },
         })
-        
+
         if (!wallet) throw new WalletNotFoundError(input.userId, input.currency)
-        
+
         const newBalance = money.add(wallet.balance, input.amount)
-        
+
         const updated = await tx.walletAccount.updateMany({
           where: {
             userId: input.userId,
@@ -606,9 +610,9 @@ async execute(input: CreditInput): Promise<CreditResult> {
             version: { increment: 1 },
           },
         })
-        
+
         if (updated.count === 0) throw new OptimisticLockError()
-        
+
         await tx.ledgerEntry.create({
           data: {
             userId: input.userId,
@@ -620,7 +624,7 @@ async execute(input: CreditInput): Promise<CreditResult> {
             idempotencyKey: input.idempotencyKey,
           },
         })
-        
+
         return { balanceBefore: wallet.balance, balanceAfter: newBalance }
       }, {
         isolationLevel: 'Serializable',  // ⚠️ strongest isolation
@@ -634,7 +638,7 @@ async execute(input: CreditInput): Promise<CreditResult> {
       throw err
     }
   }
-  
+
   throw lastError ?? new MaxRetriesExceededError()
 }
 ```
@@ -745,16 +749,16 @@ describe('WalletService.credit', () => {
   let service: CreditWalletUseCase
   let walletRepo: MockWalletRepository
   let ledgerRepo: MockLedgerRepository
-  
+
   beforeEach(() => {
     walletRepo = new MockWalletRepository()
     ledgerRepo = new MockLedgerRepository()
     service = new CreditWalletUseCase(walletRepo, ledgerRepo)
   })
-  
+
   it('credits balance and creates ledger entry', async () => {
     await walletRepo.seed({ userId, currency: 'RUB', balance: '100.00' })
-    
+
     const result = await service.execute({
       userId,
       currency: 'RUB',
@@ -762,30 +766,48 @@ describe('WalletService.credit', () => {
       type: 'DEPOSIT',
       idempotencyKey: 'dep_1',
     })
-    
+
     expect(result.balanceAfter).toBe('150.00')
     expect(await walletRepo.getBalance(userId, 'RUB')).toBe('150.00')
     expect(await ledgerRepo.count()).toBe(1)
   })
-  
+
   it('returns duplicate result for repeated idempotency key', async () => {
     await walletRepo.seed({ userId, currency: 'RUB', balance: '100.00' })
-    
+
     // First call
-    await service.execute({ userId, currency: 'RUB', amount: '50.00', type: 'DEPOSIT', idempotencyKey: 'dep_1' })
-    
+    await service.execute({
+      userId,
+      currency: 'RUB',
+      amount: '50.00',
+      type: 'DEPOSIT',
+      idempotencyKey: 'dep_1',
+    })
+
     // Second call with same key
-    const result = await service.execute({ userId, currency: 'RUB', amount: '50.00', type: 'DEPOSIT', idempotencyKey: 'dep_1' })
-    
+    const result = await service.execute({
+      userId,
+      currency: 'RUB',
+      amount: '50.00',
+      type: 'DEPOSIT',
+      idempotencyKey: 'dep_1',
+    })
+
     expect(result.duplicate).toBe(true)
-    expect(await walletRepo.getBalance(userId, 'RUB')).toBe('150.00')  // не изменился
+    expect(await walletRepo.getBalance(userId, 'RUB')).toBe('150.00') // не изменился
   })
-  
+
   it('throws INSUFFICIENT_FUNDS when balance < amount', async () => {
     await walletRepo.seed({ userId, currency: 'RUB', balance: '10.00' })
-    
+
     await expect(
-      service.execute({ userId, currency: 'RUB', amount: '50.00', type: 'DEPOSIT', idempotencyKey: 'dep_1' })
+      service.execute({
+        userId,
+        currency: 'RUB',
+        amount: '50.00',
+        type: 'DEPOSIT',
+        idempotencyKey: 'dep_1',
+      }),
     ).rejects.toThrow(InsufficientFundsError)
   })
 })
@@ -793,13 +815,13 @@ describe('WalletService.credit', () => {
 
 ### 10.3. Critical scenarios to test
 
-| Module | Critical tests |
-|--------|---------------|
-| wallet | credit, debit, lock, unlock, optimistic lock retry |
-| payments | webhook idempotency, signature verify, KYC limit |
-| auth | register, login, refresh rotation, OAuth |
-| casino | bet idempotency, win credit, rollback |
-| referrals | daily cron GGR calculation |
+| Module    | Critical tests                                     |
+| --------- | -------------------------------------------------- |
+| wallet    | credit, debit, lock, unlock, optimistic lock retry |
+| payments  | webhook idempotency, signature verify, KYC limit   |
+| auth      | register, login, refresh rotation, OAuth           |
+| casino    | bet idempotency, win credit, rollback              |
+| referrals | daily cron GGR calculation                         |
 
 ---
 
@@ -831,12 +853,15 @@ test/    test/wallet-credit-idempotency
 
 ```markdown
 ## Что делает
+
 [краткое описание]
 
 ## Связанные задачи
+
 Closes #123
 
 ## Тип изменений
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Breaking change
@@ -844,11 +869,13 @@ Closes #123
 - [ ] Refactor
 
 ## Тестирование
+
 - [ ] Unit tests pass
 - [ ] Integration tests pass (if applicable)
 - [ ] Manual E2E test (if applicable)
 
 ## Чеклист
+
 - [ ] pnpm typecheck passes
 - [ ] pnpm lint passes
 - [ ] Все новые endpoints документированы
