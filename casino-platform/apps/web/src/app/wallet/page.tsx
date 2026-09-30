@@ -18,7 +18,7 @@ import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 import type { WalletBalance } from '@/types/wallet'
-import type { WalletTxListDto } from '@/types/wallet-tx'
+import type { WalletTxDto, WalletTxListDto } from '@/types/wallet-tx'
 
 import { money } from '@casino/shared-utils'
 
@@ -33,6 +33,115 @@ function currencyIconClass(currency: string): string {
     BTC: 'currency-icon currency-icon-btc',
   }
   return map[currency] ?? 'currency-icon bg-white/[0.06] text-white'
+}
+
+function ActiveWalletCard({
+  wallet,
+  onDeposit,
+  onWithdraw,
+}: {
+  wallet: WalletBalance
+  onDeposit: () => void
+  onWithdraw: () => void
+}): React.JSX.Element {
+  return (
+    <div className="relative mb-8 overflow-hidden rounded-3xl border border-[#6C63FF]/40 bg-gradient-to-br from-[#1E1B4B] via-[#161B33] to-[#0F0F1A] p-6 shadow-2xl md:p-8">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#6C63FF]/20 blur-3xl"
+      />
+      <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="flex h-2 w-2 rounded-full bg-[#00E676]" />
+            <span className="text-xs font-bold uppercase tracking-wider text-muted">
+              Основной игровой счёт
+            </span>
+          </div>
+          <div className="mt-2 text-3xl font-black tracking-tight text-white md:text-5xl">
+            {formatBalance(wallet.available, wallet.currency)}
+          </div>
+          <div className="mt-1 flex items-center gap-3 text-xs text-muted">
+            <span>{currencyFullName(wallet.currency)}</span>
+            {Number(wallet.locked) > 0 && (
+              <>
+                <span>•</span>
+                <span>В заявках: {formatAmount(wallet.locked, wallet.currency)}</span>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2.5">
+          <button
+            type="button"
+            onClick={onDeposit}
+            className="btn-money px-5 py-3 text-sm font-bold shadow-lg"
+          >
+            <Plus size={18} strokeWidth={2.4} />
+            Пополнить
+          </button>
+          <button
+            type="button"
+            onClick={onWithdraw}
+            className="btn-ghost px-5 py-3 text-sm font-bold text-white hover:bg-white/10"
+          >
+            <ArrowUpRight size={18} />
+            Вывести
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TxRow({ t }: { t: WalletTxDto }): React.JSX.Element {
+  const dir = amountDirection(t.amount)
+  return (
+    <div className="flex items-center justify-between p-4 text-sm transition hover:bg-white/[0.02]">
+      <div className="flex items-center gap-3">
+        <span
+          className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
+            dir === 'in'
+              ? 'bg-[#00E676]/10 text-[#00E676]'
+              : dir === 'out'
+                ? 'bg-[#FF3D71]/10 text-[#FF3D71]'
+                : 'bg-white/5 text-muted'
+          }`}
+        >
+          {dir === 'in' ? (
+            <ArrowDownLeft size={16} />
+          ) : dir === 'out' ? (
+            <ArrowUpRight size={16} />
+          ) : (
+            <Wallet size={16} />
+          )}
+        </span>
+        <div>
+          <div className="font-semibold text-white">{txTypeLabel(t.type)}</div>
+          <div className="text-xs text-muted">
+            {new Date(t.created_at).toLocaleString('ru', {
+              day: 'numeric',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </div>
+        </div>
+      </div>
+      <div className="text-right">
+        <div
+          className={`font-bold ${
+            dir === 'in' ? 'text-[#00E676]' : dir === 'out' ? 'text-[#FF3D71]' : 'text-muted'
+          }`}
+        >
+          {formatTxAmount(t.amount, t.currency)}
+        </div>
+        <div className="text-[11px] text-muted">
+          Остаток: {formatAmount(t.balance_after, t.currency)}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function WalletPage(): React.JSX.Element {
@@ -71,7 +180,6 @@ export default function WalletPage(): React.JSX.Element {
 
   return (
     <div className="container-1 py-6 max-w-4xl">
-      {/* Заголовок страницы */}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <p className="caps-label">УПРАВЛЕНИЕ СРЕДСТВАМИ</p>
@@ -79,59 +187,13 @@ export default function WalletPage(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Крупная карточка АКТИВНОГО кошелька (ТЗ ч.5.1 §5.1) */}
-      <div className="relative mb-8 overflow-hidden rounded-3xl border border-[#6C63FF]/40 bg-gradient-to-br from-[#1E1B4B] via-[#161B33] to-[#0F0F1A] p-6 shadow-2xl md:p-8">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#6C63FF]/20 blur-3xl"
-        />
+      <ActiveWalletCard
+        wallet={activeWallet}
+        onDeposit={() => openDeposit(activeCurrency)}
+        onWithdraw={() => openWithdraw(activeCurrency)}
+      />
 
-        <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="flex h-2 w-2 rounded-full bg-[#00E676]" />
-              <span className="text-xs font-bold uppercase tracking-wider text-muted">
-                Основной игровой счёт
-              </span>
-            </div>
-            <div className="mt-2 text-3xl font-black tracking-tight text-white md:text-5xl">
-              {formatBalance(activeWallet.available, activeWallet.currency)}
-            </div>
-            <div className="mt-1 flex items-center gap-3 text-xs text-muted">
-              <span>{currencyFullName(activeWallet.currency)}</span>
-              {Number(activeWallet.locked) > 0 && (
-                <>
-                  <span>•</span>
-                  <span>В заявках: {formatAmount(activeWallet.locked, activeWallet.currency)}</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2.5">
-            <button
-              type="button"
-              onClick={() => openDeposit(activeCurrency)}
-              className="btn-money px-5 py-3 text-sm font-bold shadow-lg"
-            >
-              <Plus size={18} strokeWidth={2.4} />
-              Пополнить
-            </button>
-            <button
-              type="button"
-              onClick={() => openWithdraw(activeCurrency)}
-              className="btn-ghost px-5 py-3 text-sm font-bold text-white hover:bg-white/10"
-            >
-              <ArrowUpRight size={18} />
-              Вывести
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Список остальных кошельков: Фиат и Крипта */}
       <div className="mb-8 space-y-6">
-        {/* Фиат */}
         <div>
           <p className="caps-label mb-2">ФИАТНЫЕ СЧЕТА</p>
           <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
@@ -175,7 +237,6 @@ export default function WalletPage(): React.JSX.Element {
           </div>
         </div>
 
-        {/* Крипта */}
         {cryptoWallets.length > 0 && (
           <div>
             <p className="caps-label mb-2">КРИПТОВАЛЮТНЫЕ СЧЕТА</p>
@@ -225,7 +286,6 @@ export default function WalletPage(): React.JSX.Element {
         )}
       </div>
 
-      {/* Последние 5 транзакций */}
       <div className="mb-8">
         <div className="mb-3 flex items-center justify-between">
           <div>
@@ -242,64 +302,9 @@ export default function WalletPage(): React.JSX.Element {
 
         <div className="card overflow-hidden p-0">
           <div className="divide-y divide-[#2A2A4A]/50">
-            {(tx?.data ?? []).map((t) => {
-              const dir = amountDirection(t.amount)
-              return (
-                <div
-                  key={t.id}
-                  className="flex items-center justify-between p-4 text-sm transition hover:bg-white/[0.02]"
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
-                        dir === 'in'
-                          ? 'bg-[#00E676]/10 text-[#00E676]'
-                          : dir === 'out'
-                            ? 'bg-[#FF3D71]/10 text-[#FF3D71]'
-                            : 'bg-white/5 text-muted'
-                      }`}
-                    >
-                      {dir === 'in' ? (
-                        <ArrowDownLeft size={16} />
-                      ) : dir === 'out' ? (
-                        <ArrowUpRight size={16} />
-                      ) : (
-                        <Wallet size={16} />
-                      )}
-                    </span>
-                    <div>
-                      <div className="font-semibold text-white">{txTypeLabel(t.type)}</div>
-                      <div className="text-xs text-muted">
-                        {new Date(t.created_at).toLocaleString('ru', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <div
-                      className={`font-bold ${
-                        dir === 'in'
-                          ? 'text-[#00E676]'
-                          : dir === 'out'
-                            ? 'text-[#FF3D71]'
-                            : 'text-muted'
-                      }`}
-                    >
-                      {formatTxAmount(t.amount, t.currency)}
-                    </div>
-                    <div className="text-[11px] text-muted">
-                      Остаток: {formatAmount(t.balance_after, t.currency)}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-
+            {(tx?.data ?? []).map((t) => (
+              <TxRow key={t.id} t={t} />
+            ))}
             {(!tx?.data || tx.data.length === 0) && (
               <div className="p-8 text-center text-sm text-muted">Транзакций пока нет</div>
             )}
@@ -307,7 +312,6 @@ export default function WalletPage(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Футер-строка доверия (ТЗ ч.5.1 §5.1) */}
       <div className="flex items-center justify-center gap-2 text-center text-xs text-muted/80">
         <ShieldCheck size={16} className="text-[#00E676]" />
         <span>Отдельные балансы. Без скрытой конвертации и комиссий.</span>
