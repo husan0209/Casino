@@ -253,6 +253,10 @@ mодуль A     → внутренности модуля B (только че
 даёт `Cannot read properties of undefined (reading 'execute')`. Ловится только прогоном API —
 ни `tsc`, ни ESLint такой конструктор не забракуют.
 
+**Машинная проверка.** Guard **G22** (`node scripts/check-explicit-di.mjs`, реестр —
+`docs/QUALITY_GATES.md` §3.2) роняет CI на любом провайдере с неявным параметром — так ошибка
+не уезжает в рантайм между прогонами E2E.
+
 ```typescript
 // ❌ собирается, падает в рантайме
 constructor(private readonly login: LoginUseCase) {}

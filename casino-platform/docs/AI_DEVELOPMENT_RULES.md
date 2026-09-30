@@ -258,6 +258,9 @@ module/
 (`@Inject(WALLET_REPOSITORY)`). Импорт токена при этом обычный (value), а не `type` — иначе декоратор
 теряет ссылку на класс.
 
+Неявный DI ловит машиной — guard **G22** (`scripts/check-explicit-di.mjs`) роняет CI до рантайма.
+Владелец правила: `docs/ARCHITECTURE.md` §5.3.
+
 ### 3.3. Бизнес-логика — ТОЛЬКО в application
 
 ❌ Запрещено писать business logic в `controller` или `repository`.
