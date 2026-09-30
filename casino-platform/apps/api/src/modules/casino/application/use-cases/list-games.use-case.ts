@@ -19,38 +19,37 @@ interface CatalogQuery {
   sort?: string
 }
 
+interface CatalogItem {
+  id: string
+  name: string
+  type: GameType
+  provider: { name: string; slug: string }
+  category: GameCategory
+  slug: string
+  nameRu: string | null
+  thumbnailUrl: string | null
+  isFeatured: boolean
+  isNew: boolean
+  isPopular: boolean
+  hasDemo: boolean
+  rtp: Prisma.Decimal | null
+  volatility: GameVolatility | null
+}
+
+interface CatalogMeta {
+  page: number
+  perPage: number
+  total: number
+  totalPages: number
+  hasNext: boolean
+  hasPrev: boolean
+}
+
 @Injectable()
 export class ListGamesUseCase {
   constructor(@Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository) {}
 
-  async execute(
-    q: CatalogQuery,
-  ): Promise<{
-    items: {
-      id: string
-      name: string
-      type: GameType
-      provider: { name: string; slug: string }
-      category: GameCategory
-      slug: string
-      nameRu: string | null
-      thumbnailUrl: string | null
-      isFeatured: boolean
-      isNew: boolean
-      isPopular: boolean
-      hasDemo: boolean
-      rtp: Prisma.Decimal | null
-      volatility: GameVolatility | null
-    }[]
-    meta: {
-      page: number
-      perPage: number
-      total: number
-      totalPages: number
-      hasNext: boolean
-      hasPrev: boolean
-    }
-  }> {
+  async execute(q: CatalogQuery): Promise<{ items: CatalogItem[]; meta: CatalogMeta }> {
     const page = parseInt(q.page ?? '') || 1
     const perPage = Math.min(parseInt(q.per_page ?? '') || 24, 100)
     const where = this.buildWhere(q)

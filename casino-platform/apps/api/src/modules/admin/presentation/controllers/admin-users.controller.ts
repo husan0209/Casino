@@ -28,6 +28,85 @@ import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { BlockUserSchema } from '../dto/admin-users.dto'
 
+type AdminUserDetail =
+  | ({
+      kycProfile: {
+        id: string
+        firstName: string | null
+        lastName: string | null
+        createdAt: Date
+        updatedAt: Date
+        userId: string
+        status: KycStatus
+        dateOfBirth: Date | null
+        country: string | null
+        documentType: KycDocumentType | null
+        documentNumber: string | null
+        documentExpiry: Date | null
+        rejectionReason: string | null
+        approvedAt: Date | null
+        rejectedAt: Date | null
+        submittedAt: Date | null
+        reviewedBy: string | null
+      } | null
+      profile: {
+        id: string
+        firstName: string | null
+        lastName: string | null
+        createdAt: Date
+        updatedAt: Date
+        userId: string
+        dateOfBirth: Date | null
+        country: string | null
+        phone: string | null
+        phoneVerified: boolean
+        city: string | null
+        avatarUrl: string | null
+        currencyPreference: string
+        lastPaymentMethod: string | null
+      } | null
+      settings: {
+        id: string
+        createdAt: Date
+        updatedAt: Date
+        userId: string
+        notificationsEmail: boolean
+        notificationsPush: boolean
+        twoFaEnabled: boolean
+        twoFaSecret: string | null
+        language: string
+        timezone: string
+        selfExcludedUntil: Date | null
+      } | null
+      walletAccounts: {
+        id: string
+        createdAt: Date
+        updatedAt: Date
+        userId: string
+        currency: string
+        balance: Prisma.Decimal
+        locked: Prisma.Decimal
+        version: bigint
+      }[]
+    } & {
+      id: string
+      email: string | null
+      passwordHash: string | null
+      role: UserRole
+      lastLoginAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+      emailVerified: boolean
+      username: string | null
+      status: UserStatus
+      referralCode: string
+      referredBy: string | null
+      failedLoginAttempts: number
+      lastFailedAt: Date | null
+      lockedUntil: Date | null
+    })
+  | null
+
 @UseGuards(AdminAuthGuard)
 @Controller('admin/users')
 export class AdminUsersController {
@@ -91,87 +170,7 @@ export class AdminUsersController {
   }
 
   @Get(':id')
-  async get(
-    @Param('id') userId: string,
-  ): Promise<
-    | ({
-        kycProfile: {
-          id: string
-          firstName: string | null
-          lastName: string | null
-          createdAt: Date
-          updatedAt: Date
-          userId: string
-          status: KycStatus
-          dateOfBirth: Date | null
-          country: string | null
-          documentType: KycDocumentType | null
-          documentNumber: string | null
-          documentExpiry: Date | null
-          rejectionReason: string | null
-          approvedAt: Date | null
-          rejectedAt: Date | null
-          submittedAt: Date | null
-          reviewedBy: string | null
-        } | null
-        profile: {
-          id: string
-          firstName: string | null
-          lastName: string | null
-          createdAt: Date
-          updatedAt: Date
-          userId: string
-          dateOfBirth: Date | null
-          country: string | null
-          phone: string | null
-          phoneVerified: boolean
-          city: string | null
-          avatarUrl: string | null
-          currencyPreference: string
-          lastPaymentMethod: string | null
-        } | null
-        settings: {
-          id: string
-          createdAt: Date
-          updatedAt: Date
-          userId: string
-          notificationsEmail: boolean
-          notificationsPush: boolean
-          twoFaEnabled: boolean
-          twoFaSecret: string | null
-          language: string
-          timezone: string
-          selfExcludedUntil: Date | null
-        } | null
-        walletAccounts: {
-          id: string
-          createdAt: Date
-          updatedAt: Date
-          userId: string
-          currency: string
-          balance: Prisma.Decimal
-          locked: Prisma.Decimal
-          version: bigint
-        }[]
-      } & {
-        id: string
-        email: string | null
-        passwordHash: string | null
-        role: UserRole
-        lastLoginAt: Date | null
-        createdAt: Date
-        updatedAt: Date
-        emailVerified: boolean
-        username: string | null
-        status: UserStatus
-        referralCode: string
-        referredBy: string | null
-        failedLoginAttempts: number
-        lastFailedAt: Date | null
-        lockedUntil: Date | null
-      })
-    | null
-  > {
+  async get(@Param('id') userId: string): Promise<AdminUserDetail> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {

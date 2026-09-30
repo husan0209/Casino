@@ -26,6 +26,13 @@ export interface CreateFiatDepositInput {
   method: string
 }
 
+export interface CreateFiatDepositResult {
+  payment_request_id: string
+  payment_url: string
+  currency: string
+  method: string
+}
+
 @Injectable()
 export class CreateFiatDepositUseCase {
   // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
@@ -38,15 +45,7 @@ export class CreateFiatDepositUseCase {
     @Inject(UsersFacade) private users: UsersFacade,
   ) {}
 
-  async execute(
-    userId: string,
-    input: CreateFiatDepositInput,
-  ): Promise<{
-    payment_request_id: string
-    payment_url: string
-    currency: string
-    method: string
-  }> {
+  async execute(userId: string, input: CreateFiatDepositInput): Promise<CreateFiatDepositResult> {
     const { amount, currency, method } = input
 
     const userContext = await this.users.getGeoContext(userId)

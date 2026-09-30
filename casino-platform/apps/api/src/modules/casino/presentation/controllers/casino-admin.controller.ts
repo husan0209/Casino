@@ -49,6 +49,125 @@ function gameSlug(providerSlug: string, externalGameId: string, name?: string): 
   return `${slugBase}-${hash}`
 }
 
+type AdminGamesPage = {
+  items: ({ provider: { name: string; slug: string } } & {
+    id: string
+    createdAt: Date
+    updatedAt: Date
+    name: string
+    type: GameType
+    metadata: Prisma.JsonValue
+    category: GameCategory
+    providerId: string
+    externalGameId: string
+    slug: string
+    nameRu: string | null
+    subcategory: string | null
+    thumbnailUrl: string | null
+    bannerUrl: string | null
+    isEnabled: boolean
+    isFeatured: boolean
+    isNew: boolean
+    isPopular: boolean
+    hasDemo: boolean
+    rtp: Prisma.Decimal | null
+    volatility: GameVolatility | null
+    maxWinMultiplier: Prisma.Decimal | null
+    minBet: Prisma.Decimal | null
+    maxBet: Prisma.Decimal | null
+    supportedCurrencies: Prisma.JsonValue
+    tags: Prisma.JsonValue
+    sortOrder: number
+    launchCount: number
+  })[]
+  meta: { page: number; perPage: number; total: number }
+}
+
+type AdminSessionDetail =
+  | ({
+      user: { email: string | null }
+      game: {
+        id: string
+        createdAt: Date
+        updatedAt: Date
+        name: string
+        type: GameType
+        metadata: Prisma.JsonValue
+        category: GameCategory
+        providerId: string
+        externalGameId: string
+        slug: string
+        nameRu: string | null
+        subcategory: string | null
+        thumbnailUrl: string | null
+        bannerUrl: string | null
+        isEnabled: boolean
+        isFeatured: boolean
+        isNew: boolean
+        isPopular: boolean
+        hasDemo: boolean
+        rtp: Prisma.Decimal | null
+        volatility: GameVolatility | null
+        maxWinMultiplier: Prisma.Decimal | null
+        minBet: Prisma.Decimal | null
+        maxBet: Prisma.Decimal | null
+        supportedCurrencies: Prisma.JsonValue
+        tags: Prisma.JsonValue
+        sortOrder: number
+        launchCount: number
+      }
+      gameRounds: ({
+        gameTransactions: {
+          id: string
+          createdAt: Date
+          type: GameTransactionType
+          amount: Prisma.Decimal
+          balanceAfter: Prisma.Decimal
+          metadata: Prisma.JsonValue
+          userId: string
+          currency: string
+          processed: boolean
+          providerId: string
+          sessionId: string
+          roundId: string
+          externalTransactionId: string
+          ledgerEntryId: string | null
+        }[]
+      } & {
+        id: string
+        createdAt: Date
+        userId: string
+        currency: string
+        status: GameRoundStatus
+        providerId: string
+        gameId: string
+        closedAt: Date | null
+        totalBet: Prisma.Decimal
+        totalWin: Prisma.Decimal
+        sessionId: string
+        externalRoundId: string
+      })[]
+    } & {
+      id: string
+      ipAddress: string | null
+      userAgent: string | null
+      metadata: Prisma.JsonValue
+      userId: string
+      currency: string
+      status: GameSessionStatus
+      providerId: string
+      gameId: string
+      sessionToken: string
+      isDemo: boolean
+      startedAt: Date
+      lastActivityAt: Date
+      closedAt: Date | null
+      totalBet: Prisma.Decimal
+      totalWin: Prisma.Decimal
+      roundsPlayed: number
+    })
+  | null
+
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
 @Controller('admin')
@@ -159,41 +278,7 @@ export class CasinoAdminController {
 
   // games
   @Get('games')
-  async games(
-    @Query() q: Record<string, string | undefined>,
-  ): Promise<{
-    items: ({ provider: { name: string; slug: string } } & {
-      id: string
-      createdAt: Date
-      updatedAt: Date
-      name: string
-      type: GameType
-      metadata: Prisma.JsonValue
-      category: GameCategory
-      providerId: string
-      externalGameId: string
-      slug: string
-      nameRu: string | null
-      subcategory: string | null
-      thumbnailUrl: string | null
-      bannerUrl: string | null
-      isEnabled: boolean
-      isFeatured: boolean
-      isNew: boolean
-      isPopular: boolean
-      hasDemo: boolean
-      rtp: Prisma.Decimal | null
-      volatility: GameVolatility | null
-      maxWinMultiplier: Prisma.Decimal | null
-      minBet: Prisma.Decimal | null
-      maxBet: Prisma.Decimal | null
-      supportedCurrencies: Prisma.JsonValue
-      tags: Prisma.JsonValue
-      sortOrder: number
-      launchCount: number
-    })[]
-    meta: { page: number; perPage: number; total: number }
-  }> {
+  async games(@Query() q: Record<string, string | undefined>): Promise<AdminGamesPage> {
     const page = parseInt(q.page ?? '') || 1,
       perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
     const where: Prisma.GameWhereInput = {}
@@ -277,9 +362,7 @@ export class CasinoAdminController {
 
   // game sessions
   @Get('game-sessions')
-  async sessions(
-    @Query() q: Record<string, string | undefined>,
-  ): Promise<{
+  async sessions(@Query() q: Record<string, string | undefined>): Promise<{
     items: ({
       user: { email: string | null }
       game: { name: string; slug: string }
@@ -337,93 +420,7 @@ export class CasinoAdminController {
     return { items, meta: { page, perPage, total } }
   }
   @Get('game-sessions/:id')
-  async sessionDetail(
-    @Param('id') id: string,
-  ): Promise<
-    | ({
-        user: { email: string | null }
-        game: {
-          id: string
-          createdAt: Date
-          updatedAt: Date
-          name: string
-          type: GameType
-          metadata: Prisma.JsonValue
-          category: GameCategory
-          providerId: string
-          externalGameId: string
-          slug: string
-          nameRu: string | null
-          subcategory: string | null
-          thumbnailUrl: string | null
-          bannerUrl: string | null
-          isEnabled: boolean
-          isFeatured: boolean
-          isNew: boolean
-          isPopular: boolean
-          hasDemo: boolean
-          rtp: Prisma.Decimal | null
-          volatility: GameVolatility | null
-          maxWinMultiplier: Prisma.Decimal | null
-          minBet: Prisma.Decimal | null
-          maxBet: Prisma.Decimal | null
-          supportedCurrencies: Prisma.JsonValue
-          tags: Prisma.JsonValue
-          sortOrder: number
-          launchCount: number
-        }
-        gameRounds: ({
-          gameTransactions: {
-            id: string
-            createdAt: Date
-            type: GameTransactionType
-            amount: Prisma.Decimal
-            balanceAfter: Prisma.Decimal
-            metadata: Prisma.JsonValue
-            userId: string
-            currency: string
-            processed: boolean
-            providerId: string
-            sessionId: string
-            roundId: string
-            externalTransactionId: string
-            ledgerEntryId: string | null
-          }[]
-        } & {
-          id: string
-          createdAt: Date
-          userId: string
-          currency: string
-          status: GameRoundStatus
-          providerId: string
-          gameId: string
-          closedAt: Date | null
-          totalBet: Prisma.Decimal
-          totalWin: Prisma.Decimal
-          sessionId: string
-          externalRoundId: string
-        })[]
-      } & {
-        id: string
-        ipAddress: string | null
-        userAgent: string | null
-        metadata: Prisma.JsonValue
-        userId: string
-        currency: string
-        status: GameSessionStatus
-        providerId: string
-        gameId: string
-        sessionToken: string
-        isDemo: boolean
-        startedAt: Date
-        lastActivityAt: Date
-        closedAt: Date | null
-        totalBet: Prisma.Decimal
-        totalWin: Prisma.Decimal
-        roundsPlayed: number
-      })
-    | null
-  > {
+  async sessionDetail(@Param('id') id: string): Promise<AdminSessionDetail> {
     const session = await prisma.gameSession.findUnique({
       where: { id },
       include: {
@@ -435,9 +432,7 @@ export class CasinoAdminController {
     return session
   }
   @Get('game-transactions')
-  async gameTx(
-    @Query() q: Record<string, string | undefined>,
-  ): Promise<{
+  async gameTx(@Query() q: Record<string, string | undefined>): Promise<{
     items: {
       id: string
       createdAt: Date
