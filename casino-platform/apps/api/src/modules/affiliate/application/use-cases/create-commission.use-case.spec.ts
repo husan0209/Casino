@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import {
-  CreateCommissionUseCase,
-  type CreateCommissionInput,
-} from '../application/use-cases/create-commission.use-case'
-import { parseRevShareRate } from '../domain/value-objects/revshare-rate.value-object'
+import { CreateCommissionUseCase, type CreateCommissionInput } from './create-commission.use-case'
+import { parseRevShareRate } from '../../domain/value-objects/revshare-rate.value-object'
 
 import type {
   AffiliateCommissionEntity,
@@ -12,7 +9,7 @@ import type {
   AffiliateAttributionEntity,
   AttributionForCalc,
   CommissionOutcome,
-} from './helpers/affiliate-test-types'
+} from '../../__tests__/helpers/affiliate-test-types'
 
 const AFFILIATE_ID = 'aff-1'
 const PLAYER_ID = 'player-1'

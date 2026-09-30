@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { ClawbackPlayerCommissionsUseCase } from '../application/use-cases/clawback-player-commissions.use-case'
-import { parseRevShareRate } from '../domain/value-objects/revshare-rate.value-object'
+import { ClawbackPlayerCommissionsUseCase } from './clawback-player-commissions.use-case'
+import { parseRevShareRate } from '../../domain/value-objects/revshare-rate.value-object'
 
 import type {
   AffiliateAttributionEntity,
   AffiliateCommissionEntity,
   AffiliateEntity,
-} from './helpers/affiliate-test-types'
+} from '../../__tests__/helpers/affiliate-test-types'
 
 const PLAYER_ID = 'player-1'
 const AFFILIATE_ID = 'aff-1'

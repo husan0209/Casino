@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { AttributePlayerUseCase } from '../application/use-cases/attribute-player.use-case'
-import { parseRevShareRate } from '../domain/value-objects/revshare-rate.value-object'
+import { AttributePlayerUseCase } from './attribute-player.use-case'
+import { parseRevShareRate } from '../../domain/value-objects/revshare-rate.value-object'
 
-import type { AffiliateAttributionEntity, AffiliateEntity } from './helpers/affiliate-test-types'
+import type {
+  AffiliateAttributionEntity,
+  AffiliateEntity,
+} from '../../__tests__/helpers/affiliate-test-types'
 
 const CODE = 'ABCDEFGH'
 const PLAYER_ID = 'player-1'

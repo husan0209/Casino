@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { CreditCommissionUseCase } from '../application/use-cases/credit-commission.use-case'
-import { sanitizePath } from '../application/use-cases/track-click.use-case'
-import { parseRevShareRate } from '../domain/value-objects/revshare-rate.value-object'
+import { CreditCommissionUseCase } from './credit-commission.use-case'
+import { sanitizePath } from './track-click.use-case'
+import { parseRevShareRate } from '../../domain/value-objects/revshare-rate.value-object'
 
-import type { AffiliateCommissionEntity, AffiliateEntity } from './helpers/affiliate-test-types'
+import type {
+  AffiliateCommissionEntity,
+  AffiliateEntity,
+} from '../../__tests__/helpers/affiliate-test-types'
 
 const AFFILIATE_ID = 'aff-1'
 const AFFILIATE_USER_ID = 'user-affiliate'

@@ -1,14 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import {
-  sanitizePath,
-  FALLBACK_PATH,
-  TrackClickUseCase,
-} from '../application/use-cases/track-click.use-case'
-import { parseRevShareRate } from '../domain/value-objects/revshare-rate.value-object'
-import { extractRefererHost, normalizeIp, sanitizeUserAgent } from '../infrastructure/ip-hasher'
+import { sanitizePath, FALLBACK_PATH, TrackClickUseCase } from './track-click.use-case'
+import { parseRevShareRate } from '../../domain/value-objects/revshare-rate.value-object'
+import { extractRefererHost, normalizeIp, sanitizeUserAgent } from '../../infrastructure/ip-hasher'
 
-import type { AffiliateClickEntity, AffiliateEntity } from './helpers/affiliate-test-types'
+import type {
+  AffiliateClickEntity,
+  AffiliateEntity,
+} from '../../__tests__/helpers/affiliate-test-types'
 
 const CODE = 'ABCDEFGH'
 
