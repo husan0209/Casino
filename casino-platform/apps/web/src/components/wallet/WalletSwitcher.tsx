@@ -10,20 +10,13 @@ import {
   isCryptoCurrency,
   networkLabel,
 } from '@/lib/format/currency'
-import { sortWallets } from '@/lib/wallet/helpers'
+import { mergeWallets, sortWallets } from '@/lib/wallet/helpers'
 import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 import type { WalletBalance } from '@/types/wallet'
 
 import { money } from '@casino/shared-utils'
-
-function mergeWallets(balances: WalletBalance[], enabled: string[]): WalletBalance[] {
-  const map = new Map(balances.map((w) => [w.currency, w]))
-  return enabled.map(
-    (currency) => map.get(currency) ?? { currency, balance: '0', locked: '0', available: '0' },
-  )
-}
 
 /** CSS-класс цветного кружка для валюты (как на скриншотах spinera). */
 function currencyIconClass(currency: string): string {
