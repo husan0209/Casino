@@ -144,8 +144,10 @@ module.exports = {
       },
     },
     {
-      // Relaxed rules for tests (docs/CONVENTIONS.md §11: tests assert behavior, not size)
-      files: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e-spec.ts'],
+      // Relaxed rules for tests (docs/CONVENTIONS.md §11: tests assert behavior, not size).
+      // `.tsx` наравне с `.ts`: в React-приложениях спеки живут в tsx, а отсутствие
+      // паттерна считало `describe(...)` «слишком длинной функцией».
+      files: ['**/*.spec.ts', '**/*.spec.tsx', '**/*.test.ts', '**/*.test.tsx', '**/*.e2e-spec.ts'],
       rules: {
         'max-lines-per-function': 'off',
         'max-params': 'off',

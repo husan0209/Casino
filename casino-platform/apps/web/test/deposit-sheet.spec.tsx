@@ -153,15 +153,11 @@ describe('GAP-36/44: DepositSheet — KYC-лимит из API', () => {
     // не считаем — берём именно параграф остатка целиком (текст в двух узлах:
     // «Без верификации осталось » + «5 000 ₽»), матчим самый глубокий узел с маркером
     const deepest = (_: unknown, el: Element | null): boolean => {
-      if (
-        !el?.textContent?.includes('Без верификации осталось') ||
-        !el.textContent.includes('5 000')
-      ) {
+      const marker = 'Без верификации осталось'
+      if (!el?.textContent.includes(marker) || !el.textContent.includes('5 000')) {
         return false
       }
-      return !Array.from(el.children).some((ch) =>
-        ch.textContent?.includes('Без верификации осталось'),
-      )
+      return !Array.from(el.children).some((ch) => ch.textContent.includes(marker))
     }
     const rest = await screen.findByText(deepest, undefined, { timeout: 3000 })
     expect(rest.textContent).toContain('5 000')
@@ -213,9 +209,16 @@ describe('GAP-59: DepositSheet (крипта) — активный кошелё�
     pay_currency: 'USDT_TRC20',
   }
 
-  /** Открывает кассу с USDT-кошелька, вводит сумму и жмёт «Перейти к оплате». */
-  async function requestCryptoDeposit(): Promise<void> {
-    cryptoDepositMock.mockResolvedValue({ ...usdtTicket, expires_at: '2026-09-30T12:00:00.000Z' })
+  /**
+   * Открывает кассу с USDT-кошелька, вводит сумму и жмёт «Перейти к оплате».
+   * Дедлайн относительный: заявка живёт минуты, а не часы, и зафиксированная дата
+   * («2026-09-30T12:00Z») краснила весь репо, как только этот час проходил.
+   */
+  async function requestCryptoDeposit(deadline = Date.now() + 40 * 60_000): Promise<void> {
+    cryptoDepositMock.mockResolvedValue({
+      ...usdtTicket,
+      expires_at: new Date(deadline).toISOString(),
+    })
     renderSheet()
     expect(await screen.findByRole('heading', { name: 'Пополнить USDT' })).toBeTruthy()
     fireEvent.change(screen.getByPlaceholderText('0.00'), { target: { value: '50' } })
@@ -245,7 +248,13 @@ describe('GAP-59: DepositSheet (крипта) — активный кошелё�
     expect(screen.getByText('50.00 USDT')).toBeTruthy()
     expect(screen.getByText(usdtTicket.pay_address)).toBeTruthy()
     expect(screen.getByRole('button', { name: /скопировать/i })).toBeTruthy()
-    expect(screen.getByText(/Адрес действует/)).toBeTruthy()
+    expect(screen.getByText(/Адрес действует ещё \d+ мин/)).toBeTruthy()
+  })
+
+  it('просроченный `expires_at` — плашка «Срок заявки истёк», а не обещание действующего адреса', async () => {
+    await requestCryptoDeposit(Date.now() - 60_000)
+    expect(await screen.findByText(/Срок заявки истёк/)).toBeTruthy()
+    expect(screen.queryByText(/Адрес действует/)).toBeNull()
   })
 
   it('кладёт над адресом QR с тем же адресом заявки (ТЗ §4.9)', async () => {
