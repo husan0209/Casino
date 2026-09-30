@@ -32,11 +32,11 @@ export const AffiliatePasswordSchema = z
 export const RegisterAffiliateSchema = z.object({
   email: AffiliateEmailSchema,
   password: AffiliatePasswordSchema,
-  displayName: z.string().trim().max(128).optional(),
+  display_name: z.string().trim().max(128).optional(),
   telegram: z.string().trim().max(64).optional(),
   website: z.string().trim().url('Некорректный URL сайта').max(500).optional(),
   /** Принятие соглашения — обязательное для compliance (ТЗ ч.8 §14.1). */
-  acceptTerms: z.literal(true, { message: 'Необходимо принять условия партнёрской программы' }),
+  accept_terms: z.literal(true, { message: 'Необходимо принять условия партнёрской программы' }),
 })
 
 export const LoginAffiliateSchema = z.object({
@@ -45,14 +45,14 @@ export const LoginAffiliateSchema = z.object({
 })
 
 export const UpdateAffiliateSelfSchema = z.object({
-  displayName: z.string().trim().max(128).nullable().optional(),
+  display_name: z.string().trim().max(128).nullable().optional(),
   telegram: z.string().trim().max(64).nullable().optional(),
   website: z.string().trim().url('Некорректный URL сайта').max(500).nullable().optional(),
 })
 
 export const UpdateAffiliatePasswordSchema = z.object({
-  currentPassword: z.string().min(1).max(128),
-  newPassword: AffiliatePasswordSchema,
+  current_password: z.string().min(1).max(128),
+  new_password: AffiliatePasswordSchema,
 })
 
 /** Ставка приходит строкой: деньги-чувствительный параметр (DECIMAL, не float). */
@@ -68,22 +68,22 @@ export const RevShareRateSchema = z
 export const CreateAffiliateAdminSchema = z.object({
   email: AffiliateEmailSchema,
   password: AffiliatePasswordSchema,
-  displayName: z.string().trim().max(128).optional(),
+  display_name: z.string().trim().max(128).optional(),
   country: z.string().trim().length(2).toUpperCase().optional(),
-  payoutCurrency: z.string().trim().min(3).max(16).default('RUB'),
-  revshareRate: RevShareRateSchema.optional(),
+  payout_currency: z.string().trim().min(3).max(16).default('RUB'),
+  revshare_rate: RevShareRateSchema.optional(),
 })
 
 export const UpdateAffiliateAdminSchema = z.object({
   status: z.enum(['active', 'suspended', 'rejected']).optional(),
-  revshareRate: RevShareRateSchema.optional(),
-  displayName: z.string().trim().max(128).nullable().optional(),
+  revshare_rate: RevShareRateSchema.optional(),
+  display_name: z.string().trim().max(128).nullable().optional(),
   country: z.string().trim().length(2).toUpperCase().nullable().optional(),
   telegram: z.string().trim().max(64).nullable().optional(),
   website: z.string().trim().url().max(500).nullable().optional(),
-  payoutCurrency: z.string().trim().min(3).max(16).optional(),
-  suspendedReason: z.string().trim().max(500).nullable().optional(),
-  isAgreed: z.boolean().optional(),
+  payout_currency: z.string().trim().min(3).max(16).optional(),
+  suspended_reason: z.string().trim().max(500).nullable().optional(),
+  is_agreed: z.boolean().optional(),
 })
 
 export const RunDailySchema = z.object({

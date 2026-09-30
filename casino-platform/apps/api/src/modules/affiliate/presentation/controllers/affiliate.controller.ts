@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Кабинет партнёра (UC-AFF-12..16; ТЗ ч.8 §10.2, §12).
  *
  * OWNER-CHECK. Ни один метод не принимает affiliateId: он берётся ТОЛЬКО из
@@ -9,8 +9,19 @@
  * Это осознанное требование: ошибка в расчёте разрушает доверие быстрее, чем
  * низкая ставка (ТЗ ч.8 §3.9).
  */
-import { Controller, Get, Inject, Patch, Post, UseGuards, UsePipes } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common'
 
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AffiliateActor } from '@/common/types/req-user'
 
@@ -71,7 +82,7 @@ export class AffiliateController {
    * «0.2000». Сырое значение тоже возвращается: оно попадает в расчёты.
    */
   @Get('me')
-  async me(actor: AffiliateActor): Promise<{
+  async me(@CurrentUser() actor: AffiliateActor): Promise<{
     affiliate_id: string
     email: string
     display_name: string | null
@@ -116,8 +127,8 @@ export class AffiliateController {
   @Get('dashboard')
   @UsePipes(new ZodValidationPipe(ClickQuerySchema))
   async dashboard(
-    actor: AffiliateActor,
-    query: ClickQueryDto,
+    @CurrentUser() actor: AffiliateActor,
+    @Query() query: ClickQueryDto,
   ): Promise<{
     period_days: number
     clicks: { total: number; converted: number; conversion_rate: string }
@@ -167,8 +178,8 @@ export class AffiliateController {
   @Get('commissions')
   @UsePipes(new ZodValidationPipe(CommissionListQuerySchema))
   async commissions(
-    actor: AffiliateActor,
-    query: CommissionListQueryDto,
+    @CurrentUser() actor: AffiliateActor,
+    @Query() query: CommissionListQueryDto,
   ): Promise<{
     data: Array<{
       id: string
@@ -195,8 +206,8 @@ export class AffiliateController {
       status: query.status,
       from: query.from !== undefined ? new Date(query.from) : undefined,
       to: query.to !== undefined ? new Date(query.to) : undefined,
-      page: query.page,
-      perPage: query.per_page,
+      page: readPageNumber(query.page, 1),
+      perPage: readPageNumber(query.per_page, 20),
     })
 
     return {
@@ -217,13 +228,17 @@ export class AffiliateController {
         status: item.status,
         credited_at: item.creditedAt !== null ? item.creditedAt.toISOString() : null,
       })),
-      meta: { page: query.page, perPage: query.per_page, total: page.total },
+      meta: {
+        page: readPageNumber(query.page, 1),
+        perPage: readPageNumber(query.per_page, 20),
+        total: page.total,
+      },
     }
   }
 
   /** Приведённые игроки со статусами — партнёр видит качество своего трафика. */
   @Get('players')
-  async players(actor: AffiliateActor): Promise<{
+  async players(@CurrentUser() actor: AffiliateActor): Promise<{
     data: Array<{
       player_id: string
       status: string
@@ -257,7 +272,7 @@ export class AffiliateController {
 
   /** Промо-ссылки: базовая + deep-link на каталог/игру. */
   @Get('links')
-  async links(actor: AffiliateActor): Promise<{
+  async links(@CurrentUser() actor: AffiliateActor): Promise<{
     tracking_url: string
     cookie_days: number
     examples: Array<{ name: string; url: string }>
@@ -279,11 +294,17 @@ export class AffiliateController {
   @Patch('me')
   @UsePipes(new ZodValidationPipe(UpdateAffiliateSelfSchema))
   async updateMe(
-    body: UpdateAffiliateSelfDto,
-    actor: AffiliateActor,
+    @Body() body: UpdateAffiliateSelfDto,
+    @CurrentUser() actor: AffiliateActor,
   ): Promise<{ display_name: string | null; telegram: string | null; website: string | null }> {
     const affiliate = await this.requireAffiliate(actor.affiliateId)
-    const updated = await this.affiliates.updateSelf(affiliate.id, body)
+    // Явное сопоставление DTO (snake_case, API_CONVENTIONS §1.2) -> репозиторий
+    // (camelCase). Раскрытие {...body} привело бы к молчаливой потере полей.
+    const updated = await this.affiliates.updateSelf(affiliate.id, {
+      ...(body.display_name !== undefined ? { displayName: body.display_name } : {}),
+      ...(body.telegram !== undefined ? { telegram: body.telegram } : {}),
+      ...(body.website !== undefined ? { website: body.website } : {}),
+    })
     return {
       display_name: updated.displayName,
       telegram: updated.telegram,
@@ -299,7 +320,7 @@ export class AffiliateController {
    * это не санкция, а отказ от работы.
    */
   @Post('leave')
-  async leave(actor: AffiliateActor): Promise<{ status: string; message: string }> {
+  async leave(@CurrentUser() actor: AffiliateActor): Promise<{ status: string; message: string }> {
     const affiliate = await this.requireAffiliate(actor.affiliateId)
     await this.affiliates.update(affiliate.id, {
       status: 'suspended',
@@ -335,4 +356,18 @@ export class AffiliateController {
     const appUrl = process.env['APP_URL'] ?? 'http://localhost:3000'
     return `${appUrl.replace(/\/+$/, '')}/go/${trackingCode}`
   }
+}
+
+/**
+ * Query-параметр пагинации -> положительное целое.
+ *
+ * ZodValidationPipe намеренно пропускает всё, кроме body (common/pipes/
+ * zod-validation.pipe.ts), поэтому z.coerce.number() из схемы не применяется и
+ * в контроллер приходит строка. Без приведения Prisma получает take: "20"
+ * и падает с «Expected Int, provided String». Приведение здесь, а не в схеме,
+ * чтобы работало независимо от того, включат ли query-валидацию.
+ */
+function readPageNumber(value: unknown, fallback: number): number {
+  const parsed = Number(value)
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
 }

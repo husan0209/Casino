@@ -46,6 +46,7 @@ import {
   type AffiliateAttributionRepository,
   type AffiliateCommissionRepository,
   type AffiliateRepository,
+  type UpdateAffiliateAdminInput,
 } from '../../domain/repositories/affiliate.repository'
 import {
   parseRevShareRate,
@@ -178,11 +179,11 @@ export class AffiliateAdminController {
       passwordHash: '',
       trackingCode: await this.affiliates.generateUniqueTrackingCode(),
       revshareRate:
-        body.revshareRate !== undefined
-          ? parseRevShareRate(body.revshareRate)
+        body.revshare_rate !== undefined
+          ? parseRevShareRate(body.revshare_rate)
           : parseRevShareRate((await this.settings.get()).defaultRevshareRate),
-      payoutCurrency: body.payoutCurrency,
-      displayName: body.displayName ?? null,
+      payoutCurrency: body.payout_currency,
+      displayName: body.display_name ?? null,
       country: body.country ?? null,
       isAgreed: true,
     })
@@ -219,19 +220,19 @@ export class AffiliateAdminController {
     @Req() request: Request,
   ): Promise<{ id: string; revshare_rate: string; status: string }> {
     const before = await this.requireAffiliate(id)
-    const revshareRate =
-      body.revshareRate !== undefined ? parseRevShareRate(body.revshareRate) : undefined
-    const updated = await this.affiliates.update(id, { ...body, revshareRate })
+    const patch = toAffiliateUpdatePatch(body)
+    const updated = await this.affiliates.update(id, patch)
     await this.audit.log({
       actorType: 'admin',
       actorId: admin.id,
-      action: revshareRate !== undefined ? 'affiliate.rate.changed' : 'affiliate.partner.updated',
+      action:
+        patch.revshareRate !== undefined ? 'affiliate.rate.changed' : 'affiliate.partner.updated',
       targetType: 'affiliate',
       targetId: id,
       payload: {
         from: { revshareRate: before.revshareRate, status: before.status },
         to: { revshareRate: updated.revshareRate, status: updated.status },
-        reason: body.suspendedReason ?? null,
+        reason: body.suspended_reason ?? null,
       },
       ipAddress: request.ip,
     })
@@ -502,5 +503,29 @@ export class AffiliateAdminController {
       throw new AffiliateNotFoundError(id)
     }
     return affiliate
+  }
+}
+
+/**
+ * DTO (snake_case в HTTP-контракте, API_CONVENTIONS §1.2) -> вход репозитория
+ * (camelCase).
+ *
+ * Явное сопоставление, а не {...body}: раскрытие привело бы к тому, что все
+ * поля молча игнорируются — update вернул бы 200, не изменив ничего.
+ * Отдельная функция ещё и держит complexity метода контроллера в лимите.
+ */
+function toAffiliateUpdatePatch(body: UpdateAffiliateAdminDto): UpdateAffiliateAdminInput {
+  return {
+    ...(body.status !== undefined ? { status: body.status } : {}),
+    ...(body.revshare_rate !== undefined
+      ? { revshareRate: parseRevShareRate(body.revshare_rate) }
+      : {}),
+    ...(body.display_name !== undefined ? { displayName: body.display_name } : {}),
+    ...(body.country !== undefined ? { country: body.country } : {}),
+    ...(body.telegram !== undefined ? { telegram: body.telegram } : {}),
+    ...(body.website !== undefined ? { website: body.website } : {}),
+    ...(body.payout_currency !== undefined ? { payoutCurrency: body.payout_currency } : {}),
+    ...(body.suspended_reason !== undefined ? { suspendedReason: body.suspended_reason } : {}),
+    ...(body.is_agreed !== undefined ? { isAgreed: body.is_agreed } : {}),
   }
 }
