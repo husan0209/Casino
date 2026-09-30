@@ -3,16 +3,27 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { API_BASE_URL } from '@/lib/api-base'
 
 /**
- * P1 #11 (остаток): nonce-CSP — строгая Content-Security-Policy на каждый запрос.
+ * P1 #11 (остаток): CSP — Content-Security-Policy на каждый запрос.
  *
- * Паттерн из документации Next.js: middleware генерирует nonce, кладёт CSP
- * и в request-headers (Next сам подставит nonce в свои inline/hydration-скрипты),
- * и в response. `'strict-dynamic'` пропускает скрипты, вставленные доверенными;
- * `'unsafe-inline'` остаётся как fallback для старых браузеров без strict-dynamic
- * (игнорируется ими же при наличии nonce). `unsafe-eval` нужен только в dev (HMR).
+ * Про nonce и почему его тут нет. Канонический паттерн Next.js — генерировать
+ * nonce в middleware и подставлять его в свои скрипты. Он требует динамического
+ * рендеринга: nonce живёт в запросе, а статическая страница пререндерится на
+ * сборке и лежит на диске уже без него. У нас 24 статических маршрута и 0
+ * динамических, поэтому nonce в HTML не появляется НИ РАЗУ.
  *
- * nginx CSP для веб-хоста убран: два CSP-заголовка пересекаются браузером,
- * strict-dynamic не пробьёт внешний 'unsafe-inline'-CSP (см. casino.conf).
+ * Раньше здесь стоял `'strict-dynamic'`. По спецификации CSP L3 его присутствие
+ * обязывает браузер игнорировать `'self'`, `https:` и `'unsafe-inline'`, так что
+ * единственным разрешённым источником скриптов остаётся nonce. В сборке main
+ * nonce не было ни в одном из 514 тегов <script> — то есть не выполнялся ни один
+ * скрипт на сайте: ни гидратация, ни касса, ни кабинет партнёра.
+ *
+ * Политика сейчас соответствует режиму рендеринга: `'self'` для внешних
+ * скриптов, `'unsafe-inline'` для инлайнового бутстрапа. Ужесточение (nonce
+ * без `'unsafe-inline'`) требует `force-dynamic` на всех маршрутах — это отдельная
+ * задача с замером TTFB, а не побочка к починке.
+ *
+ * nginx CSP для веб-хоста убран: два CSP-заголовка пересекаются браузером, и
+ * политику должен задавать ровно один источник.
  */
 export function middleware(request: NextRequest): NextResponse {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
@@ -36,9 +47,10 @@ export function middleware(request: NextRequest): NextResponse {
 
   const cspHeader = [
     `default-src 'self'`,
-    // 'unsafe-inline' в script-src — совместимость со старыми браузерами;
-    // современные применяют nonce+strict-dynamic и его игнорируют
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https: 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
+    // 'self' — внешние скрипты (Next отдаёт их сам), 'unsafe-inline' — бутстрап.
+    // 'strict-dynamic' здесь недопустим: он отключил бы и 'self', и 'unsafe-inline'
+    // (см. докблок выше), а подставить nonce в статику нечем.
+    `script-src 'self' 'unsafe-inline' https:${isDev ? " 'unsafe-eval'" : ''}`,
     // Next styled-jsx/глобальные стили: инлайновые <style> без nonce
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' blob: data: https:`,
@@ -54,6 +66,9 @@ export function middleware(request: NextRequest): NextResponse {
   ].join('; ')
 
   const requestHeaders = new Headers(request.headers)
+  // Next подставляет x-nonce в свои скрипты только на динамических маршрутах.
+  // Сейчас их нет, поэтому заголовок ни на что не влияет — оставлен как опора для
+  // перехода на force-dynamic, где nonce в политике станет обязательным.
   requestHeaders.set('x-nonce', nonce)
   requestHeaders.set('content-security-policy', cspHeader)
 
