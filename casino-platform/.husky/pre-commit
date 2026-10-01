@@ -6,6 +6,11 @@ PLAT="$ROOT/casino-platform"
 if command -v gitleaks >/dev/null 2>&1; then
   gitleaks detect --source "$ROOT" --verbose || {
     echo "SECRETS_FOUND: potential secrets detected, aborting commit"
+    echo "  Секрет уже мог попасть в индекс: git restore --staged <файл>,"
+    echo "  затем убери значение из файла (значение — из .env, не из кода)."
+    echo "  False positive (плейсхолдер или пример из доков): добавь путь/regex"
+    echo "  в allowlist файла .gitleaks.toml в корне репо — тот же конфиг"
+    echo "  использует job secrets-scan в CI, так что разрешение не разъедется."
     exit 1
   }
 else
@@ -15,10 +20,21 @@ else
   if git diff --cached --diff-filter=ACM --unified=0 | grep -IEn "$PATTERNS"; then
     echo ""
     echo "SECRETS_FOUND: potential secret in staged changes — commit aborted"
-    echo "If this is a false positive, use: git commit --no-verify"
+    echo "  Упрощённый скан не знает allowlist'ов. Что делать:"
+    echo "  1) если это настоящий ключ — убрать из diff (значения живут в .env),"
+    echo "     staged-файл: git restore --staged <файл>;"
+    echo "  2) если это учебный пример/плейсхолдер — поставь gitleaks и"
+    echo "     добавь исключение в .gitleaks.toml (корень репо), как уже сделано"
+    echo "     для docs/API_CONVENTIONS.md и docs/PROVIDER_INTEGRATION_STRATEGY.md."
+    echo "  Пропуск pre-commit-хука в этом репозитории запрещён (CONVENTIONS §10.4)."
     exit 1
   fi
 fi
+
+# ── Scratch denylist ─────────────────────────────────────────────
+# ДО lint-staged: последний линтует и форматает КАЖДЫЙ staged-файл, поэтому
+# падать надо до него — иначе мусор уже переписан, а коммит всё равно не соберётся.
+sh "$PLAT/scripts/bin/check-staged-paths" || exit 1
 
 # ── Lint staged files (use sh to invoke on FAT fs without exec bit) ──
 cd "$PLAT" || exit 1
