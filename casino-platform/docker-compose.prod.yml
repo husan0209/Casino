@@ -100,6 +100,12 @@ services:
     build:
       context: .
       dockerfile: infra/docker/admin.prod.Dockerfile
+      args:
+        # GAP-59: admin — такой же NEXT_PUBLIC_-бандл, как web. Без build-arg в
+        # образ уезжал ARG-дефолт `casino.example.com`, и на реальном домене
+        # админка (axios 'use client', vhost admin без location /api/) уходила
+        # на чужой хост. env_file на сборку не влияет — только build.args.
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://casino.example.com/api/v1}
     env_file: [.env.production]
     depends_on: [api]
     restart: unless-stopped
