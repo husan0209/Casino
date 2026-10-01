@@ -3,7 +3,7 @@ title: Agent Instructions
 description: Machine-readable правила для AI IDE (Cursor/Windsurf/Cline/Claude Code): два формата инструкций в одном файле
 audience: AI agents (Cursor, Windsurf, Cline, Claude Code и аналоги)
 status: living document
-last_updated: 2026-08-28
+last_updated: 2026-10-01
 ---
 
 # Agent Instructions
@@ -227,6 +227,17 @@ Online casino платформа для рынка СНГ. MVP на русско
 7.  **Безопасность** — не логируй пароли, токены, номера карт, документы. Валидируй через Zod. Проверяй права в Guard.
 8.  **Транзакции БД** — все финансовые multi-table операции в `prisma.$transaction()`. Optimistic locking retry до 3 раз.
 9.  **Webhook** — сначала сохранить raw callback в БД, потом обрабатывать. Всегда возвращать 200 OK провайдеру.
+
+## Git: одно дерево, несколько агентов (CONVENTIONS §10.5)
+
+- Каноническая папка — `D:/projects/Casino`; она же `git-common-dir` для всех linked worktrees: её перенос или удаление уничтожает объекты и refs всего репозитория.
+- `git worktree add` запрещён по умолчанию; исключение — долгая изолированная задача: дерево только на `D:` (hoisted-линковка + pnpm store на `D:`, на `C:` выходит полная копия ~1G) и только в `D:/worktrees/<задача>`, в конце обязательно `git worktree remove` + строка в описании PR.
+- Один агент = одна ветка = одна задача: параллельность ветками и `git switch`, а не копиями рабочего дерева.
+- Перед `checkout`/`reset`/`clean`/`stash drop`/`worktree remove`: `git status --porcelain` в `%TEMP%`, затем `git stash create` + сразу `git update-ref refs/saved/<имя>-<дата>` (один `refs/stash` как якорь не годится), копии файлов в `%TEMP%`, `git cat-file -e` по ключевым blob — и только потом разрушающая команда.
+- Запрещены `git clean -f*` (с `-x` сносит `.env`-файлы безвозвратно), `git gc --prune=now`, `git reflog expire`; `git add -A`/`git add .` не используются — только явные пути, а «игнорируется» ≠ «можно удалить».
+- WIP из отстающей ветки: перед переносом на актуальный main проверить, нет ли этого уже в main, и разрешать конфликт в пользу main, а не «в пользу stash».
+- Порты: 3000/3001/3002 — общий dev-кластер (`pnpm -r --parallel dev`), 3005 — QA-съёмка харнеса, 3010–3019 — персональные dev-серверы агентов (по одному), 3012 — mock-api для QA, 3101 — запасной api; `taskkill` только по PID, который поднял сам агент; до начала работы читать лок `%TEMP%\casino-agent.lock`.
+- Второй `next dev` в той же папке обязан задать `WEB_DIST_DIR`; `rm -rf .next` в дереве с живым чужим сервером запрещён.
 
 ## Типичные задачи
 
