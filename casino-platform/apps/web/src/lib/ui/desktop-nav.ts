@@ -74,7 +74,10 @@ export function isSearchShortcut(event: {
   ctrlKey: boolean
   target?: EventTarget | null
 }): boolean {
-  if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey)) {
+  // key отсутствует у синтетических keydown, которые шлют расширения браузера:
+  // без проверки typeof падаем на undefined.toLowerCase() и рвём обработчик.
+  const pressedKey = typeof event.key === 'string' ? event.key.toLowerCase() : ''
+  if (pressedKey !== 'k' || !(event.metaKey || event.ctrlKey)) {
     return false
   }
   const element = event.target as HTMLElement | null
