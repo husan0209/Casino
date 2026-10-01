@@ -17,7 +17,16 @@ import { prisma } from '@casino/database'
 
 import { PrismaWalletLedger } from '../src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma'
 
-const transactionMock = vi.mocked(prisma.$transaction)
+import type { MockedFunction } from 'vitest'
+
+/**
+ * `$transaction` в Prisma перегружен (массив промисов | колбэк с клиентом транзакции),
+ * а спеке нужна только колбэк-ветка с урезанным клиентом из `makeTx()`. Тип выводим
+ * сами: `vi.mocked` от оригинала не позволяет описатьImplementation одной веткой.
+ */
+type TransactionMock = MockedFunction<(fn: (tx: unknown) => Promise<unknown>) => Promise<unknown>>
+
+const transactionMock = prisma.$transaction as unknown as TransactionMock
 
 const P2034 = Object.assign(
   new Error(

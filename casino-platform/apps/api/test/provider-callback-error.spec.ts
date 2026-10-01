@@ -78,10 +78,16 @@ describe('GAP-57: provider-callback не отдаёт текст внутрен�
     await controller.handle('gitslotpark', { 'x-gsp-op': 'withdraw' }, VALID_BODY, res)
 
     expect(adapter.formatErrorResponse).toHaveBeenCalledWith('INTERNAL_ERROR', 'INTERNAL_ERROR')
-    const body = res.json.mock.calls[0][0] as { message: string }
-    expect(body.message).toBe('INTERNAL_ERROR')
-    expect(body.message).not.toContain('updateMany')
-    expect(body.message).not.toContain('D:\\projects')
+    // `res.json` — vi.fn() без типизации аргументов, поэтому кортеж вызова описан
+    // явно: `?.` здесь отвергает и tsc (индекс без проверки), и eslint (цепочка
+    // на не-nullish). Единственный честный вариант — достать вызов и проверить его.
+    const [call] = res.json.mock.calls as Array<[{ message: string }]>
+    if (!call) {
+      throw new Error('res.json не был вызван — проверять нечего')
+    }
+    expect(call[0].message).toBe('INTERNAL_ERROR')
+    expect(call[0].message).not.toContain('updateMany')
+    expect(call[0].message).not.toContain('D:\\projects')
   })
 
   it('известная доменная ошибка сохраняет свой код для провайдера', async () => {

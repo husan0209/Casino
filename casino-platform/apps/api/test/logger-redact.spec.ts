@@ -18,7 +18,7 @@ async function captureLog(obj: Record<string, unknown>): Promise<{ raw: string; 
   const chunks: Buffer[] = []
   stream.on('data', (c: Buffer) => chunks.push(c))
   const logger = pino(
-    { level: 'info', redact: { paths: LOG_REDACT_PATHS, censor: REDACT_CENSOR } },
+    { level: 'info', redact: { paths: [...LOG_REDACT_PATHS], censor: REDACT_CENSOR } },
     stream,
   )
   logger.info(obj)
@@ -60,10 +60,12 @@ describe('GAP-23 pino redact', () => {
 
   it('buildPinoHttpOptions: redact-пути на месте, уровень по LOG_LEVEL', () => {
     const opts = buildPinoHttpOptions()
-    expect(opts.redact.censor).toBe(REDACT_CENSOR)
-    expect(opts.redact.paths).toContain('req.headers.authorization')
-    expect(opts.redact.paths).toContain('req.body.password')
-    expect(opts.redact.paths).toContain('res.headers["set-cookie"]')
+    // `redact` в типе pino — union `string[] | redactOptions` с необязательными полями.
+    const redact = opts.redact as { censor: string; paths: string[] }
+    expect(redact.censor).toBe(REDACT_CENSOR)
+    expect(redact.paths).toContain('req.headers.authorization')
+    expect(redact.paths).toContain('req.body.password')
+    expect(redact.paths).toContain('res.headers["set-cookie"]')
     expect(opts.level).toBe(process.env['LOG_LEVEL'] ?? 'info')
   })
 

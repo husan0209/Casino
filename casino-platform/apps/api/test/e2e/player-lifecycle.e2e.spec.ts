@@ -30,6 +30,12 @@ const SUPERADMIN_PASSWORD = 'e2e-SuperPass1'
 const RUKASSA_SECRET = process.env['RUKASSA_SECRET_KEY'] ?? 'e2e-rukassa-hmac-secret'
 const RUKASSA_SHOP_ID = process.env['RUKASSA_SHOP_ID'] ?? 'e2e-shop'
 
+/** `BodyInit` здесь не глобал (lib без DOM), а fetch-тело ровно из этих трёх форм. */
+type HttpBody = string | FormData | null
+
+/** Строка /wallet/balances: balance и locked — MoneyAmount (строка), не число. */
+type WalletRow = { currency: string; balance: string; locked?: string }
+
 dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () => {
   let playerToken = ''
   let playerUserId = ''
@@ -40,7 +46,7 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
   let gameId = ''
   const userIds: string[] = []
 
-  async function api(
+  async function api<T = Record<string, unknown>>(
     method: 'GET' | 'POST',
     path: string,
     opts: {
@@ -49,12 +55,12 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
       raw?: { text: string; sign?: string }
       multipart?: { fields: Record<string, string>; file?: { name: string; bytes: Buffer } }
     } = {},
-  ): Promise<{ status: number; json: Record<string, unknown> | null }> {
+  ): Promise<{ status: number; json: T | null }> {
     const headers: Record<string, string> = {}
     if (opts.token) {
       headers['authorization'] = `Bearer ${opts.token}`
     }
-    let body: BodyInit | undefined
+    let body: HttpBody = null
     if (opts.multipart) {
       const form = new FormData()
       for (const [k, v] of Object.entries(opts.multipart.fields)) {
@@ -81,9 +87,9 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     }
     const res = await fetch(`${BASE}/api/v1${path}`, { method, headers, body })
     const text = await res.text()
-    let json: Record<string, unknown> | null = null
+    let json: unknown
     try {
-      json = JSON.parse(text) as Record<string, unknown>
+      json = JSON.parse(text)
     } catch {
       json = { raw: text }
     }
@@ -92,14 +98,15 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     // и идёт мимо интерсептора (у него success/balance на верхнем уровне — не трогаем).
     if (
       typeof json === 'object' &&
+      json !== null &&
       'success' in json &&
       'data' in json &&
       json['data'] !== null &&
       typeof json['data'] === 'object'
     ) {
-      json = json['data'] as Record<string, unknown>
+      json = json['data']
     }
-    return { status: res.status, json }
+    return { status: res.status, json: json as T | null }
   }
 
   /** Формула rukassa.client.ts: HMAC-SHA256(`${shopId}:${orderId}:${amount}`) по RAW-байтам. */
@@ -261,10 +268,8 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
       raw: { text: raw, sign: rukassaSign(raw) },
     })
     expect(res.status).toBe(200)
-    const bal = await api('GET', '/wallet/balances', { token: playerToken })
-    const rub = (bal.json as Array<{ currency: string; balance: string; locked: string }>).find(
-      (b) => b.currency === 'RUB',
-    )
+    const bal = await api<WalletRow[]>('GET', '/wallet/balances', { token: playerToken })
+    const rub = (bal.json ?? []).find((b) => b.currency === 'RUB')
     expect(rub?.balance).toBe('1000')
     expect(rub?.locked).toBe('0')
   })
@@ -275,10 +280,8 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
       raw: { text: raw, sign: 'deadbeef'.repeat(8) },
     })
     expect(res.status).toBe(200)
-    const bal = await api('GET', '/wallet/balances', { token: playerToken })
-    const rub = (bal.json as Array<{ currency: string; balance: string }>).find(
-      (b) => b.currency === 'RUB',
-    )
+    const bal = await api<WalletRow[]>('GET', '/wallet/balances', { token: playerToken })
+    const rub = (bal.json ?? []).find((b) => b.currency === 'RUB')
     expect(rub?.balance).toBe('1000')
   })
 
@@ -329,10 +332,8 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     })
     expect(res.status).toBe(201)
     withdrawalPrId = res.json?.['payment_request_id'] as string
-    const bal = await api('GET', '/wallet/balances', { token: playerToken })
-    const rub = (bal.json as Array<{ currency: string; balance: string; locked: string }>).find(
-      (b) => b.currency === 'RUB',
-    )
+    const bal = await api<WalletRow[]>('GET', '/wallet/balances', { token: playerToken })
+    const rub = (bal.json ?? []).find((b) => b.currency === 'RUB')
     expect(rub?.balance).toBe('1150')
     expect(rub?.locked).toBe('500')
   })
@@ -347,10 +348,8 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
       token: login.json?.['accessToken'] as string,
     })
     expect(approve.status).toBe(201)
-    const bal = await api('GET', '/wallet/balances', { token: playerToken })
-    const rub = (bal.json as Array<{ currency: string; balance: string; locked: string }>).find(
-      (b) => b.currency === 'RUB',
-    )
+    const bal = await api<WalletRow[]>('GET', '/wallet/balances', { token: playerToken })
+    const rub = (bal.json ?? []).find((b) => b.currency === 'RUB')
     expect(rub?.balance).toBe('650')
     expect(rub?.locked).toBe('0')
     // проводки игрока: DEPOSIT 1000 + BET -100 + WIN 250 +
