@@ -1,6 +1,6 @@
 # casino-platform — Agent Instructions (opencode / Claude Code / Cline)
 
-> Источник: `docs/AGENT_INSTRUCTIONS.md` §2. Синхронизировано 2026-09-27.
+> Источник: `docs/AGENT_INSTRUCTIONS.md` §2. Синхронизировано 2026-10-01 (добавлен блок «Git: одно дерево, несколько агентов»).
 > **Производный файл (derived):** правила менять в источнике (§2) и копировать сюда — прямые правки приведут к расхождению.
 > Для Cursor/Windsurf см. `.cursorrules` в корне.
 
@@ -37,6 +37,17 @@ Online casino платформа для рынка СНГ. MVP на русско
 8. **Транзакции БД** — все финансовые multi-table операции в `prisma.$transaction()`. Optimistic locking retry до 3 раз.
 9. **Webhook** — сначала сохранить raw callback в БД, потом обрабатывать. Всегда возвращать 200 OK провайдеру.
 
+## Git: одно дерево, несколько агентов (CONVENTIONS §10.5)
+
+- Каноническая папка — `D:/projects/Casino`; она же `git-common-dir` для всех linked worktrees: её перенос или удаление уничтожает объекты и refs всего репозитория.
+- `git worktree add` запрещён по умолчанию; исключение — долгая изолированная задача: дерево только на `D:` (hoisted-линковка + pnpm store на `D:`, на `C:` выходит полная копия ~1G) и только в `D:/worktrees/<задача>`, в конце обязательно `git worktree remove` + строка в описании PR.
+- Один агент = одна ветка = одна задача: параллельность ветками и `git switch`, а не копиями рабочего дерева.
+- Перед `checkout`/`reset`/`clean`/`stash drop`/`worktree remove`: `git status --porcelain` в `%TEMP%`, затем `git stash create` + сразу `git update-ref refs/saved/<имя>-<дата>` (один `refs/stash` как якорь не годится), копии файлов в `%TEMP%`, `git cat-file -e` по ключевым blob — и только потом разрушающая команда.
+- Запрещены `git clean -f*` (с `-x` сносит `.env`-файлы безвозвратно), `git gc --prune=now`, `git reflog expire`; `git add -A`/`git add .` не используются — только явные пути, а «игнорируется» ≠ «можно удалить».
+- WIP из отстающей ветки: перед переносом на актуальный main проверить, нет ли этого уже в main, и разрешать конфликт в пользу main, а не «в пользу stash».
+- Порты: 3000/3001/3002 — общий dev-кластер (`pnpm -r --parallel dev`), 3005 — QA-съёмка харнеса, 3010–3019 — персональные dev-серверы агентов (по одному), 3012 — mock-api для QA, 3101 — запасной api; `taskkill` только по PID, который поднял сам агент; до начала работы читать лок `%TEMP%\casino-agent.lock`.
+- Второй `next dev` в той же папке обязан задать `WEB_DIST_DIR`; `rm -rf .next` в дереве с живым чужим сервером запрещён.
+
 ## Типичные задачи
 
 ### Создать новый модуль
@@ -72,20 +83,20 @@ Online casino платформа для рынка СНГ. MVP на русско
 
 ## Команды для разработки
 
-| Команда                           | Что делает                             |
-| --------------------------------- | -------------------------------------- |
-| `pnpm install`                    | Установить зависимости                 |
-| `pnpm dev`                        | Запустить api + web + admin локально   |
-| `pnpm build`                      | Собрать всё                            |
-| `pnpm typecheck`                  | Проверить TypeScript по всему монорепо |
+| Команда                           | Что делает                                  |
+| --------------------------------- | ------------------------------------------- |
+| `pnpm install`                    | Установить зависимости                      |
+| `pnpm dev`                        | Запустить api + web + admin локально        |
+| `pnpm build`                      | Собрать всё                                 |
+| `pnpm typecheck`                  | Проверить TypeScript по всему монорепо      |
 | `pnpm lint`                       | ESLint по всем проектам; warnings = падение |
-| `pnpm test`                       | Vitest (unit тесты)                    |
-| `pnpm test:e2e`                   | E2E тесты (требует поднятую БД)        |
-| `pnpm db:generate`                | Prisma generate                        |
-| `pnpm db:migrate`                 | Создать миграцию (dev)                 |
-| `pnpm db:deploy`                  | Применить миграции (prod)              |
-| `pnpm db:studio`                  | GUI для БД                             |
-| `pnpm --filter @casino/api <cmd>` | Запустить команду в одном пакете       |
+| `pnpm test`                       | Vitest (unit тесты)                         |
+| `pnpm test:e2e`                   | E2E тесты (требует поднятую БД)             |
+| `pnpm db:generate`                | Prisma generate                             |
+| `pnpm db:migrate`                 | Создать миграцию (dev)                      |
+| `pnpm db:deploy`                  | Применить миграции (prod)                   |
+| `pnpm db:studio`                  | GUI для БД                                  |
+| `pnpm --filter @casino/api <cmd>` | Запустить команду в одном пакете            |
 
 ## Когда СПРОСИТЬ пользователя
 
