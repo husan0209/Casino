@@ -3,6 +3,8 @@ node_modules
 dist
 build
 .next
+# Отдельные каталоги сборок (WEB_DIST_DIR=.next-qa у QA-харнеса): иначе попадут в git status
+.next-*
 out
 .env
 .env*.local
