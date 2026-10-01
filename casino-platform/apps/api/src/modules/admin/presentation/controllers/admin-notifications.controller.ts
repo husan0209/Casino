@@ -5,8 +5,7 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
 
-import { prisma } from '@casino/database'
-
+import { AdminBroadcastService } from '../../application/admin-broadcast.service'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { SendNotificationSchema } from '../dto/admin-notifications.dto'
@@ -14,7 +13,10 @@ import { SendNotificationSchema } from '../dto/admin-notifications.dto'
 @UseGuards(AdminAuthGuard)
 @Controller('admin/notifications')
 export class AdminNotificationsController {
-  constructor(@Inject(AuditLogService) private audit: AuditLogService) {}
+  constructor(
+    @Inject(AdminBroadcastService) private broadcast: AdminBroadcastService,
+    @Inject(AuditLogService) private audit: AuditLogService,
+  ) {}
 
   @Post('send')
   @UsePipes(new ZodValidationPipe(SendNotificationSchema))
@@ -23,37 +25,20 @@ export class AdminNotificationsController {
     @CurrentUser() admin: AdminActor,
     @Req() req: Request,
   ): Promise<{ success: boolean; sentCount: number }> {
-    // Send to specific users or all users if userIds is empty
-    let targets = body.userIds
-    if (targets.length === 0) {
-      const allUsers = await prisma.user.findMany({ select: { id: true } })
-      targets = allUsers.map((u: { id: string }) => u.id)
-    }
-
-    const notifications = targets.map((userId) => ({
-      userId,
+    const res = await this.broadcast.send(body.userIds, {
       title: body.title,
       message: body.message,
-      // Notification.type — VarChar(64), не enum — каст не нужен
-      type: body.type || 'system',
-      channel: 'internal' as const,
-      isRead: false,
-    }))
-
-    await prisma.notification.createMany({
-      data: notifications,
+      type: body.type,
     })
-
     await this.audit.log({
       actorType: 'admin',
       actorId: admin.id,
       action: 'admin.notifications.sent',
       targetType: 'notification_batch',
       targetId: 'batch',
-      payload: { title: body.title, count: targets.length },
+      payload: { title: body.title, count: res.sentCount },
       ipAddress: req.ip,
     })
-
-    return { success: true, sentCount: targets.length }
+    return res
   }
 }

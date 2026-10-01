@@ -18,7 +18,7 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
 
-import { PaymentRequestRepository } from '@modules/payments/infrastructure/repositories/payment-request.repository'
+import { type IPaymentRequestRepository, PAYMENT_REQUEST_REPOSITORY } from '@modules/payments/domain/payments.ports'
 import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
@@ -80,7 +80,7 @@ function parsePagination(q: Record<string, string | undefined>): { page: number;
 export class AdminFinanceController {
   constructor(
     @Inject(WalletFacade) private wallet: WalletFacade,
-    @Inject(PaymentRequestRepository) private payments: PaymentRequestRepository,
+    @Inject(PAYMENT_REQUEST_REPOSITORY) private payments: IPaymentRequestRepository,
     @Inject(AuditLogService) private audit: AuditLogService,
   ) {}
 

@@ -45,9 +45,15 @@ beforeEach(() => {
   auditRepo.log.mockClear()
 })
 
+const fakeUsersService = { touchLastLogin: vi.fn().mockResolvedValue(undefined) }
+
 describe('аудит 2026-09-26: POST /admin/auth/login', () => {
   it('неверные креды → InvalidAdminCredentialsError (401 + error-конверт), не HTTP-200', async () => {
-    const ctl = new AdminAuthController(fakeAdminAuth(null), audit)
+    const ctl = new AdminAuthController(
+      fakeAdminAuth(null),
+      fakeUsersService as never,
+      audit,
+    )
     await expect(ctl.login({ email: 'x@x.x', password: 'wrong-pass' })).rejects.toBeInstanceOf(
       InvalidAdminCredentialsError,
     )
@@ -55,7 +61,7 @@ describe('аудит 2026-09-26: POST /admin/auth/login', () => {
 
   it('верные креды → {accessToken, admin}', async () => {
     const auth = fakeAdminAuth(adminOk)
-    const ctl = new AdminAuthController(auth, audit)
+    const ctl = new AdminAuthController(auth, fakeUsersService as never, audit)
     const res = await ctl.login({ email: 'admin@casino.local', password: 'secret-pass' })
     expect(res).toEqual({ accessToken: 'jwt-token', admin: adminOk })
   })

@@ -56,4 +56,17 @@ export class AdminUsersService {
   async unblock(id: string): Promise<AdminUserRow> {
     return this.repo.setActive(id, true)
   }
+
+  /** Блокировка игрока (users-контроллер): статус + отзыв сессий — через порт (В3). */
+  blockPlayer(userId: string): Promise<void> {
+    return this.repo.blockPlayer(userId)
+  }
+
+  unblockPlayer(userId: string): Promise<void> {
+    return this.repo.unblockPlayer(userId)
+  }
+
+  touchLastLogin(id: string): Promise<void> {
+    return this.repo.touchLastLogin(id)
+  }
 }
