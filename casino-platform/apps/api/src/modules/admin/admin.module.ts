@@ -15,6 +15,7 @@ import {
   PrismaDashboardRepository,
 } from './infrastructure/repositories/admin.prisma.repository'
 import { AdminAuthGuard } from './presentation/admin-auth.guard'
+import { PaymentsModule } from '../payments/payments.module'
 import { WalletModule } from '../wallet/wallet.module'
 import { AdminAdminsController } from './presentation/controllers/admin-admins.controller'
 import { AdminAuditController } from './presentation/controllers/admin-audit.controller'
@@ -22,10 +23,9 @@ import { AdminAuthController } from './presentation/controllers/admin-auth.contr
 import { AdminDashboardController } from './presentation/controllers/admin-dashboard.controller'
 import { AdminFinanceController } from './presentation/controllers/admin-finance.controller'
 import { AdminUsersController } from './presentation/controllers/admin-users.controller'
-import { PaymentRequestRepository } from '../payments/infrastructure/repositories/payment-request.repository'
 
 @Module({
-  imports: [WalletModule],
+  imports: [WalletModule, PaymentsModule],
   controllers: [
     AdminAuthController,
     AdminUsersController,
@@ -43,7 +43,6 @@ import { PaymentRequestRepository } from '../payments/infrastructure/repositorie
     AuditLogService,
     AdminUsersService,
     DashboardService,
-    PaymentRequestRepository,
   ],
   // AdminAuthService экспортируем вместе с AdminAuthGuard: guard инжектит его,
   // и без экспорта импортирующие модули (KycModule) падали на DI (E2E, PR #15)

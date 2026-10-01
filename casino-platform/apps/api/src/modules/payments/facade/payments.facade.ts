@@ -30,6 +30,19 @@ export class PaymentsFacade {
     return this.repo.findById(id)
   }
 
+  getPaymentRequest(id: string): Promise<PaymentRequest | null> {
+    return this.repo.findById(id)
+  }
+
+  /** Смена статуса платёжки (admin approve/reject/batch — admin-finance). */
+  updatePaymentStatus(
+    id: string,
+    status: PaymentRequest['status'],
+    extra?: { completedAt?: Date; externalStatus?: string; errorMessage?: string },
+  ): Promise<void> {
+    return this.repo.updateStatus(id, status, extra)
+  }
+
   listUserPayments(
     userId: string,
     page: number,

@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import { Decimal } from 'decimal.js'
 
-import { InsufficientFundsError } from '@modules/wallet/domain/errors'
+import { InsufficientFundsError } from '@modules/wallet/facade/wallet.facade'
 import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import { type Currency } from '@casino/shared-types'

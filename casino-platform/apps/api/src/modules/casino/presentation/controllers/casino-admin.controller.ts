@@ -1,6 +1,6 @@
 import { createHash } from 'crypto'
 
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
+import { Body, Controller, Get, Inject, Param, Patch, Post, Query, UseGuards, UsePipes } from '@nestjs/common'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
@@ -9,9 +9,9 @@ import { Roles, RolesGuard } from '@modules/auth/presentation/guards/roles.guard
 
 import { type GameCategory, type GameProviderType, type GameRoundStatus, type GameSessionStatus, type GameTransactionType, type GameType, type GameVolatility, prisma, type Prisma } from '@casino/database'
 
+import { IProviderAdapterFactory, PROVIDER_ADAPTER_FACTORY } from '../../domain/casino.ports'
 import { CasinoEntityNotFoundError } from '../../domain/errors'
 import { type ProviderGameRow } from '../../domain/provider-adapter.interface'
-import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 import { UpdateGameSchema } from '../dto/admin-game.dto'
 
 /** Стабильный slug игры: читаемая база + хэш пары (provider, externalId). */
@@ -32,7 +32,9 @@ function gameSlug(providerSlug: string, externalGameId: string, name?: string): 
 @Roles('admin', 'superadmin')
 @Controller('admin')
 export class CasinoAdminController {
-  constructor(private adapters: ProviderAdapterFactory) {}
+  constructor(
+    @Inject(PROVIDER_ADAPTER_FACTORY) private adapters: IProviderAdapterFactory,
+  ) {}
 
   // providers
   @Get('providers')

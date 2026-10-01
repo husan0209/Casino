@@ -20,6 +20,11 @@ import {
 
 import type { Prisma } from '@prisma/client'
 
+/** Публичная поверхность wallet-модуля для потребителй (В1): фасад + типы
+ *  результата и доменные ошибки — deep-импорты из domain/ не нужны. */
+export type { CreditResult } from '../domain/repositories/wallet.repository'
+export { InsufficientFundsError } from '../domain/errors'
+
 /**
  * Единственная точка входа в wallet для других модулей (4-слойка, GAP-22):
  * семантика операций — в application/use-cases, Prisma-реализация —
