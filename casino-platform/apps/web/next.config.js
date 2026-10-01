@@ -7,6 +7,8 @@
  * произвольным URL самой же платформой (SSRF-вектор + кеш мусора).
  * Разрешённые хосты — NEXT_PUBLIC_IMAGE_HOSTS через запятую.
  */
+const path = require('node:path')
+
 const hosts = (process.env['NEXT_PUBLIC_IMAGE_HOSTS'] ?? '')
   .split(',')
   .map((host) => host.trim())
@@ -16,6 +18,11 @@ const hosts = (process.env['NEXT_PUBLIC_IMAGE_HOSTS'] ?? '')
 const nextConfig = {
   // Второй `next dev` в этой же папке (QA-съёмка) не должен сносить .next чужого dev-сервера.
   distDir: process.env['WEB_DIST_DIR'] ?? '.next',
+  // infra/docker/web.prod.Dockerfile копирует .next/standalone и запускает apps/web/server.js —
+  // без standalone этого каталога не существует, и `docker compose build web` падает на COPY.
+  output: 'standalone',
+  // Монорепо: трассировка от корня workspace, иначе standalone соберёт зависимости вне /app.
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   reactStrictMode: true,
   images: {
     formats: ['image/avif', 'image/webp'],

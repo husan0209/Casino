@@ -251,5 +251,16 @@ module.exports = {
       files: ['apps/web/**/*.{ts,tsx}', 'apps/admin/**/*.{ts,tsx}'],
       env: { browser: true, node: true, es2022: true },
     },
+    {
+      // ── CommonJS-конфиги: require() здесь обязателен, а не вопрос стиля ──
+      // Next, postcss и tailwind читают эти файлы как CJS (module.exports), поэтому
+      // ESM-импорт в них неработоспособен. Держим правило выключенным: без этого любая
+      // правка такого конфига с require('node:...') блокируется pre-commit, потому что
+      // `next lint --dir src --dir test` конфиги не видит, а lint-staged линтует staged-файл.
+      files: ['**/*.config.js'],
+      rules: {
+        '@typescript-eslint/no-require-imports': 'off',
+      },
+    },
   ],
 }
