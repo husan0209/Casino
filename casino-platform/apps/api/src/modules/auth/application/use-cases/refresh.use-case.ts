@@ -1,19 +1,19 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { IJwtTokenService, JWT_TOKEN_SERVICE } from '../../domain/auth.ports'
 import { SessionInvalidError, SessionExpiredError, AccountBlockedError } from '../../domain/errors'
 import {
   ISessionRepository,
   SESSION_REPOSITORY,
 } from '../../domain/repositories/session.repository'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { JwtTokenService } from '../../infrastructure/services/jwt.service'
 
 @Injectable()
 export class RefreshUseCase {
   constructor(
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,
     @Inject(USER_REPOSITORY) private users: IUserRepository,
-    @Inject(JWT_TOKEN_SERVICE) private jwt: IJwtTokenService,
+    private jwt: JwtTokenService,
   ) {}
   async execute(refreshToken: string): Promise<{ accessToken: string; refreshToken: string; }> {
     const hash = this.jwt.hashRefreshToken(refreshToken)

@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { IPasswordHasher, PASSWORD_HASHER } from '../../domain/auth.ports'
 import { InvalidCredentialsError, PasswordNotSetError, WeakPasswordError } from '../../domain/errors'
 import { ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories/session.repository'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
 
 /**
  * GAP-52 (ТЗ ч.5 §9 «Безопасность»): смена пароля из профиля залогиненным
@@ -17,7 +17,7 @@ export class ChangePasswordUseCase {
   constructor(
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,
-    @Inject(PASSWORD_HASHER) private hasher: IPasswordHasher,
+    private hasher: PasswordHasher,
   ) {}
 
   async execute(input: {

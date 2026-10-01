@@ -9,8 +9,6 @@ import { DISPLAY_RUB_RATES } from '@casino/shared-config'
 
 import { PaymentProviderNotConfiguredError } from './rukassa.client'
 
-import type { INowPaymentsClient } from '../../domain/payments.ports'
-
 const MAP: Record<string, string> = {
   USDT_TRC20: 'usdttrc20',
   BTC: 'btc',
@@ -80,7 +78,7 @@ function parseCreateResponse(json: unknown): { paymentId: string; payAddress: st
  * заголовок x-nowpayments-sig.
  */
 @Injectable()
-export class NOWPaymentsClient implements INowPaymentsClient {
+export class NOWPaymentsClient {
   private readonly logger = new Logger(NOWPaymentsClient.name)
   constructor(private config: ConfigService) {}
 
@@ -135,13 +133,7 @@ export class NOWPaymentsClient implements INowPaymentsClient {
     payCurrency: string
     orderId: string
     ipnCallbackUrl: string
-  }): Promise<{
-    paymentId: string
-    payAddress: string
-    payAmount: string
-    payCurrency: string
-    expirationEstimateDate: string
-  }> {
+  }): Promise<{ paymentId: string; payAddress: string; payAmount: string; payCurrency: string; expirationEstimateDate: string; }> {
     if (!this.isProd() && !this.config.get<string>('NOWPAYMENTS_API_KEY')) {
       return this.devStubPayment(params)
     }
@@ -165,9 +157,7 @@ export class NOWPaymentsClient implements INowPaymentsClient {
       const d = asPspResponse<NOWPaymentsCreatePaymentResponse>(await res.json())
       const { paymentId, payAddress } = parseCreateResponse(d)
       if (!paymentId || !payAddress) {
-        throw new Error(
-          `unexpected shape: ${JSON.stringify({ paymentId, payAddress }).slice(0, 200)}`,
-        )
+        throw new Error(`unexpected shape: ${JSON.stringify({ paymentId, payAddress }).slice(0, 200)}`)
       }
       this.logger.log(`NOWPayments payment created: ${paymentId}`)
       return {

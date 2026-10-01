@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 
-import { Inject, Injectable } from '@nestjs/common'
+import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
@@ -8,19 +8,15 @@ import { errorMessage } from '@/common/utils/error-message'
 import { KycCheckService } from '@modules/kyc/application/use-cases/kyc-check.service'
 
 import { PaymentProviderError } from '../../domain/errors'
-import {
-  INowPaymentsClient,
-  IPaymentRequestRepository,
-  NOWPAYMENTS_CLIENT,
-  PAYMENT_REQUEST_REPOSITORY,
-} from '../../domain/payments.ports'
+import { NOWPaymentsClient } from '../../infrastructure/clients/nowpayments.client'
+import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 
 @Injectable()
 export class CreateCryptoDepositUseCase {
   // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
-    @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
-    @Inject(NOWPAYMENTS_CLIENT) private readonly np: INowPaymentsClient,
+    private repo: PaymentRequestRepository,
+    private np: NOWPaymentsClient,
     private kycCheck: KycCheckService,
     private config: ConfigService,
   ) {}

@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { IJwtTokenService, JWT_TOKEN_SERVICE } from '../../domain/auth.ports'
 import { type UserRole } from '../../domain/entities/user.entity'
 import { TokenAlreadyUsedError, TokenExpiredError, TokenInvalidError } from '../../domain/errors'
 import { EMAIL_VERIFICATION_REPOSITORY, IEmailVerificationRepository, ISessionRepository, SESSION_REPOSITORY } from '../../domain/repositories'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { JwtTokenService } from '../../infrastructure/services/jwt.service'
 
 @Injectable()
 export class VerifyEmailUseCase {
@@ -13,7 +13,7 @@ export class VerifyEmailUseCase {
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(EMAIL_VERIFICATION_REPOSITORY) private verif: IEmailVerificationRepository,
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,
-    @Inject(JWT_TOKEN_SERVICE) private jwt: IJwtTokenService,
+    private jwt: JwtTokenService,
   ) {}
   async execute(token: string, ip?: string, userAgent?: string): Promise<{ accessToken: string; refreshToken: string; user: { id: string; email: string | null; role: UserRole; }; }> {
     const rec = await this.verif.findByToken(token)

@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 
 import { errorMessage } from '@/common/utils/error-message'
 
@@ -8,13 +8,8 @@ import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 import { type Currency } from '@casino/shared-types'
 
 import { classifyPaymentStatus } from '../../domain/payment-status'
-import {
-  type PaymentRequest,
-  IRukassaClient,
-  IPaymentRequestRepository,
-  PAYMENT_REQUEST_REPOSITORY,
-  RUKASSA_CLIENT,
-} from '../../domain/payments.ports'
+import { RukassaClient } from '../../infrastructure/clients/rukassa.client'
+import { type PaymentRequest, PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 
 /** Rukassa отдаёт id платежа в разных полях в зависимости от сценария. */
 function pickExternalId(body: Record<string, unknown>): string {
@@ -39,12 +34,12 @@ export class ProcessRukassaWebhookUseCase {
   private logger = new Logger(ProcessRukassaWebhookUseCase.name)
   // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
-    @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
-    @Inject(RUKASSA_CLIENT) private readonly rukassa: IRukassaClient,
+    private repo: PaymentRequestRepository,
+    private rukassa: RukassaClient,
     private wallet: WalletFacade,
     private users: UsersFacade,
   ) {}
-  async execute(input: ProcessRukassaWebhookInput): Promise<{ ok: boolean }> {
+  async execute(input: ProcessRukassaWebhookInput): Promise<{ ok: boolean; }> {
     const { rawHeaders, body, rawBody, ip } = input
     // Store the EXACT raw body bytes the provider signed. If we ever need to
     // re-verify or investigate a dispute, we have the original payload.
@@ -97,14 +92,7 @@ export class ProcessRukassaWebhookUseCase {
 
   /** Успех -> зачисление депозита; failure -> failed; остальное -> processing. */
   private async applyOutcome(
-    pr: {
-      id: string
-      userId: string
-      status: string
-      currency: string | null
-      amount: { toString(): string }
-      method: string | null
-    },
+    pr: { id: string; userId: string; status: string; currency: string | null; amount: { toString(): string }; method: string | null },
     status: string,
     externalId: string,
   ): Promise<void> {

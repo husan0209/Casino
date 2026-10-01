@@ -2,8 +2,7 @@
 part: 5
 total_parts: 7
 version: 1.0
-status: 'frozen spec v1.0'
-supplement: 'tz-part-5.1-frontend-design.md'
+status: "frozen spec v1.0"
 ---
 
 # ТЗ — Часть 5. Frontend Web (витрина, личный кабинет, кошелёк, история)
@@ -23,8 +22,6 @@ supplement: 'tz-part-5.1-frontend-design.md'
 > 5. **Frontend Web** ← текущая часть
 > 6. [Admin Panel, Support, Referral System](tz-part-6-admin-support-referrals.md)
 > 7. [DevOps, Security, Logging, QA, Release Prep](tz-part-7-devops-security-qa.md)
->
-> **Дополнение к Части 5:** [Часть 5.1. Дизайн-сборка фронтенда (гибридный UI)](tz-part-5.1-frontend-design.md) — визуальные направления, макетные решения, GameDeck, тон голоса. При противоречии макетов — побеждает Часть 5.1.
 
 ---
 
@@ -177,15 +174,15 @@ Text secondary:       #8888AA
 
 Игровые валюты (полный продуктовый набор; MVP — см. §2.2):
 
-| Код  | Как писать игроку | Символ | Пример в шапке | MVP     |
-| ---- | ----------------- | ------ | -------------- | ------- |
-| RUB  | руб.              | ₽      | `1 200 ₽`      | ✅      |
-| UAH  | грн               | ₴      | `500 ₴`        | Phase 2 |
-| BYN  | бр                | Br     | `50 Br`        | Phase 2 |
-| KZT  | тг                | ₸      | `15 000 ₸`     | Phase 2 |
-| UZS  | сум               | soʻm   | `150 000 soʻm` | Phase 2 |
-| USDT | USDT              | USDT   | `150 USDT`     | ✅      |
-| BTC  | BTC               | BTC    | `0.0012 BTC`   | ✅      |
+| Код | Как писать игроку | Символ | Пример в шапке | MVP |
+|---|---|---|---|---|
+| RUB | руб. | ₽ | `1 200 ₽` | ✅ |
+| UAH | грн | ₴ | `500 ₴` | Phase 2 |
+| BYN | бр | Br | `50 Br` | Phase 2 |
+| KZT | тг | ₸ | `15 000 ₸` | Phase 2 |
+| UZS | сум | soʻm | `150 000 soʻm` | Phase 2 |
+| USDT | USDT | USDT | `150 USDT` | ✅ |
+| BTC | BTC | BTC | `0.0012 BTC` | ✅ |
 
 Правила формата:
 
@@ -1022,7 +1019,7 @@ interface WalletStore {
   lastPaymentMethod: string | null
   isLoading: boolean
 
-  setActiveCurrency(currency: string): Promise<void> // PATCH /users/me currency_preference
+  setActiveCurrency(currency: string): Promise<void>  // PATCH /users/me currency_preference
   getActiveWallet(): WalletBalance | undefined
   getNonZeroWallets(): WalletBalance[]
   fetchWallets(): Promise<void>
@@ -1084,9 +1081,14 @@ geo.api.ts
 TanStack Query ключи:
 
 ```ts
-;['geo'][('games', filters)][('games', slug)][('wallet', userId)][
-  ('wallet', 'transactions', userId, filters)
-][('users', 'me')][('kyc', 'status')][('history', filters)]
+['geo']
+['games', filters]
+['games', slug]
+['wallet', userId]
+['wallet', 'transactions', userId, filters]
+['users', 'me']
+['kyc', 'status']
+['history', filters]
 ```
 
 Prefetch meta игры при появлении карточки в viewport — желательно.  
@@ -1139,14 +1141,14 @@ xl   1280
 2xl  1536
 ```
 
-| Зона         | Телефон                 | Десктоп             |
-| ------------ | ----------------------- | ------------------- |
-| Навигация    | bottom nav              | икон-панель         |
-| Касса        | Sheet снизу             | Sheet/Modal         |
-| Сетка слотов | 2 колонки               | 5–6                 |
-| Запуск       | fullscreen              | iframe + fullscreen |
-| Поиск        | экран / поле под шапкой | хедер + ⌘K          |
-| Карточка     | тап = игра              | hover доп. кнопки   |
+| Зона | Телефон | Десктоп |
+|---|---|---|
+| Навигация | bottom nav | икон-панель |
+| Касса | Sheet снизу | Sheet/Modal |
+| Сетка слотов | 2 колонки | 5–6 |
+| Запуск | fullscreen | iframe + fullscreen |
+| Поиск | экран / поле под шапкой | хедер + ⌘K |
+| Карточка | тап = игра | hover доп. кнопки |
 
 Тестировать в первую очередь 360–430px. Десктоп не может иметь другой порядок денег.
 

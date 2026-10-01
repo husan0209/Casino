@@ -27,9 +27,6 @@ vi.mock('ioredis', () => ({
   },
 }))
 
-import { GetReadinessUseCase } from '@modules/health/application/use-cases/get-readiness.use-case'
-import { PrismaHealthProbe } from '@modules/health/infrastructure/probes/prisma-health.probe'
-import { RedisHealthProbe } from '@modules/health/infrastructure/probes/redis-health.probe'
 import { HealthController } from '@modules/health/presentation/health.controller'
 
 import { prisma } from '@casino/database'
@@ -59,11 +56,7 @@ function makeRes(): ResStub {
 
 function makeCtrl(redisUrl?: string): HealthController {
   const config = { get: (k: string) => (k === 'REDIS_URL' ? redisUrl : undefined) }
-  // Контроллер стал тонким (решение В2): readiness-логика — в use-case,
-  // пробы — infrastructure. Моки prisma/ioredis выше перехватывают их вызовы.
-  return new HealthController(
-    new GetReadinessUseCase([new PrismaHealthProbe(), new RedisHealthProbe(config as never)]),
-  )
+  return new HealthController(config as never)
 }
 
 describe('HealthController readiness (GAP-35)', () => {

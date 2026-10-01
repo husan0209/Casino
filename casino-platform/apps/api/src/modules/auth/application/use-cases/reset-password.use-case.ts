@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { IPasswordHasher, PASSWORD_HASHER } from '../../domain/auth.ports'
 import {
   TokenInvalidError,
   TokenExpiredError,
@@ -14,6 +13,7 @@ import {
   SESSION_REPOSITORY,
 } from '../../domain/repositories'
 import { IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
+import { PasswordHasher } from '../../infrastructure/services/password-hasher.service'
 
 @Injectable()
 export class ResetPasswordUseCase {
@@ -22,7 +22,7 @@ export class ResetPasswordUseCase {
     @Inject(PASSWORD_RESET_REPOSITORY) private resets: IPasswordResetRepository,
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,
-    @Inject(PASSWORD_HASHER) private hasher: IPasswordHasher,
+    private hasher: PasswordHasher,
   ) {}
   async execute(token: string, newPassword: string): Promise<{ ok: boolean; }> {
     if (newPassword.length < 8) {

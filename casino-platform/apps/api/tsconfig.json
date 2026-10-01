@@ -1,8 +1,14 @@
 {
   "extends": "@casino/tsconfig/nest.json",
   "compilerOptions": {
+    "rootDir": "../..",
     "outDir": "./dist",
+    // baseUrl обязателен: nest.json объявляет "./src/*" для @/*, а baseUrl
+    // наследуется относительно packages/tsconfig — без него алиасы резолвятся
+    // не туда (TS2307). ignoreDeprecations нужен, чтобы заглушить
+    // предупреждение про deprecated moduleResolution=node10.
     "baseUrl": "./",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@/*": ["./src/*"],
       "@modules/*": ["./src/modules/*"],

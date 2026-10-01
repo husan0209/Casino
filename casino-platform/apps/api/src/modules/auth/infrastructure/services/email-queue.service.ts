@@ -4,8 +4,6 @@ import { ConfigService } from '@nestjs/config'
 import { EMAIL_QUEUE_PORT, EmailQueuePort, type EnqueueResult } from '@/queues/queue.types'
 import { renderPasswordResetEmail, renderVerificationEmail } from '@/queues/templates'
 
-import { type IEmailQueueService } from '../../domain/auth.ports'
-
 /**
  * Продюсер писей аутентификации (verify-email / reset-password).
  * Постановка в очередь `email` через QueuesModule (GAP-02);
@@ -13,7 +11,7 @@ import { type IEmailQueueService } from '../../domain/auth.ports'
  * Rich HTML (GAP-02 post-MVP) — через templates/; plain-text fallback сохранён.
  */
 @Injectable()
-export class EmailQueueService implements IEmailQueueService {
+export class EmailQueueService {
   constructor(
     private config: ConfigService,
     @Inject(EMAIL_QUEUE_PORT) private readonly emailQueue: EmailQueuePort,

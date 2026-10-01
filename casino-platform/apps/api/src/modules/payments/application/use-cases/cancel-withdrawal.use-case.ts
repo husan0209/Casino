@@ -1,18 +1,18 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common'
+import { Injectable, ForbiddenException } from '@nestjs/common'
 
 import { WalletFacade } from '@modules/wallet/application/wallet.facade'
 
 import type { Currency } from '@casino/shared-types'
 
-import { IPaymentRequestRepository, PAYMENT_REQUEST_REPOSITORY } from '../../domain/payments.ports'
+import { PaymentRequestRepository } from '../../infrastructure/repositories/payment-request.repository'
 
 @Injectable()
 export class CancelWithdrawalUseCase {
   constructor(
-    @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
+    private repo: PaymentRequestRepository,
     private wallet: WalletFacade,
   ) {}
-  async execute(userId: string, id: string): Promise<{ ok: boolean }> {
+  async execute(userId: string, id: string): Promise<{ ok: boolean; }> {
     const pr = await this.repo.findById(id)
     if (!pr || pr.userId !== userId) {
       throw new ForbiddenException()

@@ -66,10 +66,8 @@ detect() {
         done
       ;;
     # Кросс-модульные deep-импорты мимо Facade (MODULE_BOUNDARIES.md).
-    # Разрешено (публичный API модуля): импорт *.facade и guard'ов (*.guard) —
-    # MODULE_BOUNDARIES §2.5 объявляет JwtAuthGuard/RolesGuard экспортом auth,
-    # решение В6 (2026-09-28). queues/, common/ и прочее вне src/modules
-    # модулями не считаются.
+    # Разрешено: импорт *.facade (публичный API модуля). queues/, common/ и
+    # прочее вне src/modules модулями не считаются.
     cross-module-imports)
       MODS=$(ls -1 apps/api/src/modules | tr '\n' '|' | sed 's/|$//')
       grep -rnoE "from '[^']+'" apps/api/src/modules --include='*.ts' 2>/dev/null |
@@ -81,7 +79,6 @@ detect() {
             split(f1, p, ":"); file = p[1]; gsub(/\\/, "/", file)
             if (imp !~ ("/(" mods ")/(domain|application|infrastructure|presentation)(/|$)")) next
             if (imp ~ /\.facade$/) next
-            if (imp ~ /\.guard$/) next
             match(file, /modules\/[a-z-]+\//); A = substr(file, RSTART + 8, RLENGTH - 9)
             B = ""
             if (match(imp, /@modules\/[a-z-]+\//)) {

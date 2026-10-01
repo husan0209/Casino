@@ -432,9 +432,7 @@ referral_rewards                (period, ggr, reward_amount, status)
 ### 9.4. Используется в
 
 - Frontend (реферальный кабинет)
-- `admin` (admin-API `ReferralsAdminController` — `GET /admin/referrals`,
-  `GET /admin/referrals/stats`; ручной триггер `POST /admin/referrals/run-daily`
-  переехал в maintenance presentation, §18 — решение В2, путь/контракт сохранены)
+- `admin` (`ReferralsAdminController` — `POST /admin/referrals/run-daily`, audit-log)
 - `maintenance` (job `referral-daily` запускает `ReferralCalcService.runDaily`, §18)
 
 ---
@@ -729,7 +727,6 @@ apps/api/src/modules/maintenance/application/            (5 job-классов: 
 apps/api/src/modules/maintenance/domain/maintenance.ports.ts
 apps/api/src/modules/maintenance/infrastructure/maintenance.prisma.repo.ts
 apps/api/src/modules/maintenance/infrastructure/maintenance.worker.ts
-apps/api/src/modules/maintenance/presentation/maintenance-admin.controller.ts
 apps/api/src/queues/infrastructure/maintenance.scheduler.ts
 apps/api/src/modules/maintenance/maintenance.module.ts
 ```
@@ -747,12 +744,10 @@ apps/api/src/modules/maintenance/maintenance.module.ts
 
 ### 18.4. Использует
 
-- `referrals` (ReferralCalcService — job `referral-daily` и ручной триггер)
-- `admin` (AuditLogService — audit-log ручного триггера run-daily)
+- `referrals` (ReferralCalcService — job `referral-daily`)
 - `queues` (BullMQ-планирование; EMAIL_QUEUE_PORT — письмо админам)
 - `payments` (NOWPaymentsClient — источник курсов; прямой импорт клиента
   из `payments/infrastructure/clients/`)
-- `auth` (AuthGuard/RolesGuard — на presentation-контроллере ручного триггера)
 
 ### 18.5. Используется в
 
@@ -771,8 +766,7 @@ admin_users          (email активных админов)
 ### 18.7. КРИТИЧНО
 
 - Ручной триггер реферальных начислений — `POST /admin/referrals/run-daily`
-  (`MaintenanceAdminController`, presentation maintenance; решение В2 — переехал
-  из referrals-модуля, путь/guards/контракт сохранены; superadmin; audit-log
-  через `AuditLogService`), job `referral-daily` — его же автоматический запуск
+  (superadmin; audit-log через `AuditLogService`), job `referral-daily` —
+  его же автоматический запуск
 - Все джобы идемпотентны: повторный тик не создаёт дублей (условные update,
   дедуп-окна, deleteMany по условию)

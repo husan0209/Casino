@@ -12,11 +12,6 @@ import { CreateFiatDepositUseCase } from './application/use-cases/create-fiat-de
 import { CreateWithdrawalUseCase } from './application/use-cases/create-withdrawal.use-case'
 import { ProcessNOWPaymentsWebhookUseCase } from './application/use-cases/process-nowpayments-webhook.use-case'
 import { ProcessRukassaWebhookUseCase } from './application/use-cases/process-rukassa-webhook.use-case'
-import {
-  NOWPAYMENTS_CLIENT,
-  PAYMENT_REQUEST_REPOSITORY,
-  RUKASSA_CLIENT,
-} from './domain/payments.ports'
 import { NOWPaymentsClient } from './infrastructure/clients/nowpayments.client'
 import { RukassaClient } from './infrastructure/clients/rukassa.client'
 import { PaymentRequestRepository } from './infrastructure/repositories/payment-request.repository'
@@ -27,14 +22,9 @@ import { PaymentsController } from './presentation/controllers/payments.controll
   imports: [ConfigModule, AuthModule, WalletModule, KycModule, GeoModule, UsersModule],
   controllers: [PaymentsController, PaymentsWebhookController],
   providers: [
-    // Класс-токен остаётся: presentation-контроллер payments.controller.ts пока
-    // внедряет репозиторий напрямую (вне рамок задачи В5 — только application).
     PaymentRequestRepository,
-    // В5: application-слой получает infrastructure только через порты (DI-токены).
-    // useExisting — тот же экземпляр, что и у класс-токена (образец: geo.module.ts).
-    { provide: PAYMENT_REQUEST_REPOSITORY, useExisting: PaymentRequestRepository },
-    { provide: RUKASSA_CLIENT, useClass: RukassaClient },
-    { provide: NOWPAYMENTS_CLIENT, useClass: NOWPaymentsClient },
+    RukassaClient,
+    NOWPaymentsClient,
     CreateFiatDepositUseCase,
     CreateCryptoDepositUseCase,
     ProcessRukassaWebhookUseCase,
