@@ -14,6 +14,8 @@ const hosts = (process.env['NEXT_PUBLIC_IMAGE_HOSTS'] ?? '')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Второй `next dev` в этой же папке (QA-съёмка) не должен сносить .next чужого dev-сервера.
+  distDir: process.env['WEB_DIST_DIR'] ?? '.next',
   reactStrictMode: true,
   images: {
     formats: ['image/avif', 'image/webp'],
