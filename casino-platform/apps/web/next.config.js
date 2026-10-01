@@ -12,9 +12,22 @@ const hosts = (process.env['NEXT_PUBLIC_IMAGE_HOSTS'] ?? '')
   .map((host) => host.trim())
   .filter((host) => host.length > 0)
 
+const apiProxyTarget = process.env['API_PROXY_TARGET'] ?? 'http://localhost:3001/api/v1'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  async rewrites() {
+    if (process.env['NODE_ENV'] !== 'production') {
+      return [
+        {
+          source: '/api/v1/:path*',
+          destination: `${apiProxyTarget}/:path*`,
+        },
+      ]
+    }
+    return []
+  },
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: hosts.map((hostname) => ({
