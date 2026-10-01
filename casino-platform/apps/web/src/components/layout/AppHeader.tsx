@@ -23,7 +23,7 @@ export function AppHeader(): React.JSX.Element {
   const { user } = useAuth()
   const { activeCurrency, getActiveWallet, fetchWallets } = useWalletStore()
   const { config, load } = useGeoStore()
-  const { openDeposit, openLogin, openWalletSwitcher } = useUIStore()
+  const { openDeposit, openLogin, openRegister, openWalletSwitcher } = useUIStore()
   const router = useRouter()
   const [query, setQuery] = useState('')
 
@@ -101,9 +101,9 @@ export function AppHeader(): React.JSX.Element {
               >
                 Войти
               </button>
-              <Link href="/register" className="btn px-3 py-1.5 text-sm">
+              <button type="button" onClick={openRegister} className="btn px-3 py-1.5 text-sm">
                 Регистрация
-              </Link>
+              </button>
             </>
           )}
         </div>

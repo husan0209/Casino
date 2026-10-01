@@ -1,0 +1,535 @@
+{
+  "total_count": 6,
+  "jobs": [
+    {
+      "id": 108905013305,
+      "run_id": 36415335181,
+      "workflow_name": "CI",
+      "head_branch": "chore/wave-2",
+      "run_url": "https://api.github.com/repos/husan0209/Casino/actions/runs/36415335181",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTbbdXs8AAAAZWz6gOQ",
+      "head_sha": "40c7ac7699d251fcf35d34ade121210abe81889b",
+      "url": "https://api.github.com/repos/husan0209/Casino/actions/jobs/108905013305",
+      "html_url": "https://github.com/husan0209/Casino/actions/runs/36415335181/job/108905013305",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-09-28T11:23:12Z",
+      "started_at": "2026-09-28T11:23:14Z",
+      "completed_at": "2026-09-28T11:26:39Z",
+      "name": "lint-typecheck-test",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-28T11:23:15Z",
+          "completed_at": "2026-09-28T11:23:17Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-28T11:23:17Z",
+          "completed_at": "2026-09-28T11:23:32Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-28T11:23:32Z",
+          "completed_at": "2026-09-28T11:23:33Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-28T11:23:33Z",
+          "completed_at": "2026-09-28T11:23:34Z"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-28T11:23:34Z",
+          "completed_at": "2026-09-28T11:23:44Z"
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-28T11:23:44Z",
+          "completed_at": "2026-09-28T11:23:47Z"
+        },
+        {
+          "name": "Prisma generate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-28T11:23:47Z",
+          "completed_at": "2026-09-28T11:23:50Z"
+        },
+        {
+          "name": "Build workspace packages",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-28T11:23:50Z",
+          "completed_at": "2026-09-28T11:23:56Z"
+        },
+        {
+          "name": "Prisma migrate deploy (test schema)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-28T11:23:56Z",
+          "completed_at": "2026-09-28T11:23:57Z"
+        },
+        {
+          "name": "Verify no schema drift",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-09-28T11:23:57Z",
+          "completed_at": "2026-09-28T11:23:58Z"
+        },
+        {
+          "name": "Lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-28T11:23:58Z",
+          "completed_at": "2026-09-28T11:24:28Z"
+        },
+        {
+          "name": "Typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-28T11:24:28Z",
+          "completed_at": "2026-09-28T11:24:43Z"
+        },
+        {
+          "name": "Unit tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-28T11:24:43Z",
+          "completed_at": "2026-09-28T11:24:58Z"
+        },
+        {
+          "name": "Build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-09-28T11:24:58Z",
+          "completed_at": "2026-09-28T11:26:03Z"
+        },
+        {
+          "name": "E2E player lifecycle (GAP-05)",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 15,
+          "started_at": "2026-09-28T11:26:03Z",
+          "completed_at": "2026-09-28T11:26:36Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 27,
+          "started_at": "2026-09-28T11:26:36Z",
+          "completed_at": "2026-09-28T11:26:36Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28,
+          "started_at": "2026-09-28T11:26:36Z",
+          "completed_at": "2026-09-28T11:26:36Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29,
+          "started_at": "2026-09-28T11:26:36Z",
+          "completed_at": "2026-09-28T11:26:36Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30,
+          "started_at": "2026-09-28T11:26:36Z",
+          "completed_at": "2026-09-28T11:26:37Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 31,
+          "started_at": "2026-09-28T11:26:37Z",
+          "completed_at": "2026-09-28T11:26:37Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/husan0209/Casino/check-runs/108905013305",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000003375,
+      "runner_name": "GitHub Actions 1000003375",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 108905013493,
+      "run_id": 36415335181,
+      "workflow_name": "CI",
+      "head_branch": "chore/wave-2",
+      "run_url": "https://api.github.com/repos/husan0209/Casino/actions/runs/36415335181",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTbbdXs8AAAAZWz6g9Q",
+      "head_sha": "40c7ac7699d251fcf35d34ade121210abe81889b",
+      "url": "https://api.github.com/repos/husan0209/Casino/actions/jobs/108905013493",
+      "html_url": "https://github.com/husan0209/Casino/actions/runs/36415335181/job/108905013493",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-09-28T11:23:12Z",
+      "started_at": "2026-09-28T11:23:14Z",
+      "completed_at": "2026-09-28T11:23:34Z",
+      "name": "commitlint",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-28T11:23:15Z",
+          "completed_at": "2026-09-28T11:23:15Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-28T11:23:15Z",
+          "completed_at": "2026-09-28T11:23:16Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-28T11:23:16Z",
+          "completed_at": "2026-09-28T11:23:18Z"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-28T11:23:18Z",
+          "completed_at": "2026-09-28T11:23:22Z"
+        },
+        {
+          "name": "Install toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-28T11:23:22Z",
+          "completed_at": "2026-09-28T11:23:31Z"
+        },
+        {
+          "name": "Lint commits",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-28T11:23:31Z",
+          "completed_at": "2026-09-28T11:23:32Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-09-28T11:23:32Z",
+          "completed_at": "2026-09-28T11:23:32Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-28T11:23:32Z",
+          "completed_at": "2026-09-28T11:23:32Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-28T11:23:32Z",
+          "completed_at": "2026-09-28T11:23:32Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-28T11:23:32Z",
+          "completed_at": "2026-09-28T11:23:33Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/husan0209/Casino/check-runs/108905013493",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000003376,
+      "runner_name": "GitHub Actions 1000003376",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 108905013632,
+      "run_id": 36415335181,
+      "workflow_name": "CI",
+      "head_branch": "chore/wave-2",
+      "run_url": "https://api.github.com/repos/husan0209/Casino/actions/runs/36415335181",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTbbdXs8AAAAZWz6hgA",
+      "head_sha": "40c7ac7699d251fcf35d34ade121210abe81889b",
+      "url": "https://api.github.com/repos/husan0209/Casino/actions/jobs/108905013632",
+      "html_url": "https://github.com/husan0209/Casino/actions/runs/36415335181/job/108905013632",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-09-28T11:23:12Z",
+      "started_at": "2026-09-28T11:23:15Z",
+      "completed_at": "2026-09-28T11:23:26Z",
+      "name": "secrets-scan",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-28T11:23:16Z",
+          "completed_at": "2026-09-28T11:23:17Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-28T11:23:17Z",
+          "completed_at": "2026-09-28T11:23:20Z"
+        },
+        {
+          "name": "Run gitleaks/gitleaks-action@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-28T11:23:20Z",
+          "completed_at": "2026-09-28T11:23:23Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-28T11:23:23Z",
+          "completed_at": "2026-09-28T11:23:24Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-28T11:23:24Z",
+          "completed_at": "2026-09-28T11:23:24Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/husan0209/Casino/check-runs/108905013632",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000003377,
+      "runner_name": "GitHub Actions 1000003377",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 108905013754,
+      "run_id": 36415335181,
+      "workflow_name": "CI",
+      "head_branch": "chore/wave-2",
+      "run_url": "https://api.github.com/repos/husan0209/Casino/actions/runs/36415335181",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTbbdXs8AAAAZWz6h-g",
+      "head_sha": "40c7ac7699d251fcf35d34ade121210abe81889b",
+      "url": "https://api.github.com/repos/husan0209/Casino/actions/jobs/108905013754",
+      "html_url": "https://github.com/husan0209/Casino/actions/runs/36415335181/job/108905013754",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-09-28T11:23:12Z",
+      "started_at": "2026-09-28T11:23:14Z",
+      "completed_at": "2026-09-28T11:23:55Z",
+      "name": "audit",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-28T11:23:15Z",
+          "completed_at": "2026-09-28T11:23:16Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-28T11:23:16Z",
+          "completed_at": "2026-09-28T11:23:17Z"
+        },
+        {
+          "name": "Run pnpm/action-setup@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-28T11:23:17Z",
+          "completed_at": "2026-09-28T11:23:18Z"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-28T11:23:18Z",
+          "completed_at": "2026-09-28T11:23:26Z"
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-28T11:23:26Z",
+          "completed_at": "2026-09-28T11:23:30Z"
+        },
+        {
+          "name": "pnpm audit (prod) — ratchet",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-28T11:23:30Z",
+          "completed_at": "2026-09-28T11:23:53Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-09-28T11:23:53Z",
+          "completed_at": "2026-09-28T11:23:53Z"
+        },
+        {
+          "name": "Post Run pnpm/action-setup@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-28T11:23:53Z",
+          "completed_at": "2026-09-28T11:23:53Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-28T11:23:53Z",
+          "completed_at": "2026-09-28T11:23:53Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-28T11:23:53Z",
+          "completed_at": "2026-09-28T11:23:53Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/husan0209/Casino/check-runs/108905013754",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000003378,
+      "runner_name": "GitHub Actions 1000003378",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 108906147725,
+      "run_id": 36415335181,
+      "workflow_name": "CI",
+      "head_branch": "chore/wave-2",
+      "run_url": "https://api.github.com/repos/husan0209/Casino/actions/runs/36415335181",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTbbdXs8AAAAZW0_vjQ",
+      "head_sha": "40c7ac7699d251fcf35d34ade121210abe81889b",
+      "url": "https://api.github.com/repos/husan0209/Casino/actions/jobs/108906147725",
+      "html_url": "https://github.com/husan0209/Casino/actions/runs/36415335181/job/108906147725",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-09-28T11:26:40Z",
+      "started_at": "2026-09-28T11:26:40Z",
+      "completed_at": "2026-09-28T11:26:40Z",
+      "name": "docker-build",
+      "steps": [
+
+      ],
+      "check_run_url": "https://api.github.com/repos/husan0209/Casino/check-runs/108906147725",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    },
+    {
+      "id": 108906148009,
+      "run_id": 36415335181,
+      "workflow_name": "CI",
+      "head_branch": "chore/wave-2",
+      "run_url": "https://api.github.com/repos/husan0209/Casino/actions/runs/36415335181",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTbbdXs8AAAAZW0_wqQ",
+      "head_sha": "40c7ac7699d251fcf35d34ade121210abe81889b",
+      "url": "https://api.github.com/repos/husan0209/Casino/actions/jobs/108906148009",
+      "html_url": "https://github.com/husan0209/Casino/actions/runs/36415335181/job/108906148009",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-09-28T11:26:40Z",
+      "started_at": "2026-09-28T11:26:40Z",
+      "completed_at": "2026-09-28T11:26:40Z",
+      "name": "Deploy to VPS (only after green CI)",
+      "steps": [
+
+      ],
+      "check_run_url": "https://api.github.com/repos/husan0209/Casino/check-runs/108906148009",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    }
+  ]
+}

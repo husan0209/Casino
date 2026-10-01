@@ -2,8 +2,10 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 
-import { apiGet, apiPost, setAccessToken } from '@/lib/api'
+import { toast } from '@/components/ui/toaster'
+import { apiGet, apiPost, errText, setAccessToken } from '@/lib/api'
 import { type AuthState, type WebUser, useAuth } from '@/stores/auth'
+import { useUIStore } from '@/stores/ui'
 
 /**
  * OAuth-блок входа/регистрации (pre-launch: ТЗ ч.2 UC-AUTH-08/09).
@@ -42,8 +44,14 @@ declare global {
 export function OAuthButtons({ referralCode }: { referralCode?: string }): React.JSX.Element | null {
   const setSession = useAuth((s: AuthState) => s.setSession)
   const router = useRouter()
+  const closeLogin = useUIStore((s) => s.closeLogin)
   const telegramContainer = useRef<HTMLDivElement>(null)
+  const referralCodeRef = useRef(referralCode)
   const [telegramBusy, setTelegramBusy] = useState(false)
+
+  useEffect(() => {
+    referralCodeRef.current = referralCode
+  }, [referralCode])
 
   // Telegram Login Widget: скрипт монтируется один раз, колбэк глобальный.
   useEffect(() => {
@@ -54,15 +62,22 @@ export function OAuthButtons({ referralCode }: { referralCode?: string }): React
       setTelegramBusy(true)
       apiPost<{ accessToken: string; user: WebUser }>('/auth/telegram', {
         ...user,
-        referral_code: referralCode,
+        referral_code: referralCodeRef.current,
       })
         .then((res) => {
           setAccessToken(res.accessToken)
           setSession(res.accessToken, res.user)
-          router.push('/profile')
+          closeLogin()
+          const gameSlug = useUIStore.getState().pendingGameSlug
+          if (gameSlug) {
+            window.location.href = `/casino/${gameSlug}?launch=1`
+          } else {
+            router.push('/profile')
+          }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           setTelegramBusy(false)
+          toast.error(errText(error))
         })
     }
     const s = document.createElement('script')
@@ -75,22 +90,27 @@ export function OAuthButtons({ referralCode }: { referralCode?: string }): React
     s.setAttribute('data-request-access', 'write')
     telegramContainer.current.appendChild(s)
     return () => {
+      s.remove()
       delete window.onTelegramAuth
     }
-  }, [referralCode, setSession, router])
+  }, [closeLogin, setSession, router])
 
   const startGoogle = async (): Promise<void> => {
     // redirect_uri — текущий origin; API валидирует по allowlist и строит
     // подписанный state (CSRF). referral_code в state не влезает (подпись) —
     // он передаётся при обмене code (POST /auth/google) с той же страницы.
-    const redirectUri = `${APP_ORIGIN}/auth/google/callback`
-    const { url } = await apiGet<{ url: string; state: string }>('/auth/google/url', {
-      redirect_uri: redirectUri,
-    })
-    if (referralCode) {
-      sessionStorage.setItem('oauth_referral_code', referralCode)
+    try {
+      const redirectUri = `${APP_ORIGIN}/auth/google/callback`
+      const { url } = await apiGet<{ url: string; state: string }>('/auth/google/url', {
+        redirect_uri: redirectUri,
+      })
+      if (referralCode) {
+        sessionStorage.setItem('oauth_referral_code', referralCode)
+      }
+      window.location.assign(url)
+    } catch (error) {
+      toast.error(errText(error))
     }
-    window.location.assign(url)
   }
 
   if (!GOOGLE_CLIENT_ID && !TELEGRAM_BOT_NAME) {
