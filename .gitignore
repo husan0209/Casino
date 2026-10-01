@@ -2,5 +2,20 @@
 /*.jpg
 /*.jpeg
 /*.png
+
+# ── Scratch-артефакты в корне рабочего дерева ─────────────────────────────
+# Логи прогонов, дампы CI, одноразовые зонды. Это не код проекта: их не надо ни
+# коммитить, ни удалять, но они обязаны не попадать в `git status` — pre-commit
+# линтует и форматирует КАЖДЫЙ staged-файл, а `git add -A` подхватывает мусор.
+# Внутри casino-platform/ те же правила уже есть в casino-platform/.gitignore.
+*.log
+*.tmp.txt
+*.tmp.json
+*.tmp.log
+zz-*.cjs
+zz-*.js
+only-mine.txt
+cl-out.txt
+
 node_modules/
 casino-platform/.env.stend
