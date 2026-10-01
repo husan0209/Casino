@@ -38,24 +38,28 @@ build_section() {
 FAIL=0
 for DF in infra/docker/*.prod.Dockerfile; do
   [ -f "$DF" ] || continue
-  # ARG'и, объявленные в проде (кроме служебных, начинающихся с '_')
+  # ARG'и, объявленные в проде (кроме служебных, начинающихся с '_').
+  # `|| true` — у api.prod.Dockerfile ARG'ов нет вовсе, и grep вернёт 1; без этого
+  # под `bash -e` (флаги runner'а) присваивание уронило бы скрипт до вывода ❌ —
+  # ровно как errexit-баг D7 в docs-guard (GAP-41).
   ARGS=$(grep -oE '^ARG[[:space:]]+[A-Za-z_][A-Za-z0-9_]*' "$DF" |
-    awk '{print $2}' | grep -v '^_' | sort -u)
+    awk '{print $2}' | grep -v '^_' | sort -u || true)
   [ -n "$ARGS" ] || continue
 
-  # Какой сервис собирается из этого Dockerfile
-  SVC=$(grep -B40 "dockerfile: $DF\$" "$COMPOSE" | grep -oE '^  [a-z0-9_-]+:' | tail -1 | tr -d ' :')
+  # Какой сервис собирается из этого Dockerfile (40 строк выше — с запасом)
+  SVC=$(grep -B40 "dockerfile: $DF\$" "$COMPOSE" | grep -oE '^  [a-z0-9_-]+:' |
+    tail -1 | tr -d ' :' || true)
   if [ -z "$SVC" ]; then
     echo "❌ G23 FAIL: $DF не используется ни одним сервисом $COMPOSE"
     FAIL=1
     continue
   fi
 
+  # list-формат: '- NAME=value'; map-формат: 'NAME: value'
   PASSED=$(build_section "$SVC" | grep -oE '^[[:space:]]*-?[[:space:]]*[A-Za-z_][A-Za-z0-9_]*' |
-    awk '{print $NF}' | sort -u)
-  # build.args в list-формате: '- NAME=value' и в map-формате: 'NAME: value'
+    awk '{print $NF}' | sort -u || true)
   PASSED_MAP=$(build_section "$SVC" | grep -oE '^[[:space:]]+[A-Za-z_][A-Za-z0-9_]*:' |
-    tr -d ' :' | sort -u)
+    tr -d ' :' | sort -u || true)
 
   for A in $ARGS; do
     if ! echo "$PASSED" | grep -qx "$A" && ! echo "$PASSED_MAP" | grep -qx "$A"; then
