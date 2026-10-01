@@ -11,6 +11,7 @@ export interface LaunchCurrencyOptions {
 
 interface UIState {
   loginSheet: boolean
+  loginSheetMode: 'login' | 'register'
   depositSheet: boolean
   /** GAP-55 (з) §10.3/§16.1: касса вывода — глобальный sheet (открывается и поверх игры). */
   withdrawSheet: boolean
@@ -21,6 +22,8 @@ interface UIState {
   pendingGameSlug: string | null
   depositCurrency?: string | undefined
   openLogin: (gameSlug?: string) => void
+  openRegister: () => void
+  setLoginSheetMode: (mode: 'login' | 'register') => void
   closeLogin: () => void
   openDeposit: (currency?: string) => void
   closeDeposit: () => void
@@ -34,13 +37,17 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
   loginSheet: false,
+  loginSheetMode: 'login',
   depositSheet: false,
   withdrawSheet: false,
   walletSwitcher: false,
   launchCurrencySheet: false,
   launchCurrencyOptions: null,
   pendingGameSlug: null,
-  openLogin: (gameSlug) => set({ loginSheet: true, pendingGameSlug: gameSlug ?? null }),
+  openLogin: (gameSlug) =>
+    set({ loginSheet: true, loginSheetMode: 'login', pendingGameSlug: gameSlug ?? null }),
+  openRegister: () => set({ loginSheet: true, loginSheetMode: 'register', pendingGameSlug: null }),
+  setLoginSheetMode: (loginSheetMode) => set({ loginSheetMode }),
   closeLogin: () => set({ loginSheet: false }),
   openDeposit: (currency) => set({ depositSheet: true, depositCurrency: currency }),
   closeDeposit: () => set({ depositSheet: false, depositCurrency: undefined }),

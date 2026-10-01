@@ -1,0 +1,24 @@
+тзЧ   input: merge(main): ╨┐╨╛╨┤╤В╤П╨╜╤Г╤В╤М #109 тАФ ╤Б╨┐╨╡╨║╨╕ wallet/casino use-cases
+╨Ю╨┤╨╕╨╜ ╨║╨╛╨╝╨╝╨╕╤В ╨╜╨░ `main` (`f878a8c`), ╨╛╨┤╨╕╨╜ ╨║╨╛╨╜╤Д╨╗╨╕╨║╤В.
+╨Ъ╨╛╨╜╤Д╨╗╨╕╨║╤В ╨▓ `tech-debt/pnpm-audit.txt` ╤А╨░╨╖╤А╨╡╤И╤С╨╜ ╨▓ ╨┐╨╛╨╗╤М╨╖╤Г ╨▓╨╡╤В╨║╨╕, ╨╕ ╤Н╤В╨╛
+╤Б╨╛╨┤╨╡╤А╨╢╨░╤В╨╡╨╗╤М╨╜╨╛╨╡ ╤А╨╡╤И╨╡╨╜╨╕╨╡, ╨░ ╨╜╨╡ ╨╝╨╡╤Е╨░╨╜╨╕╤З╨╡╤Б╨║╨╛╨╡. `main` ╨┐╨╛╨┤╨╜╤П╨╗ baseline ╨┤╨╛
+high 24 / moderate 29, ╤В╨╛ ╨╡╤Б╤В╤М ╨┐╤А╨╕╨╜╤П╨╗ ╨┤╨▓╨░ ╨╜╨╛╨▓╤Л╤Е advisory ╨┐╨╛
+`brace-expansion@1.1.16` (ReDoS, high) ╨╕ ╨╛╨┤╨╕╨╜ moderate. ╨Т╨╡╤В╨║╨░ ╨╕╤Е ╨╜╨╡
+╨┐╤А╨╕╨╜╤П╨╗╨░, ╨░ ╨┐╨╛╤З╨╕╨╜╨╕╨╗╨░ тАФ override ╨╜╨░ `brace-expansion@<1.1.21` ╨┐╨╡╤А╨╡╨▓╨╛╨┤╨╕╤В
+╤В╤А╨░╨╜╨╖╨╕╤В╨╕╨▓╨╜╤Г╤О ╨╖╨░╨▓╨╕╤Б╨╕╨╝╨╛╤Б╤В╤М ╨╜╨░ ╨▓╨╡╤А╤Б╨╕╤О, ╨╖╨░╨║╤А╤Л╨▓╨░╤О╤Й╤Г╤О ╨▓╤Б╨╡ ╤В╤А╨╕. ╨Я╨╛╤Б╨╗╨╡ ╤Б╨╗╨╕╤П╨╜╨╕╤П ╤Б╤З╤С╤В
+20 / 28 ╨┐╤А╨╕ baseline 24 / 29 ╨╜╨░ `main`, ╤В╨╛ ╨╡╤Б╤В╤М PR ╨╜╨╡ ╤В╨╛╨╗╤М╨║╨╛ ╨┐╤А╨╛╤Е╨╛╨┤╨╕╤В
+╤А╨░╤В╤З╨╡╤В, ╨╜╨╛ ╨╕ ╤Г╨╢╨╕╨╝╨░╨╡╤В ╨╡╨│╨╛ ╨╛╤В╨╜╨╛╤Б╨╕╤В╨╡╨╗╤М╨╜╨╛ `main`.
+G21 ╨┐╨╛╤Б╨╗╨╡ ╤Б╨╗╨╕╤П╨╜╨╕╤П ╨┤╨░╤С╤В 28 ╤Д╨░╨║╤В╨╕╤З╨╡╤Б╨║╨╕ ╨╜╨╡╨┐╨╛╨║╤А╤Л╤В╤Л╤Е use-case'╨╛╨▓ ╨┐╤А╨╕ baseline 33,
+╨╜╨╕ ╨╛╨┤╨╜╨╛╨│╨╛ affiliate. ╨б╨┐╨╡╨║╨╕ ╨┐╨░╤А╤В╨╜╤С╤А╨║╨╕ (╨┤╨╡╨▓╤П╤В╤М ╤И╤В╤Г╨║) ╨╜╨╡ ╨┐╨╡╤А╨╡╤Б╨╡╨║╨░╤О╤В╤Б╤П ╤Б╨╛
+╤Б╨┐╨╡╨║╨░╨╝╨╕ wallet/casino ╨╕╨╖ #109.
+╨Я╨╛╨┐╤Г╤В╨╜╨╛ ╤Г╨▒╤А╨░╨╜╤Л ╨╜╨╡╨╕╤Б╨┐╨╛╨╗╤М╨╖╤Г╨╡╨╝╤Л╨╣ ╨╕╨╝╨┐╨╛╤А╤В `randomBytes` ╨╕ ╨┤╨╛╨┐╨╕╤Б╨░╨╜╤Л ╤В╨╕╨┐╤Л ╨▓╨╛╨╖╨▓╤А╨░╤В╨░
+╨▓ ╨┤╨▓╤Г╤Е ╤Б╨┐╨╡╨║╨░╤Е ╨╕╨╖ #109 тАФ `casino-favorites.spec.ts` ╨╕
+`casino-launch-game.spec.ts`; ╨╕╨╜╨░╤З╨╡ pre-commit ╤Е╤Г╨║ ╨╜╨╡ ╨┤╨░╤С╤В ╤Б╨╛╨▒╤А╨░╤В╤М ╨║╨╛╨╝╨╝╨╕╤В.
+╨Я╤А╨╛╨▓╨╡╤А╨║╨╕: tsc 0 ╨┐╨╛ ╨▓╤Б╨╡╨╝╤Г ╨╝╨╛╨╜╨╛╤А╨╡╨┐╨╛, eslint api 0 ╨┐╤А╨╕ `--max-warnings=0`,
+608 ╤В╨╡╤Б╤В╨╛╨▓ (api 435 / web 162 / admin 11), audit-ratchet OK (20/28),
+G16/G17/G18/G19/G20/G21 = baseline, D3 99 = 99, D7 тАФ 0 ╨╜╨╡╨┤╨╛╤Б╤В╨░╤О╤Й╨╕╤Е.
+тЬЦ   type must be one of [feat, fix, docs, style, refactor, perf, test, chore, revert, wip, security] [type-enum]
+тЬЦ   scope must be one of [auth, wallet, payments, casino, kyc, admin, support, referrals, affiliate, notifications, users, health, database, shared, api, web, admin-ui, infra, deps, ci, docs, security, rg] [scope-enum]
+тЪа   footer must have leading blank line [footer-leading-blank]
+тЬЦ   found 2 problems, 1 warnings
+тУШ   Get help: https://github.com/conventional-changelog/commitlint/#what-is-commitlint

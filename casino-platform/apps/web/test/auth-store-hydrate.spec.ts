@@ -71,6 +71,27 @@ describe('аудит 2026-09-26: hydrate() разворачивает {user, ...
     expect(user).not.toHaveProperty('kycStatus')
   })
 
+  it('одновременно запущенные hydrate используют один refresh-запрос', async () => {
+    let resolveRefresh: ((value: { data: { data: { accessToken: string } } }) => void) | undefined
+    mockedApi.post.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRefresh = resolve
+        }),
+    )
+    mockedApi.get.mockResolvedValue({ data: { data: meDto } })
+
+    const firstHydration = useAuth.getState().hydrate()
+    const secondHydration = useAuth.getState().hydrate()
+
+    expect(mockedApi.post).toHaveBeenCalledTimes(1)
+    resolveRefresh?.({ data: { data: { accessToken: 'jwt-shared' } } })
+    await Promise.all([firstHydration, secondHydration])
+
+    expect(useAuth.getState().token).toBe('jwt-shared')
+    expect(useAuth.getState().user?.id).toBe('u1')
+  })
+
   it('отказ /users/me после успешного refresh сбрасывает сессию (как раньше)', async () => {
     mockedApi.post.mockResolvedValue({ data: { data: { accessToken: 'jwt-4' } } })
     mockedApi.get.mockRejectedValue(new Error('boom'))
