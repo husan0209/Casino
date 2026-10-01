@@ -32,16 +32,18 @@ export default function AffiliatePlayersPage(): React.JSX.Element {
   return (
     <div>
       <div className="grid grid-cols-3 gap-3 mb-4">
+        {/* «Квалифицировано» — одно слово, в three-column сетке на 390px оно не влезает
+            в text-sm и обрезается карточкой: перенос разрешён явно. */}
         <div className="card">
-          <div className="text-muted text-sm">Всего</div>
+          <div className="text-muted text-xs leading-tight break-words">Всего</div>
           <div className="text-2xl font-black mt-1">{total}</div>
         </div>
         <div className="card">
-          <div className="text-muted text-sm">Квалифицировано</div>
+          <div className="text-muted text-xs leading-tight break-words">Квалифицировано</div>
           <div className="text-2xl font-black mt-1 text-[#00C853]">{qualified}</div>
         </div>
         <div className="card">
-          <div className="text-muted text-sm">Отклонено</div>
+          <div className="text-muted text-xs leading-tight break-words">Отклонено</div>
           <div className="text-2xl font-black mt-1 text-[#FF3D71]">{rejected}</div>
         </div>
       </div>
