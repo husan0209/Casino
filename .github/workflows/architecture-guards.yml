@@ -305,7 +305,11 @@ jobs:
           if [ -z "$BR" ]; then
             BR="${{ github.ref_name }}"
           fi
-          if ! echo "$BR" | grep -qE "^(feat|fix|chore|docs|refactor|test|perf|style|security|wip)/"; then
+          # arena/* — ветки платформы Arena (agent-сессии): имя фиксирует платформа
+          # (arena/<session-id>-<slug>), переименовать нельзя. Без этого исключения
+          # любой PR из такой ветки краснел на G12 — по имени ветки, а не по делу,
+          # и job обрывался до остальных guard'ов (GAP-59: G23 не доходил до прогона).
+          if ! echo "$BR" | grep -qE "^(feat|fix|chore|docs|refactor|test|perf|style|security|wip)/|^arena/[a-z0-9._-]+$"; then
             echo "❌ G12 FAIL: branch '$BR' does not follow type/name convention."
             echo "   Use one of: feat/, fix/, chore/, docs/, refactor/, test/, perf/, style/, security/, wip/"
             echo "   See docs/CONVENTIONS.md §10.1."
