@@ -3,8 +3,9 @@ import { Throttle } from '@nestjs/throttler'
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
-import { type AdminRole, prisma } from '@casino/database'
+import { type AdminRole } from '@casino/database'
 
+import { AdminUsersService } from '../../application/admin-users.service'
 import { AuditLogService } from '../../application/audit-log.service'
 import { InvalidAdminCredentialsError } from '../../domain/errors'
 import { AdminAuthService } from '../../infrastructure/admin-jwt.service'
@@ -26,6 +27,7 @@ import { AdminLoginSchema } from '../dto/admin-auth.dto'
 export class AdminAuthController {
   constructor(
     @Inject(AdminAuthService) private auth: AdminAuthService,
+    @Inject(AdminUsersService) private usersService: AdminUsersService,
     @Inject(AuditLogService) private audit: AuditLogService,
   ) {}
   @Post('login')
@@ -41,7 +43,7 @@ export class AdminAuthController {
       // error-конверт из GlobalExceptionFilter — как у всех остальных эндпоинтов.
       throw new InvalidAdminCredentialsError('Неверный email или пароль')
     }
-    await prisma.adminUser.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } })
+    await this.usersService.touchLastLogin(admin.id)
     await this.audit.log({ actorType: 'admin', actorId: admin.id, action: 'admin.login' })
     const token = this.auth.sign(admin)
     return { accessToken: token, admin: { id: admin.id, email: admin.email, role: admin.role } }

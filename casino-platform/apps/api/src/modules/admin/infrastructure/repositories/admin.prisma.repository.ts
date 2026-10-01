@@ -61,6 +61,22 @@ export class PrismaAdminUserRepository implements IAdminUserRepository {
   setActive(id: string, isActive: boolean): Promise<AdminUserRow> {
     return prisma.adminUser.update({ where: { id }, data: { isActive } })
   }
+
+  async touchLastLogin(id: string): Promise<void> {
+    await prisma.adminUser.update({ where: { id }, data: { lastLoginAt: new Date() } })
+  }
+
+  /** Блокировка игрока: статус + отзыв активных сессий — одна доменная операция. */
+  async blockPlayer(userId: string): Promise<void> {
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: userId }, data: { status: 'blocked' } }),
+      prisma.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } }),
+    ])
+  }
+
+  async unblockPlayer(userId: string): Promise<void> {
+    await prisma.user.update({ where: { id: userId }, data: { status: 'active' } })
+  }
 }
 
 @Injectable()

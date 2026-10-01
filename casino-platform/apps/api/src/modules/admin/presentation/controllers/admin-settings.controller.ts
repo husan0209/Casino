@@ -5,8 +5,9 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
 
-import { prisma, type SystemSettingType } from '@casino/database'
+import type { SystemSettingType } from '@casino/database'
 
+import { AdminSettingsService } from '../../application/admin-settings.service'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { EmailTemplateSchema, UpsertSettingSchema } from '../dto/admin-settings.dto'
@@ -14,10 +15,13 @@ import { EmailTemplateSchema, UpsertSettingSchema } from '../dto/admin-settings.
 @UseGuards(AdminAuthGuard)
 @Controller('admin/settings')
 export class AdminSettingsController {
-  constructor(@Inject(AuditLogService) private audit: AuditLogService) {}
+  constructor(
+    @Inject(AdminSettingsService) private settings: AdminSettingsService,
+    @Inject(AuditLogService) private audit: AuditLogService,
+  ) {}
 
   @Get()
-  async getSettings(): Promise<
+  getSettings(): Promise<
     {
       id: string
       updatedAt: Date
@@ -29,7 +33,7 @@ export class AdminSettingsController {
       updatedBy: string | null
     }[]
   > {
-    return prisma.systemSetting.findMany()
+    return this.settings.list()
   }
 
   @Post()
@@ -48,15 +52,11 @@ export class AdminSettingsController {
     category: string | null
     updatedBy: string | null
   }> {
-    const setting = await prisma.systemSetting.upsert({
-      where: { key: body.key },
-      update: { value: body.value, updatedBy: admin.id },
-      create: {
-        key: body.key,
-        value: body.value,
-        type: (body.type || 'string') as SystemSettingType,
-        updatedBy: admin.id,
-      },
+    const setting = await this.settings.upsert({
+      key: body.key,
+      value: body.value,
+      type: (body.type || 'string') as SystemSettingType,
+      updatedBy: admin.id,
     })
     await this.audit.log({
       actorType: 'admin',
@@ -72,7 +72,7 @@ export class AdminSettingsController {
 
   // Email template management (simulated via SystemSettings since there is no EmailTemplate model)
   @Get('email-templates')
-  async getEmailTemplates(): Promise<
+  getEmailTemplates(): Promise<
     {
       id: string
       updatedAt: Date
@@ -84,9 +84,7 @@ export class AdminSettingsController {
       updatedBy: string | null
     }[]
   > {
-    return prisma.systemSetting.findMany({
-      where: { key: { startsWith: 'email_template_' } },
-    })
+    return this.settings.listEmailTemplates()
   }
 
   @Post('email-templates')
@@ -98,15 +96,11 @@ export class AdminSettingsController {
   ): Promise<{ name: string; subject: string; htmlBody: string }> {
     const templateKey = `email_template_${body.name}`
     const templateValue = JSON.stringify({ subject: body.subject, htmlBody: body.htmlBody })
-    await prisma.systemSetting.upsert({
-      where: { key: templateKey },
-      update: { value: templateValue, updatedBy: admin.id },
-      create: {
-        key: templateKey,
-        value: templateValue,
-        type: 'json' as SystemSettingType,
-        updatedBy: admin.id,
-      },
+    await this.settings.upsert({
+      key: templateKey,
+      value: templateValue,
+      type: 'json' as SystemSettingType,
+      updatedBy: admin.id,
     })
     await this.audit.log({
       actorType: 'admin',
