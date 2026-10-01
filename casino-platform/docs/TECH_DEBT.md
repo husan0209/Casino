@@ -16,17 +16,17 @@
 - **WARN** — долг погашен: ужми базлайн (`sh scripts/bin/tech-debt gen <name>`)
   в том же PR, иначе храповик начнёт шуметь.
 
-## Реестр (замер на 2026-09-27)
+## Реестр (замер на 2026-10-01; ранее — 2026-09-27)
 
 | Гард | Правило | Замер | Базлайн | Как гасить |
 |------|---------|-------|---------|------------|
-| G16 | Кросс-модульные deep-импорты мимо Facade | 29 в 24 файлах | `tech-debt/cross-module-imports.txt` | Импортировать только `*.facade` цели; для авторских guard'ов (`AuthGuard`, `RolesGuard`) решить: вынести в common или оформить как публичный API auth-модуля |
-| G17 | Сырой `new Error()` вместо AppError-подклассов | 58 | `tech-debt/raw-error.txt` | Обернуть в доменный AppError (`code` + `httpStatus`); механическая работа, гасить по модулю |
-| G18 | NestJS built-in exceptions (`BadRequestException` и др.) | 19 | `tech-debt/nest-exceptions.txt` | То же: AppError-подкласс вместо HttpException |
-| G19 | `eslint-disable` в продакшн-коде | 25 (max-params 13, no-explicit-any 10, по одному exhaustive-deps и no-var-requires) | `tech-debt/eslint-disable.txt` | Каждое разобрать: чинить код либо переносить в overrides `.eslintrc.js` с обоснованием (QUALITY_GATES §2.1.1) |
-| G20 | Денежное поле, типизированное `number` | 1 (`nowpayments.client.ts` — парсинг ответа провайдера) | `tech-debt/money-number.txt` | Конвертировать в string сразу при парсинге ответа |
-| G21 | Use-case без теста (соседний `.spec.ts` ИЛИ имя класса в `apps/api/test/`) | 33 из 40 (замер 2026-09-28, после Волны 3а) | `tech-debt/use-case-specs.txt` | Писать тесты на новые use-cases сразу; старые — по мере рефакторинга. Каждый новый use-case без теста = FAIL |
-| audit (ci.yml) | Уязвимости prod-зависимостей (pnpm audit) | 3 critical · 22 high · 27 moderate · 3 low | `tech-debt/pnpm-audit.txt` | Dependabot/`pnpm up` по конкретным advisory; после мержа фикса — `node scripts/audit-ratchet.mjs --gen`. Конкретный список — в логах job'а `audit` (локально на Windows отчёт урезан EMFILE) или в GitHub Dependabot alerts |
+| G16 | Кросс-модульные deep-импорты мимо Facade | 10 в 7 файлах (замер 2026-10-01) | `tech-debt/cross-module-imports.txt` | Импортировать только `*.facade` цели; для авторских guard'ов (`AuthGuard`, `RolesGuard`) решить: вынести в common или оформить как публичный API auth-модуля |
+| G17 | Сырой `new Error()` вместо AppError-подклассов | 1 (замер 2026-10-01) | `tech-debt/raw-error.txt` | Обернуть в доменный AppError (`code` + `httpStatus`); механическая работа, гасить по модулю |
+| G18 | NestJS built-in exceptions (`BadRequestException` и др.) | 7 в 4 файлах (замер 2026-10-01) | `tech-debt/nest-exceptions.txt` | То же: AppError-подкласс вместо HttpException |
+| G19 | `eslint-disable` в продакшн-коде | 13 (max-params DI-конструкторов; замер 2026-10-01) | `tech-debt/eslint-disable.txt` | Каждое разобрать: чинить код либо переносить в overrides `.eslintrc.js` с обоснованием (QUALITY_GATES §2.1.1) |
+| G20 | Денежное поле, типизированное `number` | 0 (замер 2026-10-01) | `tech-debt/money-number.txt` | Конвертировать в string сразу при парсинге ответа |
+| G21 | Use-case без теста (соседний `.spec.ts` ИЛИ имя класса в `apps/api/test/`) | 28 (замер 2026-10-01) | `tech-debt/use-case-specs.txt` | Писать тесты на новые use-cases сразу; старые — по мере рефакторинга. Каждый новый use-case без теста = FAIL |
+| audit (ci.yml) | Уязвимости prod-зависимостей (pnpm audit) | 3 critical · 19 high · 27 moderate · 3 low (замер 2026-10-01) | `tech-debt/pnpm-audit.txt` | Dependabot/`pnpm up` по конкретным advisory; после мержа фикса — `node scripts/audit-ratchet.mjs --gen`. Конкретный список — в логах job'а `audit` (локально на Windows отчёт урезан EMFILE) или в GitHub Dependabot alerts |
 
 Замечание к audit-храповику: реестр CVE живёт своей жизнью — если в
 транзитивной зависимости появится новый advisory, job покраснеет БЕЗ твоих
@@ -111,3 +111,4 @@
 | 2026-09-28 | В6 | cross-module: 24 → 13 файлов (guards auth легализованы) | PR #99 |
 | 2026-09-28 | В2/В5 | слои health/maintenance достроены; application→infrastructure = 0 (порты+токены) | PR #99 |
 | 2026-09-28 | Волна 3а | raw-error 58→46, nest-exceptions 19→13, cross-module 13→8 файлов, G21 40→33 (kyc+payments: фасады, В3/В4, ошибки→AppError, 3 спека) | PR #100 |
+| 2026-10-01 | Ужатие базлайнов после полной проверки проекта (GAP-59) | nest-exceptions 5→4 файла (7 вхождений), G21 33→28, audit high 20→19 / moderate 28→27; замеры реестра (G16–G20) пересчитаны — таблица отставала от базлайнов | GAP-59 |

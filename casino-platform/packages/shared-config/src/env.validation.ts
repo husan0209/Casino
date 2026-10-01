@@ -196,6 +196,19 @@ export const envSchema = z
     RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().positive().optional(),
     RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().optional(),
     RATE_LIMIT_AUTH_MAX: z.coerce.number().int().positive().optional(),
+    // ─── GAP-29: паритет с ENVIRONMENT_VARIABLES.md §22 (D3) — остаток ──────
+    // Прежний детектор D3 (grep '^  [A-Z]…') не видел ключи схемы: они на четырёх
+    // пробелах, поэтому он объявлял невалидированными ВСЕ 99 переменных, хотя
+    // секция GAP-29 выше уже покрывала 98 из них. Детектор исправлен, а эти
+    // шесть — настоящий остаток: ADMIN_DOMAIN/DB_* живут на уровне compose/nginx
+    // (API их не читает), THROTTLE_REFRESH_LIMIT и WALLET_LOCK_TIMEOUT_MS —
+    // читаются кодом напрямую из process.env с дефолтами.
+    ADMIN_DOMAIN: z.string().min(3).optional(),
+    DB_NAME: z.string().optional(),
+    DB_USER: z.string().optional(),
+    DB_PASSWORD: z.string().optional(),
+    THROTTLE_REFRESH_LIMIT: z.coerce.number().int().positive().optional(),
+    WALLET_LOCK_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV !== 'production') {

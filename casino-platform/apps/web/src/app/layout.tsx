@@ -1,5 +1,13 @@
 import './globals.css'
-import { Inter } from 'next/font/google'
+// ТЗ ч.5.1: единая фирменная типографика; cyrillic — обязательный сабсет.
+// GAP-59 (п.3 аудита): Inter САМОХОСТИНГОЙ, а не next/font/google. Google Fonts
+// тянет woff2 во время `next build` — сетевой отказ ронял сборку прод-образа web
+// (воспроизведено локально: «next/font error: Failed to fetch Inter»).
+// @fontsource-variable/inter кладёт файлы в бандл: latin/cyrillic + ось wght,
+// font-display: swap — как у прежней конфигурации. Семейство 'Inter Variable'
+// проброшено в --font-inter (globals.css), Tailwind по-прежнему берёт
+// var(--font-inter) — вся типографика не изменилась.
+import '@fontsource-variable/inter/wght.css'
 
 import { AffiliateCodeCapture } from '@/components/affiliate/AffiliateCodeCapture'
 import { MainShell } from '@/components/layout/MainShell'
@@ -10,11 +18,6 @@ import { Providers } from './providers'
 import type { Metadata, Viewport } from 'next'
 
 /** ТЗ ч.5.1: единая фирменная типографика; cyrillic — обязательный сабсет. */
-const inter = Inter({
-  subsets: ['latin', 'cyrillic'],
-  variable: '--font-inter',
-  display: 'swap',
-})
 
 export const metadata: Metadata = {
   title: {
@@ -36,7 +39,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    <html lang="ru" className={inter.variable}>
+    <html lang="ru">
       <body className="font-sans">
         <Providers>
           {/* Партнёрский код в localStorage — переживает ITP-усечение cookie */}
