@@ -1,7 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { type CreditResult } from '@modules/wallet/facade/wallet.facade'
-import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
+import { WalletFacade, type CreditResult } from '@modules/wallet/facade/wallet.facade'
 
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'

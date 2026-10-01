@@ -10,7 +10,8 @@ import {
 
 /**
  * Публичный API payments-модуля (MODULE_TEMPLATE Шаг 8).
- * Потребители: maintenance (estimateRub для курсов), admin (чтение платёжек).
+ * Потребители: maintenance (estimateRub для курсов), admin (чтение платёжек,
+ * approve/reject заявок).
  */
 @Injectable()
 export class PaymentsFacade {
@@ -30,16 +31,16 @@ export class PaymentsFacade {
     return this.repo.findById(id)
   }
 
-  getPaymentRequest(id: string): Promise<PaymentRequest | null> {
-    return this.repo.findById(id)
-  }
-
   /** Смена статуса платёжки (admin approve/reject/batch — admin-finance). */
   updatePaymentStatus(
     id: string,
     status: PaymentRequest['status'],
-    extra?: { completedAt?: Date; externalStatus?: string; errorMessage?: string },
-  ): Promise<void> {
+    extra?: {
+      completedAt?: Date | undefined
+      externalStatus?: string | undefined
+      errorMessage?: string | undefined
+    },
+  ): Promise<PaymentRequest> {
     return this.repo.updateStatus(id, status, extra)
   }
 
@@ -47,9 +48,7 @@ export class PaymentsFacade {
     userId: string,
     page: number,
     perPage: number,
-  ): Promise<{ items: PaymentRequest[]; total: number }> {
-    return this.repo
-      .listUser({ userId, type: 'deposit', page, perPage })
-      .then(([items, total]) => ({ items, total }))
+  ): Promise<[PaymentRequest[], number]> {
+    return this.repo.listUser({ userId, type: 'deposit', page, perPage })
   }
 }

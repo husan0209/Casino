@@ -15,7 +15,8 @@ import {
   PrismaDashboardRepository,
 } from './infrastructure/repositories/admin.prisma.repository'
 import { AdminAuthGuard } from './presentation/admin-auth.guard'
-import { PaymentsModule } from '../payments/payments.module'
+import { PAYMENT_REQUEST_REPOSITORY } from '../payments/domain/payments.ports'
+import { PaymentRequestRepository } from '../payments/infrastructure/repositories/payment-request.repository'
 import { WalletModule } from '../wallet/wallet.module'
 import { AdminAdminsController } from './presentation/controllers/admin-admins.controller'
 import { AdminAuditController } from './presentation/controllers/admin-audit.controller'
@@ -25,7 +26,7 @@ import { AdminFinanceController } from './presentation/controllers/admin-finance
 import { AdminUsersController } from './presentation/controllers/admin-users.controller'
 
 @Module({
-  imports: [WalletModule, PaymentsModule],
+  imports: [WalletModule],
   controllers: [
     AdminAuthController,
     AdminUsersController,
@@ -39,6 +40,8 @@ import { AdminUsersController } from './presentation/controllers/admin-users.con
     AdminAuthGuard,
     { provide: ADMIN_USER_REPOSITORY, useClass: PrismaAdminUserRepository },
     { provide: AUDIT_LOG_REPOSITORY, useClass: PrismaAuditLogRepository },
+    // Порт из payments-домена: admin-finance инжектит IPaymentRequestRepository (В3)
+    { provide: PAYMENT_REQUEST_REPOSITORY, useClass: PaymentRequestRepository },
     { provide: DASHBOARD_REPOSITORY, useClass: PrismaDashboardRepository },
     AuditLogService,
     AdminUsersService,
