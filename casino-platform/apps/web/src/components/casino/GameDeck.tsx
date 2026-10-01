@@ -23,10 +23,13 @@ interface DeckCard {
   tagColor: string
 }
 
+const EMPTY_GAMES: GameDto[] = []
+const EMPTY_FAVORITE_SLUGS = new Set<string>()
+
 export function GameDeck({
   games,
-  recentGames = [],
-  favoriteSlugs = new Set(),
+  recentGames = EMPTY_GAMES,
+  favoriteSlugs = EMPTY_FAVORITE_SLUGS,
   onToggleFavorite,
 }: GameDeckProps): React.JSX.Element | null {
   const { user } = useAuth()
