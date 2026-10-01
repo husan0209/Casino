@@ -14,6 +14,8 @@ import type { CatalogCategory } from '@/lib/ui/catalog-filters'
 import { useAuth } from '@/stores/auth'
 import type { GameDto, ProviderDto } from '@/types/casino'
 
+const EMPTY_GAMES: GameDto[] = []
+
 /**
  * GAP-52/55 (ТЗ ч.5 §6) + ISR (§20/§22): тело главной.
  *
@@ -65,7 +67,7 @@ export function HomeView({
           capsLabel="ТВОЯ ИСТОРИЯ"
           actionHref="/history"
           actionLabel="Вся история"
-          games={recent ?? []}
+          games={recent ?? EMPTY_GAMES}
           variant="row"
           favoriteSlugs={favoriteSlugs}
           onToggleFavorite={toggleFavorite}
@@ -76,7 +78,7 @@ export function HomeView({
       {user && (
         <GameDeck
           games={popular}
-          recentGames={recent ?? []}
+          recentGames={recent ?? EMPTY_GAMES}
           favoriteSlugs={favoriteSlugs}
           onToggleFavorite={toggleFavorite}
         />

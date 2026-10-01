@@ -16,6 +16,8 @@ interface AuthResponse {
   user: WebUser
 }
 
+let hydratePromise: Promise<void> | null = null
+
 export interface AuthState {
   token: string | null
   user: WebUser | null
@@ -87,21 +89,30 @@ export const useAuth = create<AuthState>()((set, get) => ({
     if (get().hydrated || get().token) {
       return
     }
-    try {
-      const res = await apiPost<{ accessToken: string }>('/auth/refresh')
-      if (!res.accessToken) {
-        throw new Error('no access token')
+      if (!hydratePromise) {
+        hydratePromise = (async () => {
+          try {
+            const res = await apiPost<{ accessToken: string }>('/auth/refresh')
+            if (!res.accessToken) {
+              throw new Error('no access token')
+            }
+            set({ token: res.accessToken })
+            // GET /users/me отдаёт {user, profile, settings, kycStatus} (GetMeUseCase ->
+            // UserProfileFull) внутри конверта — пользователем является только поле user.
+            // Найдено аудитом контрактов 2026-09-26: раньше весь объект уходил в store,
+            // и у «пользователя» после перезагрузки страницы не было id/email/role.
+            const me = await apiGet<MeDto>('/users/me')
+            set({ user: me.user, hydrated: true })
+          } catch {
+            set({ token: null, user: null, hydrated: true })
+          }
+        })()
       }
-      set({ token: res.accessToken })
-      // GET /users/me отдаёт {user, profile, settings, kycStatus} (GetMeUseCase ->
-      // UserProfileFull) внутри конверта — пользователем является только поле user.
-      // Найдено аудитом контрактов 2026-09-26: раньше весь объект уходил в store,
-      // и у «пользователя» после перезагрузки страницы не было id/email/role.
-      const me = await apiGet<MeDto>('/users/me')
-      set({ user: me.user, hydrated: true })
-    } catch {
-      set({ token: null, user: null, hydrated: true })
-    }
+      try {
+        await hydratePromise
+      } finally {
+        hydratePromise = null
+      }
   },
 }))
 
