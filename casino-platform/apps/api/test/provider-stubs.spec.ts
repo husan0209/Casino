@@ -12,6 +12,10 @@ import { RukassaClient } from '../src/modules/payments/infrastructure/clients/ru
  * под fail-closed реализацию (клиенты бросают ошибку отсутствующих ключей
  * в проде — см. историю PR-0): jest.spyOn → vi.spyOn (проект на vitest).
  */
+
+/** `verifyIPN` по контракту портов принимает СЫРОЙ текст тела, а не распарсенный объект. */
+const IPN_RAW = JSON.stringify({ order_id: '123', amount: '100' })
+
 describe('Provider Stubs Security', () => {
   let config: ConfigService
   let rukassaClient: RukassaClient
@@ -106,9 +110,9 @@ describe('Provider Stubs Security', () => {
         return undefined
       })
 
-      expect(() =>
-        nowpaymentsClient.verifyIPN({ order_id: '123', amount: '100' }, 'fake_signature'),
-      ).toThrow(/обязательные ключи/)
+      expect(() => nowpaymentsClient.verifyIPN(IPN_RAW, 'fake_signature')).toThrow(
+        /обязательные ключи/,
+      )
     })
 
     it('returns false in development when secret is not configured', () => {
@@ -122,10 +126,7 @@ describe('Provider Stubs Security', () => {
         return undefined
       })
 
-      const result = nowpaymentsClient.verifyIPN(
-        { order_id: '123', amount: '100' },
-        'fake_signature',
-      )
+      const result = nowpaymentsClient.verifyIPN(IPN_RAW, 'fake_signature')
 
       expect(result).toBe(false)
     })

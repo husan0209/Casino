@@ -1,9 +1,6 @@
 import { ListGamesUseCase } from '../src/modules/casino/application/use-cases/list-games.use-case'
 
-import type {
-  CatalogQuery,
-  IGameCatalogRepository,
-} from '../src/modules/casino/domain/repositories/casino.repository'
+import type { IGameCatalogRepository } from '../src/modules/casino/domain/repositories/casino.repository'
 
 function makeCatalog(): { catalog: IGameCatalogRepository; calls: Array<Record<string, unknown>> } {
   const calls: Array<Record<string, unknown>> = []
@@ -31,7 +28,7 @@ describe('ListGamesUseCase', () => {
   it('дефолты: страница 1, perPage 24; catalog.findMany получает skip=0/take=24', async () => {
     const { catalog, calls } = makeCatalog()
     const uc = new ListGamesUseCase(catalog)
-    const res = await uc.execute({} as CatalogQuery)
+    const res = await uc.execute({})
     expect(res.meta.page).toBe(1)
     expect(res.meta.perPage).toBe(24)
     expect(res.meta.total).toBe(1)
@@ -42,7 +39,7 @@ describe('ListGamesUseCase', () => {
   it('page=3, per_page=50 → skip=(3-1)*50, take=50', async () => {
     const { catalog, calls } = makeCatalog()
     const uc = new ListGamesUseCase(catalog)
-    await uc.execute({ page: '3', per_page: '50' } as CatalogQuery)
+    await uc.execute({ page: '3', per_page: '50' })
     const findMany = calls.find((c) => 'skip' in c && 'take' in c)
     expect(findMany).toMatchObject({ skip: 100, take: 50 })
   })
@@ -50,7 +47,7 @@ describe('ListGamesUseCase', () => {
   it('per_page=500 клампится до 100', async () => {
     const { catalog, calls } = makeCatalog()
     const uc = new ListGamesUseCase(catalog)
-    await uc.execute({ page: '1', per_page: '500' } as CatalogQuery)
+    await uc.execute({ page: '1', per_page: '500' })
     const findMany = calls.find((c) => 'skip' in c && 'take' in c)
     expect(findMany).toMatchObject({ skip: 0, take: 100 })
   })
@@ -58,7 +55,7 @@ describe('ListGamesUseCase', () => {
   it('мусор в page/per_page → дефолты (1/24), не NaN', async () => {
     const { catalog, calls } = makeCatalog()
     const uc = new ListGamesUseCase(catalog)
-    const res = await uc.execute({ page: 'abc', per_page: 'xyz' } as unknown as CatalogQuery)
+    const res = await uc.execute({ page: 'abc', per_page: 'xyz' })
     expect(res.meta.page).toBe(1)
     expect(res.meta.perPage).toBe(24)
     const findMany = calls.find((c) => 'skip' in c && 'take' in c)

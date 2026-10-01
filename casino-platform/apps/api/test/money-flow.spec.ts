@@ -4,6 +4,7 @@ import type { ParsedProviderCallback } from '../src/modules/casino/domain/provid
 import type {
   GameRow,
   GameSessionWithGame,
+  GameSessionWithUser,
   GameTransactionRow,
   IGamePlayRepository,
 } from '../src/modules/casino/domain/repositories/casino.repository'
@@ -22,7 +23,13 @@ function cb(overrides: Partial<ParsedProviderCallback>): ParsedProviderCallback 
   return { action: 'bet', rawRequest: {}, ...overrides }
 }
 
-const SESSION: GameSessionWithGame = {
+/**
+ * Фейк несёт оба relation-поля: репозиторий разделяет `…WithGame` (колбэк игры)
+ * и `…WithUser` (колбэк кошелька), и одна строка должна подходить к обоим методам.
+ */
+type FakeSession = GameSessionWithGame & GameSessionWithUser
+
+const SESSION: FakeSession = {
   id: 'session-1',
   userId: 'user-1',
   gameId: 'game-1',
@@ -31,7 +38,7 @@ const SESSION: GameSessionWithGame = {
   status: 'active',
   providerId: 'prov',
   game: { id: 'game-1', name: 'Slots' },
-} as unknown as GameSessionWithGame
+} as unknown as FakeSession
 
 interface WalletCall {
   op: 'credit' | 'debit'
@@ -40,7 +47,7 @@ interface WalletCall {
 
 /** In-memory реализация IGamePlayRepository — только то, что читает сервис. */
 class FakePlay implements IGamePlayRepository {
-  sessions = new Map<string, GameSessionWithGame>()
+  sessions = new Map<string, FakeSession>()
   rounds = new Map<string, GameRow>()
   transactions = new Map<string, GameTransactionRow>() // key: providerId:externalId
   rollbacks: GameTransactionRow[] = []
@@ -68,10 +75,10 @@ class FakePlay implements IGamePlayRepository {
     return { id: 'session-1', sessionToken: String(data.sessionToken) }
   }
   async touchSession(): Promise<void> {}
-  async addSessionBet(id: string, _amount: string, tx?: Prisma.TransactionClient) {
+  async addSessionBet(_id: string, _amount: string, tx?: Prisma.TransactionClient) {
     this.record('addSessionBet', tx)
   }
-  async addSessionWin(id: string, _amount: string, tx?: Prisma.TransactionClient) {
+  async addSessionWin(_id: string, _amount: string, tx?: Prisma.TransactionClient) {
     this.record('addSessionWin', tx)
   }
   async findRoundByExternal(
@@ -105,7 +112,7 @@ class FakePlay implements IGamePlayRepository {
     this.record('findTransactionByExternal', tx)
     return this.transactions.get(`${providerId}:${externalTransactionId}`) ?? null
   }
-  async findRollbackOf(roundId: string, rollbackOfId: string, tx?: Prisma.TransactionClient) {
+  async findRollbackOf(roundId: string, _rollbackOfId: string, tx?: Prisma.TransactionClient) {
     this.record('findRollbackOf', tx)
     return this.rollbacks.find((r) => r.roundId === roundId) ?? null
   }
@@ -233,8 +240,7 @@ describe('GAP-24 money flow: bet/win/rollback (idempotency, types, atomicity)', 
     expect(wallet.calls).toHaveLength(1)
     expect(wallet.calls[0]!.op).toBe('credit') // bet откатывается возвратом
     expect(wallet.calls[0]!.input.tx).toBe(TX)
-    const rb = play.rollbacks[0]
-    expect(rb.type).toBe('rollback')
+    expect(play.rollbacks[0]?.type).toBe('rollback')
   })
 
   it('rollback выигрыша → DEBIT (забрать выплату обратно)', async () => {

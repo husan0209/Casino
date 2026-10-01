@@ -11,7 +11,16 @@ import { prisma } from '@casino/database'
 
 import { PrismaWalletTransactionRunner } from '../src/modules/wallet/infrastructure/ledger/wallet-transaction-runner.prisma'
 
-const transactionMock = vi.mocked(prisma.$transaction)
+import type { MockedFunction } from 'vitest'
+
+/**
+ * Раннер использует только колбэк-перегрузку `$transaction(fn)`, а Prisma объявляет
+ * обе (массив промисов | колбэк). Тип мока сужен до нужной ветки, иначе `txBody(tx)`
+ * внутри mockImplementation требует настоящий TransactionClient.
+ */
+type TransactionMock = MockedFunction<(fn: (tx: unknown) => Promise<unknown>) => Promise<unknown>>
+
+const transactionMock = prisma.$transaction as unknown as TransactionMock
 
 /** GAP-57: раннер обязан получить кошелёк — по нему берётся advisory-лок. */
 const TARGET = { userId: 'user-1', currency: 'RUB' as const }

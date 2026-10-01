@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto'
+
 import { ConfigService } from '@nestjs/config'
 import { describe, it, expect, vi } from 'vitest'
 
@@ -23,36 +25,39 @@ const SECRET = 'test_secret_gitslotpark_deterministic_only'
 const AGENT = 'AGENT42'
 const API_TOKEN = 'API_TOKEN_LOCAL'
 
-function buildConfig(
-  overrides: {
-    agentId?: string
-    apiToken?: string
-    secret?: string
-    apiBase?: string
-  } = {},
-): ConfigService {
+function configWith(values: Record<string, string>): ConfigService {
   const config = new ConfigService()
-  vi.spyOn(config, 'get').mockImplementation(((key: string) => {
-    if (key === 'GITSLOTPARK_AGENT_ID') {
-      return overrides.agentId ?? AGENT
-    }
-    if (key === 'GITSLOTPARK_API_TOKEN') {
-      return overrides.apiToken ?? API_TOKEN
-    }
-    if (key === 'GITSLOTPARK_SECRET_KEY') {
-      return overrides.secret ?? SECRET
-    }
-    if (key === 'GITSLOTPARK_API_BASE') {
-      return overrides.apiBase
-    }
-    return undefined
-  }) as never)
+  vi.spyOn(config, 'get').mockImplementation(((key: string) => values[key]) as never)
   return config
 }
 
-const createHmac = (await import('crypto')).createHmac
+/** Провайдер настроен: три обязательных ключа на месте. */
+function buildConfig(): ConfigService {
+  return configWith({
+    GITSLOTPARK_AGENT_ID: AGENT,
+    GITSLOTPARK_API_TOKEN: API_TOKEN,
+    GITSLOTPARK_SECRET_KEY: SECRET,
+  })
+}
 
-/** Локальный эталона HMAC — должен совпадать с тем, что делает адаптер. */
+/** Ни одного GITSLOTPARK_* ключа — именно этот случай обязан быть fail-closed. */
+function buildConfigWithoutKeys(): ConfigService {
+  return configWith({})
+}
+
+/**
+ * `CALLBACK_MESSAGE_BUILDERS` — `Record<string, …>`, поэтому индекс по строковому ключу
+ * даёт `| undefined` (noUncheckedIndexedAccess). Провал — явно, а не «is not a function».
+ */
+function builder(op: string): (body: Record<string, unknown>) => string {
+  const fn = CALLBACK_MESSAGE_BUILDERS[op]
+  if (!fn) {
+    throw new Error(`gitslotpark.adapter: нет билдера подписи для «${op}»`)
+  }
+  return fn
+}
+
+/** Локальный эталон HMAC — должен совпадать с тем, что делает адаптер. */
 function expectedSign(message: string): string {
   return createHmac('sha256', SECRET).update(message).digest('hex').toUpperCase()
 }
@@ -64,11 +69,10 @@ describe('GAP-43 GitslotparkProviderAdapter', () => {
     // менеджер подтвердит — оставляем как есть; если скажет «у нас порядок X»
     // — фикс в адаптере ИЛИ в этом спеке, но НЕ односторонне.
 
-    const build = (op: string) => CALLBACK_MESSAGE_BUILDERS[op]
     const AMT = (v: unknown) => Number(v ?? 0).toFixed(2)
 
     it('getbalance: agentID + userID', () => {
-      const message = build('getbalance')({ agentID: AGENT, userID: 'u-1' })
+      const message = builder('getbalance')({ agentID: AGENT, userID: 'u-1' })
       expect(message).toBe(`${AGENT}u-1`)
     })
 
@@ -80,7 +84,7 @@ describe('GAP-43 GitslotparkProviderAdapter', () => {
         transactionID: 'tx-w-1',
         roundID: 'r-1',
       }
-      const message = build('withdraw')(body)
+      const message = builder('withdraw')(body)
       expect(message).toBe(`${AGENT}u-1${AMT(body.amount)}${body.transactionID}${body.roundID}`)
       // sanity: ожидаемая подпись детерминирована
       expect(expectedSign(message)).toMatch(/^[A-F0-9]{64}$/)
@@ -95,7 +99,7 @@ describe('GAP-43 GitslotparkProviderAdapter', () => {
         transactionID: 'tx-d-1',
         roundID: 'r-1',
       }
-      const message = build('deposit')(body)
+      const message = builder('deposit')(body)
       expect(message).toBe(
         `${AGENT}u-1${AMT(body.amount)}${body.refTransactionID}${body.transactionID}${body.roundID}`,
       )
@@ -111,7 +115,7 @@ describe('GAP-43 GitslotparkProviderAdapter', () => {
         transactionID: 'tx-bw-1',
         roundID: 'r-1',
       }
-      const message = build('betwin')(body)
+      const message = builder('betwin')(body)
       expect(message).toBe(
         `${AGENT}u-1${AMT(body.betAmount)}${AMT(body.winAmount)}${body.transactionID}${body.roundID}`,
       )
@@ -120,7 +124,7 @@ describe('GAP-43 GitslotparkProviderAdapter', () => {
 
     it('rollbacktransaction: agentID + userID + refTransactionID', () => {
       const body = { agentID: AGENT, userID: 'u-1', refTransactionID: 'tx-r-1' }
-      const message = build('rollbacktransaction')(body)
+      const message = builder('rollbacktransaction')(body)
       expect(message).toBe(`${AGENT}u-1${body.refTransactionID}`)
       expect(expectedSign(message)).toMatch(/^[A-F0-9]{64}$/)
     })
@@ -142,9 +146,8 @@ describe('GAP-43 GitslotparkProviderAdapter', () => {
       headers: Record<string, string>
       body: Record<string, unknown>
     } {
-      const build = CALLBACK_MESSAGE_BUILDERS[op]
       const body = { agentID: AGENT, userID: 'u-1', ...extra }
-      const message = build(body)
+      const message = builder(op)(body)
       const sign = expectedSign(message)
       return { headers: { 'x-gsp-op': op }, body: { ...body, sign } }
     }
@@ -191,11 +194,11 @@ describe('GAP-43 GitslotparkProviderAdapter', () => {
     })
 
     it('без ключей → false БЕЗ исключения (fail-closed)', () => {
-      const adapter = new GitslotparkProviderAdapter(
-        buildConfig({ agentId: undefined, apiToken: undefined, secret: undefined }),
-      )
-      const headers = { 'x-gsp-op': 'getbalance' }
-      const body = { agentID: AGENT, userID: 'u-1', sign: 'A'.repeat(64) }
+      // С ВЕРНОЙ подписью: те же headers/body при настроенных ключах дают true
+      // (см. предыдущий тест), значит падение здесь — именно из-за отсутствия ключей,
+      // а не из-за несовпадения HMAC.
+      const adapter = new GitslotparkProviderAdapter(buildConfigWithoutKeys())
+      const { headers, body } = buildSignedBody('getbalance', {})
       expect(adapter.verifyCallback(headers, body)).toBe(false)
     })
 

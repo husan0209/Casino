@@ -12,6 +12,9 @@ import type {
 } from '../src/modules/casino/domain/repositories/casino.repository'
 import type { WalletFacade } from '../src/modules/wallet/facade/wallet.facade'
 
+/** Контракт входа выводится из сигнатуры use-case: `LaunchGameInput` в src не экспортируется. */
+type LaunchInput = Parameters<LaunchGameUseCase['execute']>[0]
+
 function makeGame(over: Record<string, unknown> = {}): never {
   return {
     id: 'g1',
@@ -46,15 +49,15 @@ function makeUc(
   }
 }
 
-const input = (over: Record<string, unknown> = {}): unknown =>
-  ({
-    gameSlug: 'sweet-bonanza',
-    userId: undefined,
-    currency: 'RUB',
-    isDemo: true,
-    returnUrl: 'https://casino.local/return',
-    ...over,
-  }) as never
+const input = (over: Partial<LaunchInput> = {}): LaunchInput => ({
+  gameSlug: 'sweet-bonanza',
+  currency: 'RUB',
+  returnUrl: 'https://casino.local/return',
+  isDemo: true,
+  isMobile: false,
+  ip: '127.0.0.1',
+  ...over,
+})
 
 describe('LaunchGameUseCase', () => {
   it('игра не найдена → GameNotFoundError', async () => {

@@ -62,8 +62,8 @@ describe('sentry.options (GAP-50)', () => {
       const deep = { arr: [{ password: 'x' }, { ok: true }] }
       const out = scrubPII(deep) as Record<string, unknown>
       const arr = out['arr'] as Array<Record<string, unknown>>
-      expect(arr[0]['password']).toBe('[REDACTED]')
-      expect(arr[1]['ok']).toBe(true)
+      expect(arr[0]?.['password']).toBe('[REDACTED]')
+      expect(arr[1]?.['ok']).toBe(true)
 
       // глубже 6 уровней — замена на [deep], не бесконечная рекурсия
       let v: unknown = { password: 'x' }
