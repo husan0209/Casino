@@ -133,4 +133,11 @@ describe('GAP-54: Ctrl/⌘K (§4.4)', () => {
     expect(isSearchShortcut(event({ ctrlKey: true, target: textarea }))).toBe(false)
     expect(isSearchShortcut(event({ ctrlKey: true, target: editable }))).toBe(false)
   })
+
+  it('не падает на синтетическом keydown без key (расширения браузера)', () => {
+    // keydown от расширения приходит с metaKey/ctrlKey, но без key — раньше
+    // обработчик падал на undefined.toLowerCase() и переставал работать.
+    expect(isSearchShortcut(event({ ctrlKey: true, key: undefined }))).toBe(false)
+    expect(isSearchShortcut(event({ metaKey: true, key: undefined }))).toBe(false)
+  })
 })
