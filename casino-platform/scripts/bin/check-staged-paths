@@ -1,0 +1,116 @@
+#!/bin/sh
+# Scratch-denylist staged-путей. Вызывается из pre-commit ДО lint-staged:
+#
+#   sh "$PLAT/scripts/bin/check-staged-paths"
+#
+# Зачем: `git add -A` подхватывает скриншоты, tmp-логи и одноразовые зонды, а
+# lint-staged потом линтует и форматирует КАЖДЫЙ staged-файл. Итог одного такого
+# индекса — коммит из 33 файлов, где 24 мусор (16 картинок в корне репо,
+# gitlink .wt-g21, .vite/vitest/results.json). Останавливать надо здесь и ДО
+# форматирования: после lint-staged часть файлов уже переписана.
+#
+# Игнор (.gitignore, .git/info/exclude) от мусора не спасает: он только убирает
+# пути из `git status`, а `git add -f`, уже отслеживаемый файл или свежий клон
+# без exclude возвращают мусор в индекс. Это вторая линия обороны.
+#
+# Обход — только явной переменной ALLOW_SCRATCH_COMMIT=1 (с предупреждением),
+# НЕ --no-verify: обход хуков в этом репозитории запрещён владельцем.
+#
+# Список путей по умолчанию берётся из индекса; можно передать аргументами —
+# для ручной проверки и тестов:
+#   sh scripts/bin/check-staged-paths only-mine.txt apps/web/public/ok.png
+#
+# Ограничение: имена с переводом строки не поддерживаются (список читается
+# построчно). Таких имён в репо нет и быть не должно.
+
+set -u
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "check-staged-paths: мы вне git-репозитория (git rev-parse --show-toplevel)" >&2
+  exit 2
+}
+
+if [ "$#" -gt 0 ]; then
+  # Режим проверки: пути пришли аргументами, индекс не трогаем.
+  LIST=$(printf '%s\n' "$@")
+  SRC="из аргументов"
+else
+  cd "$ROOT" || exit 2
+  # core.quotepath=off обязательно: иначе не-ASCII имена приходят как
+  # "\320\241..." и расширение не распознаётся (реальный случай в этом репо —
+  # «Снимок Экрана 2026-09-30 100033.png»).
+  LIST=$(git -c core.quotepath=off diff --cached --name-only --diff-filter=ACM)
+  SRC="из индекса"
+fi
+
+# reason <путь> — печатает причину в stdout; пустой вывод = путь чистый.
+# Git всегда отдаёт «/» как разделитель, регистр расширения нормализуем.
+reason() {
+  lower=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  base=${lower##*/}
+
+  # Каталоги инструментов и linked worktrees, поднятые внутри основного дерева.
+  case "$lower" in
+    .vite/*) printf 'кэш инструментов (.vite/)\n'; return ;;
+    .wt-*) printf 'linked worktree (.wt-*)\n'; return ;;
+    .kilo/*|.kilo|.kilocode/*|.kilocode|.freebuff/*|.freebuff)
+      printf 'рабочее дерево агента-инструмента\n'; return ;;
+  esac
+
+  # Временные артефакты — на любом уровне: они никогда не часть задачи.
+  case "$base" in
+    *.tmp.txt|*.tmp.json|*.tmp.log) printf 'tmp-дамп\n'; return ;;
+    *.log) printf 'лог\n'; return ;;
+    zz-*) printf 'одноразовый зонд (zz-*)\n'; return ;;
+    only-mine.txt|cl-out.txt) printf 'вывод утилиты/агента\n'; return ;;
+  esac
+
+  # Картинки В КОРНЕ РЕПО (путь без слэша). Легитимные изображения в
+  # apps/*/public/, docs/ и packages/ этим правилом не затрагиваются.
+  case "$lower" in
+    */*) : ;;
+    *)
+      case "$base" in
+        *.jpg|*.jpeg|*.png|*.gif|*.webp) printf 'картинка в корне репо\n'; return ;;
+      esac
+      ;;
+  esac
+
+  printf ''
+}
+
+BAD=$(
+  printf '%s\n' "$LIST" | while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    R=$(reason "$p")
+    [ -n "$R" ] || continue
+    printf '   %s\n      ↳ %s\n' "$p" "$R"
+  done
+)
+
+[ -n "$BAD" ] || exit 0
+
+if [ "${ALLOW_SCRATCH_COMMIT:-}" = "1" ]; then
+  echo "⚠️  check-staged-paths: ALLOW_SCRATCH_COMMIT=1 — denylist пропущен:"
+  printf '%s\n' "$BAD"
+  echo "   Ответственность на авторе коммита: эти пути увидят ревью и CI."
+  exit 0
+fi
+
+# Путь violation'а начинается ровно с трёх пробелов, строка причины — с шести.
+N=$(printf '%s\n' "$BAD" | grep -c '^   [^ ]')
+echo ""
+echo "❌ check-staged-paths: $N scratch-путь(ей) $SRC — коммит прерван."
+echo "   scratch-файлы не коммитим — перенеси их в %TEMP% (CONVENTIONS §10.4)"
+printf '%s\n' "$BAD"
+echo ""
+echo "   Убрать из индекса, оставив файл на диске:"
+echo "     git restore --staged <путь>   # обычный файл"
+echo "     git rm --cached -- <путь>     # gitlink/каталог (.wt-*)"
+echo "   Перенести в scratch:"
+echo "     mkdir -p \"\$TEMP/casino-scratch\" && mv <путь> \"\$TEMP/casino-scratch/\""
+echo ""
+echo "   Если это правда файл задачи (обход с предупреждением, а не пропуск хука):"
+echo "     ALLOW_SCRATCH_COMMIT=1 git commit ..."
+echo ""
+exit 1
