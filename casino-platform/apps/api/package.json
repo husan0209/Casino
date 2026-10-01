@@ -6,7 +6,7 @@
     "build": "nest build && tsc-alias -p tsconfig.build.json",
     "dev": "nest start --watch",
     "start": "node dist/main",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.eslint.json",
     "lint": "eslint src test --ext .ts --max-warnings=0",
     "test": "vitest run",
     "test:watch": "vitest",

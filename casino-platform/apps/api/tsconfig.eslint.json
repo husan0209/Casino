@@ -1,4 +1,7 @@
 {
+  // Файл двойного назначения: type-aware правила ESLint и `pnpm typecheck`
+  // (`tsc --noEmit -p tsconfig.eslint.json`). Оба гейта должны видеть одну область —
+  // src + test, иначе типизация спеков не проверяется нигде (tsconfig.json берёт только src).
   "extends": "./tsconfig.json",
   "compilerOptions": {
     // Скрипты проверки в test/*.js (di-graph.check.js, affiliate-flow.check.js,

@@ -176,7 +176,7 @@ Frontend:   Next.js 14 App Router + Tailwind + TanStack Query + Zustand + React 
 -   pnpm install         install deps
 -   pnpm dev             run api + web + admin in parallel
 -   pnpm build           build all
--   pnpm typecheck       tsc --noEmit across workspace
+-   pnpm typecheck       tsc --noEmit across workspace (api: `tsconfig.eslint.json` — src **и** test)
 -   pnpm lint            per-project (api: eslint src test, web/admin: next lint --dir src --dir test), fails on warnings
 -   pnpm test            vitest (unit tests)
 -   pnpm db:generate     prisma generate
