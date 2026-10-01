@@ -136,7 +136,7 @@ describe('GAP-54: Ctrl/⌘K (§4.4)', () => {
 
   it('не падает на синтетическом keydown без key (расширения браузера)', () => {
     // keydown от расширения приходит с metaKey/ctrlKey, но без key — раньше
-    // обработчик падал на undefined.toLowerCase() и.shortcut переставал работать.
+    // обработчик падал на undefined.toLowerCase() и переставал работать.
     expect(isSearchShortcut(event({ ctrlKey: true, key: undefined }))).toBe(false)
     expect(isSearchShortcut(event({ metaKey: true, key: undefined }))).toBe(false)
   })
