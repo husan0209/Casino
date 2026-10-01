@@ -641,6 +641,20 @@ Closes #123
 - [ ] Migration applied (if needed)
 ```
 
+### 10.4. Scratch-файлы в рабочем дереве
+
+Логи dev-серверов, дампы CI и одноразовые зонды (`web-3005.log`, `ci-109500018885.tmp.txt`,
+`jobs.tmp.json`, `casino-platform/zz-probe.cjs`) оседают в корне дерева и висят в `git status`
+во всех worktree-ах. Опасно не это, а `git add -A`: `pre-commit` линтует и форматирует каждый
+staged-файл, поэтому мусор в индексе — это падение хука или коммит с чужим файлом.
+
+- scratch пишется **вне** рабочего дерева (`%TEMP%`), а не в нём;
+- то, что уже лежит, закрыто ignore-правилами: корневой `.gitignore` (`*.log`, `*.tmp.txt`,
+  `*.tmp.json`, `zz-*.cjs`, `zz-*.js`, `only-mine.txt`, `cl-out.txt`, личные изображения
+  пользователя) и `casino-platform/.gitignore` (`.env`, сборки, логи, coverage). Игнор — это не
+  «удалить»: файлы остаются на диске, просто не попадают в индекс;
+- перед `git add -A` смотреть `git status --short` — в индексе должны быть только файлы задачи.
+
 ---
 
 ## 11. Test Conventions
