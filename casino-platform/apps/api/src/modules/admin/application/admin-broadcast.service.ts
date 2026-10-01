@@ -15,7 +15,7 @@ export class AdminBroadcastService {
   async send(
     userIds: string[],
     payload: { title: string; message: string; type: string },
-  ): Promise<{ sentCount: number }> {
+  ): Promise<{ success: boolean; sentCount: number }> {
     let targets = userIds
     if (targets.length === 0) {
       targets = await this.repo.getAllUserIds()
