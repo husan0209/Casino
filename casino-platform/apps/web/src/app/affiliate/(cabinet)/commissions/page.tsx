@@ -150,9 +150,15 @@ export default function AffiliateCommissionsPage(): React.JSX.Element {
                       </div>
                     )}
                     <div className="flex justify-between border-t border-white/10 pt-0.5 mt-1">
-                      <span>NGR × {formatRate(row.revshare_rate)}</span>
+                      <span>NGR</span>
                       <span className="font-mono">
                         {formatAmount(row.ngr_amount, row.currency)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>× {formatRate(row.revshare_rate)}</span>
+                      <span className="font-mono">
+                        {formatAmount(row.commission_amount, row.currency)}
                       </span>
                     </div>
                   </div>
