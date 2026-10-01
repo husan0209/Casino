@@ -7,7 +7,7 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
 
-import { PaymentRequestRepository } from '@modules/payments/infrastructure/repositories/payment-request.repository'
+import { PaymentsFacade } from '@modules/payments/facade/payments.facade'
 import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
@@ -41,7 +41,7 @@ function parsePagination(q: Record<string, string | undefined>): { page: number;
 export class AdminFinanceController {
   constructor(
     private wallet: WalletFacade,
-    private payments: PaymentRequestRepository,
+    private payments: PaymentsFacade,
     private audit: AuditLogService,
   ) {}
 
@@ -147,7 +147,7 @@ export class AdminFinanceController {
 
   /** Общая логика одобрения одной заявки (single + batch). */
   private async approveOne(id: string, admin: AdminActor, req: Request): Promise<void> {
-    const wd = await this.payments.findById(id)
+    const wd = await this.payments.getPaymentRequest(id)
     if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') {
       throw new WithdrawalInvalidStatusError()
     }
@@ -159,7 +159,7 @@ export class AdminFinanceController {
       // GAP-55 (§11): списание по выводу тоже несёт ссылку на заявку
       metadata: { payment_request_id: wd.id },
     })
-    await this.payments.updateStatus(id, 'completed', { completedAt: new Date() })
+    await this.payments.updatePaymentStatus(id, 'completed', { completedAt: new Date() })
     await this.audit.log({
       actorType: 'admin',
       actorId: admin.id,
@@ -173,7 +173,7 @@ export class AdminFinanceController {
 
   /** Общая логика отклонения одной заявки (single + batch). */
   private async rejectOne(id: string, reason: string | undefined, admin: AdminActor, req: Request): Promise<void> {
-    const wd = await this.payments.findById(id)
+    const wd = await this.payments.getPaymentRequest(id)
     if (!wd || wd.type !== 'withdrawal' || wd.status !== 'pending') {
       throw new WithdrawalInvalidStatusError()
     }
@@ -183,7 +183,7 @@ export class AdminFinanceController {
       amount: wd.amount.toString(),
       idempotencyKey: `wd_unlock_${wd.id}_${randomUUID()}`,
     })
-    await this.payments.updateStatus(id, 'cancelled', { errorMessage: reason })
+    await this.payments.updatePaymentStatus(id, 'cancelled', { errorMessage: reason })
     await this.audit.log({
       actorType: 'admin',
       actorId: admin.id,
