@@ -37,6 +37,12 @@ export interface IAdminUserRepository {
   list(page: number, perPage: number): Promise<{ items: AdminUserRow[]; total: number }>
   create(data: CreateAdminUserInput): Promise<AdminUserRow>
   setActive(id: string, isActive: boolean): Promise<AdminUserRow>
+  /** Волна 4 (В3): lastLoginAt после успешного admin-логина. */
+  touchLastLogin(id: string): Promise<void>
+  /** Блокировка игрока: статус + отзыв всех активных сессий (атомарно в impl). */
+  blockPlayer(userId: string): Promise<void>
+  /** Снятие блокировки игрока. */
+  unblockPlayer(userId: string): Promise<void>
 }
 
 export const ADMIN_USER_REPOSITORY = Symbol('ADMIN_USER_REPOSITORY')

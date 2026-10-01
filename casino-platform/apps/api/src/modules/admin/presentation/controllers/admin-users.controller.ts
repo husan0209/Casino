@@ -21,6 +21,7 @@ import {
   type UserStatus,
 } from '@casino/database'
 
+import { AdminUsersService } from '../../application/admin-users.service'
 import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import { BlockUserSchema } from '../dto/admin-users.dto'
@@ -42,7 +43,10 @@ type AdminUserDetail = Prisma.UserGetPayload<{
 @UseGuards(AdminAuthGuard)
 @Controller('admin/users')
 export class AdminUsersController {
-  constructor(@Inject(AuditLogService) private readonly auditLogService: AuditLogService) {}
+  constructor(
+    @Inject(AuditLogService) private readonly auditLogService: AuditLogService,
+    @Inject(AdminUsersService) private readonly usersService: AdminUsersService,
+  ) {}
 
   @Get()
   async list(
@@ -122,14 +126,8 @@ export class AdminUsersController {
     @Body() dto: { reason?: string },
     @Req() req: Request,
   ): Promise<{ ok: boolean }> {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { status: 'blocked' },
-    })
-    await prisma.session.updateMany({
-      where: { userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    })
+    // Мутации — через application-сервис (В3): статус + отзыв сессий атомарны в репозитории
+    await this.usersService.blockPlayer(userId)
     await this.auditLogService.log({
       actorType: 'admin',
       actorId: (req.user as AdminActor).id,
@@ -145,10 +143,7 @@ export class AdminUsersController {
 
   @Post(':id/unblock')
   async unblock(@Param('id') userId: string, @Req() req: Request): Promise<{ ok: boolean }> {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { status: 'active' },
-    })
+    await this.usersService.unblockPlayer(userId)
     await this.auditLogService.log({
       actorType: 'admin',
       actorId: (req.user as AdminActor).id,
