@@ -25,7 +25,6 @@ export interface CreateCryptoDepositResult {
 
 @Injectable()
 export class CreateCryptoDepositUseCase {
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(NOWPAYMENTS_CLIENT) private readonly np: INowPaymentsClient,

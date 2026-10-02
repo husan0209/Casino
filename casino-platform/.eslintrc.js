@@ -144,6 +144,20 @@ module.exports = {
       },
     },
     {
+      // Repos — те же @Injectable-классы: состав конструктора задаёт DI-граф,
+      // а не автор файла (GAP-25). Но методы репозитория — публичный контракт
+      // infrastructure-слоя, поэтому здесь выключается РОВНО max-params:
+      // explicit-function-return-type для *.repo.ts остаётся включённым.
+      // Без этого блока каждая новая repository-конструкция с >3 портами
+      // требует построчного `eslint-disable`, то есть вместо выключенного по
+      // классу файлов правила растёт долг G19 (QUALITY_GATES §2.1.1:
+      // подавление либо чинится, либо переносится в override).
+      files: ['**/*.repo.ts'],
+      rules: {
+        'max-params': 'off',
+      },
+    },
+    {
       // Relaxed rules for tests (docs/CONVENTIONS.md §11: tests assert behavior, not size).
       // `.tsx` наравне с `.ts`: в React-приложениях спеки живут в tsx, а отсутствие
       // паттерна считало `describe(...)` «слишком длинной функцией».

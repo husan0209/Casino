@@ -13,7 +13,6 @@ import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories
 
 @Injectable()
 export class VerifyEmailUseCase {
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(EMAIL_VERIFICATION_REPOSITORY) private verif: IEmailVerificationRepository,

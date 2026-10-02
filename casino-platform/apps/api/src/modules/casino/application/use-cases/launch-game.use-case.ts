@@ -41,7 +41,6 @@ interface ActiveGameSession {
 
 @Injectable()
 export class LaunchGameUseCase {
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(PROVIDER_ADAPTER_FACTORY) private adapters: IProviderAdapterFactory,
     @Inject(WalletFacade) private wallet: WalletFacade,

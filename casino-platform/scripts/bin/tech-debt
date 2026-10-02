@@ -2,16 +2,27 @@
 # Храповик техдолга (ratchet): правила архитектуры включены в error, но
 # СУЩЕСТВУЮЩИЙ долг заморожен в базлайнах tech-debt/<name>.txt.
 #
-#   tech-debt check <name>...  — FAIL, если долг вырос относительно базлайна
-#                                (новый файл или рост числа нарушений в файле);
-#                                WARN, если базлайн можно ужать (долг погашен).
+#   tech-debt check <name>...  — сравнение числа нарушений per-file:
+#                                факт > базлайн → FAIL (долг вырос);
+#                                факт < базлайн → STALE (часть погашена,
+#                                базлайн надо ужмять) — тоже ненулевой exit,
+#                                иначе храповик вечно шумит и его перестают
+#                                замечать (G18 шумел 30.09–02.10 именно так);
+#                                равно → OK.
+#                                Флаг --allow-stale понижает STALE до warning
+#                                с exit 0 (для переходных прогонов CI).
 #   tech-debt gen   <name>...  — перезаписать базлайн текущим состоянием
 #                                (только осознанно: после разбора части долга
 #                                или при добавлении нового правила).
 #   tech-debt list             — имена всех правил.
 #
+# Exit codes: 0 — OK (или STALE при --allow-stale); 1 — долг вырос;
+# 2 — ошибка использования / нет базлайна / неизвестное правило;
+# 3 — долг погашен, базлайн не ужмят.
+#
 # Формат базлайна: `путь<TAB>количество` (для use-case-specs — просто путь
-# на строку). Путь — от корня casino-platform, слэши всегда «/».
+# на строку, это то же самое, что количество 1). Путь — от корня
+# casino-platform, слэши всегда «/».
 # Один и тот же детектор используется и в gen, и в check — правь его здесь,
 # а не в workflow. CI вызывает `sh scripts/bin/tech-debt check <name>`.
 
@@ -60,14 +71,23 @@ detect() {
     # Use-case без теста (CONVENTIONS §11). Тест считается найденным, если:
     # (а) есть соседний .spec.ts, ИЛИ (б) имя класса упоминается в любом спеке
     # apps/api/test/ (конвенция репо: спеки живут в test/, не рядом с кодом).
+    # Упоминание ищется ЦЕЛЫМ СЛОВОМ (-w): подстрокой `LoginUseCase` матчился
+    # внутри `TelegramLoginUseCase`, и непокрытый кейс молча считался покрытым.
     use-case-specs)
       find apps/api/src/modules -name '*.use-case.ts' ! -name '*.spec.ts' 2>/dev/null |
         sed 's|\\|/|g' | sort |
         while IFS= read -r uc; do
           [ -f "${uc%.ts}.spec.ts" ] && continue
           BASE=$(basename "$uc" .use-case.ts)
-          CLS=$(printf '%s' "$BASE" | awk -F'-' '{o="";for(i=1;i<=NF;i++)o=o toupper(substr($i,1,1)) substr($i,2); print o "UseCase"}')
-          grep -rqF "$CLS" apps/api/test --include='*.spec.ts' 2>/dev/null && continue
+          # Механический camelCase от имени файла не всегда и есть имя класса
+          # (google-oauth.use-case.ts → GoogleOAuthUseCase, process-nowpayments-
+          # webhook → ProcessNOWPaymentsWebhookUseCase). Имя берётся из файла,
+          # вывод имени из пути — только запасной вариант: иначе гард ловил бы
+          # «покрытие» по строке-опечатке в комментарии, а не по реальному классу.
+          DERIVED=$(printf '%s' "$BASE" | awk -F'-' '{o="";for(i=1;i<=NF;i++)o=o toupper(substr($i,1,1)) substr($i,2); print o "UseCase"}')
+          CLS=$(grep -oE 'export class [A-Za-z0-9_]*UseCase' "$uc" 2>/dev/null | head -1 | awk '{print $3}')
+          [ -n "$CLS" ] || CLS="$DERIVED"
+          grep -rqw "$CLS" apps/api/test --include='*.spec.ts' 2>/dev/null && continue
           printf '%s\n' "$uc"
         done
       ;;
@@ -107,6 +127,54 @@ detect() {
 
 NAMES='raw-error nest-exceptions eslint-disable money-number use-case-specs cross-module-imports'
 
+# Имя правила проверяется ДО любого редиректа в tech-debt/: `gen <опечатка>`
+# ранее создавал пустой tech-debt/<опечатка>.txt, который потом попадал в git
+# (так был заведён отслеживаемый tech-debt/gen.txt коммитом e07de5f).
+is_known_name() {
+  for known in $NAMES; do
+    [ "$known" = "$1" ] && return 0
+  done
+  return 1
+}
+
+# Базлайн и вывод детектора к общему виду `тег<TAB>путь<TAB>число`:
+# строка без числа (use-case-specs) = 1, повторный путь суммируется, CR
+# из windows-копи basefiles отбрасывается. Тег обязателен: `awk NR==FNR`
+# на пустом первом файле принимает базлайн за факт, а пустой базлайн —
+# штатная ситуация («долга нет»), см. raw-error после погашения G17.
+normalise() {
+  awk -F'\t' -v tag="$2" '
+    {
+      path = $1
+      gsub(/\r/, "", path)
+      if (path == "") next
+      count = ($2 ~ /^[0-9]+$/) ? $2 + 0 : 1
+      total[path] += count
+    }
+    END { for (p in total) printf "%s\t%s\t%d\n", tag, p, total[p] }
+  ' "$1"
+}
+
+# Различия факта и базлайна: GROW — число выросло (или появился новый путь),
+# STALE — число упало или путь исчез (базлайн надо ужать).
+diff_state() {
+  awk -F'\t' '
+    $1 == "C" { fact[$2] = $3 + 0; next }
+    $1 == "B" { base[$2] = $3 + 0 }
+    END {
+      for (p in fact) {
+        b = (p in base) ? base[p] : 0
+        if (fact[p] > b) printf "GROW\t%s\t%d\t%d\n", p, b, fact[p]
+        else if (fact[p] < b) printf "STALE\t%s\t%d\t%d\n", p, b, fact[p]
+      }
+      for (p in base)
+        if (!(p in fact)) printf "STALE\t%s\t%d\t0\n", p, base[p]
+    }
+  ' "$TMPD/cur.n" "$TMPD/bl.n" | sort
+}
+
+TAB=$(printf '\t')
+
 case "${1:-}" in
   list)
     echo "$NAMES"
@@ -115,48 +183,93 @@ case "${1:-}" in
     shift
     [ "${1:-}" = "all" ] && set -- $NAMES
     [ $# -gt 0 ] || { echo "usage: tech-debt gen <name>...|all" >&2; exit 2; }
-    mkdir -p "$DIR"
     for name in "$@"; do
-      detect "$name" > "$DIR/$name.txt" || exit 2
+      is_known_name "$name" || {
+        echo "tech-debt gen: неизвестное правило '$name' (см. tech-debt list)" >&2
+        exit 2
+      }
+    done
+    mkdir -p "$DIR"
+    TMPD=$(mktemp -d) || exit 2
+    trap 'rm -rf "$TMPD"' EXIT
+    for name in "$@"; do
+      # Пишем во временный файл и подменяем только успешный прогон: упавший
+      # детектор не должен оставить обрезанный базлайн.
+      detect "$name" > "$TMPD/out" || exit 2
+      cat "$TMPD/out" > "$DIR/$name.txt"
       printf '%-22s %s записей(ь) в %s\n' "$name" \
         "$(wc -l < "$DIR/$name.txt" | tr -d ' ')" "$DIR/$name.txt"
     done
     ;;
   check)
     shift
+    ALLOW_STALE=0
+    NAMES_ARG=''
+    for arg in "$@"; do
+      if [ "$arg" = "--allow-stale" ]; then
+        ALLOW_STALE=1
+      else
+        NAMES_ARG="$NAMES_ARG $arg"
+      fi
+    done
+    # Имена без пробелов, поэтому разбивка по словам здесь и ожидается.
+    set -- $NAMES_ARG
     [ "${1:-}" = "all" ] && set -- $NAMES
-    [ $# -gt 0 ] || { echo "usage: tech-debt check <name>...|all" >&2; exit 2; }
+    [ $# -gt 0 ] || {
+      echo "usage: tech-debt check [--allow-stale] <name>...|all" >&2
+      exit 2
+    }
+    TMPD=$(mktemp -d) || exit 2
+    trap 'rm -rf "$TMPD"' EXIT
     RC=0
     for name in "$@"; do
+      if ! is_known_name "$name"; then
+        echo "tech-debt check: неизвестное правило '$name' (см. tech-debt list)"
+        RC=2
+        continue
+      fi
       BL="$DIR/$name.txt"
       if [ ! -f "$BL" ]; then
         echo "❌ tech-debt [$name]: нет базлайна $BL — сгенерируй: sh scripts/bin/tech-debt gen $name"
         RC=2
         continue
       fi
-      TMPD=$(mktemp -d) || exit 2
-      trap 'rm -rf "$TMPD"' EXIT
       detect "$name" > "$TMPD/cur" || exit 2
-      sort "$BL" > "$TMPD/bl"
-      BAD=$(comm -23 "$TMPD/cur" "$TMPD/bl")
-      STALE=$(comm -13 "$TMPD/cur" "$TMPD/bl")
-      if [ -n "$BAD" ]; then
+      normalise "$TMPD/cur" C > "$TMPD/cur.n"
+      normalise "$BL" B > "$TMPD/bl.n"
+      DIFF=$(diff_state)
+      GROW=$(printf '%s\n' "$DIFF" | grep "^GROW" || true)
+      STALE=$(printf '%s\n' "$DIFF" | grep "^STALE" || true)
+      if [ -n "$GROW" ]; then
         echo "❌ tech-debt [$name]: долг ВЫРОС относительно $BL:"
-        printf '%s\n' "$BAD" | sed 's/^/   /'
+        printf '%s\n' "$GROW" | while IFS="$TAB" read -r _tag path base now; do
+          [ -n "$path" ] || continue
+          printf '   %s: базлайн %s → факт %s\n' "$path" "$base" "$now"
+        done
         echo "   Новых нарушений допускать нельзя — почини или обоснуй в PR."
         RC=1
       fi
       if [ -n "$STALE" ]; then
         echo "⚠️  tech-debt [$name]: часть базлайна погашена — ужми $BL (sh scripts/bin/tech-debt gen $name):"
-        printf '%s\n' "$STALE" | sed 's/^/   /'
+        printf '%s\n' "$STALE" | while IFS="$TAB" read -r _tag path base now; do
+          [ -n "$path" ] || continue
+          printf '   %s: базлайн %s → факт %s\n' "$path" "$base" "$now"
+        done
+        # Погашенный долг без `gen` — это не «всё хорошо»: базлайн врёт
+        # следующему изменению, а гард тихо пропускает рост до его величины.
+        # Отсюда ненулевой exit; --allow-stale — сознательный переходный режим.
+        if [ "$ALLOW_STALE" = 0 ] && [ "$RC" = 0 ]; then
+          RC=3
+        fi
       fi
-      [ -n "$BAD" ] || [ -n "$STALE" ] ||
+      if [ -z "$GROW" ] && [ -z "$STALE" ]; then
         echo "✅ tech-debt [$name]: OK ($(wc -l < "$TMPD/cur" | tr -d ' ') записей = базлайну)"
+      fi
     done
     exit $RC
     ;;
   *)
-    echo "usage: tech-debt gen|check <name>...|all; tech-debt list" >&2
+    echo "usage: tech-debt gen|check [--allow-stale] <name>...|all; tech-debt list" >&2
     exit 2
     ;;
 esac

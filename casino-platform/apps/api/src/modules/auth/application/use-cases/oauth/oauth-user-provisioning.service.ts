@@ -48,7 +48,6 @@ export interface ProviderSignInInput {
  */
 @Injectable()
 export class OAuthUserProvisioningService {
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(AUTH_PROVIDER_REPOSITORY) private authProviders: IAuthProviderRepository,

@@ -17,7 +17,6 @@ import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories
 
 @Injectable()
 export class ResetPasswordUseCase {
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(PASSWORD_RESET_REPOSITORY) private resets: IPasswordResetRepository,
     @Inject(USER_REPOSITORY) private users: IUserRepository,
