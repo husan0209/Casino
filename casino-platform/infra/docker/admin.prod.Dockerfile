@@ -13,6 +13,10 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages ./packages
 COPY apps/admin ./apps/admin
 RUN pnpm install --frozen-lockfile
+# Сборка пакетов @casino/* перед admin НЕ нужна (в отличие от web.prod):
+# apps/admin не импортирует ни shared-types, ни shared-utils — ни прямой зависимости,
+# ни через tsconfig paths. packages/ в контексте остаётся потому, что admin требует
+# @casino/tsconfig (devDependency, workspace:*) для pnpm install --frozen-lockfile.
 RUN pnpm --filter @casino/admin build
 
 FROM node:20-alpine
@@ -23,5 +27,9 @@ COPY --from=builder /app/apps/admin/.next/static ./apps/admin/.next/static
 COPY --from=builder /app/apps/admin/public ./apps/admin/public
 RUN chown -R node:node /app
 USER node
-EXPOSE 3000
+# 3002, а не 3000 как у web: nginx-хост ADMIN_DOMAIN проксирует http://admin:3002,
+# а standalone-сервер слушает process.env.PORT (его задаёт docker-compose.prod.yml).
+# EXPOSE справочный, но ровно этот расхождение и маскировало, что админка в проде
+# не отвечала никогда.
+EXPOSE 3002
 CMD ["node", "apps/admin/server.js"]

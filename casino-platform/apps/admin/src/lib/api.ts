@@ -1,7 +1,9 @@
 'use client'
 import axios, { type AxiosError } from 'axios'
 
-export const API_URL = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001/api/v1'
+import { API_URL } from './api-base'
+
+export { API_URL }
 
 /**
  * Axios-инстанс без interceptor'ов (их подключает lib/api-interceptors.ts
@@ -89,9 +91,5 @@ export async function apiPatch<T>(url: string, body?: unknown): Promise<T> {
 export function errText(e: unknown): string {
   const ax = e as AxiosError<ApiResponse<unknown>> | null
   const respData = ax?.response?.data
-  return (
-    respData?.error?.message ??
-    respData?.message ??
-    ((e as Error).message || 'Ошибка')
-  )
+  return respData?.error?.message ?? respData?.message ?? ((e as Error).message || 'Ошибка')
 }
