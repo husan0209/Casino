@@ -1,15 +1,9 @@
-apps/api/src/modules/auth/application/use-cases/oauth/google-oauth.use-case.ts
 apps/api/src/modules/payments/application/use-cases/cancel-withdrawal.use-case.ts
 apps/api/src/modules/payments/application/use-cases/create-crypto-deposit.use-case.ts
 apps/api/src/modules/payments/application/use-cases/create-fiat-deposit.use-case.ts
 apps/api/src/modules/payments/application/use-cases/get-deposit-status.use-case.ts
 apps/api/src/modules/payments/application/use-cases/list-withdrawals.use-case.ts
 apps/api/src/modules/payments/application/use-cases/process-nowpayments-webhook.use-case.ts
-apps/api/src/modules/support/application/use-cases/close-ticket.use-case.ts
-apps/api/src/modules/support/application/use-cases/create-ticket.use-case.ts
-apps/api/src/modules/support/application/use-cases/get-ticket.use-case.ts
-apps/api/src/modules/support/application/use-cases/list-user-tickets.use-case.ts
-apps/api/src/modules/support/application/use-cases/send-message.use-case.ts
 apps/api/src/modules/users/application/use-cases/get-geo-context.use-case.ts
 apps/api/src/modules/users/application/use-cases/get-me.use-case.ts
 apps/api/src/modules/users/application/use-cases/list-sessions.use-case.ts
