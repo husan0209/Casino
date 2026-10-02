@@ -25,7 +25,10 @@ const nextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../../'),
   reactStrictMode: true,
   images: {
-    formats: ['image/avif', 'image/webp'],
+    // AVIF отключён до миграции на Next 15: GHSA-2xp9-vwfh-vxw4 (critical) — RCE в
+    // Image Optimization именно через декодирование AVIF, а чинится только мажором
+    // Next. Webp остаётся, деградация — форматы картинок, не функциональность.
+    formats: ['image/webp'],
     remotePatterns: hosts.map((hostname) => ({
       protocol: 'https',
       hostname,
