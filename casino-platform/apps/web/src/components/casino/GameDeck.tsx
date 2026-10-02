@@ -1215,7 +1215,11 @@ export function GameDeck({
     `${animHint === 'return' ? ' deck-card-return' : ''}`
 
   return (
-    <section className="mb-8">
+    /* isolate: все z-слои колоды (задние 20 / фронт 30 / улёт 40) живут внутри
+       собственного stacking context и не рисуются поверх sticky-шапки (z-30).
+       overflow-x-clip: веер задних карт не создаёт горизонтальный скролл
+       страницы; сам section на всю ширину вьюпорта, поэтому свайп не режется. */
+    <section className="mb-8 isolate overflow-x-clip">
       <DeckHeader total={deck.length} position={position} onShuffle={handleShuffle} />
 
       <div className="relative mx-auto max-w-md">
