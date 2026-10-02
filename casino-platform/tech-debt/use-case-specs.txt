@@ -1,5 +1,0 @@
-apps/api/src/modules/payments/application/use-cases/process-nowpayments-webhook.use-case.ts
-apps/api/src/modules/users/application/use-cases/list-sessions.use-case.ts
-apps/api/src/modules/users/application/use-cases/revoke-all-sessions.use-case.ts
-apps/api/src/modules/users/application/use-cases/revoke-session.use-case.ts
-apps/api/src/modules/users/application/use-cases/self-exclusion.use-case.ts
