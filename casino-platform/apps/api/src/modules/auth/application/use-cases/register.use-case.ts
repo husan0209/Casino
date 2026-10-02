@@ -39,7 +39,6 @@ const CODE_LENGTH = 8
 export class RegisterUseCase {
   private readonly logger = new Logger(RegisterUseCase.name)
 
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(USER_REPOSITORY) private users: IUserRepository,
     @Inject(SESSION_REPOSITORY) private sessions: ISessionRepository,

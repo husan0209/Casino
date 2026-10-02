@@ -1,4 +1,3 @@
 apps/api/src/common/pipes/zod-validation.pipe.ts	1
-apps/api/src/modules/admin/presentation/admin-auth.guard.ts	2
 apps/api/src/modules/auth/presentation/guards/auth.guard.ts	2
 apps/api/src/modules/users/presentation/controllers/users.controller.ts	2

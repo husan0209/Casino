@@ -5,7 +5,10 @@ import { AppError } from '@casino/shared-utils'
 export class AdminJwtTokenError extends AppError {
   readonly code: string
   readonly httpStatus = 401
-  constructor(code: 'BAD_SIGNATURE' | 'TOKEN_EXPIRED') {
+  // INVALID_TOKEN — отказы verify, у которых нет своей причины из JWT: битый
+  // base64, невалидный JSON payload, отсутствующий JWT_ACCESS_SECRET. Вешать на
+  // них BAD_SIGNATURE означало бы искать сломанную подпись там, где её нет.
+  constructor(code: 'BAD_SIGNATURE' | 'TOKEN_EXPIRED' | 'INVALID_TOKEN') {
     super(code)
     this.code = code
   }
