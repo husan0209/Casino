@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 :root {
+  /* GAP-59 (п.3 аудита): Inter самохостын (@fontsource-variable/inter/wght.css,
+     импорт в layout.tsx) — сборка web не зависит от fonts.googleapis.com.
+     Имя переменной прежнее: Tailwind fontFamily.sans = var(--font-inter). */
+  --font-inter: 'Inter Variable';
   --bg: #0f0f1a;
   --surface: #1a1a2e;
   --surface2: #16213e;

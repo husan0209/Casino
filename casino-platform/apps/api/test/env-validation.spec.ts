@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import path from 'node:path'
+
 import { validateEnv } from '@casino/shared-config'
 
 describe('Environment Validation', () => {
@@ -139,6 +142,46 @@ describe('Environment Validation', () => {
         }
         expect(() => validateEnv(env)).not.toThrow()
       })
+    })
+  })
+
+  // ── GAP-29: паритет .env.example ↔ envSchema ────────────────────────────
+  // Зачем спек, если есть docs-guard D3: детектор D3 — grep по исходнику, и он
+  // уже врал один раз (искал ключи на двух пробелах, а они на четырёх, и объявлял
+  // невалидированными все 99 переменных при 98 покрытых). Спек читает те же файлы,
+  // но падает в обычном прогоне тестов — дрейф не может спрятаться за регэкспом.
+  describe('GAP-29 .env.example ↔ envSchema parity', () => {
+    // test/ → apps/api → casino-platform (здесь лежат .env.example и packages/)
+    const root = path.join(__dirname, '..', '..', '..')
+    const documented = fs
+      .readFileSync(path.join(root, '.env.example'), 'utf8')
+      .split('\n')
+      .filter((line) => !/^\s*#/.test(line) && /^[A-Z][A-Z0-9_]*=/.test(line))
+      .map((line) => line.slice(0, line.indexOf('=')))
+
+    const validated = fs
+      .readFileSync(path.join(root, 'packages', 'shared-config', 'src', 'env.validation.ts'), 'utf8')
+      .split('\n')
+      .flatMap((line) => {
+        const m = /^\s+([A-Z][A-Z0-9_]*):/.exec(line)
+        return m ? [m[1]] : []
+      })
+
+    it('документированное число переменных разумно (ловим вырожденный парсинг)', () => {
+      expect(documented.length).toBeGreaterThan(90)
+      expect(validated.length).toBeGreaterThan(90)
+    })
+
+    it('каждая переменная из .env.example описана в envSchema', () => {
+      const missing = documented.filter((name) => !validated.includes(name))
+      expect(missing).toEqual([])
+    })
+
+    it('новая переменна не проходит мимо схемы молча (негатив на сам детектор)', () => {
+      // Если регэксп пасинга сломается (как было с отступами в D3), документированных
+      // имён станет 0 — и тест выше упадёт на «length > 90», а не на пустом missing.
+      expect(documented).toContain('WALLET_LOCK_TIMEOUT_MS')
+      expect(validated).toContain('WALLET_LOCK_TIMEOUT_MS')
     })
   })
 })
