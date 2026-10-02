@@ -12,6 +12,7 @@
  * и покрытие засчитывается.
  */
 import { ProcessNOWPaymentsWebhookUseCase } from '../src/modules/payments/application/use-cases/process-nowpayments-webhook.use-case'
+
 import type {
   INowPaymentsClient,
   IPaymentRequestRepository,
@@ -76,7 +77,9 @@ function makeDeps(over: {
 
   const wallet = {
     credit: async (args: CreditArgs) => {
-      if (over.creditError) throw over.creditError
+      if (over.creditError) {
+throw over.creditError
+}
       credited.push(args)
       return { ok: true }
     },

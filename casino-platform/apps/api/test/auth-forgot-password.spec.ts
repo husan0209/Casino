@@ -88,7 +88,9 @@ describe('ForgotPasswordUseCase', () => {
     let got: string | undefined
     const d = makeDeps({ user: makeUser() })
     // Подменяем поиск, чтобы поймать нормализованный аргумент
-    const users = { findByEmail: async (e: string) => { got = e; return null } }
+    const users = { findByEmail: async (e: string) => {
+ got = e; return null 
+} }
     const uc = new ForgotPasswordUseCase(
       users as unknown as IUserRepository,
       {

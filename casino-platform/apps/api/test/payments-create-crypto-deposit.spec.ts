@@ -11,6 +11,7 @@ import {
   KycRequiredError,
   PaymentProviderError,
 } from '../src/modules/payments/domain/errors'
+
 import type {
   INowPaymentsClient,
   IPaymentRequestRepository,
@@ -41,7 +42,9 @@ function makeDeps(over: { npError?: Error } = {}) {
   const np: INowPaymentsClient = {
     getEstimatePrice: async () => ({ estimatedAmount: '12345.5' }),
     createPayment: async () => {
-      if (over.npError) throw over.npError
+      if (over.npError) {
+throw over.npError
+}
       return NP_PAYMENT
     },
   } as unknown as INowPaymentsClient

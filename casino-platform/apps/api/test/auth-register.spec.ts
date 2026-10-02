@@ -17,7 +17,6 @@ import type {
   IJwtTokenService,
   IPasswordHasher,
 } from '../src/modules/auth/domain/auth.ports'
-import type { ModuleRef } from '@nestjs/core'
 import type { UserProps } from '../src/modules/auth/domain/entities/user.entity'
 import type {
   ISessionRepository,
@@ -29,6 +28,7 @@ import type {
   IUserRepository,
 } from '../src/modules/auth/domain/repositories/user.repository'
 import type { IEmailVerificationRepository } from '../src/modules/auth/domain/repositories/verification-token.repository'
+import type { ModuleRef } from '@nestjs/core'
 
 function makeUser(over: Partial<UserProps> = {}): User {
   return new User({

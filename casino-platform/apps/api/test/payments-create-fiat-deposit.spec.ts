@@ -13,6 +13,7 @@ import {
   KycRequiredError,
   PaymentProviderError,
 } from '../src/modules/payments/domain/errors'
+
 import type {
   IPaymentRequestRepository,
   IRukassaClient,
@@ -43,7 +44,9 @@ function makeDeps(over: { rukassaError?: Error } = {}) {
 
   const rukassa: IRukassaClient = {
     createPayment: async () => {
-      if (over.rukassaError) throw over.rukassaError
+      if (over.rukassaError) {
+throw over.rukassaError
+}
       return { paymentId: 'pay-1', paymentUrl: 'https://pay.url' }
     },
   } as unknown as IRukassaClient

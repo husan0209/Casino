@@ -5,6 +5,7 @@
  * geo-дефолтов следующего депозита. Чистый прокси, void-результат.
  */
 import { UpdateAfterDepositUseCase } from '../src/modules/users/application/use-cases/update-after-deposit.use-case'
+
 import type { IUserProfileRepository } from '../src/modules/users/domain/repositories/user-profile.repository'
 
 describe('UpdateAfterDepositUseCase', () => {

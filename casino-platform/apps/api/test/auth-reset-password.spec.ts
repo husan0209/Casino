@@ -94,7 +94,9 @@ function makeDeps(over: { rec?: VerificationTokenView | null; user?: User | null
   }
 
   const uc = new ResetPasswordUseCase(resets, users, sessions, hasher)
-  return { uc, updated, markedUsed, revokedAll, hashed, get findByTokenCalls() { return findByTokenCalls } }
+  return { uc, updated, markedUsed, revokedAll, hashed, get findByTokenCalls() {
+ return findByTokenCalls 
+} }
 }
 
 function rec(over: Partial<VerificationTokenView> = {}): VerificationTokenView {

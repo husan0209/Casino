@@ -5,6 +5,7 @@
  * как except-аргумент — пользователь не разлогинивается сам собой.
  */
 import { RevokeAllSessionsUseCase } from '../src/modules/users/application/use-cases/revoke-all-sessions.use-case'
+
 import type { IUserSessionRepository } from '../src/modules/users/domain/repositories/user-session.repository'
 
 describe('RevokeAllSessionsUseCase', () => {

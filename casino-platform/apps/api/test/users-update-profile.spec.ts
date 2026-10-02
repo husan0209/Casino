@@ -5,6 +5,7 @@
  * date_of_birth парсится в Date (или остаётся undefined).
  */
 import { UpdateProfileUseCase } from '../src/modules/users/application/use-cases/update-profile.use-case'
+
 import type { IUserProfileRepository } from '../src/modules/users/domain/repositories/user-profile.repository'
 
 type UpdateArgs = {

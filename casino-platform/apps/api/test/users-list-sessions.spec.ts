@@ -5,6 +5,7 @@
  * без currentSessionId все сессии помечаются как чужие.
  */
 import { ListSessionsUseCase } from '../src/modules/users/application/use-cases/list-sessions.use-case'
+
 import type { IUserSessionRepository } from '../src/modules/users/domain/repositories/user-session.repository'
 
 function sessionRow(over: { id?: string; ipAddress?: string | null; userAgent?: string | null } = {}) {

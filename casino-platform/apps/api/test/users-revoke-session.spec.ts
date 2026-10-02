@@ -5,6 +5,7 @@
  * не принадлежащая юзеру, для него «не найдена» (revoke вернул false).
  */
 import { RevokeSessionUseCase } from '../src/modules/users/application/use-cases/revoke-session.use-case'
+
 import type { IUserSessionRepository } from '../src/modules/users/domain/repositories/user-session.repository'
 
 function makeDeps(over: { revokeResult?: boolean } = {}) {

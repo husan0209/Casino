@@ -12,6 +12,7 @@ import {
   SelfExclusionUseCase,
 } from '../src/modules/users/application/use-cases/self-exclusion.use-case'
 import { InvalidSelfExclusionPeriodError } from '../src/modules/users/domain/errors'
+
 import type { ResponsibleGamingHook } from '../src/common/ports/responsible-gaming-hook'
 import type {
   IUserSettingsRepository,
@@ -37,7 +38,9 @@ function makeDeps(over: { settings?: UserExclusionSettings | null; hookError?: E
   }
   const hook = {
     onSelfExclusion: async (userId: string) => {
-      if (over.hookError) throw over.hookError
+      if (over.hookError) {
+throw over.hookError
+}
       hookCalls.push(userId)
     },
   } as unknown as ResponsibleGamingHook

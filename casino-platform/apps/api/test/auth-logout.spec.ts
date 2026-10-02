@@ -16,7 +16,9 @@ function makeSessions(over: { revokeError?: Error } = {}) {
     },
     findByRefreshTokenHash: async () => null,
     revoke: async (id) => {
-      if (over.revokeError) throw over.revokeError
+      if (over.revokeError) {
+throw over.revokeError
+}
       revoked.push(id)
     },
     revokeAllUserSessions: async () => {},

@@ -4,6 +4,7 @@
  * Прокси: репозиторий получает валюту как есть, наружу отдаётся эхо.
  */
 import { UpdateCurrencyPreferenceUseCase } from '../src/modules/users/application/use-cases/update-currency-preference.use-case'
+
 import type { IUserProfileRepository } from '../src/modules/users/domain/repositories/user-profile.repository'
 
 describe('UpdateCurrencyPreferenceUseCase', () => {

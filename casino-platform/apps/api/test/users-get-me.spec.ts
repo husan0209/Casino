@@ -5,6 +5,7 @@
  */
 import { GetMeUseCase } from '../src/modules/users/application/use-cases/get-me.use-case'
 import { MeNotFoundError } from '../src/modules/users/domain/errors'
+
 import type { IUserProfileRepository, UserProfileFull } from '../src/modules/users/domain/repositories/user-profile.repository'
 
 function profile(): UserProfileFull {

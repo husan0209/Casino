@@ -5,6 +5,7 @@
  * snake_case → camelCase.
  */
 import { UpdateSettingsUseCase } from '../src/modules/users/application/use-cases/update-settings.use-case'
+
 import type { IUserProfileRepository } from '../src/modules/users/domain/repositories/user-profile.repository'
 
 type UpdateArgs = {
