@@ -38,9 +38,34 @@ export interface IGameCatalogRepository {
   ): Promise<Prisma.GameGetPayload<{ select: S }>[]>
   count(where: Prisma.GameWhereInput): Promise<number>
   incrementLaunchCount(id: string): Promise<void>
+  /**
+   * В3 (админ-контур): правка строки каталога. Форму `data` собирает
+   * application — репозиторий не знает ни про snake_case запроса, ни про
+   * правила «новые игры выключены».
+   */
+  updateGame(id: string, data: Prisma.GameUncheckedUpdateInput): Promise<void>
+  /** Создание игры (синхронизация каталога провайдера, UC-GAME-19). */
+  createGame(data: Prisma.GameUncheckedCreateInput): Promise<Game>
+  /** Игра провайдера по внешнему ID — вход upsert'а синхронизации. */
+  findByProviderAndExternalGameId(providerId: string, externalGameId: string): Promise<Game | null>
 }
 
 export const GAME_CATALOG_REPOSITORY = Symbol('GAME_CATALOG_REPOSITORY')
+
+/**
+ * Провайдеры игр: мутации админ-контура (В3) + чтение, которое нужно
+ * application-слою (в application prisma banned — guard G1).
+ * Read-only списки для витрины остаются в presentation по ADR GAP-51.
+ */
+export interface IGameProviderRepository {
+  findById(id: string): Promise<GameProvider | null>
+  /** Включить/выключить провайдера (endpoints enable/disable). */
+  setEnabled(id: string, isEnabled: boolean): Promise<void>
+  /** Актуальный счётчик игр каталога (пересчитывается после синхронизации). */
+  setGameCount(id: string, gameCount: number): Promise<void>
+}
+
+export const GAME_PROVIDER_REPOSITORY = Symbol('GAME_PROVIDER_REPOSITORY')
 
 export interface FavoriteWithGame {
   id: string
@@ -88,7 +113,9 @@ export interface IGameFavoritesRepository {
   countFavorites(userId: string): Promise<number>
   /** Последние уникальные игры игрока (distinct по gameId, только реальные сессии). */
   findRecentSessions(userId: string, take: number): Promise<RecentSessionRow[]>
-  findRoundsWithGame(args: RoundHistoryFilter & { skip: number; take: number }): Promise<RoundHistoryRow[]>
+  findRoundsWithGame(
+    args: RoundHistoryFilter & { skip: number; take: number },
+  ): Promise<RoundHistoryRow[]>
   countRounds(args: RoundHistoryFilter): Promise<number>
   /** Оборот/выигрыши по валютам в пределах того же фильтра. */
   roundStats(args: RoundHistoryFilter): Promise<RoundStatsRow[]>
@@ -113,7 +140,10 @@ export interface IGamePlayRepository {
     externalRoundId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<GameRow | null>
-  createRound(data: Prisma.GameRoundUncheckedCreateInput, tx?: Prisma.TransactionClient): Promise<GameRow>
+  createRound(
+    data: Prisma.GameRoundUncheckedCreateInput,
+    tx?: Prisma.TransactionClient,
+  ): Promise<GameRow>
   updateRound(
     id: string,
     data: Prisma.GameRoundUncheckedUpdateInput,
