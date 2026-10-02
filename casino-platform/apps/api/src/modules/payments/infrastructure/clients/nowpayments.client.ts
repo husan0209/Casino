@@ -152,6 +152,10 @@ export class NOWPaymentsClient implements INowPaymentsClient {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
         body: JSON.stringify({
+          // Контракт NOWPayments POST /v1/payment: price_amount — ЧИСЛО (не строка).
+          // MoneyAmount-правило не нарушается: в наше доменное поле деньги приходят
+          // строкой (params.priceAmount: string), провайдеру уходит число по его
+          // спецификации (docs/PAYMENT_OVERVIEW.md, решение В11).
           price_amount: Number(params.priceAmount),
           price_currency: params.priceCurrency.toLowerCase(),
           pay_currency: this.mapCurrency(params.payCurrency),
