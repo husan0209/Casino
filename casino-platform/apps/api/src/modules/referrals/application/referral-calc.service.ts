@@ -13,6 +13,17 @@ import {
   REFERRAL_REPOSITORY,
 } from '../domain/referral.repository'
 
+/**
+ * Сводка суточного прогона: `processed` — создан записей referralReward,
+ * `credited` — из них реально зачислено на кошелёк. Счётчики записей, а не
+ * деньги (AI_DEVELOPMENT_RULES §1), поэтому number законен.
+ */
+export interface ReferralDailyResult {
+  processed: number
+  credited: number
+  date: Date
+}
+
 @Injectable()
 export class ReferralCalcService {
   private logger = new Logger(ReferralCalcService.name)
@@ -22,7 +33,7 @@ export class ReferralCalcService {
     @Inject(REFERRAL_REPOSITORY) private readonly repo: IReferralRepository,
   ) {}
 
-  async runDaily(dateStr?: string): Promise<{ processed: number; credited: number; date: Date }> {
+  async runDaily(dateStr?: string): Promise<ReferralDailyResult> {
     const date = dateStr ? new Date(dateStr) : new Date(Date.now() - 86400000)
     const dayStart = new Date(date)
     dayStart.setUTCHours(0, 0, 0, 0)
