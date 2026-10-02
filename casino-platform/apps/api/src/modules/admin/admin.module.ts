@@ -1,5 +1,10 @@
 import { Module } from '@nestjs/common'
 
+import { PAYMENT_REQUEST_REPOSITORY } from '../payments/domain/payments.ports'
+import { PaymentRequestRepository } from '../payments/infrastructure/repositories/payment-request.repository'
+import { WalletModule } from '../wallet/wallet.module'
+import { AdminBroadcastService } from './application/admin-broadcast.service'
+import { AdminSettingsService } from './application/admin-settings.service'
 import { AdminUsersService } from './application/admin-users.service'
 import { AuditLogService } from './application/audit-log.service'
 import { DashboardService } from './application/dashboard.service'
@@ -8,24 +13,27 @@ import {
   AUDIT_LOG_REPOSITORY,
   DASHBOARD_REPOSITORY,
 } from './domain/admin.repository'
+import { ADMIN_BROADCAST_REPOSITORY, SYSTEM_SETTING_REPOSITORY } from './domain/system.repository'
 import { AdminFacade } from './facade/admin.facade'
 import { AdminAuthService } from './infrastructure/admin-jwt.service'
+import {
+  PrismaAdminBroadcastRepository,
+  PrismaSystemSettingRepository,
+} from './infrastructure/admin-system.prisma.repository'
 import {
   PrismaAdminUserRepository,
   PrismaAuditLogRepository,
   PrismaDashboardRepository,
 } from './infrastructure/repositories/admin.prisma.repository'
 import { AdminAuthGuard } from './presentation/admin-auth.guard'
-import { PAYMENT_REQUEST_REPOSITORY } from '../payments/domain/payments.ports'
-import { WalletModule } from '../wallet/wallet.module'
 import { AdminAdminsController } from './presentation/controllers/admin-admins.controller'
 import { AdminAuditController } from './presentation/controllers/admin-audit.controller'
 import { AdminAuthController } from './presentation/controllers/admin-auth.controller'
 import { AdminDashboardController } from './presentation/controllers/admin-dashboard.controller'
 import { AdminFinanceController } from './presentation/controllers/admin-finance.controller'
+import { AdminNotificationsController } from './presentation/controllers/admin-notifications.controller'
+import { AdminSettingsController } from './presentation/controllers/admin-settings.controller'
 import { AdminUsersController } from './presentation/controllers/admin-users.controller'
-import { PaymentRequestRepository } from '../payments/infrastructure/repositories/payment-request.repository'
-
 
 @Module({
   imports: [WalletModule],
@@ -36,6 +44,8 @@ import { PaymentRequestRepository } from '../payments/infrastructure/repositorie
     AdminAdminsController,
     AdminFinanceController,
     AdminDashboardController,
+    AdminSettingsController,
+    AdminNotificationsController,
   ],
   providers: [
     AdminAuthService,
@@ -45,10 +55,20 @@ import { PaymentRequestRepository } from '../payments/infrastructure/repositorie
     // Порт payments-домена: admin-finance инжектит IPaymentRequestRepository (В3)
     { provide: PAYMENT_REQUEST_REPOSITORY, useClass: PaymentRequestRepository },
     { provide: DASHBOARD_REPOSITORY, useClass: PrismaDashboardRepository },
+    // Настройки/шаблоны и массовая рассылка (В3). До этого коммита сервисы и
+    // порты были объявлены, но не подключены: Nest не резолвил
+    // SYSTEM_SETTING_REPOSITORY / ADMIN_BROADCAST_REPOSITORY, а оба
+    // контроллера не стояли в controllers — /admin/settings и
+    // /admin/notifications/send отдавали 404, хотя apps/admin дергает их
+    // (dashboard/settings/page.tsx).
+    { provide: SYSTEM_SETTING_REPOSITORY, useClass: PrismaSystemSettingRepository },
+    { provide: ADMIN_BROADCAST_REPOSITORY, useClass: PrismaAdminBroadcastRepository },
     AuditLogService,
     AdminFacade,
     AdminUsersService,
     DashboardService,
+    AdminSettingsService,
+    AdminBroadcastService,
     PaymentRequestRepository,
   ],
   // AdminAuthService экспортируем вместе с AdminAuthGuard: guard инжектит его,
