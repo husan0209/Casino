@@ -1,561 +1,1309 @@
-# Implementation Gaps — честный аудит ТЗ vs код
-
-> Дата аудита: 2026-08-23, ревизия 2026-08-24. Цель: зафиксировать расхождения между ТЗ (`docs/tz-part-*.md`) и фактическим кодом.
-> Последняя ревизия: **2026-10-01 (вечер) — GAP-60 ЗАКРЫТ (п.3 «хрупкость и гигиена»): docker-build собирает все три прод-образа и на PR, и на main — и первым же прогоном нашёл, что образы web/admin не собирались ни разу (в контекст не попадали корневой `.eslintrc.js` и `.npmrc`: 129 parsing-ошибок + изолированная `decimal.js`); Inter самохостын (@fontsource-variable/inter) — сборка web не зависит от Google Fonts; базлайны техдолга и аудита ужаты (реестр пересчитан); QA_CHECKLIST пересчитан; GAP-29 переоткрыт-и-закрыт по-настоящему — детектор D3 врал (искал ключи на двух пробелах вместо четырёх) и объявлял невалидированными все 99 переменных при 98 покрытых; остаток 6 переменных добавлен, регрессия закрыта спеком паритета**. Ранее: 2026-10-01 — GAP-59 ЗАКРЫТ (полная проверка проекта): прод-compose не передавал build-arg NEXT_PUBLIC_API_URL сервису admin — бандл админки запекал домен-плейсхолдер и на реальном домене уходил на чужой хост (фикс + новый guard G23); 5 спеков affiliate были продублированы в двух каталогах и гонялись дважды (168 вместо 236 тестов, вся сумма зелёная); счётчики тестов в README сведены с фактом**. Ранее: 2026-09-27 (поздний вечер) — GAP-58 ЗАКРЫТ: аудит контрактов фронт↔API (~40 эндпоинтов) — починены сломанные листинги всей админки, «успешный» админ-логин с HTTP 200 при неверном пароле, тихая порча user в hydrate, невидимый rejectionReason на /kyc, мёртвый тип /referrals/list (строка ниже)**. Ранее: **2026-09-27 (вечер) — GAP-47 ПРОГОН ВЫПОЛНЕН (k6, локальный Docker-стенд, отчёт `docs/archive/load-test-2026-09-27.md`): деньги целы (баланс сходится копейка в копейку, double-spend нет), но 3 retry не покрывают профиль «100 VU на одного игрока» → найден GAP-57 (часть починена в том же PR, выбор механизма сериализации — за владельцем)**. Ранее: **2026-09-27 — GAP-56 ЗАКРЫТ: преддеплойный дрейф инфраструктуры — 9 дефектов compose/nginx/scripts/env-док, каждый из которых уронил бы первый деплой (строка ниже)**. Предыдущая: 2026-09-16 — GAP-55 ЗАКРЫТ ЦЕЛИКОМ: все остатки ТЗ ч.5 (а)–(з) закрыты PR #83–88 (строка ниже), счётчики тестов сведены (api 203 unit/integration + 9 E2E, web 157, admin 6 — прогон локально); живая проверка капчи (siteverify + виджет) — в GAP-46. Ещё ранее: 2026-09-03 — GAP-39 ЗАКРЫТ ПОЛНОСТЬЮ (PR #36–55, stages 1–10): 0 warnings repo-wide — api 1171→**0**, web ~680→**0**, admin ~530→**0** (`eslint src --ext .ts` / `next lint` чисты; `no-explicit-any: error` во всех трёх apps; CI main зелёный: lint/typecheck/test 117+E2E 9/build/deploy)**; аудит #2 GAP-39…GAP-50 от 2026-09-02 (после закрытия GAP-31…38
-> задан вопрос «проект готов?»: код MVP готов, приёмка — нет). GAP-31…38 и GAP-30 закрыты 2026-09-02.
-> Этот файл — точка правды по статусу. Не отмечать пункт «готов», пока не работает end-to-end.
-
-## 🔴 CRITICAL — блокеры (API не собирается)
-
-### GAP-01. ✅ ИСПРАВЛЕНО 2026-08-23 — модуль auth достроен
-
-Восстановлены отсутствующие файлы по контрактам существующих use-case'ов:
-
-- `domain/errors.ts` — AppError-классы (INVALID_CREDENTIALS, EMAIL_NOT_VERIFIED, TOKEN__, SESSION__ …)
-- `domain/entities/user.entity.ts`, `domain/repositories/{user,session,auth-provider,verification-token}.repository.ts` (+ index barrel)
-- `infrastructure/services/password-hasher.service.ts` (argon2id), `jwt.service.ts` (HS256 на node:crypto — jsonwebtoken недоступен в оффлайн-store), `email-queue.service.ts` (dev=лог со ссылкой, prod без SMTP_HOST=fail-closed EmailNotConfiguredError)
-- `infrastructure/repositories/*.prisma.ts` ×4
-- `application/use-cases/register.use-case.ts` (уникальность email, реферальный код 8 симв. UC-REF-01/02, verification-токен 24ч)
-- Попутно починен `admin/infrastructure/admin-jwt.service.ts` (импортировал отсутствующий jsonwebtoken → HS256 на crypto)
-- **Проверка:** `tsc --noEmit` для @casino/api — 0 ошибок. Runtime-проверка (реальный регистр/логин) требует БД+Redis — не выполнялась в этой среде.
-  Также исправлены попутные пре-существующие баги сборки: битый путь импорта zod-validation.pipe в auth.controller (`../../../`→`../../../../`), тип meta в shared-types ApiSuccessResponse (+PaginationMeta), ~25 strict-mode ошибок TS7006/7031/6133 в старых модулях, ambient-типы multer (см. Environment).
-
-### GAP-02. ✅ ИСПРАВЛЕНО 2026-08-23 — BullMQ-инфраструктура реализована
-
-`apps/api/src/queues/`:
-
-- `queue.types.ts` — `EMAIL_QUEUE_PORT`, `EmailJobData`, `EnqueueResult`
-- `infrastructure/email.queue.ts` — продюсер `BullMqEmailQueue` (attempts 5, backoff exp 5s, removeOnComplete/Fail) + fallback `DevLogEmailQueue`
-- `infrastructure/smtp.mailer.ts` — `MAILER_PORT`: `SmtpMailer` (nodemailer ленивым require — optional peer) / `DevLogMailer`; в production без `SMTP_HOST` приложение не стартует (fail-closed)
-- `application/email.worker.ts` — консьюмер очереди `email` (тот же процесс, MVP), проставляет `notifications.sentAt`
-- Подключены producers: auth (`EmailQueueService` → verify/reset письма с HTML), notifications (UC-NOTIF-01, проверка `user_settings.notificationsEmail`)
-- env: добавлены опциональные `SMTP_PORT/SMTP_USER/SMTP_PASS`
-- **Проверка:** tsc 0 ошибок. Runtime (реальная отправка) требует Redis+SMTP на Linux-FS среде.
-- Rich HTML-шаблоны — ✅ закрыто 2026-09-27 (ветка `feat/email-html-templates`): `apps/api/src/queues/templates/index.ts` — брендированный 600px table-layout (inline-стили, без внешних CSS/картинок/шрифтов) + билдеры всех 4 писем (email-верификация, сброс пароля, withdrawal-reminder, generic notification из notifications) с сохранённым дословно plain-text fallback; продюсеры (auth/notifications/maintenance) передают `html` в очередь, SmtpMailer отдаёт его в nodemailer. Спек: `apps/api/test/email-html-templates.spec.ts`. Старый стаб `modules/notifications/templates/index.ts` (plain text, нигде не импортируется) не тронут.
-- Вынос воркера в отдельный процесс — ✅ закрыто 2026-09-27 (ветка `feat/email-worker-process`, пристроена поверх `feat/email-html-templates`): консьюмер очереди `email` управляется env-флагом `EMAIL_WORKER_IN_PROCESS` (дефолт `true` — в процессе API, dev-удобство; `false` — API только ставит письма в очередь); новый entrypoint `apps/api/src/worker.ts` — Nest ApplicationContext без HTTP (ConfigModule + pino + QueuesModule; Prisma — напрямую через @casino/database), SIGTERM → `worker.close()` (grace 45s); сервис `worker` в `docker-compose.prod.yml` — тот же образ, что api (`node apps/api/dist/worker.js`, флаг `true`, без healthcheck — от него никто не зависит), у api флаг `false`. Maintenance-воркер (GAP-33) остался в процессе API — сознательно, вне скоупа.
-
-## 🟠 HIGH — фичи заявлены, но не работают
-
-| #      | Gap                                                                                    | Где                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | TZ                                                                                                                                                                                                                                                       |
-| ------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GAP-03 | ~~Google OAuth — заглушка~~                                                            | ✅ Реализовано 2026-08-24: authorization-code flow (`GET /auth/google/url` со state=HMAC 10 мин; `POST /auth/google` — обмен кода, userinfo, провижининг через `OAuthUserProvisioningService`, сессия+refresh-cookie). Требует `GOOGLE_CLIENT_ID/SECRET`. Runtime не проверялся (нет сети/ключей в среде)                                                                                                                                                                                                                    |
-| GAP-04 | ~~Telegram Login — заглушка~~                                                          | ✅ Реализовано 2026-08-24: `POST /auth/telegram` — верификация виджета (secret=SHA256(bot_token), HMAC data-check-string, timingSafeEqual, auth_date ≤24ч), пользователь без email (schema nullable), сессия. Требует `TELEGRAM_BOT_TOKEN`                                                                                                                                                                                                                                                                                   |
-| GAP-05 | ~~Email-отправка отсутствует~~                                                         | ✅ Закрыт вместе с GAP-02: очередь+воркер+SmtpMailer; в prod без SMTP_HOST — старт невозможен (fail-closed)                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| GAP-06 | ~~Rukassa createPayment — заглушка~~                                                   | ✅ Реализовано 2026-08-24: реальный HTTP (`POST {RUKASSA_API_BASE                                                                                                                                                                                                                                                                                                                                                                                                                                                            | pay.rukassa.is}/api/v1/order/create`, заголовки shop_id/api_key, timeout 30с), getPaymentStatus; dev без ключей — лог-стаб. Верификация вебхука HMAC-SHA256 активна в prod (раньше кидала NOT_IMPLEMENTED). Runtime — нужны боевые ключи                 |
-| GAP-07 | ~~NOWPayments — стабы~~                                                                | ✅ Реализовано 2026-08-24: `POST /v1/payment` (x-api-key), `/estimate`, `/payment/{id}`; курсы больше не хардкод при наличии ключа; IPN HMAC-SHA512 активен в prod. Env: `NOWPAYMENTS_API_BASE`. Runtime — нужен NOWPAYMENTS_API_KEY                                                                                                                                                                                                                                                                                         |
-| GAP-08 | ~~Только DemoProvider~~                                                                | ✅ Код готов 2026-08-24: адаптер **GitSlotPark** (`gitslotpark.adapter.ts`) — агрегатор Pragmatic Play/PG Soft/Amatic/Amusnet (один seamless-протокол на 4 бренда). userAuth/gamelist + callback-операции GetBalance/Withdraw/Deposit/BetWin/Rollback с HMAC-SHA256-sign, маршруты `/provider-callback/gitslotpark/{Op}`. ⚠️ До продакшена: сверить порядки конкатенации sign по каждой операции с менеджером GSP; связка `userID→сессия` в GameCallbackService и атомарность BetWin — проверить runtime с тестовыми ключами |
-| GAP-09 | ~~Admin sync-games — заглушка~~                                                        | ✅ Реализовано 2026-08-24: `syncGames` вызывает `adapter.fetchGameList()`, upsert по `[providerId, externalGameId]`, slug = name+md5-суффикс, обновляет rtp/thumbnail/hasDemo/metadata, пересчитывает gameCount; новые игры создаются выключенными (UC-GAME-19). Кнопка «Синхронизировать» в UI админки уже показывает результат                                                                                                                                                                                             |
-| GAP-10 | ~~Frontend админки — заглушки~~                                                        | ✅ Исправлено 2026-08-23: реальный UI на 13 страницах (`apps/admin/src`): логин c JWT (zustand persist), guard-layout, дашборд на живых metrics/charts/events + Recharts, users (block/unblock), transactions, payments, withdrawals (single+batch approve/reject), KYC (approve/reject/resubmit), games/providers (toggle/sync), support (диалог+внутр.заметки+приоритет+close), referrals (stats), audit, admins (superadmin CRUD), settings. `tsc -p apps/admin` = 0                                                      |
-| GAP-11 | ~~Нет API метрик дашборда~~                                                            | ✅ Исправлено 2026-08-23: `admin/application/dashboard.service.ts` + `AdminDashboardController` (`/admin/dashboard/metrics\|charts\|events`), raw SQL по date_trunc, деньги string. Runtime — нужна БД (prisma generate)                                                                                                                                                                                                                                                                                                     |
-| GAP-12 | ~~Нет batch approve/reject~~                                                           | ✅ Исправлено 2026-08-23: `POST /admin/withdrawals/batch-approve\|batch-reject`, независимая обработка каждой заявки + audit-log сводки; single-эндпоинты рефакторнуты на общие helpers + `WithdrawalInvalidStatusError`(AppError)                                                                                                                                                                                                                                                                                           |
-| GAP-13 | ~~Referral rewards помечаются `credited` без реального зачисления через WalletFacade~~ | `referrals/application/referral-calc.service.ts:56-60`                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | UC-REF-03 шаг 5 — ⚠️ **частично**: само зачисление реальное (`walletFacade.credit`, тип `REFERRAL_REWARD`, ключ `ref_reward_<id>`), **но метод `runDaily` никто не вызывает** → деньги всё равно не движутся. Перенесено в **GAP-32** (аудит 2026-09-01) |
-
-## 🛡 АУДИТ 2026-08-25 → открытые пункты (ревизия 2026-08-28)
-
-> Полный снимок аудита с ревизией каждого пункта: **`docs/archive/audit-2026-08-25.md`**.
-> Из 30 пунктов аудита **17 исправлены** (список в снимке), открытые — перенесены сюда:
-
-| #          | Audit ID            | Что                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Где                                                                              | Приоритет                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GAP-18     | N2                  | ~~Account lockout после N неудачных логинов (SECURITY_BASELINE §2.3: 10 за 15 мин → блок 30 мин)~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `auth/application/use-cases/login.use-case.ts`                                   | ✅ P1 закрыт 2026-08-30: поля `failed_login_attempts/last_failed_at/locked_until` (миграция `20260830_account_lockout.sql` — применить при деплое); 10 неудач/15 мин → блок 30 мин; enumeration-safe (неверный пароль → всегда INVALID_CREDENTIALS, лок виден только при верном); уже заблокированный аккаунт не продлевается (DoS-защита); юнит-тесты `test/account-lockout.spec.ts`. Env: `LOCKOUT_MAX_ATTEMPTS/WINDOW_MS/DURATION_MS`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| GAP-19     | N3                  | ~~ThrottlerModule (app-level rate limit)~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | `app.module.ts`, `apps/api/package.json`                                         | ✅ P0 закрыт 2026-08-30: `@nestjs/throttler` v6, глобальный `ThrottlerGuard` (APP_GUARD) 120 req/мин на IP; `/auth/*` строже — `@Throttle` 10/мин; webhook'и провайдеров и game-callback — `@SkipThrottle()` (у них HMAC). Исключение 2026-09-29: `/auth/refresh` — свой лимит 30/мин (`THROTTLE_REFRESH_LIMIT`), т.к. это зонд сессии при каждой загрузке страницы (P1 #11) и классовый AUTH-лимит давил легитимные сессии (NAT/офис; в проде внешним ограничителем остаётся nginx `api_auth 10r/m`). Env: `THROTTLE_TTL_MS`, `THROTTLE_GLOBAL_LIMIT`, `THROTTLE_AUTH_LIMIT`, `THROTTLE_REFRESH_LIMIT`                                                                                                                                                                                                                                                                                                                                                                           |
-| GAP-20     | N4                  | ~~helmet() middleware~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `main.ts`, `apps/api/package.json`                                               | ✅ P0 закрыт 2026-08-30: `app.use(helmet())` в bootstrap до парсеров; API отдаёт только JSON → дефолтный CSP безопасен, `frame-ancestors 'none'` против clickjacking                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| GAP-21     | N8, N9, C3          | ~~Zod-валидация на всех `@Body` inputs~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `apps/api/src/modules/*/presentation/controllers/`                               | ✅ P1 закрыт 2026-08-30: `@UsePipes(new ZodValidationPipe(Schema))` на всех клиентских `@Body` (auth incl. google/telegram, users profile/settings/self-exclude, casino launch/demo, kyc submit/documents, support + support-admin, все admin-контроллеры incl. finance credit/debit/batch). Новые DTO-схемы по модулям; неизвестные ключи вырезаются (anti mass-assignment). **Exempt (задокументировано в коде):** `payments-webhook` и `provider-callback` — payload'ы провайдеров под HMAC, жёсткая схема отбила бы валидные коллбэки                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| GAP-22     | A1, C5, C6          | ~~Wallet-модуль: вынести lock/unlock/confirmWithdrawal в `application/use-cases/` (4-слойка);~~ ~~убрать `toMoney(n: any)`~~; ~~разбить `runCreditDebit`~~. **2026-08-30: G1-часть закрыта** — репозитории извлечены для casino, notifications, referrals, users, admin; **2026-08-31: типизация закрыта** — `toMoney` без any; tx-клиенты `Prisma.TransactionClient`; `CreditInput.type: LedgerEntryType` (поймал реальный баг lowercase-типа); 0 `as any`. **2026-08-31: 4-слойка закрыта** — `LockFundsUseCase`/`UnlockFundsUseCase`/`ConfirmWithdrawalUseCase` в `application/use-cases/` (WalletFacade делегирует, внешний API прежний); `runCreditDebit` разбит (`getOrCreateWallet` + `applyCreditDebit`); NOTE-компромисс устранён | `modules/wallet/`                                                                | ✅ P2                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| GAP-23     | H6                  | ~~Pino + redact вместо Nest Logger (пароли/токены могут попасть в логи)~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `apps/api/src/common/logger/logger.options.ts`                                   | ✅ P1 закрыт 2026-08-30: `nestjs-pino` + pino-http по всему Nest (`useLogger`); redact-пути `password/token/authorization/cookie/set-cookie` на 3 уровнях вложенности + `req.body.*`; кастомный req-сериализатор (body в логах — но с redact); `GlobalExceptionFilter` больше не логирует `err` целиком (только type/message/stack через PinoLogger); корреляция request-id между pino и RequestIdMiddleware через общий `resolveRequestId`; env `LOG_LEVEL`/`LOG_FORMAT` подключены (pretty в dev, json в prod). Тесты `test/logger-redact.spec.ts` — секреты физически отсутствуют в выводе лога                                                                                                                                                                                                                                                                                                                                                                                |
-| GAP-24     | A5, A6              | ~~Покрытие тестами: минимум — money flow + idempotency~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | `apps/api`                                                                       | ✅ P2 закрыт 2026-08-31: `money-flow.spec.ts` (11), `ledger.integration.spec.ts` (6 на реальном Postgres, в CI `prisma db push` + `LEDGER_INTEGRATION=1` — откат tx при сбое и idempotency проверены на Serializable-БД), `nowpayments-ipn.spec.ts` (13), `kyc-file-sniffer.spec.ts` (8), `account-lockout.spec.ts` (5), `logger-redact.spec.ts` (3), **E2E (GAP-05) — `player-lifecycle.e2e.spec.ts` (9, CI-шаг с собранным сервером)**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| GAP-25     | A7                  | ~~Довести ESLint до обещанного в QUALITY_GATES §2.1: `max-params` warn(4)→error(3), `complexity` warn(10)→error(10)~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `.eslintrc.js:70,74`                                                             | ✅ P2 закрыт 2026-09-01: пороги подняты, разобраны **45 `max-params` + 13 `complexity`** в `apps/api/src` (0 errors). Бизнес-методы переведены на input-объекты вместе с вызовами (`wallet` lock/unlock/confirm → `WithdrawalOpArgs`, `kyc.setStatus`, `support` createTicket/listUserTickets/addMessage, `referrals` sumTransactions/findReward/processUserRewards, `casino` findRoundsWithGame/findOrCreateRound/creditWin, `notifications.list`, `payment-request.listUser`, `favorites.history`, webhook `execute` → `Process*WebhookInput`); complexity — на приватные методы/таблицы (`sniffDocumentMime`, `GlobalExceptionFilter`, `syncGames`, `provider-callback.handle`, GitSlotPark verify/parse, Rukassa/NOWPayments webhook). Исключения только framework-imposed и описаны: `overrides` `max-params: off` для `**/*.controller.ts` + `src/main.ts` (сигнатуру задают декораторы/express-verify) и inline-disable для 10 DI-конструкторов — см. QUALITY_GATES §2.1.1 |
-| GAP-26     | C4                  | ~~Относительные импорты `../../../../` → path aliases~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `apps/api/src/modules/**`                                                        | ✅ P3 закрыт 2026-09-01: **72 импорта** (все с ≥3 `../`) переведены на `@modules/<mod>/…` (кросс-модульные) и `@/<seg>/…` (общий код); внутримодульные `../` оставлены. Рантайм-резолвер не понадобился: `build` = `nest build && tsc-alias -p tsconfig.build.json` — алиасы переписываются в относительные пути в `dist`, `node dist/main.js` (prod/Docker) работает без `tsconfig-paths`. `baseUrl`+`paths` объявлены в `apps/api/tsconfig.json` (иначе `pnpm typecheck` резолвил `./src/*` от `packages/tsconfig`); алиасы продублированы в `vitest.config.ts`. Доказательство рантайма — CI-шаг E2E (`pnpm build` → `node apps/api/dist/main.js` → 9/9). Правила — CONVENTIONS §3.1                                                                                                                                                                                                                                                                                           |
-| GAP-27     | NEW                 | ~~argon2 без явных параметров~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | `password-hasher.service.ts:7`                                                   | ✅ P1 закрыт 2026-08-30: `PasswordHasher.hash` → `argon2.hash(plain, {type: argon2id, memoryCost: 65536, timeCost: 3, parallelism: 4})` (совпадает с SECURITY_BASELINE §2.1 и admin-хэшером `admin-users.service.ts:28`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| GAP-28     | H4                  | ~~Идемпотентность депозита: `deposit_${pr.id}` — добавить защиту и по `external_id`~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `process-rukassa-webhook.use-case.ts`, `process-nowpayments-webhook.use-case.ts` | ✅ P3 закрыт 2026-09-01: ключ проводки депозита — **`deposit_${provider}_${externalId}`** (был `deposit_${pr.id}`, который защищал только уникальность НАШЕЙ платёжки). Повторный коллбэк по тому же внешнему платежу, смэпившийся на другую платёжку (рассинхрон маппинга), больше не зачислит дважды — уникальный индекс `ledger.idempotencyKey` отсекает на уровне БД. Первый уровень защиты сохранён: `pr.status === 'completed'` → `duplicate` до wallet.credit. Регресс-тесты `test/deposit-idempotency.spec.ts` (4): NP/Rukassa — ключ от external_id, повторная доставка той же платёжки — без credit, отсутствие external_id — без зачисления                                                                                                                                                                                                                                                                                                                            |
-| GAP-29     | NEW (docs-guard D3) | ~~env.validation.ts валидирует не все ключи `.env.example`~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `packages/shared-config/src/env.validation.ts`                                   | ✅ Закрыт 2026-08-30: все 39 ключей §22 в Zod-схеме (coerce/url/enum, все optional — поведение кода не меняется); D3 молчит                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ~~GAP-30~~ | NEW (PR-0)          | 14 методов 61–88 строк (prettier-инфляция после `--fix`): `game-callback.service` bet/win/rollback, `dashboard.service` metrics/events, `wallet.ledger.prisma` runCreditDebit/lock/unlock/confirmWithdrawal, `list-games.use-case` execute, webhook execute ×2, `provider-callback.controller` handle — разбить на приватные методы, вернуть лимит 60. Делать вместе с тестами (GAP-21/24)                                                                                                                                                                                                                                                                                                                                                 | перечисленные файлы                                                              | P3                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | — ✅ закрыт 2026-09-02: max-lines-per-function 90→60 (попутно max-params-фикс в applyRollback — entry-объект вместо 7 параметров); рефакторинг wallet.ledger.prisma.ts (общие existingDuplicate/withRetry/findWalletOrThrow/ledgerEntry, методы lock/unlock/confirmWithdrawal ≤60) и game-callback.service.ts (applyRollback вынесен из rollback). Все гейты зелёные |
-
-## 🔎 АУДИТ ГОТОВНОСТИ К ЗАПУСКУ — 2026-09-01 (GAP-31…GAP-38)
-
-> Повод: после закрытия P0/P1/P2-трекера и зеленого CI задан вопрос «проект готов?».
-> Аудит сравнивал **фактический код** с ТЗ ч.3 §13, ч.7 §10/§12 и `docs/QA_CHECKLIST.md`.
-> Найдено 8 расхождений, из них 2 — блокеры запуска.
->
-> **Формат обязателен для исполнителя (в т.ч. другого AI-агента):** пункт закрывается
-> только при выполнении «Критерия приёмки» целиком. Отметка «готово» без критерия —
-> причина, по которой GAP-13 полгода числился закрытым при неработающем начислении.
-> Правило INDEX.md §6.3: закрыл код → обнови этот файл в том же PR.
-
-| #      | Что не работает                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Где                                                                                                    | Приоритет                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Критерий приёмки                                                                                                                                                                                                                                                                                                                                                              |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GAP-31 | ~~**Нет Prisma-миграций.**~~ **✅ P0 закрыт 2026-09-02.** Baseline-миграция migrations/0_init/migration.sql (774 строки, 27 CREATE TABLE, все enum/индексы/FK) сгенерирована prisma migrate diff --from-empty из schema.prisma — покрывает и три historical manual/*.sql (поля last_payment_method, self_excluded_until, account_lockout включены; manual-скрипты перенесены в docs/archive/manual-migrations/ — Prisma считает каждый подкаталог migrations/ миграцией и без migration.sql падает P3015; ходовой кейс пойман CI). migration_lock.toml: postgresql. В CI db push заменён на prisma migrate deploy + дрейф-детектор (migrate diff --from-schema-datasource --to-schema-datamodel с непустым выводом = падение джобы). Примечание: на БД, созданных ДО введения миграций, один раз выполнить migrate resolve --applied 0_init (см. migrations/manual/README.md). Для применимости в проде: schema-engine не запускается на Android/Termux — генерация выполнена одноразовым workflow на ubuntu-раннере (артефакт), workflow удалён из ветки до мержа | `packages/database/prisma/`, `infra/scripts/deploy.sh`                                                 | ~~P0~~ ✅ закрыт                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Критерии: 1) ✅ baseline покрывает 27 моделей + 3 manual; 2) — проверяется в CI этого PR: пустой Postgres → migrate deploy создаёт схему; 3) ✅ дрейф-детектор встроен в CI (шаг Verify no schema drift, пустой вывод = ок); 4) ✅ manual/ перенесён в docs/archive/manual-migrations/ (README с историей и инструкцией resolve); 5) ✅ ci.yml: migrate deploy вместо db push |
-| GAP-32 | ~~**Реферальные начисления не происходят никогда.**~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | ~~`referrals/application/referral-calc.service.ts`~~                                                   | ✅ P0 закрыт 2026-09-02: 1) cron-job `referral-daily` (maintenance-очередь, `JOB_REFERRAL_DAILY_EVERY_MS`, дедуп внутри runDaily) **и** ручной `POST /admin/referrals/run-daily` (user-JWT `@Roles('superadmin')`, Zod-схема, audit-log `referrals.run_daily`); 2) интеграционный тест на реальной БД `test/referral-payout.integration.spec.ts` (LEDGER_INTEGRATION=1): GGR 80 → проводка `REFERRAL_REWARD` суммы 4.00 (5%), `idempotencyKey=ref_reward_<id>`, статус `credited`; 3) повторный запуск за тот же день — credited=0, вторых проводок нет; 4) win>bet → `zero`, проводок нет. Попутный фикс: RolesGuard читал метаданные только с хендлера — class-level `@Roles` на admin-контроллерах игнорировался (любой user проходил); теперь getAllAndOverride([handler, class]) + `test/roles-guard.spec.ts`                                                                                                                                                                                                                                                                                                                             |
-| GAP-33 | ~~**Ни одного scheduled job.**~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | ~~`queues/queue.types.ts`~~                                                                            | ✅ P1 закрыт 2026-09-02: BullMQ **Job Schedulers** (`upsertJobScheduler`, очередь `maintenance`, `apps/api/src/queues/infrastructure/maintenance.scheduler.ts` + воркер `modules/maintenance/infrastructure/maintenance.worker.ts`) — 4 repeatable-job'ы с интервалами из env `JOB_*_EVERY_MS`: `expire-deposits` (5 мин; крипто по `expires_at`, фиат по 2ч; условный updateMany — гонка с вебхуком не затирает `completed`), `update-rates` (5 мин; NOWPayments /estimate → `exchange_rates` + Redis TTL 5 мин; фиат — константы `source='static'`), `withdrawal-reminder` (1ч; email активным admin_users + audit_log, дедуп 24ч), `referral-daily` (24ч). Юнит-тесты всех задач — `test/maintenance-jobs.spec.ts`; документировано в `.env.example` + ENVIRONMENT_VARIABLES §2/§22 (D3 ✅). **Отклонение критерия 3 (документировано):** `notifications` имеет FK на `users` (админы — в `admin_users`) → уведомление админам = email через EMAIL_QUEUE_PORT + запись в `audit_logs`, дедуп по audit-записи. Без Redis / NODE_ENV=test — no-op (как EmailWorker). Потребителей курсов переключит GAP-34 (таблица и кеш уже пишутся job'ой) |
-| GAP-34 | ~~**Курсы валют захардкожены.**~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | ~~`packages/shared-config/src/geo.config.ts`, `apps/api/src/modules/geo/domain/geo-config.policy.ts`~~ | ✅ P1 закрыт 2026-09-02: потребители переключены на БД/кеш. `ExchangeRatesService` (`modules/geo/application/exchange-rates.service.ts`): приоритет Redis-кеш `exchange_rates:rub` → последняя запись `exchange_rates` (по `currencyFrom/currencyTo='RUB'`, `fetchedAt desc`) → fallback `DISPLAY_RUB_RATES`; курс старше 1ч (`RATE_STALE_AFTER_MS`) — warn, запрос не роняем; сбой источника — fallback static, не 500. `PrismaExchangeRatesReader` — Redis lazy + БД. `GeoFacade.convertRubToDisplay` стал async (единственный потребитель — KYC get-status, обновлён); фиатные депозиты (`toRubEquivalent`) намеренно остались на политических константах — это расчёт amountRub для KYC-лимита, не display-конвертация. `convertRubToDisplayAmount` принял параметр `rateOverride`. Тесты: `test/exchange-rates.spec.ts` (приоритет кеш/БД/fallback, stale, RUB-шорткат, форматирование с override). Остаток: админ-отчётность GGR в валютах — читает те же константы в аналитике (вне изначального критерия, приоритет P3)                                                                                                                |
-| GAP-35 | ~~**Health-эндпоинты фиктивные.**~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | ~~`apps/api/src/modules/health/presentation/health.controller.ts`, `docker-compose.prod.yml`~~         | ✅ P1 закрыт 2026-09-02: `/health/ready` — `SELECT 1` к БД (недоступна → **503 fail-closed**) + `PING` Redis (недоступен → 200 `degraded:true` — деградация очередей, не отказ API, проверка полного connect+auth цикла); healthcheck в docker-compose.prod.yml переведён на `/health/ready`; liveness не тронут (не зависит от внешних сервисов). `/health/details` сознательно не заводился (сервисы и счётчики видны в логах/метриках; отдельный admin-эндпоинт — при появлении потребности). Тесты: `test/health-ready.spec.ts` (db fail → 503, redis fail → degraded, без REDIS_URL → degraded без коннекта, liveness статический). E2E-`wait-on` теперь честный — упадёт при мёртвой БД                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| GAP-36 | ~~**KYC-лимит не виден игроку**~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | ~~`apps/web/src/app/kyc/page.tsx`~~                                                                    | ✅ P2 закрыт 2026-09-02: страница KYC показывает остаток лимита **из API** (`getKycStatus` из нового `src/lib/api/kyc.api.ts`, поля `limit_remaining`/`limit_currency`/`deposit_limit_rub`; типизированный `KycStatus` вместо `any`) + при исчерпании — красный блок с CTA «Пройти верификацию» (анкор на форму, без ошибки 422 после отправки); DepositSheet показывает остаток в валюте шита и при исчерпании лимита меняет CTA на «Лимит исчерпан — пройти верификацию» → роут на /kyc (критерий 2: до отправки формы, а не 422 после); пересчёта на клиенте нет (критерий 3). Статус approved — лимит снят. tsc/eslint ✅                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| GAP-37 | ~~**Дрейф деплой-документации**~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | ~~`docs/DEPLOY.md`, `infra/scripts/`~~                                                                 | ✅ P3 закрыт 2026-09-02: DEPLOY.md переписан под фактический пайплайн (единый ci.yml, deploy-job после 4 чеков, deploy-skip без VPS-секретов, migrate deploy на деплое); `infra/scripts/resource-check.sh` добавлен по образцу ТЗ ч.7 §12.3 (CPU 85%/RAM 90%/disk 85% + проба /health/ready, cron */5); в ТЗ-эскизе deploy.yml — пометка «в репо не существует, фактический пайплайн — DEPLOY.md»; заодно в Monitoring DEPLOY.md — честный readiness (GAP-35) и ресурс-скрипт                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| GAP-38 | ~~**На чистом проде некому войти в админку**~~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | ~~`packages/database/src/seed.ts`, `docs/DEPLOY.md`~~                                                  | ✅ P2 закрыт 2026-09-02: seed fail-closed при NODE_ENV=production — отказ без SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD и при дефолтном dev-пароле (exit 1 до обращения к БД); DEPLOY.md — раздел «Первичная инициализация админа» с обязательными переменными и предупреждением; повторный запуск идемпотентен (upsert по email, был); SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD уже были в .env.example (§ Bootstrap) + ENVIRONMENT_VARIABLES §15/§22 — D3-парити ✅. Guard вынесен в чистый модуль packages/database/src/seed-guard.ts (без argon2/prisma-зависимостей — тестируется без native-модулей); тест test/seed-guard.spec.ts (5 кейсов: prod без SEED_* → отказ, дефолтный пароль → отказ, валидные → ok, dev/test → ok)                                                                                                                                                                                                                                                                                                                                                                                                                    |
-
-## 🔎 АУДИТ ГОТОВНОСТИ #2 — 2026-09-02 (GAP-39…GAP-51)
-
-> Повод: все гэпы аудита #1 (GAP-31…38) и техдолг GAP-30 закрыты, main зелёный (7/7),
-> задан вопрос «проект готов к запуску?». Ответ: **код MVP готов (~85%), приёмка — 0%**.
-> Проверялось машинно: `grep` кода против `.env.example`, покрытие тестами по файлам,
-> ТЗ ч.3 §13/ч.5 §2.8/ч.7 §12, `docs/QA_CHECKLIST.md`, состав `apps/web`/`apps/admin`.
->
-> **Формат обязателен для исполнителя (в т.ч. другого AI-агента):** пункт закрывается
-> только при выполнении «Критерия приёмки» целиком; закрыл код → обнови эту строку
-> в том же PR (INDEX.md §6.3). Заголовок PR — conventional commit, scope из
-> `commitlint.config.js` (`geo` в enum отсутствует, для смешанных изменений — `api`).
->
-> **Что можно делать без боевых ключей:** GAP-39, 40, 41, 42, 43, 44, 45, 48, 51.
-> **GAP-51 — не выход этого аудита**, а находка 2026-09-04 при закрытии GAP-48: в коде висел
-> TODO со ссылкой на GAP-22 на работу, которой в критериях GAP-22 никогда не было, а сам гэп
-> закрыт — из-за чего долг выглядел исполненным. Перенесён в собственную строку, чтобы трекался.
-> **Требует ключей/стенда:** GAP-46 (runtime-приёмка), GAP-47 (нагрузка).
-> **Требует решения владельца:** GAP-49 (юридика). ~~GAP-50 (Sentry)~~ — согласовано 2026-09-04, реализовано (см. строку GAP-50).
-
-| #      | Что не работает                                         | Где                                                       | Приоритет                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Критерий приёмки |
-| ------ | ------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------- |
-| GAP-39 | **Техдолг: 1171 ESLint warning (0 errors), CI зелёный** | `apps/api/src/**`, `apps/admin/src/**`, `apps/web/src/**` | 🟡 P3 открыт 2026-09-02: GAP-25 заявлен закрытым по **`max-params: error(3)`** и **`complexity: error(10)`** (0 нарушений в `apps/api/src`), но **не закрыт** по **`no-explicit-any`** — в CI job `Lint` последнего коммита `a8c86fe` (run 33632859122) видно `✖ 1171 problems (0 errors, 1171 warnings)`. Правило в `.eslintrc.js:32` стоит как `error`, но через `next lint` для `apps/admin` и `apps/web` понижается до warning (конфликт с `eslint-config-next`). Среди 1171: `no-explicit-any` (≈117 в `apps/api` + множество в `apps/admin` pages), `no-unsafe-assignment/member-access/call` (каскад от `any`), `explicit-function-return-type` (Next.js pages), `max-lines-per-function >140` (отдельные Next.js pages 149–194 строк), `prefer-nullish-coalescing` (замена `\|\|` на `??`). **Запуску не мешает** — CI зелёный, typecheck проходит, тесты проходят, билд и E2Е проходят. **Должно быть зафиксировано** по правилу INDEX.md §6.3 (закрыл код → обнови трекер), что и делает эта строка. **Критерий приёмки:** 1) `pnpm lint` возвращает 0 warnings (без понижения уровня для фронта — вынести `next.config.js` override или привести ESLint-конфиги фронта к `error`); 2) `no-explicit-any: error` работает в `apps/api` (сейчас: 0 нарушений) и в `apps/admin`/`apps/web`; 3) длинные Next.js pages разбиты на компоненты или `max-lines-per-function: 140` повышен до 200 (как обсуждалось в QUALITY_GATES §2.3) с явным обоснованием. Допустимо частичное закрытие по этапам: сначала `apps/api` (money-код, самый критичный), затем `apps/admin` (наибольшее скопление warnings), затем `apps/web`. |
-
-**✅ ПРОГРЕСС 2026-09-02/03 (PR #36–39): `apps/api`-часть ЗАКРЫТА целиком.**
-
-- PR #36 — 10 disable для PSP payload parsing (defensive parsing внешних провайдеров, легитимный any);
-- PR #37 — типизация сигнатур контроллеров: 48 any -> 0 (UserActor/AdminActor из `common/types/req-user.ts`, Prisma.*WhereInput);
-- PR #38 — 16 catch (e: any) -> catch (e) + errorMessage() (общий хелпер `common/utils/error-message.ts`);
-- PR #39 — **`no-explicit-any: warn -> error` в `apps/api/.eslintrc.js`**: разобраны оставшиеся ~95 any (репозитории на Prisma-типах, доменные интерфейсы ISupportRepository/IKycRepository, module augmentation express Request.user, структурный тип SmtpTransport вместо недоступных типов nodemailer). Итог: apps/api lint = **0 errors**, неподавленных any в src = 0 (остались только легитимные disable: 10 PSP + 2 multer-ambient shim);
-- Итого warnings: 1171 -> **439** в apps/api (0 errors).
-- PR #42 — stage 6: `prefer-nullish-coalescing` (72) с `ignorePrimitives: true` (семантика `||` на строках/числах осознанная — фолбэк пустых значений), `no-unnecessary-condition` (18) разобран вручную, guard-типизация (admin-auth/roles/roles.guard, admin-jwt.verify -> Record<string,unknown>); api: 439 -> **313** warnings;
-- PR #43 — stage 6b: return-типы не-контроллеров (261 из 313): user.entity, game-callback.service (AuthenticateResult/ProviderCallbackResponse), adapters gitslotpark/demo (ProviderGameRow/ProviderCallbackResponse/boolean), favorites.use-case (FavoriteWithGame/GameHistoryRow exported), notification.service (NotificationRow), wallet.facade (CreditResult/WalletBalanceRow/WalletBalanceView), users.facade (UserGeoContext/currency_preference/void), admin-users.service (AdminUserRow), audit-log (void), admin-jwt.sign (string), oauth (OAuthSignInResult); api: 313 -> **263** warnings (0 errors);
-- PR #46 — stage 7 (apps/web): **`no-explicit-any: warn -> error`**: 55 any разобраны — lib/api.ts на `ApiResponse<T>` (apiGet/apiPost/apiPatch без `<T = any>`), stores/auth.ts (AuthResponse), новые DTO в `src/types/*` (casino.ts: GameDto/GamesListDto/GameLaunchDto/HistoryDto; wallet-tx.ts; user.ts: MeDto; referral.ts; support.ts), все страницы на `apiGet<Dto>`; попутно исправлены реальные баги чтения полей (profile/referral/support читали snake_case, а API отдаёт camelCase); web: ~680 -> **123** warnings (0 errors), осталось 4 no-unsafe-*;
-- PR #47 — stage 8 (apps/admin): **`no-explicit-any: warn -> error`**: 13 any разобраны — lib/api.ts на `ApiResponse<T> + ApiMeta` (apiGetFull тоже), stores/auth.ts (AdminLoginResponse — сырой ответ без data-обёртки), admins (role-union каст), audit (payload `Record<string, unknown> | null`), withdrawals (destination `{ card_masked?; address? } | null`), support (AdminTicketFull/AdminMessageRow), referrals (AdminReferralReward); admin: ~530 -> **112** warnings (0 errors);
-- PR #49 — stage 9 (apps/web + apps/admin): аннотированы все export-функции/хендлеры (`React.JSX.Element`, `Promise<void>`, `void`; `AuthState` из stores/auth для zustand-селекторов), errText()/errCode() хелперы вместо inline catch-кастов, trySilentRefresh типизирован, admin SyncResult сверен с API; web: 123 -> **19**, admin: 112 -> **16** warnings;
-- PR #50 — stage 9b (финал): **apps/web и apps/admin: `✔ No ESLint warnings or errors`** — критерий приёмки 1) и 3) выполнен: `import/no-cycle` разорван выносом axios-interceptors в `lib/api-interceptors.ts` (регистрация из `providers.tsx`, веб + админ), избыточные проверки после типизации `apiPost<AuthResponse>` убраны, `axios.get<T>` в verify-email (no-unsafe-member-access), `import { Decimal } from 'decimal.js'`, страницы-переращеры разложены на подкомпоненты (`WithdrawalRow` 216→166 строк, `KycForm` 205→159), `max-lines-per-function: 140→200` для Next.js pages с явным обоснованием в `.eslintrc.js` (разметка+UI; бизнес-логика в `apps/api` c `error(60)`); web: 19 -> **0**, admin: 16 -> **0** warnings;
-- PR #51 — tracker stage 9/9b (поправка к прошлой ревизии: фраза «explicit-function-return-type в контроллерах освобождён override'ом по QUALITY_GATES §2.1.1» была **неточной** — §2.1.1 освобождает только `max-params`; фактически return-типы были закрыты аннотациями в stages 10);
-- PR #55 — **stage 10 (apps/api → 0): GAP-39 ЗАКРЫТ ПОЛНОСТЬЮ.** 263 → **0** warnings, 0 errors:
-  - `common/types/express-context.ts` (новый): `getHttpRequest<T>()` изолирует `any` от `switchToHttp().getRequest()`; current-user.decorator (`UserActor | AdminActor | undefined`), admin-auth.guard (`satisfies AdminActor`), roles.guard (типизирован `getHttpRequest`);
-  - `config.get('X')` → `config.get<string>('X')` (12 мест — источник no-unsafe-assignment); nowpayments-webhook: `Record<string, unknown>` без eslint-disable; zod pipe: `ZodType` (zod 3.25);
-  - 206 return-аннотаций по инференсу checker'а (noTruncation); Prisma-namespace имена префиксованы `Prisma.X`, доменные типы импортированы по конвенции (`type Prisma` из `@prisma/client` в domain/application — как в `domain/repositories`, гард G1 запрещает только runtime-импорт `@casino/database`);
-  - import-гигиена: order/no-duplicates/consistent-type-imports (inline) по main-паттерну под-групп `@/` → `@modules/` → `@casino/`; **E2E поймал DI-регрессию**: type-only импорт класса в constructor-параметре ломает `design:paramtypes` (Nest can't resolve) — value-импорты DI восстановлены (38 файлов), `ZodValidationPipe` (не-Injectable) оставлен type-only;
-  - точечные: `Request.id?`/`cookies: Record<string, string | undefined>` в express-augment (вместо any), `request-id.middleware: candidate as unknown[]`, auth refresh: `RequestWithCookies` + `token ?? ''` (семантика SessionInvalidError сохранена), `Roles(): MethodDecorator & ClassDecorator`, `get userId(): string`, casino-admin rtp-условие, decimal.js named-import;
-- **✅ GAP-39 закрыт по всем трём apps (0/0/0) — критерии приёмки 1)+2)+3) выполнены.** CI main после squash `6fd0bc5`: lint ✔ (`apps/api: 0`, `apps/web: ✔`, `apps/admin: ✔`), typecheck ✔, 117 unit + 9 E2E ✔, docker-build ✔, deploy ✔.
-- **2026-09-03 — критерий 1 закреплён машиной** (отдельный PR). До этого «0 warnings» было свойством _вывода_, а не _exit-кода_: `eslint src --ext .ts` без `--max-warnings` возвращает 0 и при тысячах warnings — ровно эта конфигурация и позволяла GAP-39 числиться зелёным с `✖ 1171 problems (0 errors, 1171 warnings)`. Теперь `--max-warnings=0` стоит во всех трёх lint-скриптах (`apps/api`, `apps/web`, `apps/admin`), а сам флаг сторожит guard **G13** в architecture-guards: удаление — падение Tier 2. Обоснование и форма записи — QUALITY_GATES §2.4.
-
-| GAP-40 | **SMTP-пароль не доезжает до nodemailer — письма не уходят в проде.** Мейлер читает `SMTP_PASS`, а `.env.example` и `ENVIRONMENT_VARIABLES.md` предписывают оператору `SMTP_PASSWORD`. В `env.validation.ts` **обе** формы `optional()` — валидация расхождение не ловит. Итог: оператор заполняет прод по доке → `createTransport` получает `pass: undefined` → SMTP-аутентификация у провайдера (Resend и любой другой) падает → не уходят письма верификации email, сброса пароля и все уведомления из очереди `email`. Не поймано тестами: `smtp.mailer.ts` не покрыт, а E2E регистрируется без подтверждения email | `apps/api/src/queues/infrastructure/smtp.mailer.ts:40`, `.env.example:79`, `packages/shared-config/src/env.validation.ts:66,90` | ✅ **P1 закрыт 2026-09-03**: 1) каноническое имя `SMTP_PASSWORD` в `smtp.mailer.ts`; 2) в `env.validation.ts` единственная запись `SMTP_PASSWORD`; 3) `superRefine` для `NODE_ENV=production` при заданных `SMTP_HOST`+`SMTP_USER` требует пароль; 4) новый спек `apps/api/test/smtp-mailer.spec.ts` (6 кейсов); 5) D3 зелёный | 1) ✅ одно каноническое имя `SMTP_PASSWORD` во всех трёх местах (`smtp.mailer.ts`, `.env.example`, ENVIRONMENT_VARIABLES §10) — дока под код не правилась; 2) ✅ в `env.validation.ts` одна запись, дубликат `SMTP_PASS` удалён (в коде от старого имени остались только исторические комментарии — чек D7 на них не реагирует, т.к. они не являются чтением конфига); 3) ✅ `superRefine`: `NODE_ENV=production` + `SMTP_HOST` + `SMTP_USER` без пароля → ошибка валидации (fail-closed, тихая поломка больше не повторится); 4) ✅ спек есть, **с обоснованным отклонением от буквы критерия**: вместо `vi.mock('nodemailer')` — подмена `require()`, потому что `smtp.mailer.ts` грузит nodemailer через CommonJS `require`, а `vi.mock` подменяет ES-импорты (в спеке задокументировано); есть кейс «НЕ читает устаревшее имя `SMTP_PASS`»; 5) ✅ docs-guard D3 зелёный. ⚠️ Строка была 4-ячеечной (критерии влились в ячейку статуса) — колонка восстановлена |
-| GAP-41 | ~~**Дрейф «код ↔ `.env.example`»: 7 переменных читаются из кода, но не описаны оператору.** `GITSLOTPARK_AGENT_ID`, `GITSLOTPARK_API_TOKEN`, `GITSLOTPARK_SECRET_KEY`, `GITSLOTPARK_API_BASE`, `NOWPAYMENTS_API_BASE`, `RUKASSA_API_BASE`, `SMTP_PASS` (последняя уходит с GAP-40). `GITSLOTPARK_*` — **0 упоминаний** в `ENVIRONMENT_VARIABLES.md`: поднимая прод по доке, оператор не узнает, что игровому провайдеру нужны ключи, и получит `PaymentProviderNotConfiguredError` на первом launch. Слепое пятно инструмента: docs-guard **D3** сверяет `.env.example` ↔ §22 двунаправленно, но **код** ↔ `.env.example` не сверяет — поэтому дрейф копился незамеченным~~ | ~~`apps/api/src/modules/casino/infrastructure/providers/gitslotpark/gitslotpark.adapter.ts`, `.env.example`, `docs/ENVIRONMENT_VARIABLES.md`~~ | ✅ **P2 закрыт 2026-09-03.** `.env.example`: `GITSLOTPARK_AGENT_ID`/`GITSLOTPARK_API_TOKEN`/`GITSLOTPARK_SECRET_KEY` — активными dev-плейсхолдерами `dev_gsp_*` (стиль существующих провайдерских ключей, gitleaks-нейтрально); `GITSLOTPARK_API_BASE` и `RUKASSA_API_BASE` — закомментированными опциональными overrides с дефолтом из кода (конвенция уже описанной `NOWPAYMENTS_API_BASE`). `ENVIRONMENT_VARIABLES.md`: §21 «Casino Demo Provider» → «Casino & Game Providers», новый §21.2 GitSlotPark (4 переменные, fail-closed поведение `creds()`, 4 бренда агрегатора, риск сверки подписи → GAP-43); §20 деплой-чеклист += `GITSLOTPARK_*`; §22 — зеркало `.env.example` (D3 ✅). `env.validation.ts` не менялся: все 6 уже были в Zod-схеме (строки 43–52), неблокирующее предупреждение D3 молчит. **Новый чек D7** в `.github/workflows/docs-guard.yml`: извлекает `process.env.X` / `process.env['X']` / `config.get*(… 'X')` по `apps/api/src` + `packages/*/src` (сейчас 44 имени), сверяет с `.env.example` (активные и закомментированные строки), при расхождении — падение с перечнем имён; allowlist `NODE_ENV`, `CI`, `*_INTEGRATION`, `E2E_*`. Временная запись `SMTP_PASS` из allowlist **снята после мержа GAP-40 (#53)** — код читает канонический `SMTP_PASSWORD`, чек это подтверждает. Отрицательный тест: фиктивный `process.env.SOME_BRAND_NEW_SECRET_VAR` → D7 FAIL (проверено). `QUALITY_GATES.md`: Tier 2.5 D1–D6 → D1–D7 + changelog; `BRANCH_PROTECTION.md` не менялся — D-чеки там не перечислены (только упоминание D6). Прогон D1–D7 зелёный **под флагами runner'а** (`bash -e -o pipefail`): первая версия падала в CI именно на errexit — `grep -vE` с пустым выводом (всё отфильтровано allowlist'ом) внутри `D7_MISSING=$(…)` молча ронял весь guard до блока «итог», без `❌` и без перечня; починено `\|\| true`, локально без `-e` не воспроизводилось. **Попутное (найдено этим же PR'ом и починено здесь же):** (а) локальный прогон вынесен в версионируемый `scripts/docs-guard-local.sh` — он извлекает тело шага из `docs-guard.yml` и запускает его **с флагами runner'а** (`bash -e -o pipefail`); `$HOME/dg.sh` стал тонким указателем на него (ручная байт-копия была причиной того, что баг не поймался локально; старая копия — `dg.sh.bak-manual-mirror`). (б) **D3/D6 защищены от errexit-смерти**: `\|\| true` на извлечениях-в-файл + явный ❌ D6 при пустом списке required checks; проверено before/after на битом `BRANCH_PROTECTION.md` — старый скрипт умирал молча (красный чек без объяснения), новый печатает ❌ и «Docs guard FAILED». (в) история с честностью: в `main` коммитом `d9b1504` (docs-PR #51 по GAP-39) оказалась пометка «GAP-40 закрыт», поставленная раньше кода — в тот момент мейлер читал `SMTP_PASS`, дубликат в `env.validation.ts` не был удалён, спеки не было, при этом строка таблицы оставалась открытой. Я это исправил; позже squash #52 (с устаревшей базы) откатил абзац нарратива, а реальный фикс приехал в **#53** — то есть сейчас пометка в нарративе соответствует правде, и временная запись `SMTP_PASS` в allowlist D7 снята этим же PR. Урок зафиксирован в шапке файла: «закрыт» ставится только когда end-to-end работает, а squash с устаревшей базы может молча откатить чужие строки трекера. | 1) Все 7 переменных есть в `.env.example` (с безопасными плейсхолдерами — учесть `.gitleaks.toml` allowlist) и в `ENVIRONMENT_VARIABLES.md` (тематический раздел + §22); 2) новый чек **docs-guard D7**: имена из `process.env[...]`/`config.get(...)` по `apps/api/src` + `packages/*/src` сверяются с `.env.example`, при расхождении — падение с перечнем (allowlist: `NODE_ENV`, `CI`, `*_INTEGRATION`, `E2E_*`); 3) D7 добавлен в `docs/BRANCH_PROTECTION.md`/`QUALITY_GATES.md`, если там перечислены D-чеки; 4) прогон `$HOME/dg.sh` — D1–D7 зелёные |
-| GAP-42 | ✅ **Закрыт 2026-09-03 (PR #52) — `apps/api/test/oauth-verify.spec.ts`.** Спек 11 кейсов: Telegram (валидный/подделанный hash, auth_date > 24ч, без TELEGRAM_BOT_TOKEN → 503, hash неверной длины), Google (buildAuthUrl↔verifyState round-trip, подменённая подпись, state > 10 мин, отсутствие state, без GOOGLE_CLIENT_ID/SECRET → 503). HTTP-обмен с Google не мокается (runtime, GAP-46). Добавлен `apps/api/tsconfig.test.json` для typecheck'а тестов. Боевые ключи не нужны — фиктивные секреты подставляются в `ConfigService`. Подробности см. в описании PR. ~~Верификация OAuth-подписей не покрыта ни одним тестом.~~ | `apps/api/src/modules/auth/application/use-cases/oauth/telegram-login.use-case.ts`, `google-oauth.use-case.ts` | ✅ **закрыт** | Новый спек `oauth-verify.spec.ts` в `apps/api/test/`, 11 кейсов зелёные: **Telegram** — валидный `hash` проходит; подделанный → `OAuthExchangeError`; `auth_date` старше `MAX_AUTH_AGE_SEC` → `OAuthExchangeError`; без `TELEGRAM_BOT_TOKEN` → `OAuthNotConfiguredError` (503); `hash` другой длины не роняет процесс (`timingSafeEqual` защищён проверкой длины). **Google** — `buildAuthUrl()` → `verifyState()` round-trip ок; подменённая подпись → `OAuthStateError`; `state` старше 10 минут → `OAuthStateError`; без `GOOGLE_CLIENT_ID`/`SECRET` → `OAuthNotConfiguredError`. HTTP-обмен с Google **не мокать** — это runtime (GAP-46) |
-| GAP-43 | **Адаптер GitSlotPark без тестов, порядок полей подписи не подтверждён.** В коде честная пометка «⚠️ сверить с менеджером»: билдеры строки подписи для 5 операций (`getbalance`/`withdraw`/`deposit`/`betwin`/`rollbacktransaction`) собраны по общему принципу из доки и одному примеру. Если реальный порядок иной — **все seamless-колбэки провайдера будут отбиты** как невалидные, игрок не сможет играть. Тестов 0: ни на билдеры, ни на `parseCallback`, ни на fail-closed без ключей. Это самая слабая часть проекта (Часть 4 ТЗ, ~60%) | `apps/api/src/modules/casino/infrastructure/providers/gitslotpark/gitslotpark.adapter.ts` | ✅ **P2 закрыт 2026-09-03**: 1) `CALLBACK_MESSAGE_BUILDERS` **экспортирован** из адаптера (рефакторинг для чистого теста без `as any`); 2) новый спек `apps/api/test/gitslotpark-adapter.spec.ts` с фиктивным SECRET фиксирует **текущий** контракт: 5 операций — точная строка сообщения и UPPERCASE-hex HMAC, плюс sanity `^[A-F0-9]{64}$`; 3) `verifyCallback`: верная подпись → `true`, неверная → `false`, lowercase → `true` (нормализация), неизвестный `x-gsp-op` → `false`, без ключей → `false` **без исключения** (fail-closed), `body === undefined` → `false`; 4) `parseCallback`: `withdraw`→`bet`, `betwin`/`deposit`→`win`, `rollbacktransaction`→`rollback`, `getbalance`→`balance`, `playerToken === 'uid:<userID>'`, первый непустой из `amount`/`betAmount`/`winAmount`; 5) `formatErrorResponse`: коды `6/8/9/11/3/5`; неизвестный код → `1`; 6) `AMT` ровно 2 знака; 7) `formatSuccessResponse`: status всегда `0`, balance через `Number(...).toFixed(2)` (string, не money-helper — это контракт GitSlotPark). Смысл: после сверки с менеджером правится **только** `CALLBACK_MESSAGE_BUILDERS`, а тесты сразу показывают, что именно изменилось. Сама сверка и живой раунд — GAP-46 |
-| GAP-44 | ~~**Фронтенд без тестов: 0 spec-файлов в `apps/web` и `apps/admin`.** В `package.json` обоих — только `lint`, тест-раннера нет вообще. 18 страниц web и 14 страниц админки защищены лишь `tsc` и ESLint; логика, которую типы не ловят (условия показа CTA, ветки состояний загрузки, форматирование денег на экране), регрессирует молча. Особенно уязвим только что сделанный GAP-36: остаток KYC-лимита и переход на `/kyc` при исчерпании~~ | `apps/web`, `apps/admin` | ✅ **P3 закрыт полностью 2026-09-09 (два этапа)**. **Этап 1 (PR #59)**: vitest 2.1.9 в devDeps web+admin, `pnpm -r test` в CI; unit-тесты чистых функций — web: `format-currency.spec.ts` (12), `wallet-helpers.spec.ts` (12), `api-errors.spec.ts` (8); admin: `err-text.spec.ts` (4). **Этап 2 (этот PR)**: `@testing-library/react` 16.1.0 + `@testing-library/dom` + `@testing-library/jest-dom` + `jsdom` 25.0.1 + `@vitejs/plugin-react` 4.3.4 (точные версии) в devDeps обоих; vitest-конфиги переведены на `environment: 'jsdom'` + plugin-react; **компонентные DOM-тесты критериев GAP-36**: `deposit-sheet.spec.tsx` (3: остаток лимита из API в валюте шита без пересчёта — «Остаток лимита: 5 000 ₽»; исчерпан → CTA «Лимит исчерпан — пройти верификацию» ведёт на `/kyc` ДО отправки формы — createFiatDeposit не вызывается; approved → обычная кнопка «Пополнить» без редиректа), `kyc-page.spec.tsx` (3: остаток из limit_remaining/limit_currency; исчерпан → красный блок + CTA-анкор `#kyc-form`; approved → «Лимит снят» без блока), admin `login-page.smoke.spec.tsx` (2: сабмит вызывает store.login(email, password) и редирект /dashboard; ошибка → ErrorBox INVALID_CREDENTIALS без редиректа). Итого web 39 passed, admin 6 passed; все сторы/API мокнуты модульно, компоненты — «глупый рендер». Гейты: tsc ✅, `next lint --max-warnings=0` ✅ обоих, api не тронут (158 passed). Lockfile: +772 строки (testing-library/jsdom/vitejs), sentry-часть из main не изменена |
-| GAP-45 | **`QA_CHECKLIST.md`: 33 пункта, отмечено 0 — при этом ~9 из них уже проверяются машиной.** E2E `player-lifecycle` закрывает register → login → KYC submit+approve → депозит по валидному HMAC (и отбой невалидного) → launch → bet/win → вывод с блокировкой → одобрение админом со сверкой типов проводок. Ещё часть закрыта unit-тестами: идемпотентность депозита, `InsufficientFunds`, NOWPayments `actually_paid`, roles-guard, lockout. Чеклист занижает фактическое покрытие и не даёт понять, что реально требует рук | `docs/QA_CHECKLIST.md` | ✅ **P3 закрыт 2026-09-03** (PR #58): 1) у каждого из 33 пунктов — пометка `[auto: <файл>::<имя теста>]` или `[manual: ...]`; 2) пункты, закрытые автотестами, отмечены `[x]` со ссылкой на тест; частично покрытые — `[x*]` (код-путь закрыт, хвост боевой интеграции — GAP-46); 3) в шапке — сводка «14 из 33 закрыто автотестами полностью, 10 частично, 9 manual»; 4) в конце файла — считалка по разделам (Auth/Wallet/Casino/Support/Admin) + куда идти за деталями (apps/api/test/ для авто, GAP-46 для manual). **Причина отставания трекера от кода:** параллельный агент обновил `QA_CHECKLIST.md` в PR #58 (code + checklist в одном коммите), но правило INDEX.md §6.3 «закрыл код → обнови трекер в том же PR» не было соблюдено — строка 137 в `IMPLEMENTATION_GAPS.md` оставалась не отмечена. Закрыто отдельным коммитом. || GAP-46 | **Runtime-приёмка не выполнялась ни разу — главный блокер запуска.**
-
-**🟡 ПРОГРЕСС 2026-09-09 (NOWPayments — первый внешний контур, ключ предоставлен):**
-
-- ✅ **API-ключ валиден** (`GET /v1/currencies` → 236 валют, `x-api-key`); MCP-эндпоинт `mcp.nowpayments.io` также отвечает (5 tools), но его `/full-currencies` пока 404 — REST `/v1` (который использует `nowpayments.client.ts`) полностью рабочий;
-- ✅ **Все 5 валют проекта поддержаны**: `usdttrc20`/`btc`/`ton`/`trx`/`ltc` в списке; маппинг `MAP` в клиенте (`USDT_TRC20→usdttrc20`) подтверждён (прямой тест сырого `USDT_TRC20` → 400 «alpha-numeric only», т.е. маппинг обязателен и корректен);
-- ✅ **`/v1/estimate`**: `rub→usdttrc20` (1000₽→11.72 USDT), `usdttrc20→rub`, `btc→rub`, `ton/trx/ltc→rub` — оба направления KYC-флоу и курсовое maintenance-задание рабочие;
-- ✅ **`/v1/min-amount`**: `usd→usdttrc20` = 19.2 (вымогать ниже нельзя — клиент должен валидировать, ниже добавим предупреждение); `usd→btc` = 19.2;
-- ⚠️ **`price_currency` только fiat (`usd`/`eur`/`rub`…)**: `usdt` как price отклонён («not allowed») — код уже шлёт `priceCurrency: 'USD'` ✅, но проверка `rub` как price для крипто-кассы зависит от настроек аккаунта (сейчас «RUB is not allowed for fiat payment» на min-amount для пар rub→crypto; estimate rub→usdttrc20 при этом работает — для MVP крипто-депозиты считаем от USD, RUB-цена показывается через estimate);
-- ✅ **`POST /v1/payment` создан тестовый** payment_id **5120213360** (12 USD→USDTTRC20, адрес TMr2…CH3, сеть trx, статус `waiting`, `actually_paid: 0`) — оплата не производилась, списаний нет; `GET /v1/payment/:id` отвечает (`waiting`);
-- ✅ **`/v1/payout` доступен** (пустой список — payout-адреса ещё не настроены в кабинете);
-- ✅ **IPN-секрет получен от владельца** (2026-09-09) — верификация проверена: эталонная канонизация NOWPayments (sorted keys → compact JSON → HMAC-SHA512) на payload тестового payment 5120213360 даёт подпись, которую **наш `verifyIPN` принимает**; подделанная — отбивается. Секрет только в env стенда, в репо не попадал. Осталось: живой IPN после реальной оплаты (нужен публичный URL после VPS);
-- ❌ **Реальная оплата тестового payment + IPN на наш вебхук**: требует домен и публичный URL для `ipn_callback_url` (сейчас example.com) — после VPS.
-- ✅ **Telegram-бот**: токен получен от владельца (2026-09-09), `getMe` отвечает (бот жив), крипто-верификация виджета проверена на payload, подписанном РЕАЛЬНЫМ токеном (наш verify принимает, подделка отбивается); env стенда обновлён. Осталось: `/setdomain` в BotFather на боевой домен (при деплое) + живой логин; Ни одна внешняя интеграция не общалась с боевым контуром: HMAC проверен только на синтетических подписях, HTTP-клиенты — только на fail-closed. Деплоя не было: пайплайн написан и штатно скипается без секретов, миграции на живую БД не применялись, `seed` админа не выполнялся, SSL/nginx не поднимались. `restore.sh` (50 строк) **никогда не запускался** — непроверенный бэкап бэкапом не считается. Мониторов UptimeRobot по ТЗ ч.7 §12.2 нет (нужен домен) | весь внешний контур; `docs/DEPLOY.md`, `infra/scripts/restore.sh` | 🔴 **P1** | По каждому пункту — запись результата (дата, окружение, что именно проверено) в эту строку трекера, а разбор — датированным отчётом в `docs/archive/` по конвенции [audit-2026-08-25.md](archive/audit-2026-08-25.md): 1) **Rukassa** — создание платежа + приход реального вебхука → зачисление; 2) **NOWPayments** — `createPayment`/`estimate` + IPN с настоящей подписью; 3) **GitSlotPark** — порядок полей подписи **подтверждён менеджером** (закрывает риск GAP-43), `userAuth`, sync каталога, зелёный seamless-раунд bet/win/rollback; 4) **Google OAuth** — code-flow на реальном `redirect_uri`; 5) **Telegram Login Widget** — бот + домен; 6) **первый деплой на VPS** — `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY`, `migrate deploy`, `seed` с `SEED_ADMIN_*`, SSL, nginx, вход в админку; 7) **учебное восстановление** — дамп → `restore.sh` → проверка целостности (обязательно **до** приёма денег); 8) UptimeRobot-мониторы + cron `resource-check.sh`; 9) полный прогон `QA_CHECKLIST` на стенде |
-  | GAP-47 | **Нагрузочного тестирования нет — предел конкурентности кошелька неизвестен.** Ledger работает на Serializable-транзакциях с optimistic-lock и 3 попытками (backoff 50·n²). При какой параллельности ставок по одному кошельку попытки исчерпываются и игрок получает ошибку — не измерено. Для казино это профиль нагрузки по умолчанию (много ставок в секунду на одного игрока) | `apps/api/src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma.ts` | ✅ **P3 закрыт 2026-09-03 (код сценария)**; прогон — за владельцем после стенда (см. критерий 2): 1) `infra/load-tests/wallet-concurrency.js` (k6) — бьёт `POST /api/v1/provider-callback/gitslotpark/withdraw` (seamless bet), генерирует валидный HMAC по контракту `CALLBACK_MESSAGE_BUILDERS.withdraw` (GAP-43), профили 10→50→100 VU со ступенчатым ростом, threshold p95<500ms / fail<1%; кастомный warn в логе при `status=11` (DUPLICATE_TRANSACTION) — индикатор исчерпания optimistic-lock retry; 2) `infra/load-tests/README.md` — инструкция: установка k6 (brew/apt/docker), подготовка стенда (SQL-снипет для user/wallet/game_session), env-переменные, команды запуска; 3) `docs/archive/load-test-TEMPLATE.md` — шаблон отчёта по конвенции (метрики, баланс до/после, анализ Optimistic Lock, вывод про retry/advisory-lock/очередь); 4) `package.json` — скрипт `pnpm load-test:wallet`. **Критерий 2 (прогон на стенде) — ВЫПОЛНЕН 2026-09-27** (локальный Docker-стенд: Postgres 16 + Redis 7 контейнеры, API из dist, k6 v2.3.0 в docker; подробности и отклонения от README — в отчёте): прогон 10→50→100 VU по этому же сценарию. **Итог: деньги целы** — баланс сходится копейка в копейку (9 916 610.00 = 10 000 000.00 − 8 339 × 10.00, version совпадает с числом списаний), double-spend/потеря проводок нет; **но 3 retry-попытки не покрывают профиль** — при 100 VU успех 30,6% (конфликты Serializable → Prisma P2034), p95 825 ms. Прогон нашёл и починил 4 дефекта (k6-скрипт ×2, отсутствие ретрая P2034, утечка текста ошибок) — см. GAP-57; выбор механизма сериализации мутаций кошелька — за владельцем. Полный разбор: `docs/archive/load-test-2026-09-27.md`. |
-  | GAP-48 | **Последний `eslint-disable max-lines-per-function` в проекте.** `runDaily` подавляет правило и несёт собственный `TODO(referrals): split into accrual + payout`. Остальные 4 нарушителя разобраны в GAP-30; этот остался единственным исключением, то есть правило формально `error(60)`, но одно место из-под него выведено | `apps/api/src/modules/referrals/application/referral-calc.service.ts:23-24` | ✅ **P3 закрыт 2026-09-04**: `eslint-disable` и `TODO` удалены — они оказались **устаревшими**: рефакторинг в рамках GAP-30 уже разнёс логику в `processUserRewards`/`processCurrencyReward`, и `runDaily` — 30 строк (порог 60 не задет). Контракт неизменен (`{ processed, credited, date }`), репозиторий больше не содержит **ни одного** `eslint-disable max-lines-per-function`; `referral-payout.integration.spec.ts` (3 теста: GGR>0 → REFERRAL_REWARD + credited, повтор за тот же день → дедуп, день без GGR → zero/проводок нет) **Возврат подавления закрыт guard'ом G14** (Tier 2, `architecture-guards.yml`): любой `eslint-disable` для этого правила роняет CI с файлом и строкой — без чека «единственное исключение» заводится молча, и порог `error(60)` снова становится фикцией. См. также **GAP-51** (найдена при разборе этого гэпа: три `TODO` в коде ссылались на закрытый GAP-22) | 1) ✅ `eslint-disable` и `TODO` удалены, метод ≤60 строк (по мерке самого ESLint — `skipBlankLines`+`skipComments` — 29 зачётных); 2) ✅ в репо ни одного подавления этого правила, возврат закрыт G14; 3) ✅ контракт `{ processed, credited, date }` не изменён; 4) ✅ `referral-payout.integration.spec.ts` (3 теста: GGR>0 → REFERRAL_REWARD + credited, повтор за тот же день → дедуп, день без GGR → zero/проводок нет) зелёный на Postgres в CI (PR #63) |
-  | GAP-49 | **Юридика и комплаенс не закрыты — риск уровня «не запускать».** Лицензия, KYC/AML-политика, подтверждение 18+, обработка персональных данных (152-ФЗ / GDPR), налоги, публичные документы (Terms of Service, Privacy Policy, Responsible Gaming). Вне инженерной зоны, но приём **реальных** денег до закрытия недопустим. В коде есть KYC-процедура и self-exclusion, то есть техническая база под требования частично готова | вне кода; частично `apps/web` (страницы документов), `modules/kyc`, `modules/users` (self-exclusion) | 🔴 **P0 (организационный)** | Решение владельца, зафиксированное в `docs/`. В код попадают только: страницы публичных документов, возрастной гейт при регистрации (если требуется юрисдикцией) и ссылки на Responsible Gaming. Инженерная часть закрывается **после** решения — иначе делается вслепую |
-
-**🟡 ПРОГРЕСС 2026-09-03 (инженерная часть по ТЗ выполнена, организационная — за владельцем):**
-
-- Требования ТЗ ч.7 §15.6 покрыты страницами: `/legal/terms`, `/legal/privacy`, `/legal/cookies`, `/legal/responsible-gaming` (компонент `LegalPage`, единый стиль); футер по ТЗ ч.5 §4.6 (`SiteFooter` в `MainShell`: 18+ бейдж, условия, конфиденциальность, ответственная игра); возрастной гейт 18+ на регистрации (ТЗ ч.5 §16.3: чекбокс + ссылки на Terms/Privacy, кнопка заблокирована до подтверждения). Тексты — **предварительная графика** для приёмки UI, помечены в исходниках;
-- Ответственная игра: страница описывает работающие инструменты — самоисключение (24 ч минимум, 72-часовой cooloff, ревок сессий — `users.controller /me/self-exclude`), лимит депозита 5000 ₽ без KYC;
-- Рамка владеленческих решений — новый **[LEGAL_COMPLIANCE.md](LEGAL_COMPLIANCE.md)**: чек-лист (юрисдикция, лицензия, тексты юриста, AML-пороги, возрастная верификация, 152-ФЗ/GDPR, налоги) + протокол решений + критерий закрытия (сервис не принимает реальные деньги до заполнения);
-- **Остаток (владелец):** решения по LEGAL_COMPLIANCE.md §2 → замена текстов на юридически значимые → лицензия в футере. Инженерная задача на подстановку текстов — часы.
-  | GAP-50 | **Предложение (не гэп ТЗ): нет агрегатора ошибок.** ТЗ ч.7 §12.1 прямо говорит, что Prometheus+Grafana для MVP не нужны, и предписывает UptimeRobot + health-эндпоинты + просмотр логов; Sentry в ТЗ **не заявлен**. Фактически без агрегатора 500-е и необработанные исключения видны только в `docker logs` на VPS — о поломке узнаём от игроков. Внедрять **только** по решению владельца: это отклонение от ТЗ | `apps/api/src/main.ts`, `common/filters/global-exception.filter.ts` | ✅ **закрыт 2026-09-04 (согласовано владельцем в сессии)** | Если владелец согласовал: 1) `@sentry/node` с **точной** версией, DSN опционален — без него инициализация no-op (dev/CI не шумят); 2) трейсинг выключен, включён scrubbing PII, согласованный с `pino` redact (`docs/SECURITY_BASELINE.md`); 3) отправка только необработанных и 5xx, бизнес-ошибки (`AppError`) — не шум; 4) `SENTRY_DSN` в `.env.example` + `ENVIRONMENT_VARIABLES` (§22) + `env.validation` — иначе сломается D3/D7; 5) отметка в ТЗ ч.7 §12, что это осознанное дополнение Протокол: 1) ✅ `@sentry/node` 8.49.0 exact, DSN опционален — `buildSentryOptions()` без DSN возвращает undefined, init не вызывается (main.ts до NestFactory — ловит и ошибки бутстрапа); 2) ✅ tracesSampleRate: 0 + sendDefaultPii: false + scrubPII тем же списком `LOG_REDACT_PATHS` (pino redact, SECURITY_BASELINE §12.3); 3) ✅ в Sentry — только unknown-исключения и Nest 5xx (GlobalExceptionFilter), AppError/4xx не отправляются; 4) ✅ `SENTRY_DSN` в .env.example (закомментированно) + ENVIRONMENT_VARIABLES §15/§22 + env.validation (url, optional) — D3/D7 зелёные; 5) ✅ отметка в tz-part-7 §12 «осознанное дополнение». Спек sentry-options.spec.ts: 10 кейсов (no-op без DSN, трейсинг 0, скраббинг плоских/вложенных, глубина, синхронность с pino). |
-  | GAP-51 | **Реферальный расчёт и уведомления читают таблицы чужих модулей напрямую, а долг при этом никем не трекется.** В `referrals/infrastructure/referral.prisma.repository.ts` GGR считается через `prisma.gameTransaction.groupBy(...)` — таблица принадлежит casino-модулю; в `notifications/infrastructure/notification.prisma.repository.ts` читаются `user` и `user_settings` (модуль users) вместо `UsersFacade`. Граф `MODULE_BOUNDARIES` §15 зависимости `referrals → casino (event game_transaction для GGR)` и `notifications → users` **разрешает**, но как событие/порт, а не как прямое чтение чужой таблицы. Долг был осознан и помечен, однако все три метки ссылались на `GAP-22`, **закрытый 2026-08-31**, — и в его критериях этой работы никогда не было (GAP-22 про 4-слойку wallet, `toMoney`, `runCreditDebit`). Итог: задача выглядит закрытой, код не менялся, трек-задачи нет. Третья метка, в `admin` (агрегаты дашборда по users/payments/kyc/tickets), сознательно **не** считается долгом: кросс-доменная отчётность — ответственность модуля (§13.1 «Dashboard metrics»), берутся только read-only агрегаты, не сырые деньги; мёртвая ссылка убрана с обоснованием в комментарии. Блокером не является: только чтение, money-контур не трогается | `apps/api/src/modules/referrals/infrastructure/referral.prisma.repository.ts:29`, `apps/api/src/modules/notifications/infrastructure/notification.prisma.repository.ts:57,64`, метки в `referrals/domain/referral.repository.ts` и `notifications/domain/notification.repository.ts` | ✅ **P3 закрыт 2026-09-04 как ПРИНЯТОЕ РЕШЕНИЕ (ADR)** | 1) в `referrals` и `notifications` не остаётся прямых обращений к таблицам чужих модулей — проверки пусты: `grep -rn "prisma\.gameTransaction" apps/api/src/modules/referrals` и `grep -rnE "prisma\.(user\|userSettings)\b" apps/api/src/modules/notifications`; GGR получается портом casino (`CasinoFacade`/интерфейс в `domain/`), настройки уведомлений — `UsersFacade`; 2) в коде не остаётся меток со ссылкой на закрытый гэп — проверка `grep -rn "TODO(GAP-22)" apps/` пустая (путь `apps/` указан явно: строка этого трекера тоже содержит это словосочетание, общий grep по репо давал бы вечную ложь); 3) обновлены `MODULE_BOUNDARIES` §9 (Referrals) и граф зависимостей, если путь меняется на событие; 4) контракт `runDaily` не меняется (`{ processed, credited, date }`), `referral-payout.integration.spec.ts` (3 теста) зелёный на реальном Postgres в CI; 5) guard G1 (нет прямого prisma в domain/application) и Tier 1 не краснеют Протокол решения (согласовано владельцем в сессии 2026-09-04): рефакторинг признан некритичным — доступ read-only не ломает целостность, граф зависимостей эти связи разрешает, money-контур (ledger) не трогается, а «порт» поверх единого Prisma-клиента — тот же SQL с лишним слоем. Вместо рефакторинга: 1) ✅ ADR зафиксирован в комментариях всех трёх затронутых репозиториев (referral/notification: рационале + условие пересмотра «вынос модуля в отдельный сервис/БД»; admin: ссылка на ADR); 2) ✅ MODULE_BOUNDARIES §9.3 (referrals→casino: read-only groupBy, ADR), §11.3 (notifications→users: read-only email/settings, ADR), граф §15 — формулировки приведены к факту (было «event»); 3) ✅ метки TODO(GAP-22) убраны ранее (PR #66); 4) ✅ guard G1 (prisma не в domain/application) и Tier 1 не задеты — правки только комментарии/доки; 5) исходные критерии 1/4 (полный port-рефакторинг + прогон integration-спека) **сняты решением владельца** — пересматриваются при выносе casino/users в отдельный сервис; integration-спек referral-payout в CI продолжает зелёнеть (контракт не менялся). |
-
-| GAP-52 | **Фронтенд web не полностью соответствует ТЗ ч.5 (TZ-07 «⚠️ Старт»): отсутствуют ключевые разделы.** Сверка кода `apps/web` с tz-part-5 (аудит 2026-09-13, повод — вопрос владельца «фронтенд полностью реализован?»): (а) нет маршрутов `/favorites`, `/search`, `/providers/[slug]` — нет избранного как раздела и глобального поиска (ТЗ §4.4/§7); (б) профиль — одна форма данных: нет вкладок Сессии/Настройки/Безопасность, смена пароля в UI отсутствует, `hasPassword` (OAuth-признак) API не отдаёт (ТЗ §9); (в) главная без «Продолжить играть» — last played не показывается, хотя store пишет `lastPlayedSlug` (ТЗ §6.1); (г) каталог без infinite scroll — пагинация кнопками (ТЗ §7); (д) GameCard без бейджей NEW/HOT и превью по «i» (ТЗ §6.4); (е) SEO: нет OG/title на витрине/каталоге/игре, нет noindex на приватных разделах (ТЗ §20); (ж) BottomNav — 3 пункта вместо «Главная · Казино · Избранное · Профиль» (ТЗ §4.3). При этом касса/кошелёк/KYC/support/referral были реализованы ранее (GAP-10/36/44) — гэп точечный, не «всё Frontend Part 5». Для закрытия (б) потребовались минимальные аддитивные правки API: `POST /auth/change-password` (ревокь всех сессий кроме текущей), `DELETE /users/me/sessions` (та же семантика для UI-кнопки «завершить все кроме текущей»), `hasPassword` в `GET /users/me`, `timezone` в Zod-схеме настроек (use-case уже поддерживал — поле не доходило из-за схемы). Не является гэпом: WithdrawSheet как отдельная страница `/withdraw` (касса-депозит в sheet поверх игры — реализована; вывод по ТЗ §19 не обязан быть sheet), `/providers` как раздел (фильтр провайдера есть в каталоге; отдельная страница — Phase 2, как в TZ-08) | `apps/web/src/app/**`, `apps/web/src/components/**`; API: `apps/api/src/modules/auth/**`, `apps/api/src/modules/users/**` | ✅ **P2 закрыт 2026-09-13 (branch `feat/gap52-web-tz07-frontend`)** | Фронтенд: 1) `/favorites` — сетка избранного с optimistic add/remove, пустое состояние = 6 популярных + «В каталог» (ТЗ §7); 2) `/search` — глобальный поиск с недавними запросами (localStorage), пустой результат → популярные (ТЗ §4.4); 3) профиль — 4 вкладки: Данные / Безопасность (смена пароля для email-аккаунтов; OAuth — пояснение без формы, по `hasPassword`) / Сессии (IP, устройство, дата, завершить одну / все кроме текущей) / Настройки (email-уведомления, часовой пояс; push-чекбокс задизейблен до бэка, язык RU не показываем — ТЗ §9); 4) главная — «Продолжить играть» (до 12, только залогиненным, гостю пустой блок не показываем — ТЗ §6.1/6.2); 5) каталог — infinite scroll (IntersectionObserver, скелетоны, «повторить» при ошибке, «больше игр нет»); 6) GameCard — бейдж NEW или HOT (не оба), превью по «i»: провайдер/RTP/сердечко (в превью, не на обложке); 7) BottomNav — 4 пункта; 8) SEO — OG/title каталога (layout), динамическая `generateMetadata` страницы игры («{название} — играть онлайн \| Casino», с провайдером), noindex layouts на profile/wallet/history/kyc/support/referral/favorites/search/deposit/withdraw. API (аддитивно): `POST /auth/change-password` (Zod `.strict()`, WeakPassword/InvalidCredentials/PasswordNotSet-ошибки, ревокь сессий кроме текущей), `DELETE /users/me/sessions` → `{ok, revoked}`, `hasPassword` в `/users/me`, `timezone` в UpdateSettingsSchema. Тесты: api `change-password.spec.ts` (4: слабый пароль, OAuth без пароля → PASSWORD_NOT_SET, неверный текущий, happy path с ревоком всех кроме текущей), web `users-api.spec.ts` (5: контракты путей/методов snake_case). Проверено на Termux: tsc api 0 (своих ошибок; 2 pre-existing sentry — FUSE-обрезка `@sentry/core`, в CI не воспроизводятся), tsc web 0, vitest api 25/25 (lockout+roles+oauth+change-password), vitest web 38/38 unit (DOM-спеки — CI). **Остаток за CI:** next lint (Termux: ajv@6 обрезан FUSE — eslint локально не поднимается) и DOM-спеки. `/providers`/[slug]-страницы и `/profile/avatar`-загрузка — осознанно вне: TZ-08 Phase 2 / аватар — минимальная функция, вернётся отдельным гэпом при необходимости |
-
-| GAP-53 | **Phase 2 фронтенда (остаток GAP-52): нет страниц провайдеров, ленты провайдеров на главной и загрузки аватара.** По ТЗ ч.5: §2.9 маршруты `/providers`, `/providers/[slug]`; §6.1 п.7 «тонкая лента логотипов провайдеров» на главной; §9 профиль — аватар (API `POST /users/me/avatar` существовал, UI не было). Фиат Phase 2 (UAH/BYN/KZT/UZS, TZ-08) — НЕ входит: форматирование/switcher/presets уже готовы в UI, включение живёт за `fiatDepositsLive` GeoConfig и ключами PSP (без PSP кодить нечего — фейково). Десктоп-иконпанель §4.5 — перенесена в собственный гэп **GAP-54** (закрыт 2026-09-14), а её остатки — в **GAP-55** | `apps/web/src/app/providers/**`, `apps/web/src/app/page.tsx`, `apps/web/src/app/profile/**`, `apps/web/src/lib/api/casino.api.ts` | ✅ **P3 закрыт 2026-09-13 (PR сразу после #80, branch `feat/gap53-phase2-frontend`)** | 1) `/providers` — сетка провайдеров (название, game_count, заглушка лого при отсутствии), SEO-layout; 2) `/providers/[slug]` — игры провайдера на GameCard-сетке, заголовок из списка провайдеров, generateMetadata («{Название} — игры провайдера \| Casino»); 3) главная — лента провайдеров (горизонтальный скролл, тап → страница провайдера) последним блоком §6.1; 4) профиль — аватар: превью из `profile.avatarUrl`, загрузка через multipart `POST /users/me/avatar` (клиентская валидация mime/размера до отправки), обновление `me` после успеха; 5) тесты `casino-api.spec.ts` (контракты providers/recent/favorites/toggle) + avatar-кейс в `users-api.spec.ts`; tsc 0, vitest зелёный, CI — lint/build/DOM |
-
-| GAP-54 | **Десктоп-иконпанель и глобальный вход в поиск не реализованы (остаток ТЗ ч.5 §4.4/§4.5/§4.7, вынесен из GAP-53).** (а) §4.5: слева узкая икон-панель 64–72px с пунктами Главная · Казино · Избранное · Провайдеры · Кошелёк · История · Поддержка, подписи по hover/pin — в коде не было вообще никакой десктоп-навигации (только мобильный BottomNav), т.е. на телефоне каркас соответствовал ТЗ, на десктопе — нет; (б) §4.4: «десктоп: поле в хедере + Ctrl/⌘ K» и «телефон: поле под шапкой на главной» — поля поиска не было ни там, ни там, на /search не было результатов по провайдерам и last played (ТЗ требует); (в) §4.7: «Auth Layout — без казино-навигации» — обвязка (хедер/футер/таббар) монтировалась в корневом layout для ВСЕХ маршрутов, в т.ч. /login и /register (в BottomNav скрывались только две из шести auth-страниц) | `apps/web/src/components/layout/{MainShell,AppHeader,BottomNav}.tsx`, `apps/web/src/app/search/**` | ✅ **P3 закрыт 2026-09-14** | 1) `DesktopNav` — фикс-панель `w-16` (64px, по ТЗ 64–72) только с `md:`, 7 пунктов релиза, активный пункт по префиксу сегмента, подпись по hover (тултип) и pin (раскрытие до 200px, состояние в localStorage — переживает reload), контент смещается `md:pl-16`/`md:pl-[200px]`; запрещённые в релизе Live/Настольные/Быстрые/Бонусы не добавлены (§24); 2) поиск: поле в хедере (md+), лупа-ссылка на /search (телефон), `MobileSearchBar` под шапкой на главной (§4.1), `Ctrl/⌘K` → /search (обработчик игнорирует фокус в input/textarea/contentEditable, иначе ломал бы набор текста); 3) /search дополнен по §4.4: результаты по провайдерам (фильтр списка по тому же запросу), блок last played, кнопка «Сброс»; 4) §4.7 — обвязка не рендерится на auth-маршрутах (`isAuthPath` по `usePathname`, НЕ через `window.location` — иначе hydration mismatch и нерелевантность при SPA-переходах); листы кассы/логина остаются смонтированными, чтобы launch после входа продолжился (§5.5); 5) чистая логика вынесена в `lib/ui/desktop-nav.ts` (конвенция GAP-44 «компоненты — глупый рендер») и покрыта `desktop-nav.spec.ts` — 13 кейсов: набор/порядок пунктов, запретные разделы, правило активности (включая «/casinonext» ≠ активно), кодирование кириллицы в searchHref, границы auth-префиксов, шорткат и его подавление в полях ввода |
-
-| GAP-55 | **Остатки ТЗ ч.5 после GAP-52/53/54 — открыто списком, чтобы не выглядело «фронт закрыт на 100%».** Машинная сверка кода с tz-part-5 (2026-09-14): (а) §7 «Фильтры живут в URL» — каталог хранит category/provider/search в `useState`, `?sort=` в UI нет (API поддерживает popular/new/name_asc/name_desc), «сброс фильтров — одна кнопка» фактически не сбрасывает состояние (ссылка ведёт на тот же смонтированный роут); (б) §6.1 п.2 — чипы категорий на главной отсутствуют; п.5–7 — блоки «Новые» и «Избранное» на главной не выведены; (в) §8.4 — ошибки запуска должны быть отдельными экранами, а не общим toast: `CURRENCY_NOT_SUPPORTED` сейчас toast (LaunchCurrencySheet закрывает только ветку «пустой активный кошелёк»); (г) §11 — история транзакций живёт инлайном в `/wallet` (20 записей) вместо отдельного маршрута с фильтрами тип/валюта/период и деталью записи; (д) §12 — в истории ставок нет фильтров (игра/провайдер/период/валюта); (е) §22 Performance — `next/image`+WebP/blur для обложек (сейчас emoji-заглушка), CDN-домены провайдеров в `next.config.js`, ISR главной/каталога 60с (сейчас CSR-запрос), виртуализация длинных сеток, dynamic import iframe и KYC-загрузчика, prefetch мета игры при появлении карточки; (ж) §5.2 «после 5 неудач — captcha» — капчи нет ни во фронте, ни на бэке (GAP-18 сделал lockout 10/15 мин, это не капча); (з) §10.3 WithdrawSheet как глобальный sheet поверх игры (сейчас отдельная страница `/withdraw`) | `apps/web/src/app/casino/page.tsx`, `apps/web/src/app/page.tsx`, `apps/web/src/app/history/page.tsx`, `apps/web/src/app/wallet/page.tsx`, `apps/web/next.config.js` | ✅ **P3 закрыт 2026-09-16 — все пункты (а)–(з) готовы: (а,б) PR #83, (в,з) PR #84, (г,д) PR #85, (е) PR #86, (г-остаток) PR #87, (ж) PR #88; живая проверка капчи (siteverify + виджет на публичном домене) — в GAP-46** | Закрывается частями, порядок: (а)+(б) как «витрина: URL-фильтры, сортировка, сброс, чипы, полки Новые/Избранное» → (г)+(д) «история: отдельный маршрут транзакций + фильтры ставок» → (в)+(з) «ошибки запуска экранами + WithdrawSheet» → (е) performance-хвост отдельным PR. Каждый пункт — с критерием «работает в браузере», не «код написан». **Итог 2026-09-16:** код-часть (а)–(з) закрыта (прогресс ниже), счётчики тестов сведены в README/QA_CHECKLIST; браузерная приёмка фронтов и живой siteverify капчи — на стенде в рамках GAP-46.
-
-**🟡 ПРОГРЕСС 2026-09-14 — (а) и (б) ЗАКРЫТЫ (PR #83).**
-
-- **(а) фильтры в URL (§7):** состояние каталога живёт в query — `/casino?category=&provider=&sort=&q=`; `lib/ui/catalog-filters.ts` (чистые `parseFilters`/`filtersToApiParams`/`filtersToQuery`/`catalogHref`/`hasActiveFilters`), `CasinoInner` читает `useSearchParams` (Suspense-граница в `page.tsx` — без неё prerender падает, см. урок #80), `CatalogFilterBar` меняет через `router.replace`. **Пустые значения не проттекают ни в API (иначе «все» стало бы фильтром `''`), ни в URL.** Кодирование — `%20`, а не `+` (ссылки шарятся и идут в SEO; `URLSearchParams.toString()` даёт `+`, что двусмысленно для парсеров), чтение терпит обе формы — round-trip и старые ссылки покрыты тестами. Добавлена сортировка (`''|popular|new|name_asc` — значения валидны для API). **Сброс фильтров заработал по-настоящему:** раньше ссылка в пустом состоянии вела на тот же смонтированный роут и состояние не менялось; теперь кнопка (видна только при активных фильтрах) чистит query.
-- **(б) чипы и полки главной (§6.1):** `HomeChips` — категории из `GET /casino/categories` с фильтром по `game_count>0` (пустые разделы не показываем, §7) + «Популярные»/«Новые», каждая ссылка ведёт в каталог с фильтром в URL; полки «Новые» и «Избранное» выведены (последняя — только если не пустая, §6.2); `GameSection` с `variant='row'` для «Продолжить играть» (горизонтальный ряд 8–12, §6.1 п.1); порядок полок приведён к §6.1, промо-слот сознательно ВЫКЛЮЧЕН (акционного движка нет — §2.8/§24 «не обещать бонус, которого нет»); `ProviderStrip` вынесен из страницы.
-- **Инфраструктура избранного:** `hooks/useFavorites.ts` — единый кеш `['favorites-ids']` + каноничный optimistic update (onMutate правит кеш и захватывает снимок, onError откатывает по контексту, onSettled приводит к серверной правде). Раньше главная и страница избранного держали по своей копии мутации и списки разъезжались; теперь один источник, сердце синхронно на обеих страницах. Убран хардкод-фолбэк демо-игор в `page.tsx` — дублировал seed (`demo-sweet-fruits` и др.) с неверной формой полей и показывал карточки, которых нет в БД.
-- **CI-цикл #83 и инструмент против регресса:** первый пуш покраснел на `next lint` — 2 нарушения import/order
-  (`@/components/casino/CatalogFilterBar` после `GameCard`; `@/hooks/useFavorites` после `@/lib/api`) и 1 реальное
-  `react-hooks/exhaustive-deps` (`data?.data ?? []` как нестабильная зависимость useMemo → обернул в свой useMemo).
-  Причина первых двух: **предыдущая версия локального чекера молчала** — она брала список файлов из `git status`, а после
-  коммита там остаётся только помеченное, поэтому проверка не открыла ни одного файла из новых. Исправлено:
-  `scripts/check-import-order.py` теперь берёт `main...HEAD` + рабочее дерево + untracked, печатает
-  «проверено файлов: N» (молчание больше не похоже на успех) и снабжён негативным тестом (намеренная поломка
-  порядка → exit 1). Перед этим пушем: 14 файлов, 0 нарушений.
-- **Тесты:** `catalog-filters.spec.ts` — 15 кейсов (round-trip URL, непустые параметры в API, `q`→`search`, канон %20 vs `+`, `& = #` в запросе, `hasActiveFilters`, отсечение пустых категорий, набор/ссылки чипов); vitest web unit **57 → 72** локально.
-- **(в) ошибки запуска — экранами (§8.4):** маппер `lib/ui/launch-error.ts` (стабильные коды API →
-  заголовок/текст/набор действий) + `components/game/LaunchErrorScreen`; страница игры показывает экран вместо
-  toast, код ошибки выводится строкой «приложите в поддержку». Из §8.4 покрыты все шесть случаев: недоступна/
-  техработы/сессия уже открыта/валюта не поддерживается/провайдер не ответил (сеть или 5xx)/недостаточно средств.
-  Последнее оставлено флоу, а не экраном: §8.2.4 прямо велит при пустых кошельках открывать DepositSheet.
-  У каждого экрана ≥1 действия (§2.3.9 «ошибка даёт следующий шаг, не тупик»); смена игры или кошелька сбрасывает
-  ошибку. Плюс §8.3: баланс на планке игры обновляется `refreshActive()` по фокусу окна (Socket.IO запрещён §2.1).
-- **(з) WithdrawSheet как глобальный лист (§10.3/§16.1):** `components/wallet/WithdrawSheet.tsx` в корневом
-  layout, открывается из кошелька и поверх игры; чистое ядро `lib/ui/withdraw.ts` покрывает §10.3 буквально —
-
-1. KYC-стопер без формы реквизитов с одной кнопкой «Пройти верификацию», 2) «Нечего выводить» при пустых
-   кошельках, 3) «в активной пусто, в другом есть» → предложить вывести ту валюту (не открывать нулевую форму),
-2. форма. Вывод только в валюте выбранного кошелька и только на метод этой валюты (методы из GeoConfig,
-   не список из головы; API enum card|sbp). Сеть крипты видна и не меняется; валидация адреса РАЗЛИЧАЕТ сети —
-   TRC20 не проходит как BTC и наоборот (тесты фиксируют оба направления). Пресеты, минимум/максимум с символом
-   валюты (§2.5), срок «до 24 часов», стадия подтверждения с замаскированными реквизитами (§16.1 ConfirmModal
-   на вывод), результат — номер заявки + «История».
-
-- **Попутно найден и исправлен реальный баг вывода:** страница `/withdraw` слала `destination` ОБЪЕКТОМ
-  ({card_number, card_holder} / {wallet_address}), а `CreateFiatWithdrawalSchema`/`CreateCryptoWithdrawalSchema`
-  ожидают строку → любой фиат-вывод давал 422, фича не работала вообще. Также она предлагала TON/TRX/LTC,
-  запрещённые релизом (§24). Отдельные страницы кассы заменены тонкими хостами (`/deposit`, `/withdraw`
-  открывают лист — прямые ссылки и закладки не падают на 404): по §2.9 отдельных страниц кассы быть не должно.
-- **Дедупликация (по замечанию владельца о «раздутии»):** подпись валюты была вычислена инлайном в 4 местах
-  (`formatAmount(0, cur).replace(/^0\s?/, '')` в DepositSheet/LaunchCurrencySheet + карта CRYPTO_LABELS в
-  WalletSwitcher + локальная в моём первом драфте) — сведена к одной `currencyLabel()` в `lib/format/currency.ts`
-  с тестами; оболочка листа (backdrop+panel+заголовок) была продублирована в двух ветках рендера — сведена к
-  `SheetShell`; `WithdrawSheet` разбит на `WithdrawForm`/`WithdrawPrecheckPanel`/`ConfirmPanel`/`DonePanel`
-  (главная функция 238 → 143 зачётных строк при лимите 200).
-- **Инструмент самопроверки:** `scripts/check-import-order.py` (eslint на Termux не запускается) — теперь берёт
-  всю ветку (`main...HEAD` + рабочее дерево + untracked), печатает число проверенных файлов, нейтрален к
-  комментариям между импортами (первая версия врала на док-блоках). Негативный тест: намеренная поломка порядка → exit 1.
-- **Тесты (в)+(з):** `withdraw.spec.ts` 22 (пречекки по порядку, сети vs сети, минимумы/максимумы/остаток,
-  маскировка, пресеты), `launch-error.spec.ts` 15 (все шесть случаев §8.4, уникальность заголовков, следующий шаг
-  у каждого, сеть ≠ 4xx), +5 кейсов на `currencyLabel`. Vitest web unit **72 → 112** локально; в CI с DOM будет 118.
-- **Поймано локально до отправки:** мой же тест поймал ошибку в escape (U+02B8 `ʸ` вместо U+02BB `ʻ` в `soʻm`) —
-  тест на формат валюты из ТЗ §2.5, а не опечатка в проде.
-- **(г) §11 — история транзакций отдельным маршрутом:** `/wallet/transactions`
-  (защищённый, noindex наследуется с `/wallet`), фильтры **тип / валюта / период в URL**
-  (тот же подход, что каталог в (а): ссылка копируется, «назад» работает, пустое не утекает),
-  бесконечная подгрузка «Показать ещё», ошибка — с «Повторить». Сумма всегда с валютой
-  (§11: «+1 000 без валюты — ошибка UI»): `formatTxAmount` берёт знак ИЗ САМОЙ СУММЫ
-  (ledger пишет списания отрицательными: `'-' + amount` в `wallet.ledger.prisma.ts`),
-  а не из таблицы «тип → знак» — такая таблица не может разъехаться с новым типом
-  проводки. Плюс/минус — зелёный/красный. Детали строки: сеть (только крипта),
-  замороженная сумма (`metadata.locked_amount` у WITHDRAWAL_LOCK, где amount = 0),
-  провайдер и внешний id из `metadata`, «баланс после», id транзакции.
-  **Курс намеренно не показывается**: при crypto-зачислении он не фиксировался
-  (в metadata есть только `actually_paid`), а §11 разрешает курс «только если реально фиксировался».
-  Статус-колонку тоже не выдумываем: запись ledger = факт, а стадии заявки (pending/approved)
-  живут в payment_requests — это остаток, записан ниже. `/wallet` приведён к §10.1:
-  последние 5 операций **активного** кошелька + «Смотреть все».
-- **(д) §12 — история ставок:** фильтры **игра / провайдер / валюта / период** в URL +
-  `/casino/history` научился `provider` (slug), `currency`, `from`/`to` и вернул `meta` +
-  `stats`. Введена `roundStats` — `groupBy` по валютам, и список/счётчик/агрегаты строятся
-  ОДНИМ предикатом (`roundWhere`), иначе «ставок: 124» над отфильтрованной таблицей врёт.
-  Наверху — количество ставок; оборот и выигрыши показываются ТОЛЬКО когда выбрана одна
-  валюта, при смешанной выборке даётся разбивка по кошелькам и суммирования ₽+USDT нет (§12).
-  P/L — только в раскрытой детали ставки, красным-героем не вынесено (§12, §24).
-  Деньги через `money`/`formatAmount`, number в проводках не появляется.
-- **Попутно найден РЕАЛЬНЫЙ ДЕФЕКТ GAP-52 (моя же работа):** web-`GameDto` был описан в
-  snake_case (`name_ru`, `is_new`, `is_popular`, `has_demo`), а `ListGamesUseCase` и
-  `/casino/favorites|recent` отдают camelCase Prisma (`nameRu`, `isNew`, `isPopular`, `hasDemo`).
-  Следствия: бейджи NEW/HOT (§6.4, закрытые в #80) ФАКТИЧЕСКИ не рендерились, русские
-  названия не показывались, а кнопка «Демо» на странице игры не появлялась никогда
-  (функциональная потеря). Исправлено: DTO приведён к фактическому контракту,
-  отображение игры вынесено в `lib/ui/game.ts` (`gameDisplayName`/`gameBadge` с приоритетом
-  NEW над HOT по §6.4/§24 «не оба», `gameRtpLabel` — Decimal приходит строкой, `gameHasDemo`)
-  и ЗАКРЕПЛЕНО тестами `game-contract.spec.ts` — без них расхождение вернулось бы так же молча.
-- **Валидация на входе (g/д):** у обоих эндпоинтов истории появились Zod-схемы запросов
-  (`.strict()`). Раньше мусорный `?type=`/`?currency=` уходил прямо в Prisma, а `?from=вчера`
-  давал Invalid Date → **500**; перечисления валидируются по рантайм-источнику
-  (`Object.values(LedgerEntryType)`, `Object.keys(ZERO)`), поэтому не могут разъехаться
-  со схемой БД и типами. `metadata` добавлена в ответ `/wallet/transactions` (аддитивно).
-- **Тесты (г/д):** api `history-filters.spec.ts` — 4 (один WHERE на список/счётчик/агрегаты,
-  пагинация не утекает в total, пустые суммы → строка '0', пустые опции не проттекают ключами);
-  web `history-filters.spec.ts` — 15, `game-contract.spec.ts` — 12. Vitest web unit
-  **112 → 135** локально; api — зелёные.
-- **(е) §22 Performance — закрыто 2026-09-15 (PR #86):**
-- _обложки игр_: `GameThumb` — `next/image` (webp/avif из `formats`, `fill`+`sizes`, lazy)
-  **только для хостов из allowlist** `NEXT_PUBLIC_IMAGE_HOSTS`. В `next.config.js`
-  сознательно нет `hostname: '**'`: оптимизатор стал бы по заказу браузера ходить по
-  произвольным URL (SSRF + отравленный кеш). Собственный `/uploads/` идёт обычным
-  `<img loading=lazy>` — его раздаёт nginx, а не Next, через `/_next/image` такой путь
-  только 404-ится. Без обложки — прежняя emoji-заглушка (витрина не пустеет). Реальные
-  хосты CDN брендов станут известны на GAP-46, тогда достаточно дописать в env.
-  `lib/ui/thumbnail.ts` — чистые `parseImageHosts`/`isAllowedImageHost`/`thumbSource`,
-  8 тестов (поддомены, префикс-подмена `cdn.gitslotpark.com.evil.net`, битые URL).
-- _виртуализация длинных сеток_: без новой зависимости — `content-visibility: auto` +
-  `contain-intrinsic-size` на карточке (`GameCard`, утилита `.virtual-cell` в globals.css):
-  браузер пропускает отрисовку вне вьюпорта. Ручной windowing на мобиле дороже его
-  пользы для 24-карточных полок. Осознанное отклонение от буквальной «виртуализации».
-- _dynamic import iframe_: play-страница грузит `GameFrame` через
-  `dynamic(..., { ssr:false, loading })` — шапка с балансом и кнопкой кассы рисуется
-  сразу, тяжёлый фрейм провайдера догоняет; размонтируется с роутом (§8.4 «не держать
-  iframe в памяти»), в общий бандл игровые вещи не попадают (§22).
-- _prefetch меты игры_: `router.prefetch('/casino/[slug]')` на `pointerenter`/`focus`
-  карточки — по наведению, а не по вьюпорту: in-view-вариант запульнул бы 12–24 роута
-  первого экрана на 90% мобильном трафике. §22 формулирует это как «желательно».
-- _ISR главной_: `/` переведена на серверный рендер с `export const revalidate = 60`
-  (§20/§22). Публичные полки (популярные, новые, чипы категорий, лента провайдеров)
-  приходят сервером через новый `lib/api/server.ts`
-  (`fetch(..., { next: { revalidate: 60 } })`, ошибки глотаются — пустая полка лучше
-  упавшего prerender, и в CI API на билде не поднят); приватные полки («Продолжить
-  играть», «Избранное») остались клиентскими островами. Бонусом: у главной появилась
-  собственная `metadata` (раньше title/OG были только в корневом layout).
-- **Отклонения, зафиксированные честно:** (1) каталог `/casino` остаётся CSR —
-  «ISR каталога» из §22 несовместим с §7 «фильтры живут в URL» + бесконечной
-  прокруткой: кэш по произвольным комбинациям query дал бы устаревшие выдачи при
-  неизчезнувшем клиентском fetch; вместо ISR — `staleTime`/prefetch. (2) Серверную
-  env-переменную (`API_INTERNAL_URL`) не заводил — использована существующая
-  `NEXT_PUBLIC_API_URL`, чтобы не плодить расхождение с docs-guard D3/D7.
-  (3) KYC-загрузчик вынесен не был: он и так грузится внутри страницы KYC, а тяжёлой
-  библиотеки там нет (обычный `FormData` + `fetch`) — benefit'а dynamic import нет,
-  отметку в §22 снимаю с обоснованием.
-- **Остаток §7 закрыт этим же PR:** на телефоне фильтры каталога — чипы категорий +
-  bottom-sheet «Фильтры» (сортировка, провайдер), как требует §7, а не сайдбар; поиск
-  и «Сбросить фильтры» (одна кнопка) доступны и на телефоне, и на десктопе.
-- **Тесты (е):** `thumbnail.spec.ts` — 8 кейсов; vitest web unit **135 → 143** локально
-  (в CI с DOM — 149); `tsc` web 0; `scripts/check-import-order.py` — 0 нарушений;
-  длины/сложность функций в норме; CJK-мусора 0.
-- **(г-остаток) §11 «статус» — ЗАКРЫТО 2026-09-16 (PR #87), принято как ADR владельцем
-  делегировано агенту: «сделай как тебе удобно»).** Проблема была не в UI, а в данных:
-  проводка ledger не была присоединима к payment_request, поэтому показать статус
-  было нечем. Решение (порядок money-пути сохранён, добавлен только предсказуемый id):
-  1. `create-withdrawal.use-case.ts` генерирует `paymentRequestId` ДО блокировки и
-     передаёт в `lock({ idempotencyKey: wd_lock_<prId>, metadata: { payment_request_id } })`,
-     затем `create({ id: paymentRequestId, idempotencyKey: wd_<prId> })`. Порядок
-     «сначала lock, потом заявка» НЕ менялся: при отказе блокировки заявки нет
-     (тест), pending-сирот не появляется. Уникальность ключей та же (uuid), но
-     детерминированная от id заявки — повтор по той же заявке теперь видим дедупликации
-     (было: `wd_lock_<random>`, теряющий связь).
-  2. `unlock` (отмена) и `confirmWithdrawal` (выплата) несут ту же ссылку; их ключи
-     `wd_unlock_<prId>`/`wd_confirm_<prId>` (последний был детерминирован и раньше).
-  3. `GET /wallet/transactions` добирает статусы ОДНИМ запросом
-     (`findMany({ userId, id: { in } })`, не N+1) с обязательным scope по
-     пользователю (IDOR), и отдаёт `payment_status`.
-  4. UI показывает «Статус заявки» в деталях строки; **строки, записанные до этого
-     PR, остаются с `payment_status: null`** — статус не выдумывается и не подгоняется
-     эвристикой по сумме/дате (это был бы расходящийся отчёт). Маппинг
-     `PaymentStatus` → человеческий статус и цвета — в `lib/ui/history-filters.ts`, 4 теста.
-     Условие пересмотра: если ledger и payment_requests когда-нибудь разъедутся по
-     сервисам (см. ADR GAP-51), ссылка становится внешним ключом и потребует события,
-     а не join.
-     Тесты: api `withdrawal-link.spec.ts` — 5 (общий id в lock и create; разные id между
-     заявками; отказ lock ⇒ нет заявки; KYC до мутации баланса; amount остаётся строкой).
-- **(ж) §5.2 капча после 5 неудачных входов — реализована 2026-09-16 (PR #88),
-  решения приняты агентом по делегированию «сделай как тебе удобно» и зафиксированы:**
-  1. провайдер — **Cloudflare Turnstile** (бесплатно, без картинок-головоломок, виджет
-     и `siteverify` не требуют SDK; обычно доступен из СНГ). Замена на hCaptcha/reCAPTCHA
-     = один файл `captcha.service.ts` (другой URL + имя поля токена).
-  2. политика при недоступности провайдера — **fail-open** с warn в лог: капча второй
-     слой, основной барьер уже стоит (GAP-18 lockout 10/15 мин + GAP-19 throttler
-     10 req/мин на /auth). fail-closed превратил бы сбой Cloudflare в отказ всего
-     логина — это отказоустойчивость хуже, чем риск.
-  3. порог — **5** (§5.2), конфиг `CAPTCHA_AFTER_FAILED_ATTEMPTS`; lockout на 10
-     срабатывает позже, это осмысленно (капча ДО блокировки).
-  4. `TURNSTILE_SECRET_KEY`/`NEXT_PUBLIC_TURNSTILE_SITE_KEY` оба optional и механим
-     **выключен, пока задан не каждый**: dev/CI/тесты не могут остаться без входа.
-  5. `remoteip` намеренно не отправляется: за nginx мы видим адрес прокси, а ложный IP
-     в verification-запросе хуже отсутствия (генератор ложных отказов).
-  6. проверка ставится **до argon2-verify** — у бот-волны не должно быть шанса прогонять
-     хеширование; `unknown email` по-прежнему InvalidCredentials (существование аккаунта
-     капча не раскрывает).
-     Фронт: `<CaptchaField>` грузит скрипт Turnstile по требованию (SDK не становится
-     зависимостью, CSP `script-src … https:` его пропускает), появляется ТОЛЬКО после
-     `CAPTCHA_REQUIRED`; store шлёт `captcha_token` только когда он непустой (контракт
-     проверен тестами), `CAPTCHA_FAILED` чистит токен и просит повторить.
-     Тесты: api `captcha.spec.ts` — 9 (включены/выключены по ключам, порог и его
-     переопределение, «нет токена ⇒ нет обращения к провайдеру», success=false ⇒
-     CAPTCHA_FAILED, сетевой сбой ⇒ fail-open с warn, форма verification-запроса),
-     web `auth-store-captcha.spec.ts` — 4 (поле не отправляется пустым/обычным входом).
-     **Что остаётся непроверенным здесь и переносится в GAP-46:** живой `siteverify`
-     с настоящими ключами и реальный виджет в браузере (нужен публичный HTTPS-домен).
-     Код-часть гэпа на этом закрыта — открытых пунктов ТЗ ч.5 в GAP-55 не остаётся.
-
-## 🔎 АУДИТ ПРЕДДЕПЛОЙНОЙ ИНФРАСТРУКТУРЫ — 2026-09-27 (GAP-56)
-
-> Повод: планирование запуска (GAP-46) при отсутствии VPS/ключей — машинная сверка
-> `docker-compose.prod.yml` ↔ `.env.example` ↔ `docs/ENVIRONMENT_VARIABLES.md` ↔
-> `infra/scripts/*` ↔ `infra/nginx/*`. Найдено 9 дефектов; каждый из них уронил бы
-> первый деплой, ежедневный бэкап или мониторинг с первого дня. Найдены и закрыты
-> одним PR (ветка `fix/gap56-infra-drift`), runtime-проверка всего контура — при
-> первом деплое (GAP-46 п.6).
-
-| #   | Дефект                                                                                                                                                                                                                                                                                                            | Фикс (2026-09-27)                                                                                                                                                                                                                                                                                                   |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `DB_USER`/`DB_PASSWORD`/`DB_NAME` читает compose (контейнер postgres + healthcheck), но **0 упоминаний** в `.env.example`/ENVIRONMENT_VARIABLES — слепая зона D7 (код TS их не читает). Оператор, поднимающий прод по доке, получил бы падающий compose                                                           | ✅ описаны в §3 + §22 + `.env.example` с требованием согласованности с `DATABASE_URL`                                                                                                                                                                                                                               |
-| 2   | `infra/nginx/snippets/` **не смонтирован** в nginx-сервис → `include /etc/nginx/snippets/ssl.conf` падает `[emerg]` на первом старте nginx                                                                                                                                                                        | ✅ `./infra/nginx/snippets:/etc/nginx/snippets:ro`                                                                                                                                                                                                                                                                  |
-| 3   | Тома `certbot_certs`/`certbot_www` compose именует с префиксом проекта (`casino-platform_certbot_certs`), а `ssl_init.sh` и renew-cron монтируют `docker -v certbot_certs:...` буквально → сертификаты оседают в томе, которого nginx не видит                                                                    | ✅ томам заданы фиксированные `name:` в compose                                                                                                                                                                                                                                                                     |
-| 4   | Домены захардкожены: `server_name`/пути сертификатов ×4 в nginx conf, build-arg `NEXT_PUBLIC_API_URL` в compose, `DOMAINS=` в ssl_init.sh — под свой домен оператору пришлось бы править 3 файла в репо                                                                                                           | ✅ nginx conf → envsubst-шаблон `infra/nginx/templates/casino.conf.template` (конвенция official-образа; nginx-переменные `$host` и пр. не задеты), compose передаёт `DOMAIN`/`ADMIN_DOMAIN` в nginx-сервис, ssl_init.sh читает их из `.env` (fail-closed без них); `SSL_EMAIL` опционален (дефолт `admin@$DOMAIN`) |
-| 5   | `restore.sh` ссылался на несуществующие контейнер `casino-db`, пользователя `postgres`, каталог `/var/backups/casino`, содержал невалидный `DROP DATABASE x (FORCE)` (синтаксическая ошибка — правильно `WITH (FORCE)`), и **никогда не запускался** (блокер GAP-46 п.7 — учебное восстановление до приёма денег) | ✅ переписан: контейнер через `docker compose ps -q postgres`, имена из `DB_USER`/`DB_NAME` (source `.env`), `--dry-run`, `gunzip -t` до изменений, `psql -v ON_ERROR_STOP=1`, миграции и проба `/health/ready` после заливки                                                                                       |
-| 6   | `postgres-backup.sh` (cron 02:00) — молчаливые дефолты `${DB_USER:-casino}`/`${DB_NAME:-casino_prod}` могли разойтись с реальными именами БД → ночной бэкап падал или снимал пустую БД                                                                                                                            | ✅ `source .env` + fail-closed без `DB_USER`/`DB_NAME`                                                                                                                                                                                                                                                              |
-| 7   | `health-check.sh` и `resource-check.sh` пробуют `http://localhost:3001` **с хоста** — порт api не публикуется (наружу только nginx 80/443) → проба падала всегда, `resource-check` ALERT'ил бы каждые 5 минут с первого дня                                                                                       | ✅ проба перенесена внутрь контейнера api (`compose exec api wget`, wget есть в образе — им же работает healthcheck compose)                                                                                                                                                                                        |
-| 8   | `rollback.sh` звал `pm2 reload` и `pnpm build` — на VPS их нет, деплой идёт docker-образами                                                                                                                                                                                                                       | ✅ приведён к `docker compose build api web admin` + `up -d` + health-check по DEPLOY.md § Rollback                                                                                                                                                                                                                 |
-| 9   | Считалка `QA_CHECKLIST.md` (33 пункта / 7 частичных / 17 автопокрытие) разошлась с фактом: Auth фактически 9 пунктов (3 частично), итог 35/9/19; перечень спеков отставал (22 при фактических 26)                                                                                                                 | ✅ сведена с фактом (35/10/9/16, автопокрытие 19 из 35, 26 спеков)                                                                                                                                                                                                                                                  |
-
-**Гейты PR:** `bash -n` по всем скриптам; docs-guard локально (D1–D7); commitlint;
-typecheck/lint/tests не задеты (нет TS-изменений). Побочные проверки envsubst-механики
-(nginx official image: `/etc/nginx/templates/*.template` → `/etc/nginx/conf.d/`,
-envsubst только по определённым env-именам) — задокументированы в шаблоне и compose;
-живая проверка — на первом деплое.
-
-## 🔴 НАГРУЗОЧНЫЙ ПРОГОН GAP-47 → GAP-57 — 2026-09-27 (вечер)
-
-> Полный разбор — `docs/archive/load-test-2026-09-27.md`. Прогон k6 (10→50→100 VU,
-> ставки по 10.00 RUB, уникальные transactionID) на локальном Docker-стенде
-> подтвердил целостность денег (balance/version сходятся точно) и вскрыл, что
-> Serializable-конфликты при высокой конкурентности отбрасывают большинство ставок.
-
-| #      | Что не работает                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Где                                                                                                                                                                                                                                                              | Приоритет                                                                         | Критерий приёмки                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| GAP-57 | **Конкурентные мутации одного кошелька не сериализуются приложением: при 100 VU на одного игрока 69% ставок получают отказ (Prisma P2034 — Serializable write conflict на commit).** Найдено прогоном GAP-47. Версия «нашёл и починил» (этот же PR): 1) `withRetry` в ledger ловил только app-level `OptimisticLockError` — P2034 приходил от СУБД ДО app-кода и не ретраился; 2) `PrismaWalletTransactionRunner.runInTransaction` (единственная точка открытия внешних транзакций bet/win/rollback) не ретраил вовсе; 3) текст сырой Prisma-ошибки (с путями машины) утекал провайдеру в HTTP-ответе коллбэка; 4) k6-скрипт был неисполняемым (чейнинг `update()` в k6/crypto + `discardResponseBodies`). **Остаток после этого PR:** 3 ретрая не покрывали профиль (30,6% успеха) — нужен механизм сериализации мутаций одного кошелька | `apps/api/src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma.ts` (withRetry), `wallet-transaction-runner.prisma.ts`, `apps/api/src/modules/casino/presentation/controllers/provider-callback.controller.ts`, `infra/load-tests/wallet-concurrency.js` | ✅ **P1 ЗАКРЫТ 2026-09-30** (ADR: advisory-лок; прогон `docs/archive/load-test-2026-09-30.md`) | **ADR (решение владельца 2026-09-30) — вариант 1, advisory-лок.** Конкурентный abort заменён явной очередью: `pg_advisory_xact_lock(hashtextextended('casino.wallet:<userId>:<currency>',0))` ПЕРВОЙ операцией транзакции, до чтения `wallet_accounts`; isolation `ReadCommitted` (лок сам сериализует кошелёк — SSI отменял бы в том числе неконфликтующие транзакции); `lock_timeout` (env `WALLET_LOCK_TIMEOUT_MS`, дефолт 5с) — всплеск на одном кошельке не выедает пул соединений; повтор 5 раз с джиттером на P2034/55P03/`OptimisticLockError`. Почему не варианты 2/3: per-wallet очередь BullMQ вносит асинхронность в путь денег (провайдер ждёт ответа на ставку синхронно), in-process mutex не работает при >1 инстансе API. **Контракт:** `runInTransaction` принимает `WalletLockTarget` (userId+currency) — забыть сериализацию нельзя на уровне типов; `bet`/`win`/`rollback` передают кошелёк игрока; оба «денежных» пути (solo credit/debit и lock/unlock/confirm) идут через одну примитиву `runWalletTransaction`. **Критерий закрытия выполнен:** прогон 10/50/100 VU — успех **100%** (25 708/25 708) против 30,6% в базовом; баланс сошёлся копейка в копейку (10 000 000 − 10 797×10 = 9 892 030; version 10 798 = 1+10 797; ledger 1:1). Параллелизм доказан: 10 кошельков → 165 rps / p95 169 мс (против ~82 rps одного кошелька) — лок пер-кошелёк, не глобальный. Кривая латентности одного кошелька (1 VU → p95 21мс … 100 VU → 1.16с) линейна и означает очередь, а не отказ; прежний порог `p(95)<500` требовал параллелизма от последовательного ресурса и был заменён санитарным `<2000` мс. **Попутно исправлены две ловушки:** (1) `pg_advisory_xact_lock` возвращает `void`, который Prisma не десериализует в `$queryRaw` — поймано интеграционным тестом на реальном Postgres, приведено к `::text`; (2) порог k6 `http_req_failed` был **слеп** к дефекту (отказы шли как HTTP 200 + `{status:1}`, k6 показывал 0.00% при 69,4% отказов) — главный гейт перенесён на `checks: rate>0.99`. Регрессия зафиксирована тестом на реальной БД: 20 параллельных списаний одного кошелька — все проходят, баланс и `version` сходятся |
-
-> **GAP-57 ЗАКРЫТ 2026-09-30** — сериализация конкурентных мутаций одного кошелька
-> (advisory-лок + ReadCommitted, ADR в строке гэпа). Успех на 100 VU: 30,6% → **100%**,
-> деньги сошлись; параллелизм по кошелькам доказан (10 кошельков → 165 rps).
-> Отчёт: `docs/archive/load-test-2026-09-30.md`.
-
-## 🔎 АУДИТ КОНТРАКТОВ ФРОНТ↔API — 2026-09-27 (GAP-58)
-
-> Повод: первый локальный запуск (GAP-47/56 сессия) поймал креш главной (`/casino/recent`
-> двойная вложенность, исправлен в фиксах #94) — владелец поручил систематическую
-> сверку «форма ответа API ↔ ожидания web/admin» по всем потребляемым эндпоинтам
-> (~40 шт., метод: контроллер-факт с учётом ApiResponse-обёртки ↔ DTO/развороты фронтов).
-
-| #   | Что не работало                                                                                                                                                                                                                                                                                                                                 | Где                                                       | Фикс (2026-09-27)                                                                                                          |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Админка: ВСЕ листинги сломаны** — `/admin/users`, `/withdrawals`, `/payment-requests`, `/transactions`, `/audit-logs`, `/games` отдают `{items, meta}`, а клиент читал `data.data` как массив → `data.data.map is not a function`, pager total=0. `/admin/kyc` — `{items, total}`; `/admin/support/tickets`, `/admin/referrals` — ключ `data` | `apps/admin/src/lib/api.ts`                               | ✅ нормализация конвертов в `apiGetFull` (items/data/total-варианты), страницы не тронуты; спек `api-get-full.spec.ts` (5) |
-| 2   | **Админ-логин при неверном пароле возвращал «успех»**: `{success:false, error}` с HTTP 200 (interceptor пропускал объект с ключом success) → клиент получал data:undefined, вход «проходил» без токена. То же для `POST /admin/admins` и `/:id/deactivate` не-superadmin'ом (403-ситуации показывались как успех)                               | `admin-auth.controller.ts`, `admin-admins.controller.ts`  | ✅ HTTP 401/403 + стандартный error-конверт (как у всех эндпоинтов); спек `admin-contract.spec.ts` (4)                     |
-| 3   | **`/users/me` в hydrate()**: ответ `{user, profile, settings, kycStatus}` записывался целиком в `user` → после перезагрузки у `user` нет id/email/role (тихая порча; падало бы на любом обращении к user.id — до сих пор спасало только Boolean(user))                                                                                          | `apps/web/src/stores/auth.ts`                             | ✅ берём `me.user`; спек `auth-store-hydrate.spec.ts` (3)                                                                  |
-| 4   | **Блок «Причина отказа» на /kyc никогда не показывался**: клиент ждал `rejection_reason`, API отдаёт camelCase `rejectionReason`                                                                                                                                                                                                                | `apps/web/src/lib/api/kyc.api.ts`, `app/kyc/page.tsx`     | ✅ поле сведено с фактом; кейс в `kyc-page.spec.tsx`                                                                       |
-| 5   | **`/referrals/list` — тип описывал несуществующие ключи** (`status`, `created_at`); API отдаёт `{id, registered_at, is_active, total_earned, currency}` — запрос мёртвый (`void list`)                                                                                                                                                          | `apps/web/src/types/referral.ts`, `app/referral/page.tsx` | ✅ тип приведён к факту                                                                                                    |
-| —   | Остальное (~30 эндпоинтов: casino/wallet/payments/auth/kyc/support/referrals/geo/admin-dashboard) — контракты сходятся; `/admin/kyc/:id` с 200-ошибкой при отсутствии записи помечен как сомнительное место (потребителя нет — переделать при появлении)                                                                                        | —                                                         | ✅ вердикты в отчёте аудита                                                                                                |
-
-**Гейты:** web 161 passed, admin 11 passed, api 195 passed / 21 skipped, typecheck/lint — 0 по всем трём apps, commitlint OK.
-
-## 🔎 АУДИТ ПРОЕКТА — 2026-10-01 (GAP-59)
-
-> Повод: полная проверка проекта перед запуском (гейты + сборки + прод-контур).
-> Метод: локальный прогон всех гейтов, сборка standalone-образов web/admin, сверка
-> compose ↔ prod-Dockerfile ↔ бандлы фронтов, прогон `vitest list` на коллекции спеков.
-
-| #   | Что не работало / найдено | Где | Фикс (2026-10-01) |
-| --- | ------------------------- | --- | ----------------- |
-| 1   | **Прод-compose не передавал build-arg `NEXT_PUBLIC_API_URL` сервису `admin`** (у `web` был, у `admin` секции `args:` не было). `admin.prod.Dockerfile` объявляет `ARG NEXT_PUBLIC_API_URL=https://casino.example.com/api/v1` — в образ уезжал дефолт. `apps/admin/src/lib/api.ts` — axios `'use client'` с `baseURL`, все 20 страниц дашборда клиентские, серверного прокси в admin нет; nginx-vhost admin **не имеет `location /api/`** → абсолютный URL обязателен. Итог: на любом домене, отличном от `casino.example.com`, бандл админки ходил на чужой/несуществующий хост — админ-логин сломан в проде. Эмпирика: две сборки одного кода с разным `NEXT_PUBLIC_API_URL` дали разные литералы в `.next/static/chunks/**` (`http://localhost:3001/api/v1` vs `https://my-real-domain.example/api/v1`) — Next.js инлайнит `NEXT_PUBLIC_*` на сборке, `env_file` на build не влияет. CI не ловил: job `docker-build` собирает только `api.prod`. ТЗ ч.7 (web и admin) требует `https://${DOMAIN}/api/v1` для обоих сервисов | `docker-compose.prod.yml` (сервис `admin`), `infra/docker/admin.prod.Dockerfile` | ✅ `args: NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://casino.example.com/api/v1}` — как у `web`, с комментарием-предупреждением про запекание |
-| 2   | **Guard'а на этот класс дрейфа не было** (compose ↔ prod-Dockerfile ↔ бандл). Тот же класс уже дал 9 дефектов в GAP-56 | `.github/workflows/architecture-guards.yml`, `scripts/check-prod-build-args.sh` | ✅ новый guard **G23**: каждый `ARG` (кроме `_*`) из `*.prod.Dockerfile` обязан приехать через `build.args` сервиса, который его собирает. Отрицательный тест: с откатом фикса guard падает с внятным ❌ и именем переменной |
-| 3   | **5 спеков affiliate продублированы в двух каталогах**: `src/modules/affiliate/__tests__/*.use-case.spec.ts` и `src/modules/affiliate/application/use-cases/*.use-case.spec.ts` (`attribute-player`, `clawback-player-commissions`, `create-commission`, `credit-commission`, `track-click`) — содержимое идентично, отличаются только пути импортов. `vitest list --filesOnly` собирал обе копии, прогон пары файлов давал **24 теста = те же 12 имён дважды**. Каждый CI-прогон гонял ~68 тестов дважды, правка одной копии молча оставляла вторую устаревшей | `apps/api/src/modules/affiliate/__tests__/` | ✅ оставлены колокейшн-копии (в этом модуле новый стиль — спек рядом с кодом: `login-affiliate`, `qualify-attributions`, `register-affiliate`, `affiliate-daily-run` существуют только там); из `__tests__/` остались уникальные `affiliate-jwt.service`, `affiliate-settings`, `ngr-calculator`. affiliate: 236 → **168** тестов (17 → 12 файлов), вся сумма — зеленый |
-| 4   | Счётчики тестов в README отстали от факта (заявлены 157 web / 203 api) | `README.md` | ✅ web **177**, admin **11**, api **468** unit/integration: **406** прогнано локально + **62** в 12 файлах интеграций/E2E на БД (в CI; здесь не стартуют — `binaries.prisma.sh` недоступен) |
-
-**Проверка гейтов после фиксов:** api 403 passed / 44 файла (12 файлов с Prisma-зависимостью не стартуют в этой среде — `binaries.prisma.sh` недоступен, в CI они зелёные), web 177, admin 11, tech-debt ratchets OK, `check-explicit-di` OK, docs-guard D1–D10 OK, G23 OK.
-
-## 🔎 АУДИТ ПРОЕКТА, П.3 «хрупкость и гигиена» — 2026-10-01 (GAP-60)
-
-> Продолжение GAP-59: владелец выбрал пункт 3 остатков («хрупкость и гигиена») —
-> пять подпунктов, все закрыты этим заходом.
-
-| #   | Что было                                                                                                                                                                                                                                                                                                                                                                    | Фикс (2026-10-01) |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
-| 1   | **`docker-build` собирал только `api.prod` и только на push в main** (`if: github.ref == 'refs/heads/main'`). Именно поэтому дефекты прод-сборок web/admin из GAP-59 (отсутствующий `output: standalone`, build-arg `NEXT_PUBLIC_API_URL`) не ловились CI и доехали бы до деплоя                                                                                              | ✅ job собирает все три прод-образа (api/web/admin) и на PR, и на main; web/admin получают явный `build-args: NEXT_PUBLIC_API_URL` — ровно как compose |
-| 2   | **`next/font/google` тянул Inter из fonts.googleapis.com во время `next build`** — сетевой отказ ронял сборку прод-образа web (воспроизведено локально: «next/font error: Failed to fetch Inter from Google Fonts»)                                                                                                                                                        | ✅ Inter самохостын: `@fontsource-variable/inter/wght.css` в `layout.tsx`, семейство `'Inter Variable'` проброшено в прежнюю переменную `--font-inter` (globals.css) — Tailwind и типографика не изменились. Проверка: `pnpm --filter @casino/web build` зелёный БЕЗ доступа к Google Fonts, в `.next/static/media` лежат 7 woff2 (latin/cyrillic/…), `.next/standalone/apps/web/server.js` на месте |
-| 3   | **Базлайны техдолга отстали** — CI сыпал WARN'ами «часть базлайна погашена», реестр `TECH_DEBT.md` держал замеры 2026-09-27                                                                                                                                                                                                                                                | ✅ ужаты `use-case-specs` (33→28) и `nest-exceptions` (5 файлов→4), `pnpm-audit` (high 20→19, moderate 28→27); замеры реестра G16–G20 пересчитаны (отставала таблица, не только базлайны); все шесть ратчетов + audit — OK без WARN |
-| 4   | **`QA_CHECKLIST.md` заявлял 203 api / 157 web** — тот же дрейф счётчиков, что починен в README (GAP-59)                                                                                                                                                                                                                                                                     | ✅ пересчитано: api 403 unit/integration в прогоне без БД + 12 файлов интеграций/E2E в CI; web 177; admin 11. Разбивка пунктов (10/9/16) сверена — верна |
-| 5   | **GAP-29 был закрыт по лживому детектору.** Детектор docs-guard D3 искал ключи схемы регуляркой `^  [A-Z]…` (ровно два пробела), а ключи `envSchema` лежат на четырёх — он не находил НИ ОДНОГО и объявлял невалидированными все 99 переменных, хотя схема покрывала 98. Закрытие GAP-29 от 2026-08-30 опиралось на этот молчащий ❌-сигнал | ✅ детектор исправлен (`^ +` — любой отступ), D3 теперь честно молчит; настоящий остаток — 6 переменных (`ADMIN_DOMAIN`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `THROTTLE_REFRESH_LIMIT`, `WALLET_LOCK_TIMEOUT_MS`) — добавлены в схему как optional (код читает их с дефолтами, поведение не менялось); регрессия закрыта спеком `env-validation.spec.ts::GAP-29 .env.example ↔ envSchema parity` (3 кейса, включая негатив на сам парсинг — «вырожденный результат»), чтобы дрейф не спрятался за регэкспом |
-| 6   | **Прод-образы web/admin не собирались ни разу — и не из-за одной причины.** Первым же прогоном расширенного `docker-build` (п.1 этого же гэпа) сборка `web` упала на `pnpm --filter @casino/web build`. Локальное воспроизведение в scratch-копии контекста (ровно COPY-набор Dockerfile) дало **две** независимые причины: (а) корневой `.eslintrc.js` не копировался — `apps/web/.eslintrc.js` его не расширяет, а наследует обходом вверх, поэтому `next lint` (шаг `next build`) парсил `.ts` как скрипт: 129 x «Parsing error: The keyword 'import' is reserved»; (б) `.npmrc` (`node-linker=hoisted`) не копировался — pnpm изолировал транзитивную `decimal.js` из `@casino/shared-utils` -> «Cannot find module 'decimal.js'» (ровно тот класс, что `api.prod.Dockerfile` уже документировал для node-типов). `admin` — тот же дефект (31 parsing-ошибка). Проверка фикса: scratch по новому COPY-набору — оба образа собираются, `.next/standalone/apps/{web,admin}/server.js` на месте; `packages/` в рантайме не нужны — `tsconfig paths` мапят `@casino/*` на `src`, код инлайнится в бандл | ✅ `COPY .npmrc .eslintrc.js ./` в `web.prod.Dockerfile` и `admin.prod.Dockerfile`, с комментарием-расследованием, почему именно эти два файла |
-
-**Гейты после правок:** docs-guard D1–D10 OK (D3 больше не Warn'ит), tech-debt все шесть OK, audit OK, G23 OK, env-validation 13 passed, web 177 / admin 11 / **api 410 passed** (45 файлов; 12 Prisma-зависимых — в CI). Замер вырос с 406 до 410 канарейкой `architecture.canary.spec.ts` из main (#131, +4 теста) — счётчик сведён с фактом. Замер api вырос с 403 (GAP-59) до 406 ровно на три спека паритета из этого гэпа — счётчик сведён с фактом.
-
-### Что НЕ является гэпом — не переделывать (проверено 2026-09-02)
-
-- **Бонусы, вейджер, промокоды, турниры** — исключены из релиза по ТЗ ч.5 §2.8 («Бонусного движка в релизе нет») и ч.1. ТЗ прямо запрещает рисовать «Бонус: 0 ₽». Отсутствие в коде — соответствие, а не пробел.
-- **Live/настольные/быстрые игры как разделы каталога** — ТЗ ч.5 §487: «Не добавлять заранее».
-- **Ручные выплаты по выводам** — так спроектировано в ТЗ ч.3 §766: админ переводит вручную и подтверждает. Массовые выплаты через API Rukassa — «если поддерживает», то есть Phase 2, а не долг.
-- **Prometheus + Grafana** — ТЗ ч.7 §12.1 явно объявляет их излишними для MVP.
-- **2FA для админки** — в ТЗ отсутствует (0 упоминаний). Добавлять только по решению владельца.
-- **Фиатные депозиты на политических константах курса** (`toRubEquivalent`) — осознанное решение GAP-34: это расчёт `amountRub` для KYC-лимита, а не display-конвертация.
-- **Redis недоступен → `/health/ready` 200 `degraded`** — осознанное решение GAP-35: деградация очередей не равна отказу API. БД недоступна → 503 fail-closed.
-
-### Что НЕ является гэпом (проверено 2026-09-01)
-
-Чтобы исполнитель не переделывал готовое: 12 модулей API и 4-слойка на месте; 18 страниц web + 14 админки без заглушек (`grep TODO` по фронту — пусто); 27 моделей в `schema.prisma`; деньги — Decimal/string + идемпотентность + Serializable-retry; безопасность — helmet, throttler, argon2id, Zod на всех клиентских `@Body`, pino-redact, HMAC на вебхуках; тесты — 117 unit + 9 E2E; CI — 4 обязательных чека + 2 guard'а зелёные, docker-образ собирается. ESLint: **0 warnings repo-wide** (GAP-39 закрыт, PR #36–55).
-
-## 🟡 MEDIUM — частично сделано
-
-| #      | Что                                                                                                      | Статус                                                                                                                              |
-| ------ | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| GAP-14 | `GET /admin/kyc/:id` возвращал `{todo:true}`                                                             | ✅ Исправлено 2026-08-22: возвращает профиль+документы+`totalDepositedRub` (`kyc-admin.controller.ts`)                              |
-| GAP-15 | ~~NotificationService игнорировал настройки и канал email~~                                              | ✅ Закрыто в рамках GAP-02: enqueue в очередь `email` с проверкой `user_settings.notificationsEmail`; sentAt проставляет воркер     |
-| GAP-16 | README врал про `[x]` во всех частях                                                                     | ✅ Исправлено: честные проценты + ссылка сюда                                                                                       |
-| GAP-17 | KYC upload UI есть, но лимит 5000₽ проверяется только на бэке при депозите — сверить с kyc-check.service | ⚠️ API `limit_remaining` готов (`get-kyc-status.use-case.ts`), во фронте не используется → выделено в **GAP-36** (аудит 2026-09-01) |
-
-## 📋 TZ SYNC — расхождения после обновления Part 5 (2026-08-23)
-
-> ТЗ части 1–7 и PAYMENT_OVERVIEW синхронизированы с новой [tz-part-5](tz-part-5-frontend-web.md). Ниже — что **ещё не реализовано в коде**.
-
-| #     | Требование ТЗ                                                    | Статус кода                                                                                                                                                                               |
-| ----- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| TZ-01 | `GET /api/v1/geo/config` — методы по гео/валюте                  | ✅ GeoModule + shared-config geo profiles                                                                                                                                                 |
-| TZ-02 | MVP валюты: RUB + USDT_TRC20 + BTC; TON/TRX/LTC убраны из релиза | ⚠️ Публичный exchange-rates убран; проверить NOWPayments client                                                                                                                           |
-| TZ-03 | `last_payment_method` на профиле для сортировки кассы            | ✅ schema + DepositProfileService; нужна миграция БД                                                                                                                                      |
-| TZ-04 | KYC API: `limit_remaining` + `?currency=`                        | ✅ GetKycStatusUseCase обновлён                                                                                                                                                           |
-| TZ-05 | Крипто-депозит: зачисление факта, не exact amount                | ⚠️ webhook уже uses actually_paid                                                                                                                                                         |
-| TZ-06 | Launch: `CURRENCY_NOT_SUPPORTED`, кросс-валютный запрет          | ✅ LaunchGameUseCase + InsufficientFunds → DepositSheet на web                                                                                                                            |
-| TZ-07 | Frontend web (`apps/web`) по новому Part 5                       | ✅ Основные разделы реализованы 2026-09-13 (GAP-52): favorites/search/профиль-вкладки/last-played/infinite-scroll/бейджи/SEO. Phase 2 (TZ-08): /providers-страницы, UAH/BYN/KZT/UZS-касса |
-| TZ-08 | Phase 2 фиат UAH/BYN/KZT/UZS                                     | 📌 GeoConfig готов, fiatLive=false до PSP                                                                                                                                                 |
-| TZ-09 | Приёмка 90 сек: geo presets, deposit `currency`+`method`         | ⚠️ Backend готов; web flow частично (register→launch→deposit)                                                                                                                             |
-| TZ-10 | Register → сразу сессия без email-тупика                         | ✅ RegisterUseCase + auth store                                                                                                                                                           |
-
-## Параллельная разработка — РАЗРЕШЕНО 2026-08-24
-
-Работа второго агента (Copilot) слита: geo-модуль, deposit-profile, web-компоненты (`d7a923d`). Экспорты `shared-config/geo.config.ts` добавлены, два битых относительных пути починены, полный monorepo tsc = 0, всё в main (`8473f59a`).
-
-Продуктовое решение агента (TZ-10): регистрация выдаёт сессию сразу, gate `emailVerified` в LoginUseCase снят, RegisterUseCase переписан (сессия + access-token немедленно); письмо-верификация идёт по очереди как информационное. Если для рынка СНГ верификация обязательна ДО игры — вернуть gate и выдавать сессию после verify-email.
-
-## Environment — особенности этой машины (Android SD-card)
-
-- `/mnt/sdcard` = Android FUSE: **symlinks запрещены** → pnpm не может линковать `.bin`; `pnpm install` падает EACCES. В `.npmrc` добавлен `bin-links=false`.
-- Оффлайн-store без registry: `jsonwebtoken`, `@types/multer` недоступны → JWT реализован на node:crypto, multer покрыт временным shim'ом `apps/api/src/types/multer*.d.ts` (удалить после `pnpm add -D @types/multer`).
-- **Prisma client в этой среде НЕ сгенерирован** (`prisma generate` требует полный store) — типы БД проверялись через hoisted-копию; на нормальной Linux-FS выполнить: `pnpm install && pnpm db:generate && pnpm db:migrate`.
-
-## Структура проекта — найдено и исправлено 2026-08-22
-
-| Проблема                                                                                                                                                | Статус                                                                                                                                                                                     |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `docs/INDEX.md`: битые ссылки на `../tz-part-*.md` (файлы лежат в `docs/`)                                                                              | ✅ исправлено                                                                                                                                                                              |
-| В корне отсутствовали машинно-читаемые инструкции агента (`AGENTS.md`, `.cursorrules`), хотя `docs/AGENT_INSTRUCTIONS.md` предписывает их создать       | ✅ созданы из §1/§2 того же документа                                                                                                                                                      |
-| Мусор вне git-репо: `/mnt/sdcard/Casino/apps` (пустой), `/mnt/sdcard/Casino/home`, `/mnt/sdcard/Casino/uploads` (старые .txt копии доков от 2026-07-17) | ⚠️ не тронуто — решить владельцу                                                                                                                                                           |
-| `.env` лежит на диске, но не закоммичен (в git только `.env.example`)                                                                                   | ✅ ок                                                                                                                                                                                      |
-| Доки описывали схему Prisma как `prisma/schema/<area>.prisma` и `turbo.json` — в реальности один `schema.prisma` и turbo нет                            | ✅ Исправлено 2026-08-28: AGENT_INSTRUCTIONS/MODULE_TEMPLATE/.cursorrules приведены к единому `schema.prisma`, упоминания turbo убраны, `events.ts` → `apps/api/src/queues/queue.types.ts` |
-
-## Остаток работ (ревизия 2026-08-28)
-
-1. ~~**GAP-19/20/27** — Throttler + Helmet + argon2-параметры~~ ✅ закрыто 2026-08-30 (`security/gap-19-20-27`).
-2. **GAP-18 ✅ / GAP-21 ✅ / GAP-23 ✅** — lockout, Zod и Pino redact закрыты 2026-08-30. **P0 #3 (атомарность денег) и P0 #4 (NOWPayments IPN — канонический sorted-JSON HMAC) закрыты 2026-08-30. E2E закрыт 2026-08-31 (см. GAP-24)**. Осталось: sandbox-прогон NOWPayments перед боевыми ключами.
-3. **GAP-08/09 runtime** — сверка sign-порядков с менеджером GitSlotPark + runtime-тест с ключами.
-4. **GAP-03/04** — Google/Telegram OAuth: код готов, нужны ключи + runtime-проверка.
-5. **Runtime-приёмка** на Linux-FS: `pnpm install && pnpm db:generate && pnpm db:migrate && pnpm dev`; прогон register→login→deposit→launch→admin.
-6. Решение по email-верификации (см. заметку о TZ-10 выше).
-7. ~~После MVP: GAP-22/24/25/26~~ **2026-09-01: закрыты все четыре** — GAP-22 (4-слойка wallet), GAP-24 (тесты + E2E), GAP-25 (ESLint error-пороги 3/10), GAP-26 (алиасы через `tsc-alias`). ~~Из P2/P3-трекера остаётся только GAP-28~~ **GAP-28 закрыт 2026-09-01 (идемпотентность депозита по external_id)**; остался GAP-30 (возврат `max-lines-per-function` к 60); плюс email-воркер отдельным процессом и rich HTML-шаблоны.
-8. **Аудит готовности 2026-09-01 → GAP-31…GAP-38** (раздел выше). Порядок работ:
-   **сначала P0** — ~~GAP-31~~ (закрыт, PR #26) и ~~GAP-32~~ (закрыт 2026-09-02: cron + admin-эндпоинт +
-   интеграционный тест); **затем P1** — ~~GAP-33~~ (закрыт 2026-09-02: BullMQ Job Schedulers),
-   ~~GAP-34~~ (закрыт 2026-09-02: ExchangeRatesService — кеш→БД→fallback; GeoFacade.convertRubToDisplay
-   async; фиатные депозиты намеренно на константах), ~~GAP-35~~ (закрыт 2026-09-02: /health/ready —
-   SELECT 1 к БД fail-closed 503 + PING Redis degraded-режим, healthcheck compose на /ready);
-   **затем P2/P3** — ~~GAP-38~~ (закрыт 2026-09-02: seed-guard fail-closed + DEPLOY.md),
-   ~~GAP-37~~ (закрыт 2026-09-02: DEPLOY.md фактический + resource-check.sh),
-   ~~GAP-36~~ (закрыт 2026-09-02: KYC-лимит из API на странице KYC и в DepositSheet,
-   CTA на верификацию при исчерпании), ~~GAP-30~~ (закрыт 2026-09-02: eslint
-   max-lines 60 + рефакторинг ledger/callback). **Все гэпы аудита 2026-09-01 закрыты.**
-9. **Аудит готовности #2 (2026-09-02) → GAP-39…GAP-50** (раздел выше). Вывод: код MVP
-   готов (~85%), приёмка — 0%. Порядок работ для исполнителя: **сначала P1 без ключей** —
-   ~~GAP-40~~ (закрыт PR #53: канон `SMTP_PASSWORD`, дубликат из env.validation удалён,
-   prod-fail-closed superRefine, спек `smtp-mailer.spec.ts`) и ~~GAP-41~~
-   (закрыт 2026-09-03: 6 env-переменных описаны оператору + чек D7; `SMTP_PASS` ушла в GAP-40);
-   **затем P2** — ~~GAP-42~~ (закрыт PR #52: спек `oauth-verify.spec.ts`, 11 кейсов), GAP-43 (тесты
-   GitSlotPark: зафиксировать контракт подписи до сверки с менеджером); **затем P3** —
-   ~~GAP-48~~ (закрыт 2026-09-04: disable+TODO в referral-calc устарели — runDaily уже 30 строк после GAP-30; возврат подавления закрыт guard'ом G14), ~~GAP-45~~ (закрыт 2026-09-03: карта авто/ручного покрытия QA_CHECKLIST), GAP-44
-   (тест-раннер фронта), ~~GAP-39~~ (закрыт полностью 2026-09-03), GAP-47 (k6). **GAP-46 — блокер запуска,
-   выполняется владельцем при получении ключей и VPS.** GAP-49 (юридика) и GAP-50
-   (Sentry вне ТЗ) — решение владельца.
-10. **CI-инфраструктура приведена в порядок 2026-09-01** (PR #20/#21/#23/#24): docker-build
-    получил правильный контекст (`casino-platform`, а не корень репо) и `@types/node`/`.npmrc`
-    в образе; commitlint на push в main проверяет только свежий squash-коммит; `.gitleaks.toml`
-    с allowlist для placeholder-примеров в доках; deploy-job пропускается (notice), пока нет
-    `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY`. Main зелёный целиком, включая docker-build.
+# Implementation Gaps — реестр расхождений ТЗ ↔ код
+
+> Точка правды по статусу реализации. Не отмечать пункт «готов», пока он не работает end-to-end.
+> Правила ведения — [INDEX.md](INDEX.md) §6.3: закрыл код → обнови строку реестра в том же PR.
+> Соседние реестры (не дублируем): [TECH_DEBT.md](TECH_DEBT.md) — долг под храповиками G16–G21 и внутренние
+> гэпы соответствия инструкциям (В1–В11); [QUALITY_GATES.md](QUALITY_GATES.md) — гейты и D-чеки;
+> [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md) — безопасность (гард D4); [LEGAL_COMPLIANCE.md](LEGAL_COMPLIANCE.md) — GAP-49.
+
+## 0. Схема реестра (единый формат; статус кодируется одним механизмом)
+
+Один статус на позицию — колонка `Статус`. Всё остальное (эмодзи, жирный шрифт, зачёркивание `~~`,
+слово «закрыт» в тексте, дата в скобках, позиция в таблице) статусом **не является** и служит только
+отображением. Прежняя версия файла кодировала статус пятью способами одновременно — из-за этого, например,
+строка GAP-39 буквально гласила «🟡 P3 открыт» при закрытом гэпе, закрытие GAP-46 физически лежало внутри
+строки GAP-45, а статус GAP-30 уехал в 6-ю ячейку при 5-колоночном заголовке.
+
+**Закрытое перечисление статусов:**
+
+| Статус        | Значение                                                                                                    | Эмодзи (производное) |
+| ------------- | ----------------------------------------------------------------------------------------------------------- | -------------------- |
+| `CLOSED`      | сделано и подтверждено доказательством из колонки `Подтверждение`; регрессия закрыта гардом/тестом/прогоном | ✅                   |
+| `CLOSED_WORD` | числится закрытым, но машинного подтверждения нет (закрыто текстом, ADR-комментарием или чтением кода)      | ⚠️                   |
+| `CODE_DONE`   | код есть; приёмка (runtime, внешний контур, браузер) не выполнена                                           | 🟦                   |
+| `PARTIAL`     | сделано наполовину или мимо ТЗ                                                                              | 🟡                   |
+| `OPEN`        | не сделано                                                                                                  | 🔴                   |
+| `HUMAN`       | не кодуется: ждёт решения владельца или внешних условий (ключи, домен, юридика)                             | ⏳                   |
+| `ACCEPTED`    | осознанное решение НЕ делать (ADR, вне MVP, фаза 2+)                                                        | ⚖️                   |
+| `NOT_GAP`     | расхождение с ТЗ оказалось соответствием ТЗ                                                                 | ⬜                   |
+| `UNCHECKED`   | в этой ревизии не проверялось                                                                               | ❓                   |
+
+**Колонки таблицы (стабильные, порядок не меняется, число одинаковое в каждой строке):**
+
+| Колонка         | Содержание                                                                                                                                                                                                    |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ID`            | стабильный идентификатор (`GAP-nn`, `TZ-nn`); не переиспользуется и не удаляется — закрытая позиция остаётся в реестре                                                                                        |
+| `Статус`        | ровно один токен из перечисления выше                                                                                                                                                                         |
+| `При`           | приоритет: `P0` блокер, `P1` высокий, `P2` средний, `P3` низкий, `-` не задавался                                                                                                                             |
+| `Блок`          | блок/модуль: `auth`, `wallet`, `payments`, `casino`, `kyc`, `referrals`, `affiliate`, `admin`, `web`, `notifications`, `geo`, `infra`, `docs`, `qa`, `legal`                                                  |
+| `Что (кратко)`  | одна строка без форматирования; полное обоснование, критерии приёмки и история — в досье позиции (§6)                                                                                                         |
+| `Подтверждение` | доказательство текущего состояния: путь (при необходимости со строкой), имя теста, номер PR/коммита или имя гарда. Пустым не оставляется: нет доказательства — статус `CLOSED_WORD`/`UNCHECKED` и слово `нет` |
+| `Покрытие`      | чем регрессия закрыта машиной: `гард:<ID>`, `тест:<файл>`, `прогон:<отчёт>`, `код` (только чтение кода), `словом`, `ничем`                                                                                    |
+| `Сверка`        | дата сверки статуса с кодом и способ: `(код)` — пути/строки прочитаны, `(код+тест)` — найден и тест/гард, `(прогон)` — прогон в этой среде, `(не проверено)`                                                  |
+
+**Правила ведения:**
+
+1. Длинное обоснование, история решений и остаток — в досье (§6), не в ячейке таблицы: разросшаяся ячейка
+   ломает строку — так потерялись GAP-46 (слился с GAP-45) и GAP-30 (статус уехал за границы заголовка).
+2. Закрываешь код — меняешь `Статус` и `Сверка` в той же правке; эмодзи — только производная от статуса.
+3. Новый блок аудита получает строки в реестре сразу, а не нумерованный отчёт «дефекты 1…N» под таблицей:
+   именно так GAP-56, GAP-58, GAP-59 и GAP-60 не имели собственных ID, и их статус читался только из контекста.
+4. Счётчики тестов — только с коммитом-замером (§4); цифра без коммита считается недостоверной.
+5. `HUMAN` — честный ответ «это не кодит агент»; вместо выдуманных доменов, дат и имён — явная незаполненность (§3.2).
+
+## 1. Ревизия 2026-10-02 (эта правка)
+
+Сверка против `origin/main` = `89881eb` (последний коммит — #134: G21-спеки для 28 use-case'ов, базлайн
+`use-case-specs` обнулён); база ветки `chore/techdebt-docs-sync` — `5d2bd67`. Изменено содержательно, а не
+только форматом:
+
+- **Единая схема.** Все позиции (GAP-01…GAP-66, TZ-01…TZ-11) сведены в реестр §2 с одним механизмом статуса.
+- **GAP-46** извлечён из строки GAP-45 (в файле было `... || GAP-46 |` одной markdown-строкой) и стал
+  самостоятельной записью: главный блокер запуска не парсился и не имел ни статуса, ни критерия в таблице.
+- **GAP-59** (аудит проекта 2026-10-01) и **GAP-60** (п.3 «хрупкость и гигиена», коммит `5d2bd67`) из
+  нумерованных отчётных таблиц превращены в позиции реестра; текст «дефектов» перенесён в досье без потерь.
+- **Добавлены позиции ТЗ ч.8 (партнёрская программа)** — GAP-61…GAP-66 и TZ-11: модуль `affiliate`
+  (46 файлов, 2 миграции, 6 admin-страниц, кабинет партнёра, 3 cron-задачи, 13 env-переменных; PR #105,
+  #119, #123, #128) в этом реестре не был описан ни разу, хотя ТЗ ч.8 — отдельная часть спецификации.
+- **Переклассифицировано 22 позиции** (полный список «было → стало» — §3.1) и добавлено 7 новых
+  (GAP-61…GAP-66, TZ-11): GAP-13 и GAP-17 закрыты по факту кода (трекер отставал); GAP-16, GAP-43 и GAP-51
+  переоткрыты (закрыты словами, факт не соответствует); GAP-11, GAP-12, GAP-15, GAP-37, GAP-56 переведены в
+  `CLOSED_WORD` (нет машины); GAP-03, GAP-04, GAP-06, GAP-07, GAP-08, GAP-09 — в `CODE_DONE` (код есть, приёмки нет);
+  GAP-39 переведён с «открыт» на `CLOSED` (в ячейке два месяца жил текст «🟡 P3 открыт» при закрытом гэпе);
+  GAP-46 и GAP-49 получили статус `HUMAN` вместо размытого «блокер/🔴».
+- **Счётчики** (§4) пересчитаны по составу репозитория; прежние противоречили друг другу (шапка: «api 203 +
+  9 E2E, web 157, admin 6»; срез GAP-58: «api 195 passed/21 skipped, web 161, admin 11»; README: «api 472»).
+- **§3.2 «Требует решения человека»**: GAP-46, GAP-49, GAP-66, GAP-08/43, TZ-02 — с перечнем того, чего
+  буквально нет в репозитории (VPS-секретов, подтверждённого домена, заполненных юридических решений,
+  подтверждения sign-порядков менеджером GSP).
+
+## 2. РЕЕСТР
+
+> 77 позиций (66 GAP + 11 TZ). Распределение статусов на 2026-10-02: `CLOSED` — 52, `CODE_DONE` — 8,
+> `CLOSED_WORD` — 5, `PARTIAL` — 4, `HUMAN` — 4, `ACCEPTED` — 2, `OPEN` — 2.
+> Ни одна позиция не удалена: закрытые гэпы остаются в таблице как история (колонка `Сверка` показывает,
+> когда статус последний раз проверяли против кода).
+
+### 2.1 Первоначальный аудит ТЗ ↔ код (2026-08-23/24) — GAP-01…GAP-17
+
+| ID     | Статус      | При | Блок          | Что (кратко)                                                            | Подтверждение                                                                                                   | Покрытие                            | Сверка                |
+| ------ | ----------- | --- | ------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------- |
+| GAP-01 | CLOSED      | P0  | auth          | Модуль auth был неполным — достроен по контрактам use-case              | `apps/api/src/modules/auth/application/use-cases/register.use-case.ts`                                          | тест:player-lifecycle.e2e           | 2026-10-02 (код+тест) |
+| GAP-02 | CLOSED      | P1  | infra         | BullMQ-очередь email, SMTP-мейлер, rich HTML, воркер в своём процессе   | `apps/api/src/queues/infrastructure/smtp.mailer.ts:94`, `apps/api/src/worker.ts`                                | тест:email-html-templates           | 2026-10-02 (код+тест) |
+| GAP-03 | CODE_DONE   | P1  | auth          | Google OAuth code-flow: код и тесты есть, live-обмен не проверялся      | `apps/api/src/modules/auth/application/use-cases/oauth/google-oauth.use-case.ts`                                | тест:oauth-verify                   | 2026-10-02 (код+тест) |
+| GAP-04 | CODE_DONE   | P1  | auth          | Telegram Login: верификация хэша, живой логин не проверялся             | `apps/api/src/modules/auth/application/use-cases/oauth/telegram-login.use-case.ts`                              | тест:oauth-verify                   | 2026-10-02 (код+тест) |
+| GAP-05 | CLOSED      | P1  | infra         | Email-отправка: очередь + мейлер + fail-closed без SMTP_HOST            | `apps/api/src/queues/infrastructure/smtp.mailer.ts:67-70`                                                       | тест:smtp-mailer                    | 2026-10-02 (код+тест) |
+| GAP-06 | CODE_DONE   | P1  | payments      | Rukassa: реальный HTTP + HMAC вебхука; боевых ключей не было            | `apps/api/src/modules/payments/infrastructure/clients/rukassa.client.ts`                                        | тест:deposit-idempotency            | 2026-10-02 (код+тест) |
+| GAP-07 | CODE_DONE   | P1  | payments      | NOWPayments: payment/estimate/IPN; живой IPN не получен                 | `apps/api/src/modules/payments/infrastructure/clients/nowpayments.client.ts`                                    | тест:nowpayments-ipn                | 2026-10-02 (код+тест) |
+| GAP-08 | CODE_DONE   | P1  | casino        | GitSlotPark-адаптер (4 бренда); порядки sign не подтверждены менеджером | `apps/api/src/modules/casino/infrastructure/providers/gitslotpark/gitslotpark.adapter.ts`                       | тест:gitslotpark-adapter            | 2026-10-02 (код+тест) |
+| GAP-09 | CODE_DONE   | P2  | casino        | Admin syncGames: реальный fetchGameList + upsert; live-провайдера нет   | `apps/api/src/modules/casino/presentation/controllers/casino-admin.controller.ts` (syncGames)                   | тест:gitslotpark-adapter (косвенно) | 2026-10-02 (код)      |
+| GAP-10 | CLOSED      | P1  | admin         | Фронт админки: живые страницы вместо заглушек                           | `apps/admin/src/app/dashboard/affiliate/page.tsx` (и остальные разделы)                                         | тест:api-get-full                   | 2026-10-02 (код+тест) |
+| GAP-11 | CLOSED_WORD | P2  | admin         | API метрик дашборда (metrics/charts/events), raw SQL                    | `apps/api/src/modules/admin/application/dashboard.service.ts`                                                   | ничем                               | 2026-10-02 (код)      |
+| GAP-12 | CLOSED_WORD | P2  | admin         | Batch approve/reject выводов                                            | `apps/api/src/modules/admin/presentation/controllers/admin-finance.controller.ts:333,365`                       | ничем                               | 2026-10-02 (код)      |
+| GAP-13 | CLOSED      | P1  | referrals     | Начисления `runDaily` запускаются cron-задачей и admin-эндпоинтом       | `apps/api/src/modules/maintenance/application/referral-daily.job.ts:21`                                         | тест:referral-payout.integration    | 2026-10-02 (код+тест) |
+| GAP-14 | CLOSED      | P2  | kyc           | `GET /admin/kyc/:id` вместо `{todo:true}` отдаёт профиль и документы    | `apps/api/src/modules/kyc/presentation/controllers/kyc-admin.controller.ts:60`                                  | тест:kyc-status (частично)          | 2026-10-02 (код)      |
+| GAP-15 | CLOSED_WORD | P2  | notifications | Уведомления уважают `user_settings.notificationsEmail`                  | `apps/api/src/modules/notifications/application/notification.service.ts:41`                                     | ничем                               | 2026-10-02 (код)      |
+| GAP-16 | PARTIAL     | P3  | docs          | README врал про `[x]` во всех частях ТЗ                                 | README.md:49,70 на `89881eb`: «Prisma schema (19 таблиц)» при 31 модели; «retry ×3» против advisory-лока GAP-57 | словом                              | 2026-10-02 (код)      |
+| GAP-17 | CLOSED      | P2  | web           | KYC-лимит во фронте: `limit_remaining` читается из API                  | `apps/web/src/lib/api/kyc.api.ts:16`, `apps/web/src/app/kyc/page.tsx:155`                                       | тест:kyc-page, deposit-sheet        | 2026-10-02 (код+тест) |
+
+### 2.2 Аудит 2026-08-25 (ревизия 2026-08-28) — GAP-18…GAP-30
+
+| ID     | Статус | При | Блок     | Что (кратко)                                                                | Подтверждение                                                                                                                      | Покрытие                            | Сверка                |
+| ------ | ------ | --- | -------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------- |
+| GAP-18 | CLOSED | P1  | auth     | Account lockout 10 неудач/15 мин → блок 30 мин, enumeration-safe            | `apps/api/test/account-lockout.spec.ts`                                                                                            | тест:account-lockout                | 2026-10-02 (код+тест) |
+| GAP-19 | CLOSED | P0  | infra    | Глобальный ThrottlerGuard + отдельный лимит на `/auth/refresh`              | `apps/api/src/app.module.ts:39`                                                                                                    | код (гарда нет)                     | 2026-10-02 (код)      |
+| GAP-20 | CLOSED | P0  | infra    | `helmet()` в bootstrap до парсеров                                          | `apps/api/src/main.ts`                                                                                                             | код (гарда нет)                     | 2026-10-02 (код)      |
+| GAP-21 | CLOSED | P1  | infra    | Zod на всех клиентских `@Body`, 2 HMAC-exempt задокументированы             | `@Body` без `ZodValidationPipe` только в `payments-webhook.controller.ts` и `provider-callback.controller.ts` (из 30 контроллеров) | тест:use-case спеки модулей         | 2026-10-02 (код)      |
+| GAP-22 | CLOSED | P2  | wallet   | 4-слойка wallet: lock/unlock/confirm как use-case, `runCreditDebit` разбит  | `apps/api/src/modules/wallet/application/use-cases/lock-funds.use-case.ts`                                                         | тест:wallet-withdrawal-ops          | 2026-10-02 (код+тест) |
+| GAP-23 | CLOSED | P1  | infra    | Pino + redact вместо Nest Logger                                            | `apps/api/src/common/logger/logger.options.ts`                                                                                     | тест:logger-redact                  | 2026-10-02 (код+тест) |
+| GAP-24 | CLOSED | P2  | qa       | Покрытие: money flow, идемпотентность, E2E жизненного цикла                 | `apps/api/test/e2e/player-lifecycle.e2e.spec.ts`, `apps/api/test/ledger.integration.spec.ts`                                       | тест:money-flow, ledger.integration | 2026-10-02 (код+тест) |
+| GAP-25 | CLOSED | P2  | docs     | ESLint-пороги `max-params` error(3), `complexity` error(10)                 | `корневой .eslintrc.js` (framework-imposed исключения — QUALITY_GATES §2.1.1)                                                      | гард:G13, тестов нет                | 2026-10-02 (код)      |
+| GAP-26 | CLOSED | P3  | infra    | Path-алиасы вместо deep-relative, рантайм-резолвер не нужен                 | `apps/api/package.json:6` — `nest build && tsc-alias -p tsconfig.build.json`                                                       | тест:E2E на собранном dist          | 2026-10-02 (код)      |
+| GAP-27 | CLOSED | P1  | auth     | argon2id с явными параметрами (memoryCost 65536, timeCost 3, parallelism 4) | `apps/api/src/modules/auth/infrastructure/services/password-hasher.service.ts`                                                     | код (прямого теста нет)             | 2026-10-02 (код)      |
+| GAP-28 | CLOSED | P3  | payments | Идемпотентность депозита по `provider` + `external_id`                      | `apps/api/src/modules/payments/application/use-cases/process-nowpayments-webhook.use-case.ts:109`                                  | тест:deposit-idempotency            | 2026-10-02 (код+тест) |
+| GAP-29 | CLOSED | P3  | infra    | `env.validation.ts` покрывает `.env.example` (перезакрыт: детектор D3 врал) | `apps/api/test/env-validation.spec.ts`                                                                                             | гард:D3 + тест:env-validation       | 2026-10-02 (код+тест) |
+| GAP-30 | CLOSED | P3  | docs     | Длинные методы разбиты, `max-lines-per-function` возвращён к 60             | `корневой .eslintrc.js`:86 (max 60), override `:152` — только Next.js pages                                                        | гард:G14 + гард:G13                 | 2026-10-02 (код)      |
+
+### 2.3 Аудит готовности к запуску 2026-09-01 — GAP-31…GAP-38
+
+| ID     | Статус      | При | Блок      | Что (кратко)                                              | Подтверждение                                                                                     | Покрытие                                               | Сверка                |
+| ------ | ----------- | --- | --------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | --------------------- |
+| GAP-31 | CLOSED      | P0  | infra     | Prisma-миграции: baseline `0_init` + дрейф-чек            | `packages/database/prisma/migrations/0_init/migration.sql`, шаг `Verify no schema drift` в ci.yml | гард:CI-шаг, тестов нет                                | 2026-10-02 (код)      |
+| GAP-32 | CLOSED      | P0  | referrals | Реферальные начисления: cron + ручной триггер             | `apps/api/src/modules/maintenance/presentation/maintenance-admin.controller.ts:53`                | тест:referral-payout.integration                       | 2026-10-02 (код+тест) |
+| GAP-33 | CLOSED      | P1  | infra     | Scheduled jobs: BullMQ Job Schedulers, 7 задач            | `apps/api/src/queues/infrastructure/maintenance.scheduler.ts`                                     | тест:maintenance-jobs                                  | 2026-10-02 (код+тест) |
+| GAP-34 | CLOSED      | P1  | geo       | Курсы из кеша/БД с fallback вместо хардкода               | `apps/api/src/modules/geo/application/exchange-rates.service.ts`                                  | тест:exchange-rates                                    | 2026-10-02 (код+тест) |
+| GAP-35 | CLOSED      | P1  | infra     | Честный readiness: БД — 503 fail-closed, Redis — degraded | `apps/api/test/health-ready.spec.ts`, healthcheck на `/health/ready` (docker-compose.prod.yml:50) | тест:health-ready                                      | 2026-10-02 (код+тест) |
+| GAP-36 | CLOSED      | P2  | web       | KYC-лимит виден игроку до отправки формы                  | `apps/web/src/components/wallet/DepositSheet.tsx:282`                                             | тест:deposit-sheet, kyc-page                           | 2026-10-02 (код+тест) |
+| GAP-37 | CLOSED_WORD | P3  | docs      | DEPLOY.md приведён к фактическому пайплайну               | `infra/scripts/resource-check.sh`                                                                 | словом (актуальность DEPLOY.md машиной не проверяется) | 2026-10-02 (код)      |
+| GAP-38 | CLOSED      | P2  | infra     | Seed админа fail-closed в production                      | `packages/database/src/seed-guard.ts`                                                             | тест:seed-guard                                        | 2026-10-02 (код+тест) |
+
+### 2.4 Аудит готовности #2 (2026-09-02) — GAP-39…GAP-51
+
+| ID     | Статус  | При | Блок      | Что (кратко)                                                                                  | Подтверждение                                                                                                                                                                 | Покрытие                                     | Сверка                    |
+| ------ | ------- | --- | --------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------- |
+| GAP-39 | CLOSED  | P3  | docs      | ESLint-долг 1171 warning (0 errors) разобран до нуля во всех трёх apps                        | `apps/api/package.json:10`, `apps/web/package.json:9`, `apps/admin/package.json:9` — все с `--max-warnings=0`                                                                 | гард:G13 + гейт lint                         | 2026-10-02 (код)          |
+| GAP-40 | CLOSED  | P1  | infra     | SMTP-пароль: канон `SMTP_PASSWORD` в мейлере, схеме и доке                                    | `apps/api/src/queues/infrastructure/smtp.mailer.ts:70`, `packages/shared-config/src/env.validation.ts:127`                                                                    | тест:smtp-mailer + гард:D3                   | 2026-10-02 (код+тест)     |
+| GAP-41 | CLOSED  | P2  | infra     | Дрейф код↔`.env.example`: переменные описаны, добавлен чек D7                                 | чек `D7` в `docs-guard.yml`, `scripts/docs-guard-local.sh`                                                                                                                    | гард:D7                                      | 2026-10-02 (код)          |
+| GAP-42 | CLOSED  | P2  | auth      | Верификация OAuth-подписей покрыта спеком                                                     | `apps/api/test/oauth-verify.spec.ts`                                                                                                                                          | тест:oauth-verify                            | 2026-10-02 (код+тест)     |
+| GAP-43 | PARTIAL | P2  | casino    | GitSlotPark: контракт подписи зафиксирован тестом, но порядок полей не подтверждён менеджером | `apps/api/test/gitslotpark-adapter.spec.ts`, `CALLBACK_MESSAGE_BUILDERS` в адаптере                                                                                           | тест:gitslotpark-adapter                     | 2026-10-02 (код+тест)     |
+| GAP-44 | CLOSED  | P3  | web       | Тест-раннер и DOM-спеки во фронтенде                                                          | 18 spec-файлов в `apps/web/test`, 3 в `apps/admin/test`                                                                                                                       | тест:kyc-page, deposit-sheet, api-get-full   | 2026-10-02 (код+тест)     |
+| GAP-45 | CLOSED  | P3  | qa        | QA_CHECKLIST: карта авто/ручного покрытия                                                     | `docs/QA_CHECKLIST.md`: 35 пунктов — 10 `[x]`, 9 `[x*]`, 16 `[ ]`, 24 пометки `[auto:`                                                                                        | словом (сверка чеклиста ручная)              | 2026-10-02 (код)          |
+| GAP-46 | HUMAN   | P0  | infra     | Runtime-приёмка внешнего контура не выполнялась ни разу                                       | нет: VPS-секретов и домена в репозитории нет (`.env.example` не содержит `VPS_HOST`, `.env` в дереве отсутствует)                                                             | ничем                                        | 2026-10-02 (код)          |
+| GAP-47 | CLOSED  | P3  | wallet    | Нагрузочный тест кошелька написан и прогнан                                                   | `infra/load-tests/wallet-concurrency.js`, `docs/archive/load-test-2026-09-27.md`                                                                                              | прогон:load-test-2026-09-30.md               | 2026-10-02 (не проверено) |
+| GAP-48 | CLOSED  | P3  | referrals | Последнее `eslint-disable max-lines-per-function` снято, возврат закрыт гардом                | гард `G14 — no eslint-disable for max-lines-per-function` (architecture-guards.yml:349)                                                                                       | гард:G14                                     | 2026-10-02 (код)          |
+| GAP-49 | HUMAN   | P0  | legal     | Юридика и комплаенс: лицензия, тексты, AML-пороги, 152-ФЗ/GDPR, налоги                        | `docs/LEGAL_COMPLIANCE.md` §2 — все семь чекбоксов пусты                                                                                                                      | словом                                       | 2026-10-02 (код)          |
+| GAP-50 | CLOSED  | P2  | infra     | Sentry-агрегатор (вне ТЗ, согласован владельцем), no-op без DSN                               | `apps/api/test/sentry-options.spec.ts`, `SENTRY_DSN` в `.env.example`                                                                                                         | тест:sentry-options                          | 2026-10-02 (код+тест)     |
+| GAP-51 | PARTIAL | P3  | referrals | Cross-module чтения (GGR, user/userSettings) узаконены ADR «только чтение»                    | `apps/api/src/modules/referrals/infrastructure/referral.prisma.repository.ts:29`, `apps/api/src/modules/notifications/infrastructure/notification.prisma.repository.ts:57,64` | словом (ADR = комментарии в коде, гарда нет) | 2026-10-02 (код)          |
+
+### 2.5 Фронтенд по ТЗ ч.5 (аудит 2026-09-13…16) — GAP-52…GAP-55
+
+| ID     | Статус | При | Блок | Что (кратко)                                                                                       | Подтверждение                                                                    | Покрытие                                        | Сверка                |
+| ------ | ------ | --- | ---- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------- | --------------------- |
+| GAP-52 | CLOSED | P2  | web  | Разделы ТЗ ч.5: избранное, поиск, вкладки профиля, infinite scroll, бейджи, SEO                    | `apps/web/src/app/favorites/page.tsx`, `apps/web/src/app/search/page.tsx`        | тест:catalog-filters, game-contract             | 2026-10-02 (код+тест) |
+| GAP-53 | CLOSED | P3  | web  | Phase 2 фронта: страницы провайдеров, лента, загрузка аватара                                      | `apps/web/src/app/providers/[slug]/page.tsx`                                     | тест:casino-api, users-api                      | 2026-10-02 (код+тест) |
+| GAP-54 | CLOSED | P3  | web  | Десктоп-иконпанель, поиск в хедере, Ctrl/⌘K, auth-страницы без обвязки                             | `apps/web/src/components/layout/DesktopNav.tsx`                                  | тест:desktop-nav (13 кейсов)                    | 2026-10-02 (код+тест) |
+| GAP-55 | CLOSED | P3  | web  | Остатки ч.5 (а)–(з): URL-фильтры, полки, экраны ошибок, WithdrawSheet, история, performance, капча | `apps/web/src/app/wallet/transactions/page.tsx`, `apps/api/test/captcha.spec.ts` | тест:withdraw, launch-error, thumbnail, captcha | 2026-10-02 (код+тест) |
+
+### 2.6 Преддеплойная инфраструктура, кошельковый лок, контракты фронта, прод-сборки — GAP-56…GAP-60
+
+| ID     | Статус      | При | Блок   | Что (кратко)                                                                         | Подтверждение                                                                                                                             | Покрытие                                                        | Сверка                |
+| ------ | ----------- | --- | ------ | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | --------------------- |
+| GAP-56 | CLOSED_WORD | P1  | infra  | Дрейф преддеплойной инфраструктуры: 9 дефектов compose/nginx/scripts/док исправлены  | `docker-compose.prod.yml:135` (монтирование snippets), `:156-157` (имена томов), `infra/scripts/restore.sh` (`WITH (FORCE)`, `--dry-run`) | ничем (прогон compose не выполнялся)                            | 2026-10-02 (код)      |
+| GAP-57 | CLOSED      | P1  | wallet | Конкурентные мутации кошелька сериализованы advisory-локом вместо Serializable+retry | `apps/api/src/modules/wallet/infrastructure/ledger/wallet-transaction-lock.ts:130`, `.env.example:160`                                    | тест:wallet-transaction-lock + прогон:load-test-2026-09-30      | 2026-10-02 (код+тест) |
+| GAP-58 | CLOSED      | P1  | admin  | Аудит контрактов фронт↔API: 5 сломанных мест починены                                | `apps/admin/src/lib/api.ts:52-72`, `apps/web/src/stores/auth.ts:101`                                                                      | тест:api-get-full, admin-contract, auth-store-hydrate, kyc-page | 2026-10-02 (код+тест) |
+| GAP-59 | CLOSED      | P1  | infra  | Аудит проекта: build-arg `NEXT_PUBLIC_API_URL` для admin, дубли спеков, счётчики     | `docker-compose.prod.yml:108` (args у admin), `scripts/check-prod-build-args.sh`                                                          | гард:G23 (architecture-guards.yml:432)                          | 2026-10-02 (код)      |
+| GAP-60 | CLOSED      | P2  | infra  | Хрупкость и гигиена: прод-сборки web/admin, шрифты, базлайны, D3                     | `.github/workflows/ci.yml:206-222` (три прод-образа на PR и main), `apps/web/src/app/layout.tsx:10` (Inter самохостын)                    | гард:docker-build + тест:env-validation                         | 2026-10-02 (код)      |
+
+### 2.7 Партнёрская программа, ТЗ ч.8 (в реестре не была — добавлена 2026-10-02) — GAP-61…GAP-66
+
+| ID     | Статус    | При | Блок      | Что (кратко)                                                                                         | Подтверждение                                                                                                                                                                                                                                  | Покрытие                                                | Сверка                |
+| ------ | --------- | --- | --------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------- |
+| GAP-61 | CLOSED    | P1  | affiliate | Ядро ч.8 (регистрация, клик, атрибуция, NGR/RevShare, начисление, кабинет, admin-API/UI) реализовано | `apps/api/src/modules/affiliate/affiliate.module.ts`, `packages/database/prisma/migrations/20260929171538_affiliate_program_initial`, PR #105                                                                                                  | тест:affiliate-cabinet-contract + 12 spec-файлов модуля | 2026-10-02 (код+тест) |
+| GAP-62 | OPEN      | P2  | affiliate | Affiliate пишет в чужие таблицы и читает деньги под ярлыком ADR GAP-51, которого это не разрешает    | `apps/api/src/modules/affiliate/infrastructure/player-provisioning.prisma.repository.ts:23,38` (create/delete `user`), `apps/api/src/modules/affiliate/infrastructure/affiliate.prisma.repository.ts:842,852` (`walletAccount`, `ledgerEntry`) | ничем                                                   | 2026-10-02 (код)      |
+| GAP-63 | OPEN      | P3  | affiliate | Антифрод F4 (депозит ровно на порог → `needs_review`, ТЗ ч.8 §13.2) не реализован                    | нет: `needs_review` не встречается в `apps/api/src/modules/affiliate` (F1–F3 реализованы в `attribute-player.use-case.ts`)                                                                                                                     | ничем                                                   | 2026-10-02 (код)      |
+| GAP-64 | CODE_DONE | P1  | affiliate | Критерии приёмки ч.8 (A1–A25, ТЗ §19) не прогонялись end-to-end; affiliate нет в чек-листе GAP-46    | `docs/tz-part-8-affiliate-program.md` §19; спеки модуля — только юнит/контрактные                                                                                                                                                              | тест (юниты), прогона нет                               | 2026-10-02 (код)      |
+| GAP-65 | ACCEPTED  | P3  | affiliate | `provider_fee_sum` всегда 0 → NGR завышен на 2–8% (риск R2)                                          | `apps/api/src/modules/affiliate/README.md:67` (комиссии провайдеров нет в системе)                                                                                                                                                             | словом (решение MVP, риск зафиксирован в ТЗ §20)        | 2026-10-02 (код)      |
+| GAP-66 | HUMAN     | P2  | affiliate | Открытые вопросы владельца Q1–Q4 и риск R1 (блокировка самоисключённых при атрибуции)                | `docs/tz-part-8-affiliate-program.md` §20 «Открытые вопросы к владельцу»                                                                                                                                                                       | ничем                                                   | 2026-10-02 (код)      |
+
+### 2.8 TZ SYNC — расхождения после обновления ТЗ ч.5 (2026-08-23) — TZ-01…TZ-11
+
+| ID    | Статус    | При | Блок      | Что (кратко)                                                                        | Подтверждение                                                                                                                                                                                | Покрытие                                 | Сверка                |
+| ----- | --------- | --- | --------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | --------------------- |
+| TZ-01 | CLOSED    | P1  | geo       | `GET /api/v1/geo/config` — методы по гео/валюте                                     | `apps/api/src/modules/geo/presentation/controllers/geo.controller.ts:14`                                                                                                                     | код                                      | 2026-10-02 (код)      |
+| TZ-02 | HUMAN     | P2  | payments  | MVP-валюты: RUB + USDT_TRC20 + BTC; TON/TRX/LTC убраны из релиза                    | `packages/shared-config/src/geo.config.ts:3` (только USDT_TRC20, BTC) против `apps/api/src/modules/payments/infrastructure/clients/nowpayments.client.ts:15-21` (маппит `ton`, `trx`, `ltc`) | ничем                                    | 2026-10-02 (код)      |
+| TZ-03 | CLOSED    | P2  | payments  | `last_payment_method` на профиле для сортировки кассы                               | `packages/database/prisma/schema.prisma:130` (колонка есть и в baseline-миграции GAP-31)                                                                                                     | тест (сортировка — UI, см. UI_WAVE 5.1)  | 2026-10-02 (код)      |
+| TZ-04 | CLOSED    | P2  | kyc       | KYC API: `limit_remaining` + `?currency=`                                           | `apps/api/src/modules/kyc/presentation/controllers/kyc.controller.ts:55`                                                                                                                     | тест:kyc-status                          | 2026-10-02 (код+тест) |
+| TZ-05 | CLOSED    | P1  | payments  | Крипто-депозит: зачисление факта, не exact amount                                   | `apps/api/src/modules/payments/application/use-cases/process-nowpayments-webhook.use-case.ts:100-105`                                                                                        | тест:nowpayments-ipn                     | 2026-10-02 (код+тест) |
+| TZ-06 | CLOSED    | P1  | casino    | Launch: `CURRENCY_NOT_SUPPORTED`, кросс-валютный запрет                             | `apps/api/src/modules/casino/application/use-cases/launch-game.use-case.ts`                                                                                                                  | тест:casino-launch-game                  | 2026-10-02 (код+тест) |
+| TZ-07 | CLOSED    | P1  | web       | Фронтенд web по ТЗ ч.5                                                              | см. GAP-52…GAP-55                                                                                                                                                                            | тест (см. GAP-52…55)                     | 2026-10-02 (код+тест) |
+| TZ-08 | ACCEPTED  | P3  | geo       | Phase 2 фиат UAH/BYN/KZT/UZS: код готов, включение за `fiatLive` и PSP              | `packages/shared-config/src/geo.config.ts:22` (`fiatLive`), профили RU/UA/BY/KZ/UZ с `false`                                                                                                 | словом (решение ТЗ §24)                  | 2026-10-02 (код)      |
+| TZ-09 | CODE_DONE | P1  | web       | Приёмка «первые 90 секунд»: гео-пресеты, депозит `currency` + `method`              | `docs/USER_FLOW_FIRST_90_SECONDS.md`, `apps/web/src/components/wallet/DepositSheet.tsx`                                                                                                      | тест:deposit-sheet, прогон по домену нет | 2026-10-02 (код+тест) |
+| TZ-10 | CLOSED    | P1  | auth      | Регистрация сразу выдаёт сессию, без email-тупика                                   | `apps/api/src/modules/auth/application/use-cases/register.use-case.ts`                                                                                                                       | тест:auth-register, e2e                  | 2026-10-02 (код+тест) |
+| TZ-11 | PARTIAL   | P3  | affiliate | Кабинет партнёра: ТЗ §12.1 обещает `/affiliate/stats`, в коде `(cabinet)/dashboard` | `apps/web/src/app/affiliate/` (dashboard, commissions, players, links, settings); содержательные блоки §12.2 на месте                                                                        | ничем                                    | 2026-10-02 (код)      |
+
+## 3. Производные срезы (собраны из колонки `Статус`; руками не править — правь реестр)
+
+### 3.1 Что изменилось в статусах (было → стало)
+
+| ID                   | Было (в файле до этой ревизии)                                                          | Стало         | Почему                                                                                                                       |
+| -------------------- | --------------------------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| GAP-03               | ✅ «Реализовано 2026-08-24»                                                             | `CODE_DONE`   | код и спек есть, живого обмена с Google не было — ключей нет                                                                 |
+| GAP-04               | ✅ «Реализовано 2026-08-24»                                                             | `CODE_DONE`   | верификация хэша проверена синтетически и на реальном токене (2026-09-09), живого логина на домене не было                   |
+| GAP-06               | ✅                                                                                      | `CODE_DONE`   | боевых ключей Rukassa не было                                                                                                |
+| GAP-07               | ✅                                                                                      | `CODE_DONE`   | тестовый платёж создан, реальной оплаты и живого IPN не было                                                                 |
+| GAP-08               | ✅ «Код готов» + ⚠️                                                                     | `CODE_DONE`   | живой seamless-раунд не играл; sign-порядки не подтверждены (GAP-43, §3.2)                                                   |
+| GAP-09               | ✅                                                                                      | `CODE_DONE`   | upsert-логика есть, каталог не синхронизировался с живым провайдером                                                         |
+| GAP-11               | ✅ «Исправлено 2026-08-23»                                                              | `CLOSED_WORD` | ни одного теста на metrics/charts/events; доказательство — только чтение кода                                                |
+| GAP-12               | ✅                                                                                      | `CLOSED_WORD` | batch-эндпоинты есть, тестов нет                                                                                             |
+| GAP-13               | ⚠️ «частично: само зачисление реальное, но `runDaily` никто не вызывает»                | `CLOSED`      | с 2026-09-02 вызывается: cron `referral-daily.job.ts:21` + ручной `maintenance-admin.controller.ts:53`                       |
+| GAP-15               | ✅ «Закрыто в рамках GAP-02»                                                            | `CLOSED_WORD` | факт в коде есть, теста на ветку `notificationsEmail` нет                                                                    |
+| GAP-16               | ✅ «Исправлено: честные проценты + ссылка сюда»                                         | `PARTIAL`     | README на `89881eb` снова врёт: «Prisma schema (19 таблиц)» при 31 модели, «retry ×3» против advisory-лока                   |
+| GAP-17               | ⚠️ «API `limit_remaining` готов, во фронте не используется»                             | `CLOSED`      | фронты читают поле: `kyc.api.ts:16`, `kyc/page.tsx:155`, `DepositSheet.tsx:282`, закрыто спеками                             |
+| GAP-30               | статус уехал в 6-ю ячейку при 5-колоночном заголовке                                    | `CLOSED`      | `max-lines-per-function: 60` в силе, подавлений правила нет (гард G14)                                                       |
+| GAP-37               | ✅ P3 закрыт                                                                            | `CLOSED_WORD` | актуальность DEPLOY.md ничем не проверяется — это и есть причина, по которой гэп возвращался                                 |
+| GAP-39               | в ячейке буквально «🟡 P3 открыт 2026-09-02», закрытие — простынёй под таблицей         | `CLOSED`      | `--max-warnings=0` во всех трёх lint-скриптах + гард G13                                                                     |
+| GAP-43               | ✅ P3 закрыт                                                                            | `PARTIAL`     | тест-часть сделана; вторая половина формулировки («порядок полей подписи не подтверждён») — не сделана                       |
+| GAP-46               | физической строки не было: запись была вклеена в конец строки GAP-45 и не парсилась     | `HUMAN`       | отдельная позиция реестра + срез §3.2                                                                                        |
+| GAP-49               | 🔴 P0 (организационный)                                                                 | `HUMAN`       | LEGAL_COMPLIANCE §2 — чек-лист не заполнен ни по одному пункту                                                               |
+| GAP-51               | ✅ P3 закрыт как ПРИНЯТОЕ РЕШЕНИЕ (ADR)                                                 | `PARTIAL`     | критерий «grep пустой» не выполнен (2 чтения остались), ADR расширялся на ЗАПИСИ — см. GAP-62                                |
+| GAP-52               | ✅ P2 закрыт                                                                            | `CLOSED`      | страницы и спеки на месте; браузерная приёмка — остаток GAP-46                                                               |
+| GAP-53               | ✅ P3 закрыт                                                                            | `CLOSED`      | то же                                                                                                                        |
+| GAP-54               | ✅ P3 закрыт (статус был зашифрован в тексте без токена)                                | `CLOSED`      | `DesktopNav.tsx` + `desktop-nav.spec.ts`                                                                                     |
+| GAP-55               | ✅ P3 закрыт                                                                            | `CLOSED`      | (а)–(з) покрыты кодом и тестами                                                                                              |
+| GAP-56               | ✅ «ЗАКРЫТ: 9 дефектов, каждый уронил бы первый деплой»                                 | `CLOSED_WORD` | все 9 проверены только `bash -n`; живого прогона compose не было; через 4 дня нашёлся 10-й дефект того же класса (GAP-59/60) |
+| GAP-57               | ✅ P1 ЗАКРЫТ 2026-09-30                                                                 | `CLOSED`      | статус был подтверждён прогоном и тестом, но был закодирован вне реестра                                                     |
+| GAP-58               | статуса не было — «дефекты 1…5» в отчётной таблице                                      | `CLOSED`      | все 5 фиксов на месте и закрыты спеками                                                                                      |
+| GAP-59               | в треКере не было позиции (только в `docs/UI_WAVE_5.1.md` и в шапке файла)              | `CLOSED`      | гард G23 + docker-build всех трёх образов; фиксы на месте                                                                    |
+| GAP-60               | в треКере не было позиции (коммит `5d2bd67`)                                            | `CLOSED`      | три прод-образа собираются и на PR, Inter самохостын, D3 честно молчит                                                       |
+| GAP-45               | ✅ P3 закрыт (со счётчиками 14/10/9, разошедшимися с фактом)                            | `CLOSED`      | счётчики сверены: 35 пунктов, 10/9/16 — срослось с фактом                                                                    |
+| TZ-02                | ⚠️ «публичный exchange-rates убран; проверить NOWPayments client» — без ответа 2 месяца | `HUMAN`       | расхождение подтверждено кодом, решение (убрать маппинг или признать фазой 2) — за владельцем                                |
+| TZ-05                | ⚠️ «webhook уже uses actually_paid»                                                     | `CLOSED`      | закрыто тестом, а не словами: `nowpayments-ipn.spec.ts` (4 обращения к `actually_paid`)                                      |
+| TZ-08                | 📌 «GeoConfig готов, fiatLive=false до PSP»                                             | `ACCEPTED`    | фаза 2 по ТЗ §24 — осознанное решение, а не незакрытый пункт                                                                 |
+| TZ-09                | ⚠️ «Backend готов; web flow частично»                                                   | `CODE_DONE`   | код и доки потока есть; прогон «90 секунд» на публичном домене не выполнялся                                                 |
+| TZ-01/03/04/06/07/10 | ✅                                                                                      | `CLOSED`      | статус не менялся, добавлены доказательства и даты сверки                                                                    |
+
+**Новые позиции** (раньше не трекались никогда): GAP-61 `CLOSED`, GAP-62 `OPEN`, GAP-63 `OPEN`, GAP-64 `CODE_DONE`,
+GAP-65 `ACCEPTED`, GAP-66 `HUMAN`, TZ-11 `PARTIAL`.
+
+### 3.2 Требует решения человека (не кодуется агентом)
+
+Ни одна из этих позиций не закрывается правкой кода. В репозитории буквально нет того, что требуется:
+выдумывать домены, даты, имена менеджеров и юридические решения — запрещено (см. `docs/AI_DEVELOPMENT_RULES.md`).
+
+| ID              | Чего именно нет (проверено в этом дереве, `5d2bd67`/`89881eb`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Кто решает              | Что появится в коде после решения                                                                                  |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| GAP-46          | `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY` существуют только как GitHub Secrets в `.github/workflows/ci.yml` (строки 261-275) и читаются deploy-шагом, который легитимно скипается; в `.env.example` их нет и `.env`-файла в дереве нет вовсе; публичный домен не подтверждён (в `docker-compose.prod.yml:90,108` — плейсхолдер `casino.example.com`, в nginx-шаблоне `DOMAIN`/`ADMIN_DOMAIN` обязательны, но значений нет); SMTP_HOST/SMTP_PASSWORD, боевые ключи Rukassa/NOWPayments/GSP, `TURNSTILE_*` ключи — пусты или отсутствуют | владелец                | записи в эту строку по 10 пунктам критерия (досье GAP-46), датированные отчёты в `docs/archive/`                   |
+| GAP-08 / GAP-43 | порядки конкатенации sign-строк по 5 операциям GitSlotPark не подтверждены менеджером провайдера; живого раунда не было                                                                                                                                                                                                                                                                                                                                                                                                          | владелец ↔ менеджер GSP | правится только `CALLBACK_MESSAGE_BUILDERS` + спек `gitslotpark-adapter.spec.ts` показывает дельту                 |
+| GAP-49          | `docs/LEGAL_COMPLIANCE.md` §2: все семь чекбоксов пусты (юрисдикция и лицензирование, юридически значимые тексты, AML-пороги, возрастная верификация, 152-ФЗ/GDPR, налоги, лицензия на сайте). Тексты `/legal/*` в коде помечены как предварительная графика                                                                                                                                                                                                                                                                     | владелец                | замена текстов на страницах `/legal/*`, лицензия в футере, инженерная задача на возрастной гейт (если потребуется) |
+| GAP-66          | ответы на открытые вопросы ТЗ ч.8 §20: Q1 (блокировать ли самоисключённых при атрибуции — риск R1), Q2 (страховой депозит 20% на первые 30 дней), Q3 (минимальная сумма вывода партнёра), Q4 (`provider_fee` при появлении данных)                                                                                                                                                                                                                                                                                               | владелец                | правки `attribute-player.use-case.ts`, настроек в `system_settings` и текстов соглашения                           |
+| TZ-02           | решение по currencies: `geo.config.ts` допускает только `USDT_TRC20` и `BTC`, а `nowpayments.client.ts` продолжает маппить `TON`, `TRX`, `LTC`, исключённые из релиза. Убрать маппинг (тогда мёртвый код удалён) или оставить как задел фазы 2 и зафиксировать в ТЗ                                                                                                                                                                                                                                                              | владелец                | либо удаление 3 строк маппинга и теста, либо явная пометка в ТЗ ч.3 и в `PAYMENT_OVERVIEW.md`                      |
+
+Открытые вопросы, которые **не** требуют владельца сейчас (зафиксировано, кодится без решения):
+GAP-62 (affiliate ↔ чужие таблицы), GAP-63 (F4), GAP-64 (нужен стенд, но чек-лист приёмки ч.8 можно
+подготовить кодом), остаток GAP-16 (правка README — в этой же ветке).
+
+### 3.3 Чем закрыто: гард / тест / прогон / словом
+
+Позиции, помеченные `CLOSED_WORD` (в реестре: `Покрытие = ничем`, `словом` или `код`), — это те, где
+закрытие опирается на текст, а не на машину. Они же — первые кандидаты на возврат при следующей сверке:
+история показывает, что такие закрытия дрейфуют молча (GAP-29 был «закрыт» две недели по лживому детектору D3;
+GAP-56 закрыли словами, и через 4 дня нашёлся 10-й дефект того же класса).
+
+| Механизм закрытия                  | Позиции                                                                                                                                                                                                                                             | Комментарий                                                         |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| гард (CI)                          | GAP-25/GAP-30 (G13, G14), GAP-29 (D3), GAP-39 (G13), GAP-41 (D7), GAP-48 (G14), GAP-59 (G23), GAP-60 (job docker-build + гарды техдолга), GAP-31 (шаг `Verify no schema drift`)                                                                     | red-тест на откате фикса есть у G23 (проверялось автором гэпа)      |
+| тест (vitest)                      | GAP-01, GAP-02, GAP-05, GAP-13, GAP-17, GAP-18, GAP-21, GAP-22, GAP-23, GAP-24, GAP-28, GAP-30, GAP-32…GAP-36, GAP-38, GAP-40, GAP-42, GAP-43 (контракт подписи), GAP-44, GAP-50, GAP-52…GAP-55, GAP-57, GAP-58, GAP-61, TZ-04, TZ-05, TZ-06, TZ-10 | часть из них — юниты, не приёмка                                    |
+| прогон (отчёт)                     | GAP-47, GAP-57 (`docs/archive/load-test-2026-09-27.md`, `docs/archive/load-test-2026-09-30.md`)                                                                                                                                                     | воспроизводимо только со стендом                                    |
+| словом / чтением кода (машины нет) | GAP-11, GAP-12, GAP-15, GAP-37, GAP-45, GAP-51, GAP-56, GAP-65, TZ-03 (сортировка кассы — только UI-проверка в стенде), TZ-08, TZ-09                                                                                                                | этот список — ответ на вопрос «что реально не защищено от регресса» |
+| ничем (позиция открыта)            | GAP-46, GAP-49, GAP-62, GAP-63, GAP-66, TZ-02, TZ-11                                                                                                                                                                                                | —                                                                   |
+
+### 3.4 Не проверено в этой ревизии (и почему)
+
+| Что                                                                                            | Почему не проверено                                                                                                      |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Число **прошедших** тестов (api/web/admin), а также «0 warnings» линтеров                      | в этом дереве `node_modules` не устанавливались; `pnpm`-скрипты не запускались. Пересчитан только **состав файлов** (§4) |
+| Зелён ли CI на `89881eb`                                                                       | `gh` CLI в этой среде недоступен, статус прогонов не читался                                                             |
+| Повторный прогон k6 (GAP-47/GAP-57)                                                            | нужен Docker-стенд с Postgres/Redis и собранным API                                                                      |
+| Любая браузерная приёмка фронта, живой OAuth/PSP/GSP/SMTP/Turnstile, первый деплой (весь §3.2) | внешний контур: ключи, домен, VPS — у владельца (GAP-46)                                                                 |
+| Применимость миграций на живой БД (`migrate deploy`), `restore.sh` на реальном дампе           | нет БД и VPS; `restore.sh` с момента переписывания (GAP-56) не запускался ни разу                                        |
+
+## 4. Счётчики (замер 2026-10-02 против `origin/main` = `89881eb`)
+
+Состав файлов — единственное, что считается без `node_modules`. Числа «passed» ниже — это **заявки** из доков,
+не перепроверенные в этой среде (см. §3.4).
+
+| Метрика                     | Значение на `89881eb`                                                                                                                         | Как считать                                                                                         |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| spec-файлов `apps/api`      | **85** (69 в `apps/api/test`, из них 12 интеграций/E2E на БД + 16 колокейшн в `src/modules`)                                                  | `git ls-tree -r --name-only origin/main casino-platform/apps/api` с фильтром по суффиксу `.spec.ts` |
+| spec-файлов `apps/web`      | **18**                                                                                                                                        | то же по `apps/web`                                                                                 |
+| spec-файлов `apps/admin`    | **3**                                                                                                                                         | то же по `apps/admin`                                                                               |
+| моделей Prisma              | **31**                                                                                                                                        | `grep -cE '^model ' packages/database/prisma/schema.prisma`                                         |
+| миграций (каталогов)        | **4** (`0_init`, `20260929171538_affiliate_program_initial`, `20260929172043_affiliate_click_relation`, `20260904_pre_launch_gametx_indexes`) | `ls packages/database/prisma/migrations`                                                            |
+| модулей API                 | **14**                                                                                                                                        | `ls apps/api/src/modules`                                                                           |
+| переменных в `.env.example` | **99** активных ключей                                                                                                                        | `grep -cE '^[A-Z][A-Z0-9_]*=' .env.example`                                                         |
+| контроллеров API            | **30**, из них 2 с `@Body` вне Zod (задокументированные HMAC-exempt)                                                                          | `git grep -l '@Controller'` по модулям                                                              |
+
+История противоречий, которые этот раздел закрывает: шапка файла утверждала «api 203 unit/integration + 9 E2E,
+web 157, admin 6»; срез GAP-58 — «api 195 passed/21 skipped, web 161, admin 11»; README — «api 472 unit/integration
+(410 прогнано локально + 62 в 12 файлах интеграций/E2E)», QA_CHECKLIST — «api 403 + 12 файлов, web 177, admin 11».
+Разброс 195…472 объясняется тем, что счётчики обновлялись в разное время и разными PR (#88, #128, `5d2bd67`),
+а пересчёт состава файлов не делался ни разу.
+
+## 5. Не является гэпом — не переделывать (проверено 2026-09-02, повторено 2026-10-02)
+
+| Позиция                                                               | ID       | Обоснование                                                                                                                     |
+| --------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Бонусы, вейджер, промокоды, турниры                                   | NOT_GAP  | ТЗ ч.5 §2.8 («бонусного движка в релизе нет») и ч.1: отсутствие в коде — соответствие; ТЗ прямо запрещает рисовать «Бонус: 0 ₽» |
+| Live/настольные/быстрые игры как разделы каталога                     | NOT_GAP  | ТЗ ч.5: «не добавлять заранее»                                                                                                  |
+| Ручные выплаты по выводам                                             | NOT_GAP  | так спроектировано в ТЗ ч.3: админ переводит вручную и подтверждает; массовые выплаты через API Rukassa — фаза 2                |
+| Prometheus + Grafana                                                  | NOT_GAP  | ТЗ ч.7 §12.1 объявляет их излишними для MVP                                                                                     |
+| 2FA для админки                                                       | NOT_GAP  | в ТЗ отсутствует (0 упоминаний); добавлять только по решению владельца                                                          |
+| Фиатные депозиты на политических константах курса (`toRubEquivalent`) | ACCEPTED | осознанное решение GAP-34: расчёт `amountRub` для KYC-лимита, а не display-конвертация                                          |
+| Redis недоступен → `/health/ready` 200 `degraded`                     | ACCEPTED | осознанное решение GAP-35: деградация очередей ≠ отказ API; БД недоступна → 503 fail-closed                                     |
+| `/withdraw` как отдельная страница рядом с листом                     | NOT_GAP  | ТЗ §19 не требует листа для вывода; страница оставлена тонким хостом ради прямых ссылок (GAP-55 п. з)                           |
+| `catalog` на CSR вместо ISR                                           | ACCEPTED | отклонение зафиксировано в досье GAP-55 (п. е): ISR по произвольным query дал бы устаревшие выдачи                              |
+| Виртуализация сеток библиотекой                                       | ACCEPTED | `content-visibility: auto` вместо windowing — обоснование в досье GAP-55                                                        |
+| KYC-загрузчик через dynamic import                                    | NOT_GAP  | тяжёлой библиотеки нет (`FormData` + `fetch`), выгоды нет — отметка снята с обоснованием                                        |
+
+## 6. Досье позиций (обоснования, критерии, история — перенесены из ячеек таблицы без потерь)
+
+### GAP-01. Модуль auth был неполным (P0, 2026-08-23) — ✅ CLOSED
+
+Восстановлены отсутствующие файлы по контрактам уже существующих use-case'ов: `domain/errors.ts`
+(AppError-классы INVALID_CREDENTIALS, EMAIL_NOT_VERIFIED, TOKEN\_\_, SESSION\_\_), `domain/entities/user.entity.ts`,
+четыре порта репозиториев (+ barrel), `infrastructure/services/password-hasher.service.ts` (argon2id),
+`jwt.service.ts` (HS256 на node:crypto — jsonwebtoken был недоступен в оффлайн-store той среды),
+`email-queue.service.ts` (dev — лог со ссылкой, prod без SMTP_HOST — fail-closed `EmailNotConfiguredError`),
+четыре Prisma-репозитория, `application/use-cases/register.use-case.ts` (уникальность email, реферальный код
+8 символов UC-REF-01/02, verification-токен 24 ч). Попутно починены: `admin/infrastructure/admin-jwt.service.ts`
+(импортировал отсутствующий jsonwebtoken), битый путь импорта zod-validation.pipe в auth.controller,
+`meta` в `ApiSuccessResponse` (+PaginationMeta), ~25 strict-mode ошибок TS7006/7031/6133 в старых модулях.
+Проверка тогда: `tsc --noEmit` @casino/api = 0 ошибок; runtime-проверка требовала БД+Redis и не выполнялась.
+Сейчас регрессию ловит E2E `apps/api/test/e2e/player-lifecycle.e2e.spec.ts` (регистрация → login → …) и
+юнит-спеки `auth-register`, `auth-login`, `auth-refresh`, `auth-logout`, `auth-verify-email`, `auth-forgot-password`,
+`auth-reset-password`, `auth-google-oauth`.
+
+### GAP-02. BullMQ-инфраструктура и письма (P1) — ✅ CLOSED
+
+Состав: `apps/api/src/queues/queue.types.ts` (`EMAIL_QUEUE_PORT`, `EmailJobData`,
+`EnqueueResult`), `infrastructure/email.queue.ts` (продюсер BullMqEmailQueue: attempts 5, backoff exp 5s,
+removeOnComplete/Fail + fallback DevLogEmailQueue), `infrastructure/smtp.mailer.ts` (`MAILER_PORT`: SmtpMailer
+через ленивый require nodemailer / DevLogMailer; в production без `SMTP_HOST` приложение не стартует),
+`application/email.worker.ts` (консьюмер очереди `email`, проставляет `notifications.sentAt`). Продюсеры:
+auth (verify/reset письма с HTML) и notifications (UC-NOTIF-01 с проверкой `user_settings.notificationsEmail`).
+Env: добавлены опциональные `SMTP_PORT/SMTP_USER/SMTP_PASS`.
+
+- **Rich HTML-шаблоны — закрыто 2026-09-27** (ветка `feat/email-html-templates`): `apps/api/src/queues/templates/index.ts` —
+  брендированный 600px table-layout (inline-стили, без внешних CSS/картинок/шрифтов) + билдеры всех 4 писем
+  (email-верификация, сброс пароля, withdrawal-reminder, generic notification) с сохранённым дословно plain-text
+  fallback; продюсеры (auth/notifications/maintenance) передают `html` в очередь, SmtpMailer отдаёт его в nodemailer
+  (`smtp.mailer.ts:94`). Спек: `apps/api/test/email-html-templates.spec.ts`. Старый стаб
+  `modules/notifications/templates/index.ts` (plain text, нигде не импортируется) не тронут.
+- **Воркер в отдельном процессе — закрыто 2026-09-27** (ветка `feat/email-worker-process`): консьюмер управляется
+  env-флагом `EMAIL_WORKER_IN_PROCESS` (дефолт `true` — в процессе API для dev; `false` — API только кладёт в очередь);
+  entrypoint `apps/api/src/worker.ts` — Nest ApplicationContext без HTTP (ConfigModule + pino + QueuesModule,
+  Prisma через `@casino/database`), SIGTERM → `worker.close()` (grace 45s); сервис `worker` в
+  `docker-compose.prod.yml:60-69` — тот же образ, что api (`node apps/api/dist/worker.js`, флаг `true`, без healthcheck),
+  у api флаг `false`. Maintenance-воркер (GAP-33) сознательно остался в процессе API — вне скоупа.
+
+### GAP-03 / GAP-04. Google OAuth и Telegram Login (P1) — 🟦 CODE_DONE
+
+- Google: authorization-code flow — `GET /auth/google/url` (state = HMAC, 10 мин), `POST /auth/google` (обмен кода,
+  userinfo, провижининг через `OAuthUserProvisioningService`, сессия + refresh-cookie). Требует
+  `GOOGLE_CLIENT_ID/SECRET`.
+- Telegram: `POST /auth/telegram` — верификация виджета (secret = SHA256(bot_token), HMAC по data-check-string,
+  `timingSafeEqual`, `auth_date` ≤ 24 ч), пользователь без email (schema nullable), сессия. Требует `TELEGRAM_BOT_TOKEN`.
+- Контракт подписей закрыт спеком `oauth-verify.spec.ts` (11 кейсов, GAP-42); Telegram-хэш дополнительно проверен
+  2026-09-09 на payload, подписанном РЕАЛЬНЫМ токеном (наш `verify` принимает, подделка отбивается).
+- **Не сделано:** `GET /auth/google` против настоящего `redirect_uri` и живой логин виджетом на публичном домене
+  (нужен BotFather `/setdomain`) → пункт 5 критерия GAP-46.
+
+### GAP-05. Email-отправка (P1) — ✅ CLOSED (вместе с GAP-02)
+
+Очередь + воркер + SmtpMailer; fail-closed: prod без `SMTP_HOST` не стартует, а не «тихо теряет письма».
+Регресс имени переменной закрыт GAP-40 + спеком `smtp-mailer.spec.ts` (6 кейсов, включая «НЕ читает устаревшее
+`SMTP_PASS`»). Живая доставка по реальному SMTP — пункт 1 критерия GAP-46.
+
+### GAP-06 / GAP-07. Rukassa и NOWPayments (P1) — 🟦 CODE_DONE
+
+- Rukassa: реальный HTTP `POST {RUKASSA_API_BASE}/api/v1/order/create` (заголовки `shop_id`/`api_key`, timeout 30 с),
+  `getPaymentStatus`; dev без ключей — лог-стаб; верификация вебхука HMAC-SHA256 активна в prod (раньше кидала
+  NOT_IMPLEMENTED).
+- NOWPayments: `POST /v1/payment` (x-api-key), `/estimate`, `/payment/{id}`; курсы не хардкод при наличии ключа;
+  IPN HMAC-SHA512 активен в prod; env `NOWPAYMENTS_API_BASE`.
+- **Проверено живым контуром 2026-09-09** (первый внешний ключ, ключ предоставлен владельцем): `GET /v1/currencies` →
+  236 валют; `/v1/estimate` в обе стороны для usdttrc20/btc/ton/trx/ltc; `/v1/min-amount` (usd→usdttrc20 = 19.2);
+  создан тестовый payment_id 5120213360 (12 USD → USDTTRC20, адрес TMr2…CH3, статус `waiting`, оплата не производилась);
+  `/v1/payout` доступен (список пуст); IPN-секрет получен, эталонная канонизация (sorted keys → compact JSON →
+  HMAC-SHA512) проходит нашим `verifyIPN`, подделанная отбивается; секрет только в env стенда, в репо не попадал.
+- **Не сделано:** реальная оплата + живой IPN на наш вебхук (нужен публичный URL вместо example.com), боевые ключи
+  Rukassa → GAP-46 п.1–2. Отдельный unresolved — TZ-02 (маппинг TON/TRX/LTC).
+
+### GAP-08. GitSlotPark вместо «только DemoProvider» (P1) — 🟦 CODE_DONE
+
+Адаптер `gitslotpark.adapter.ts` — агрегатор Pragmatic Play / PG Soft / Amatic / Amusnet (один seamless-протокол
+на 4 бренда): `userAuth`/`gamelist` + callback-операции GetBalance/Withdraw/Deposit/BetWin/Rollback с
+HMAC-SHA256-sign, маршруты `/provider-callback/gitslotpark/{Op}`. До продакшена: (1) сверить порядки конкатенации
+sign по каждой операции с менеджером GSP (GAP-43, §3.2), (2) связка `userID → сессия` в GameCallbackService и
+атомарность BetWin — проверить runtime с тестовыми ключами (GAP-46 п.3).
+
+### GAP-09. Admin syncGames (P2) — 🟦 CODE_DONE
+
+`syncGames` вызывает `adapter.fetchGameList()`, upsert по `[providerId, externalGameId]`, slug = name + md5-суффикс,
+обновляет rtp/thumbnail/hasDemo/metadata, пересчитывает gameCount; новые игры создаются выключенными (UC-GAME-19).
+Кнопка «Синхронизировать» в админке показывает результат. **Замечание этой ревизии:** логика синхронизации живёт в
+`apps/api/src/modules/casino/presentation/controllers/casino-admin.controller.ts` и пишет в БД из presentation —
+это архитектурный долг В3 в [TECH_DEBT.md](TECH_DEBT.md) (10 записей в этом контроллере), а не гэп ТЗ; здесь
+фиксируется только потому, что закрывало гэп «заглушка».
+
+### GAP-10 / GAP-11 / GAP-12. Админка: фронт, метрики, batch-операции — ⚠️ частично без машины
+
+- GAP-10 ✅ CLOSED: реальный UI (13+ страниц в `apps/admin/src`, с 2026-09-29 — плюс 6 страниц партнёрской программы):
+  логин c JWT (zustand persist), guard-layout, дашборд на живых metrics/charts/events + Recharts, users (block/unblock),
+  transactions, payments, withdrawals (single + batch approve/reject), KYC (approve/reject/resubmit), games/providers
+  (toggle/sync), support (диалог + внутр. заметки + приоритет + close), referrals (stats), audit, admins
+  (superadmin CRUD), settings. Листинги были сломаны по форме конверта — починено аудитом GAP-58 и закрыто тестом
+  `apps/admin/test/api-get-full.spec.ts`.
+- GAP-11 ⚠️ CLOSED_WORD: `admin/application/dashboard.service.ts` + `AdminDashboardController`
+  (`/admin/dashboard/metrics|charts|events`), raw SQL по `date_trunc`, деньги string. Тестов нет; runtime проверялся
+  только чтением при аудите контрактов 2026-09-27 («контракты сходятся»).
+- GAP-12 ⚠️ CLOSED_WORD: `POST /admin/withdrawals/batch-approve|batch-reject`
+  (`apps/api/src/modules/admin/presentation/controllers/admin-finance.controller.ts:333,365`) — независимая обработка
+  каждой заявки + audit-log сводки; single-эндпоинты рефакторнуты на общие helpers +
+  `WithdrawalInvalidStatusError`(AppError). Тестов на batch-путь нет.
+
+### GAP-13. Реферальные награды: `runDaily` не вызывался (P1) — ✅ CLOSED (был ⚠️ «частично»)
+
+История: `referrals/application/referral-calc.service.ts:56-60` помечал награды `credited` без реального зачисления —
+это было верно исправлено (зачисление идёт через `walletFacade.credit`, тип `REFERRAL_REWARD`, ключ
+`ref_reward_<id>`), но начисления не происходили, потому что `runDaily` не вызывался никем: «Полгода числился
+закрытым при неработающем начислении» — причина, по которой в аудит 2026-09-01 введён обязательный формат
+«Критерий приёмки». С 2026-09-02 (GAP-32) вызов есть: cron-задача
+`apps/api/src/modules/maintenance/application/referral-daily.job.ts:21` (`referralCalc.runDaily`) и ручной
+`POST /admin/referrals/run-daily` (`apps/api/src/modules/maintenance/presentation/maintenance-admin.controller.ts:53`,
+user-JWT `@Roles('superadmin')`, Zod-схема, audit-log `referrals.run_daily`). Дедуп внутри `runDaily`
+(findReward по дню+валюте + idempotencyKey проводки). Регрессия: `referral-payout.integration.spec.ts` на реальном
+Postgres (GGR 80 → проводка REFERRAL_REWARD 4.00 (5%), `idempotencyKey=ref_reward_<id>`, статус `credited`;
+повтор за тот же день — credited 0; win > bet → `zero`, проводок нет).
+
+### GAP-14 / GAP-15. KYC-админ и канал уведомлений
+
+- GAP-14 ✅ CLOSED: `GET /admin/kyc/:id` вместо `{todo:true}` возвращает профиль + документы + `totalDepositedRub`
+  (`apps/api/src/modules/kyc/presentation/controllers/kyc-admin.controller.ts:60`).
+- GAP-15 ⚠️ CLOSED_WORD: `NotificationService` учитывает настройки и канал email —
+  `apps/api/src/modules/notifications/application/notification.service.ts:41`
+  (`settings?.notificationsEmail ?? true`); enqueue в очередь `email`, `sentAt` проставляет воркер (GAP-02).
+  Теста на ветку «пользователь отписался → письмо не ушло» нет.
+
+### GAP-16. README честен про прогресс ТЗ (P3) — 🟡 PARTIAL (переоткрыт)
+
+Гэп 2026-08-23: README отмечал `[x]` все семь частей ТЗ при неработающих OAuth/PSP/jobs. Исправление тогда:
+раздел «TZ Progress» с процентами и ссылкой на этот файл. **Что не так сейчас (замер на `89881eb`):**
+README:49 — «Prisma schema (19 таблиц)» при **31** модели; README:70 — «Optimistic locking `wallet_accounts.version`,
+retry ×3», хотя GAP-57 (закрыт 2026-09-30) заменил Serializable+retry×3 на advisory-лок + ReadCommitted + повтор ×5,
+и сам README строкой ниже это же и описывает (то есть файл противоречит сам себе); GAP-46 в блокерах не отражён
+корректно. Правка README выполняется другим агентом в этой же ветке (`chore/techdebt-docs-sync`) — в реестре
+позиция остаётся открытой до появления коммита; корректная формулировка статуса: «README приведён к коду только
+в рабочей ветке, на main расходится».
+
+### GAP-17. KYC-лимит во фронте (P2) — ✅ CLOSED (был ⚠️ «не используется»)
+
+`apps/web/src/lib/api/kyc.api.ts:16` (тип `KycStatus` с `limit_remaining`/`limit_currency`/`deposit_limit_rub`),
+`apps/web/src/app/kyc/page.tsx:155,170` (остаток из API, без клиентского пересчёта),
+`apps/web/src/components/wallet/DepositSheet.tsx:282-284,398-401` (остаток в валюте шита; при исчерпании CTA
+«Лимит исчерпан — пройти верификацию» → `/kyc` ДО отправки формы, а не 422 после). Регрессия: `kyc-page.spec.tsx`,
+`deposit-sheet.spec.tsx` (GAP-36/GAP-44). Историческая путаница: гэп описывался как «лимит проверяется только на бэке»
+и был выделен в GAP-36; обе позиции теперь закрыты и связаны.
+
+### GAP-18…GAP-29 (аудит 2026-08-25) — сводка закрытий
+
+| ID     | Дата/PR закрытия                      | Машинное подтверждение                                                                                                                                                                                                                                                                                       | Что зафиксировано в обоснование                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------ | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GAP-18 | 2026-08-30                            | `apps/api/test/account-lockout.spec.ts` (5)                                                                                                                                                                                                                                                                  | поля `failed_login_attempts/last_failed_at/locked_until` (миграция `20260830_account_lockout.sql` — применить при деплое); 10 неудач/15 мин → блок 30 мин; enumeration-safe (неверный пароль → всегда INVALID_CREDENTIALS, лок виден только при верном); уже заблокированный аккаунт не продлевается (DoS-защита); env `LOCKOUT_MAX_ATTEMPTS/WINDOW_MS/DURATION_MS`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| GAP-19 | 2026-08-30                            | `apps/api/src/app.module.ts:39`, guard в auth-контроллерах                                                                                                                                                                                                                                                   | `@nestjs/throttler` v6, глобальный ThrottlerGuard 120 req/мин на IP; `/auth/*` — 10/мин; вебхуки провайдеров и game-callback — `@SkipThrottle()` (у них HMAC). Исключение 2026-09-29: `/auth/refresh` — свой лимит 30/мин (`THROTTLE_REFRESH_LIMIT`), т.к. это зонд сессии при каждой загрузке страницы, а классовый AUTH-лимит давил легитимные сессии (NAT/офис; в проде внешним ограничителем остаётся nginx `api_auth 10r/m`). Env `THROTTLE_TTL_MS/GLOBAL_LIMIT/AUTH_LIMIT/REFRESH_LIMIT`                                                                                                                                                                                                                                                                                                                                                                                |
+| GAP-20 | 2026-08-30                            | `apps/api/src/main.ts`                                                                                                                                                                                                                                                                                       | `app.use(helmet())` в bootstrap до парсеров; API отдаёт только JSON → дефолтный CSP безопасен, `frame-ancestors 'none'` против clickjacking                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| GAP-21 | 2026-08-30                            | use-case-спеки модулей                                                                                                                                                                                                                                                                                       | `@UsePipes(new ZodValidationPipe(Schema))` на всех клиентских `@Body` (auth incl. google/telegram, users profile/settings/self-exclude, casino launch/demo, kyc submit/documents, support + support-admin, все admin-контроллеры incl. finance credit/debit/batch); неизвестные ключи вырезаются (anti mass-assignment). **Exempt (задокументировано в коде):** `payments-webhook` и `provider-callback` — payload'ы провайдеров под HMAC, жёсткая схема отбила бы валидные коллбэки. Пересчёт 2026-10-02: из 30 контроллеров `@Body` без pipe только эти два                                                                                                                                                                                                                                                                                                                 |
+| GAP-22 | 2026-08-31                            | `apps/api/test/wallet-withdrawal-ops.spec.ts`                                                                                                                                                                                                                                                                | 4-слойка: `LockFundsUseCase`/`UnlockFundsUseCase`/`ConfirmWithdrawalUseCase` в `application/use-cases/` (WalletFacade делегирует, внешний API прежний); `runCreditDebit` разбит (`getOrCreateWallet` + `applyCreditDebit`); `toMoney` без any, tx-клиенты `Prisma.TransactionClient`, `CreditInput.type: LedgerEntryType` (поймал реальный баг lowercase-типа); 0 `as any`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| GAP-23 | 2026-08-30                            | `apps/api/test/logger-redact.spec.ts` (3)                                                                                                                                                                                                                                                                    | `nestjs-pino` + pino-http (`useLogger`); redact-пути `password/token/authorization/cookie/set-cookie` на 3 уровнях вложенности + `req.body.*`; кастомный req-сериализатор; `GlobalExceptionFilter` логирует только type/message/stack; корреляция request-id между pino и RequestIdMiddleware через общий `resolveRequestId`; env `LOG_LEVEL/LOG_FORMAT`; секреты физически отсутствуют в выводе лога                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| GAP-24 | 2026-08-31                            | `money-flow.spec.ts` (11), `ledger.integration.spec.ts` (6 на реальном Postgres: откат tx при сбое и идемпотентность на Serializable-БД), `nowpayments-ipn.spec.ts` (13), `kyc-file-sniffer.spec.ts` (8), `account-lockout.spec.ts` (5), `logger-redact.spec.ts` (3), E2E `player-lifecycle.e2e.spec.ts` (9) | интеграции помечены `LEDGER_INTEGRATION=1` и идут в CI после `prisma db push`/`migrate deploy`; в локальной среде без БД не запускаются — поэтому «21 skipped» в прежних счётчиках                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| GAP-25 | 2026-09-01                            | гард G13 + `QUALITY_GATES.md` §2.1.1                                                                                                                                                                                                                                                                         | пороги `max-params` warn(4)→error(3), `complexity` warn(10)→error(10); разобраны 45 `max-params` + 13 `complexity` в `apps/api/src`; бизнес-методы переведены на input-объекты (wallet lock/unlock/confirm → `WithdrawalOpArgs`, `kyc.setStatus`, support createTicket/listUserTickets/addMessage, referrals sumTransactions/findReward/processUserRewards, casino findRoundsWithGame/findOrCreateRound/creditWin, notifications.list, payment-request.listUser, favorites.history, webhook execute → `Process*WebhookInput`); complexity — на приватные методы/таблицы (`sniffDocumentMime`, GlobalExceptionFilter, syncGames, provider-callback.handle, GitSlotPark verify/parse, Rukassa/NOWPayments webhook). Исключения только framework-imposed и описаны: overrides `max-params: off` для `**/*.controller.ts` + `src/main.ts`, inline-disable для 10 DI-конструкторов |
+| GAP-26 | 2026-09-01                            | E2E на собранном dist (`pnpm build` → `node apps/api/dist/main.js`)                                                                                                                                                                                                                                          | 72 импорта (все с ≥3 `../`) переведены на `@modules/<mod>/…` и `@/<seg>/…`; внутримодульные `../` оставлены; рантайм-резолвер не нужен: `nest build && tsc-alias -p tsconfig.build.json` переписывает алиасы в относительные пути в `dist`; `baseUrl`+`paths` в `apps/api/tsconfig.json`, алиасы продублированы в `vitest.config.ts`; правила — CONVENTIONS §3.1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| GAP-27 | 2026-08-30                            | чтение `password-hasher.service.ts`                                                                                                                                                                                                                                                                          | `argon2.hash(plain, {type: argon2id, memoryCost: 65536, timeCost: 3, parallelism: 4})` — совпадает с SECURITY_BASELINE §2.1 и admin-хэшером `admin-users.service.ts:28`; прямого теста параметров нет (покрытие косвенное через E2E)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| GAP-28 | 2026-09-01                            | `apps/api/test/deposit-idempotency.spec.ts` (4)                                                                                                                                                                                                                                                              | ключ проводки депозита — `deposit_<provider>_<externalId>` (был `deposit_<pr.id>`, защищал только уникальность нашей платёжки); повторный коллбэк по тому же внешнему платежу, смэпившийся на другую платёжку, больше не зачислит дважды — уникальный индекс `ledger.idempotencyKey` отсекает на уровне БД; первый уровень (`pr.status === 'completed'` → duplicate до wallet.credit) сохранён; отсутствие external_id — без зачисления. На `89881eb`: `process-nowpayments-webhook.use-case.ts:109`                                                                                                                                                                                                                                                                                                                                                                          |
+| GAP-29 | 2026-08-30, **перезакрыт 2026-10-01** | гард D3 + `apps/api/test/env-validation.spec.ts` (3)                                                                                                                                                                                                                                                         | исходное закрытие («все 39 ключей §22 в схеме, D3 молчит») опиралось на **лживый детектор**: D3 искал ключи регуляркой `^  [A-Z]` (ровно два пробела), а ключи `envSchema` лежат на четырёх — не находил ни одного и объявлял невалидированными все 99 переменных при 98 покрытых. Детектор исправлен (`^ +`), настоящий остаток — 6 переменных (`ADMIN_DOMAIN`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `THROTTLE_REFRESH_LIMIT`, `WALLET_LOCK_TIMEOUT_MS`) — добавлен в схему как optional, регрессия закрыта спексом паритета с негативом на сам парсинг                                                                                                                                                                                                                                                                                                                      |
+
+### GAP-30. Длинные методы (P3, PR-0) — ✅ CLOSED
+
+14 методов 61–88 строк (prettier-инфляция после `--fix`): `game-callback.service` bet/win/rollback,
+`dashboard.service` metrics/events, `wallet.ledger.prisma` runCreditDebit/lock/unlock/confirmWithdrawal,
+`list-games.use-case` execute, webhook execute ×2, `provider-callback.controller` handle. Закрыто 2026-09-02:
+`max-lines-per-function` 90→60 (попутно max-params-фикс в applyRollback — entry-объект вместо 7 параметров);
+рефакторинг `wallet.ledger.prisma.ts` (общие existingDuplicate/withRetry/findWalletOrThrow/ledgerEntry) и
+`game-callback.service.ts` (applyRollback вынесен из rollback). **Дефект разметки, исправленный этой ревизией:**
+в прежнем файле статус этой позиции лежал в 6-й ячейке при 5-колоночном заголовке, то есть формально строка была
+«без статуса». Сейчас: `корневой .eslintrc.js`:86 (max 60, skipBlankLines+skipComments), override `:152` —
+off только Next.js pages с обоснованием (GAP-39 stage 9b).
+
+### GAP-31…GAP-38 (аудит готовности 2026-09-01) — досье
+
+> Формат, введённый этим аудитом и сохранённый здесь: пункт закрывается **только при выполнении критерия
+> приёмки целиком**; отметка «готово» без критерия — причина, по которой GAP-13 полгода числился закрытым при
+> неработающем начислении (см. досье GAP-13).
+
+- **GAP-31. Нет Prisma-миграций. ✅ P0, закрыт 2026-09-02 (PR #26).** Baseline `migrations/0_init/migration.sql`
+  (774 строки, 27 CREATE TABLE, все enum/индексы/FK) сгенерирована `prisma migrate diff --from-empty` из
+  `schema.prisma` — покрывает и три historical `manual/*.sql` (поля `last_payment_method`, `self_excluded_until`,
+  account lockout включены); manual-скрипты перенесены в `docs/archive/manual-migrations/` (Prisma считает каждый
+  подкаталог `migrations/` миграцией и без `migration.sql` падает P3015 — ходовой кейс пойман CI);
+  `migration_lock.toml`: postgresql. В CI `db push` заменён на `migrate deploy` + дрейф-детектор
+  (`migrate diff --from-schema-datasource --to-schema-datamodel`, непустой вывод = падение джобы; шаг
+  `Verify no schema drift`, ci.yml:161). Примечание: на БД, созданных ДО введения миграций, один раз выполнить
+  `migrate resolve --applied 0_init` (см. README в архиве manual). Для применимости в проде: schema-engine не
+  запускается на Android/Termux — генерация выполнена одноразовым workflow на ubuntu-раннере (артефакт), workflow
+  удалён из ветки до мержа. Критерии: 1) baseline покрывает 27 моделей + 3 manual — далее их стало 31 (2 миграции
+  affiliate + индексы), проверка дрейфа в CI это покрывает; 2) пустой Postgres → `migrate deploy` создаёт схему —
+  проверяется в CI; 3) дрейф-детектор встроен; 4) manual перенесён; 5) `migrate deploy` вместо `db push`.
+- **GAP-32. Реферальные начисления не происходят никогда. ✅ P0, закрыт 2026-09-02.** См. досье GAP-13: cron
+  `referral-daily` (`JOB_REFERRAL_DAILY_EVERY_MS`, дедуп внутри `runDaily`) + ручной `POST /admin/referrals/run-daily`
+  (user-JWT `@Roles('superadmin')`, Zod-схема, audit-log `referrals.run_daily`); интеграционный тест на реальной БД;
+  повторный запуск за тот же день — credited 0; win > bet → zero. **Попутный фикс:** RolesGuard читал метаданные
+  только с хендлера — class-level `@Roles` на admin-контроллерах игнорировался (любой user проходил); теперь
+  `getAllAndOverride([handler, class])` + `apps/api/test/roles-guard.spec.ts`.
+- **GAP-33. Ни одного scheduled job. ✅ P1, закрыт 2026-09-02.** BullMQ Job Schedulers (`upsertJobScheduler`,
+  очередь `maintenance`, `apps/api/src/queues/infrastructure/maintenance.scheduler.ts` + воркер
+  `modules/maintenance/infrastructure/maintenance.worker.ts`): `expire-deposits` (5 мин; крипто по `expires_at`,
+  фиат по 2 ч; условный updateMany — гонка с вебхуком не затирает `completed`), `update-rates` (5 мин;
+  NOWPayments `/estimate` → `exchange_rates` + Redis TTL 5 мин; фиат — константы `source='static'`),
+  `withdrawal-reminder` (1 ч; email активным admin_users + audit_log, дедуп 24 ч), `referral-daily` (24 ч).
+  Юнит-тесты — `apps/api/test/maintenance-jobs.spec.ts`; документировано в `.env.example` + ENVIRONMENT_VARIABLES
+  §2/§22 (D3). **Отклонение критерия 3 (задокументировано):** `notifications` имеет FK на `users` (админы — в
+  `admin_users`) → уведомление админам = email через `EMAIL_QUEUE_PORT` + запись в `audit_logs`, дедуп по
+  audit-записи. Без Redis / `NODE_ENV=test` — no-op (как EmailWorker). В 2026-09-29 тот же планировщик принял
+  три задачи партнёрской программы (GAP-61).
+- **GAP-34. Курсы валют захардкожены. ✅ P1, закрыт 2026-09-02.** `ExchangeRatesService`
+  (`apps/api/src/modules/geo/application/exchange-rates.service.ts`): приоритет Redis-кеш `exchange_rates:rub` →
+  последняя запись `exchange_rates` (по `currencyFrom/currencyTo='RUB'`, `fetchedAt desc`) → fallback
+  `DISPLAY_RUB_RATES`; курс старше 1 ч (`RATE_STALE_AFTER_MS`) — warn, запрос не роняем; сбой источника —
+  fallback static, не 500. `PrismaExchangeRatesReader` — Redis lazy + БД. `GeoFacade.convertRubToDisplay` стал
+  async (единственный потребитель — KYC get-status, обновлён); `convertRubToDisplayAmount` принял `rateOverride`.
+  Тесты: `apps/api/test/exchange-rates.spec.ts` (приоритет кеш/БД/fallback, stale, RUB-шорткат, форматирование с
+  override). **Остаток:** админ-отчётность GGR в валютах читает те же политические константы (вне изначального
+  критерия, P3) — см. §5 «не является гэпом» про `toRubEquivalent`.
+- **GAP-35. Health-эндпоинты фиктивные. ✅ P1, закрыт 2026-09-02.** `/health/ready` — `SELECT 1` к БД
+  (недоступна → 503 fail-closed) + `PING` Redis (недоступен → 200 `degraded:true` — деградация очередей, не отказ
+  API); healthcheck в `docker-compose.prod.yml` переведён на `/health/ready` (строка 50); liveness не тронут.
+  `/health/details` сознательно не заводился (сервисы и счётчики видны в логах/метриках). Тесты:
+  `apps/api/test/health-ready.spec.ts` (db fail → 503, redis fail → degraded, без `REDIS_URL` → degraded без
+  коннекта, liveness статический). E2E `wait-on` теперь честный — упадёт при мёртвой БД.
+- **GAP-36. KYC-лимит не виден игроку. ✅ P2, закрыт 2026-09-02.** См. досье GAP-17: страница KYC показывает
+  остаток лимита из API (`getKycStatus` из нового `apps/web/src/lib/api/kyc.api.ts`, поля `limit_remaining` /
+  `limit_currency` / `deposit_limit_rub`; типизированный `KycStatus` вместо `any`) + при исчерпании красный блок с
+  CTA «Пройти верификацию» (анкор на форму, без ошибки 422 после отправки); DepositSheet показывает остаток в
+  валюте шита и меняет CTA → роут на `/kyc` (критерий 2: до отправки формы); пересчёта на клиенте нет
+  (критерий 3); статус approved — лимит снят.
+- **GAP-37. Дрейф деплой-документации. ⚠️ P3, закрыт 2026-09-02 — словом.** DEPLOY.md переписан под фактический
+  пайплайн (единый ci.yml, deploy-job после 4 чеков, deploy-skip без VPS-секретов, `migrate deploy` на деплое);
+  `infra/scripts/resource-check.sh` добавлен по образцу ТЗ ч.7 §12.3 (CPU 85% / RAM 90% / disk 85% + проба
+  `/health/ready`, cron `*/5`); в ТЗ-эскизе deploy.yml — пометка «в репо не существует, фактический пайплайн —
+  DEPLOY.md»; заодно в Monitoring — честный readiness (GAP-35) и ресурс-скрипт. **Почему `CLOSED_WORD`:** машина
+  не проверяет, что DEPLOY.md описывает текущий пайплайн; docs-guard D2/D5 проверяют существование путей и
+  несъезд производных файлов, но не актуальность текста. Класс регрессии: GAP-56 (2026-09-27) снова нашёл расхождение
+  доков с compose, а GAP-16 — расхождение README с кодом.
+- **GAP-38. На чистом проде некому войти в админку. ✅ P2, закрыт 2026-09-02.** Seed fail-closed при
+  `NODE_ENV=production` — отказ без `SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD` и при дефолтном dev-пароле (exit 1 до
+  обращения к БД); DEPLOY.md — раздел «Первичная инициализация админа»; повторный запуск идемпотентен (upsert по
+  email). Guard вынесен в `packages/database/src/seed-guard.ts` (без argon2/prisma-зависимостей — тестируется без
+  native-модулей); тест `apps/api/test/seed-guard.spec.ts` (5 кейсов: prod без `SEED_*` → отказ, дефолтный пароль →
+  отказ, валидные → ok, dev/test → ok). `SEED_ADMIN_*` уже были в `.env.example` (§ Bootstrap) +
+  ENVIRONMENT_VARIABLES §15/§22 — D3-парити.
+
+### GAP-39…GAP-51 (аудит готовности #2, 2026-09-02) — досье
+
+> Повод аудита: после закрытия P0/P1/P2-трекера и зелёного CI задан вопрос «проект готов к запуску?».
+> Ответ: **код MVP готов (~85%), приёмка — 0%**. Проверялось машинно: `grep` кода против `.env.example`,
+> покрытие тестами по файлам, ТЗ ч.3 §13 / ч.5 §2.8 / ч.7 §12, `docs/QA_CHECKLIST.md`, состав `apps/web`/`apps/admin`.
+> Что можно делать без боевых ключей: GAP-39, 40, 41, 42, 43, 44, 45, 48, 51. Требует ключей/стенда: GAP-46
+> (runtime-приёмка), GAP-47 (нагрузка). Требует решения владельца: GAP-49 (юридика); GAP-50 (Sentry) — согласовано
+> 2026-09-04 и реализовано. GAP-51 — не выход этого аудита, а находка 2026-09-04 при закрытии GAP-48: в коде висел
+> `TODO` со ссылкой на GAP-22 на работу, которой в критериях GAP-22 никогда не было, а сам гэп закрыт — из-за чего
+> долг выглядел исполненным.
+
+- **GAP-39. Техдолг ESLint: 1171 warning (0 errors) при зелёном CI. ✅ P3, закрыт 2026-09-03 (PR #36–55, stages 1–10).**
+  Исходная формулировка (в файле она осталась в статусе «🟡 P3 открыт» — дефект разметки): GAP-25 заявлен закрытым по
+  `max-params: error(3)` и `complexity: error(10)`, но не закрыт по `no-explicit-any` — в CI job `Lint` последнего
+  коммита `a8c86fe` (run 33632859122) видно `✖ 1171 problems (0 errors, 1171 warnings)`; правило в `.eslintrc.js:32`
+  стоит `error`, но через `next lint` для `apps/admin` и `apps/web` понижается до warning (конфликт с
+  `eslint-config-next`). Среди 1171: `no-explicit-any` (≈117 в `apps/api` + множество в `apps/admin` pages),
+  `no-unsafe-assignment/member-access/call` (каскад от any), `explicit-function-return-type` (Next.js pages),
+  `max-lines-per-function >140` (отдельные pages 149–194 строк), `prefer-nullish-coalescing`. Запуску не мешал —
+  CI зелёный, typecheck/тесты/билд/E2E проходят; фиксировалось по правилу INDEX.md §6.3.
+  **Критерий приёмки:** 1) `pnpm lint` = 0 warnings без понижения уровня для фронта; 2) `no-explicit-any: error`
+  работает во всех трёх apps; 3) длинные Next.js pages разбиты или `max-lines-per-function` поднят до 200 с
+  обоснованием (QUALITY_GATES §2.3). Допускалось частичное закрытие: api → admin → web.
+  **Прогресс по этапам (данные сохранены):** PR #36 — 10 disable для PSP payload parsing (легитимный any);
+  PR #37 — типизация сигнатур контроллеров 48 any → 0 (`UserActor`/`AdminActor` из `common/types/req-user.ts`,
+  `Prisma.*WhereInput`); PR #38 — 16 `catch (e: any)` → `catch (e)` + `errorMessage()`
+  (`common/utils/error-message.ts`); PR #39 — `no-explicit-any: warn → error` в `apps/api/.eslintrc.js`, разобрано
+  ~95 any (репозитории на Prisma-типах, доменные интерфейсы ISupportRepository/IKycRepository, module augmentation
+  express `Request.user`, структурный тип `SmtpTransport` вместо недоступных типов nodemailer) — api 1171 → 439;
+  PR #42 — stage 6: `prefer-nullish-coalescing` (72) с `ignorePrimitives: true`, `no-unnecessary-condition` (18)
+  вручную, guard-типизация (admin-auth/roles/roles.guard, admin-jwt.verify → `Record<string, unknown>`) — api → 313;
+  PR #43 — stage 6b: return-типы не-контроллеров (261 из 313) — api → 263; PR #46 — stage 7 (apps/web):
+  `no-explicit-any: error`, 55 any разобраны, `lib/api.ts` на `ApiResponse<T>`, новые DTO в `src/types/*`
+  (casino.ts: GameDto/GamesListDto/GameLaunchDto/HistoryDto; wallet-tx.ts; user.ts: MeDto; referral.ts; support.ts),
+  попутно исправлены реальные баги чтения полей (profile/referral/support читали snake_case, API отдаёт camelCase) —
+  web ~680 → 123; PR #47 — stage 8 (apps/admin): 13 any, `apiGetFull` на `ApiResponse<T> + ApiMeta`,
+  `AdminLoginResponse`, role-union касты, audit payload, withdrawals destination, support/referral типы —
+  admin ~530 → 112; PR #49 — stage 9: аннотированы все export-функции/хендлеры, `errText()`/`errCode()`,
+  `trySilentRefresh` типизирован, admin SyncResult сверен с API — web 19, admin 16; PR #50 — stage 9b: web и admin
+  «✔ No ESLint warnings or errors», `import/no-cycle` разорван выносом axios-interceptors в
+  `lib/api-interceptors.ts`, `axios.get<T>` в verify-email, `import { Decimal } from 'decimal.js'`,
+  страницы-переращеры разложены (`WithdrawalRow` 216→166, `KycForm` 205→159), `max-lines-per-function: 140→200`
+  для Next.js pages с обоснованием в `.eslintrc.js`; PR #51 — поправка трекера (фраза про освобождение
+  `explicit-function-return-type` override'ом по §2.1.1 была неточной — §2.1.1 освобождает только `max-params`);
+  PR #55 — stage 10 (apps/api → 0): `common/types/express-context.ts` с `getHttpRequest<T>()` (изолирует any от
+  `switchToHttp().getRequest()`), `config.get<string>('X')` в 12 местах, `Record<string, unknown>` в
+  nowpayments-webhook без disable, `ZodType` в pipe, 206 return-аннотаций, Prisma-namespace с префиксом,
+  import-гигиена по main-паттерну; **E2E поймал DI-регрессию:** type-only импорт класса в constructor-параметре
+  ломает `design:paramtypes` (Nest can't resolve) — value-импорты DI восстановлены (38 файлов), `ZodValidationPipe`
+  оставлен type-only; точечные fixes (`Request.id?`, `cookies`, `candidate as unknown[]`, `RequestWithCookies` +
+  `token ?? ''`, `Roles(): MethodDecorator & ClassDecorator`, decimal.js named-import).
+  Итог: **0/0/0 warning** (api 1171→0, web ~680→0, admin ~530→0), CI main после squash `6fd0bc5`: lint ✔,
+  typecheck ✔, 117 unit + 9 E2E ✔, docker-build ✔, deploy ✔.
+  **2026-09-03 — критерий 1 закреплён машиной:** до этого «0 warnings» было свойством _вывода_, а не _exit-кода_ —
+  `eslint src --ext .ts` без `--max-warnings` возвращает 0 и при тысячах warnings; именно эта конфигурация позволяла
+  GAP-39 числиться зелёным с `✖ 1171 problems`. Теперь `--max-warnings=0` во всех трёх lint-скриптах
+  (`apps/api/package.json:10`, `apps/web/package.json:9`, `apps/admin/package.json:9` — проверено 2026-10-02),
+  а сам флаг сторожит guard **G13** в `architecture-guards.yml` (удаление — падение Tier 2); обоснование —
+  QUALITY_GATES §2.4.
+- **GAP-40. SMTP-пароль не доезжает до nodemailer — письма не уходят в проде. ✅ P1, закрыт 2026-09-03 (PR #53).**
+  Мейлер читал `SMTP_PASS`, а `.env.example` и `ENVIRONMENT_VARIABLES.md` предписывали оператору `SMTP_PASSWORD`;
+  в `env.validation.ts` обе формы `optional()` — валидация расхождение не ловила. Итог: оператор заполняет прод по
+  доке → `createTransport` получает `pass: undefined` → SMTP-аутентификация у провайдера падает → не уходят письма
+  верификации email, сброса пароля и все уведомления из очереди `email`. Не поймано тестами: мейлер был не покрыт,
+  а E2E регистрируется без подтверждения email. Закрытие: 1) канон `SMTP_PASSWORD` в `smtp.mailer.ts:70`; 2) единственная запись в `packages/shared-config/src/env.validation.ts:127` (дубликат удалён, в коде остались
+  только исторические комментарии — D7 на них не реагирует); 3) `superRefine`: `NODE_ENV=production` + `SMTP_HOST` +
+  `SMTP_USER` без пароля → ошибка валидации (fail-closed); 4) спек `apps/api/test/smtp-mailer.spec.ts` (6 кейсов,
+  включая «НЕ читает устаревшее имя»), **с обоснованным отклонением от буквы критерия:** вместо `vi.mock('nodemailer')`
+  — подмена `require()`, потому что мейлер грузит nodemailer через CommonJS `require`, а `vi.mock` подменяет
+  ES-импорты (в спеке задокументировано); 5) D3 зелёный.
+  **История честности (важна как прецедент):** в `main` коммитом `d9b1504` (docs-PR #51 по GAP-39) оказалась пометка
+  «GAP-40 закрыт», поставленная раньше кода — в тот момент мейлер читал `SMTP_PASS`, дубликат из `env.validation.ts`
+  не был удалён, спека не было, при этом строка таблицы оставалась открытой. Исправлено; позже squash #52 (с устаревшей
+  базы) откатил абзац нарратива, реальный фикс приехал в #53. Урок: «закрыт» ставится только когда end-to-end работает,
+  а squash с устаревшей базы может молча откатить чужие строки трекера. Строка была 4-ячеечной (критерии влились в
+  ячейку статуса) — колонка была восстановлена тогда и входит в единую схему сейчас.
+- **GAP-41. Дрейф «код ↔ `.env.example`»: 7 переменных читаются, но не описаны оператору. ✅ P2, закрыт 2026-09-03.**
+  `GITSLOTPARK_AGENT_ID/API_TOKEN/SECRET_KEY/API_BASE`, `NOWPAYMENTS_API_BASE`, `RUKASSA_API_BASE`, `SMTP_PASS`
+  (последняя ушла с GAP-40). `GITSLOTPARK_*` — 0 упоминаний в `ENVIRONMENT_VARIABLES.md`: поднимая прод по доке,
+  оператор не узнаёт, что игровому провайдеру нужны ключи, и получит `PaymentProviderNotConfiguredError` на первом
+  launch. Слепое пятно инструмента: docs-guard D3 сверял `.env.example` ↔ §22, но **код** ↔ `.env.example` не сверял.
+  Закрытие: `.env.example` — `GITSLOTPARK_*` активными dev-плейсхолдерами `dev_gsp_*` (gitleaks-нейтрально),
+  `*_API_BASE` — закомментированными overrides с дефолтом из кода; `ENVIRONMENT_VARIABLES.md` — §21 «Casino & Game
+  Providers», новый §21.2 GitSlotPark (4 переменные, fail-closed поведение `creds()`, 4 бренда, риск сверки подписи →
+  GAP-43), §20 деплой-чеклист, §22 зеркало `.env.example`; `env.validation.ts` не менялся (все 6 уже были в Zod-схеме).
+  **Новый чек D7** в `docs-guard.yml`: извлекает `process.env.X` / `process.env['X']` / `config.get*(… 'X')` по
+  `apps/api/src` + `packages/*/src`, сверяет с `.env.example` (активные и закомментированные), при расхождении —
+  падение с перечнем имён; allowlist `NODE_ENV`, `CI`, `*_INTEGRATION`, `E2E_*`; временная запись `SMTP_PASS` снята
+  после мержа GAP-40; отрицательный тест — фиктивный `process.env.SOME_BRAND_NEW_SECRET_VAR` → D7 FAIL.
+  QUALITY_GATES: Tier 2.5 D1–D6 → D1–D7. **Попутное (найдено и починено тем же PR'ом):** (а) локальный прогон вынесен в
+  версионируемый `scripts/docs-guard-local.sh` — извлекает тело шага из `docs-guard.yml` и запускает его с флагами
+  runner'а (`bash -e -o pipefail`); `$HOME/dg.sh` стал тонким указателем (ручная байт-копия была причиной того, что баг
+  не поймался локально; старая копия — `dg.sh.bak-manual-mirror`); (б) D3/D6 защищены от errexit-смерти (`|| true` на
+  извлечениях + явный ❌ D6 при пустом списке required checks) — первая версия D7 падала в CI именно на errexit:
+  `grep -vE` с пустым выводом внутри `D7_MISSING=$(…)` молча ронял весь guard до блока «итог», без `❌` и без перечня.
+- **GAP-42. Верификация OAuth-подписей не покрыта тестами. ✅ P2, закрыт 2026-09-03 (PR #52).**
+  `apps/api/test/oauth-verify.spec.ts` — 11 кейсов: Telegram (валидный/подделанный hash, `auth_date` > 24 ч, без
+  `TELEGRAM_BOT_TOKEN` → `OAuthNotConfiguredError`/503, hash неверной длины не роняет процесс — `timingSafeEqual`
+  защищён проверкой длины), Google (round-trip `buildAuthUrl`↔`verifyState`, подменённая подпись → `OAuthStateError`,
+  state старше 10 мин, отсутствие state, без `GOOGLE_CLIENT_ID/SECRET` → 503). HTTP-обмен с Google не мокается —
+  это runtime (GAP-46). Добавлен `apps/api/tsconfig.test.json` для typecheck'а тестов; боевые ключи не нужны —
+  фиктивные секреты подставляются в `ConfigService`.
+- **GAP-43. Адаптер GitSlotPark без тестов, порядок полей подписи не подтверждён. 🟡 P2, PARTIAL.**
+  Тестовая часть закрыта 2026-09-03: `CALLBACK_MESSAGE_BUILDERS` экспортирован из адаптера (рефакторинг ради чистого
+  теста без `as any`); новый `apps/api/test/gitslotpark-adapter.spec.ts` на фиктивном SECRET фиксирует **текущий**
+  контракт: 5 операций — точная строка сообщения и UPPERCASE-hex HMAC + sanity `^[A-F0-9]{64}$`; `verifyCallback` —
+  верная подпись `true`, неверная `false`, lowercase `true` (нормализация), неизвестный `x-gsp-op` `false`, без ключей
+  `false` **без исключения** (fail-closed), `body === undefined` `false`; `parseCallback` — `withdraw`→`bet`,
+  `betwin`/`deposit`→`win`, `rollbacktransaction`→`rollback`, `getbalance`→`balance`, `playerToken === 'uid:<userID>'`,
+  первый непустой из `amount`/`betAmount`/`winAmount`; `formatErrorResponse` — коды 6/8/9/11/3/5, неизвестный → 1;
+  `AMT` ровно 2 знака; `formatSuccessResponse` — status всегда 0, balance через `Number(...).toFixed(2)` (string, не
+  money-helper — это контракт GitSlotPark). Смысл: после сверки с менеджером правится **только**
+  `CALLBACK_MESSAGE_BUILDERS`, а тесты показывают дельту. **Не сделано:** сама сверка порядков конкатенации с
+  менеджером GSP и живой раунд — это §3.2 и GAP-46 п.3; если реальный порядок иной, все seamless-колбэки провайдера
+  будут отбиты как невалидные и игрок не сможет играть (ТЗ ч.4, ~60% объёма).
+- **GAP-44. Фронтенд без тестов: 0 spec-файлов в `apps/web` и `apps/admin`. ✅ P3, закрыт полностью 2026-09-09.**
+  Было: в `package.json` обоих только `lint`, тест-раннера нет; 18 страниц web и 14 админки защищены лишь `tsc` и
+  ESLint; особенно уязвим только что сделанный GAP-36. **Этап 1 (PR #59):** vitest 2.1.9 в devDeps web+admin,
+  `pnpm -r test` в CI; unit-тесты чистых функций — web `format-currency.spec.ts` (12), `wallet-helpers.spec.ts` (12),
+  `api-errors.spec.ts` (8); admin `err-text.spec.ts` (4). **Этап 2:** `@testing-library/react` 16.1.0 +
+  `@testing-library/dom` + `@testing-library/jest-dom` + `jsdom` 25.0.1 + `@vitejs/plugin-react` 4.3.4 (точные версии),
+  vitest-конфиги на `environment: 'jsdom'` + plugin-react; DOM-тесты критериев GAP-36: `deposit-sheet.spec.tsx` (3),
+  `kyc-page.spec.tsx` (3), admin `login-page.smoke.spec.tsx` (2); все сторы/API мокнуты модульно, компоненты —
+  «глупый рендер». Замер 2026-10-02 по составу файлов: **18 spec-файлов web, 3 admin** (плюс 2 новых affiliate-спека).
+  Тогда же зафиксировано: гейты tsc ✅, `next lint --max-warnings=0` ✅ обоих, api не тронут (158 passed); lockfile
+  +772 строки (testing-library/jsdom/vitejs), sentry-часть из main не изменена.
+- **GAP-45. QA_CHECKLIST: 33 пункта, отмечено 0 — при этом ~9 уже проверяются машиной. ✅ P3, закрыт 2026-09-03 (PR #58).**
+  E2E `player-lifecycle` закрывает register → login → KYC submit+approve → депозит по валидному HMAC (и отбой
+  невалидного) → launch → bet/win → вывод с блокировкой → одобрение админом со сверкой типов проводок; часть закрыта
+  unit-тестами (идемпотентность депозита, `InsufficientFunds`, NOWPayments `actually_paid`, roles-guard, lockout).
+  Закрытие: у каждого пункта пометка `[auto: <файл>::<имя теста>]` или `[manual: ...]`; авто-пункты — `[x]`,
+  частично покрытые — `[x*]` (код-путь закрыт, хвост боевой интеграции — GAP-46); в шапке сводка; в конце — считалка
+  по разделам. **Причина отставания трекера от кода (зафиксирована как прецедент):** параллельный агент обновил
+  QA_CHECKLIST.md в PR #58 (код + чеклист в одном коммите), но правило INDEX.md §6.3 не соблюл — строка трекера
+  осталась не отмечена; закрыто отдельным коммитом. Счётчики чеклиста сводились с фактом трижды (PR #58 → 14/10/9,
+  аудит GAP-56 п.9 → 35/10/9/16, GAP-60 п.4 → пересчёт авто-базы). **Замер 2026-10-02:** 35 пунктов — 10 `[x]`,
+  9 `[x*]`, 16 `[ ]`, 24 пометки `[auto:`; сводка в шапке совпадает с фактом. Покрытие `словом`: сверка чеклиста с
+  фактом ручная, гарда на неё нет.
+- **GAP-46. Runtime-приёмка не выполнялась ни разу — главный блокер запуска. ⏳ P1→P0, HUMAN.**
+  _Текст позиции (был физически вклеен в строку GAP-45 — с этой ревизии самостоятельная запись)._
+  Ни одна внешняя интеграция не общалась с боевым контуром: HMAC проверен только на синтетических подписях,
+  HTTP-клиенты — только на fail-closed. Деплоя не было: пайплайн написан и штатно скипается без секретов, миграции на
+  живую БД не применялись, `seed` админа не выполнялся, SSL/nginx не поднимались. `restore.sh` **никогда не
+  запускался** — непроверенный бэкап бэкапом не считается. Мониторов UptimeRobot по ТЗ ч.7 §12.2 нет (нужен домен).
+  **Прогресс 2026-09-09 (NOWPayments — первый внешний контур, ключ предоставлен):** API-ключ валиден (`GET /v1/currencies`
+  → 236 валют); MCP-эндпоинт отвечает (5 tools), но `/full-currencies` пока 404 — REST `/v1` (его использует
+  `nowpayments.client.ts`) полностью рабочий; все 5 валют проекта поддержаны (`usdttrc20`/`btc`/`ton`/`trx`/`ltc`),
+  маппинг `MAP` подтверждён (прямой тест сырого `USDT_TRC20` → 400 «alpha-numeric only», т.е. маппинг обязателен и
+  корректен); `/v1/estimate` работает в обоих направлениях KYC-флоу и для maintenance-задачи курсов; `/v1/min-amount`
+  = 19.2 usd→usdttrc20 (вымогать ниже нельзя — клиент должен валидировать); `price_currency` только fiat (`usd`/`eur`/`rub`),
+  `usdt` как price отклонён — код уже шлёт `priceCurrency: 'USD'`, но `rub` как price для крипто-кассы зависит от
+  настроек аккаунта (для MVP крипто-депозиты считаем от USD, RUB показывается через estimate); тестовый payment
+  5120213360 создан, `GET /v1/payment/:id` отвечает `waiting`, `/v1/payout` доступен (адреса не настроены); IPN-секрет
+  получен, каноническая подписывается нашим `verifyIPN`, подделка отбивается; Telegram-бот: токен получен, `getMe`
+  отвечает, верификация виджета проверена на payload, подписанном РЕАЛЬНЫМ токеном; осталось `/setdomain` на боевой
+  домен + живой логин. ❌ Реальная оплата + живой IPN на наш вебхук: требует домена и публичного URL для
+  `ipn_callback_url` (сейчас example.com) — после VPS.
+  **Критерий закрытия (по каждому — запись результата: дата, окружение, что именно проверено; разбор — датированным
+  отчётом в `docs/archive/` по конвенции [audit-2026-08-25.md](archive/audit-2026-08-25.md)):** 1) Rukassa — создание
+  платежа + приход реального вебхука → зачисление; 2) NOWPayments — `createPayment`/`estimate` + IPN с настоящей
+  подписью; 3) GitSlotPark — порядок полей подписи **подтверждён менеджером** (снимает риск GAP-43), `userAuth`, sync
+  каталога, зелёный seamless-раунд bet/win/rollback; 4) Google OAuth — code-flow на реальном `redirect_uri`; 5) Telegram Login Widget — бот + домен; 6) первый деплой на VPS — `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY`,
+  `migrate deploy`, `seed` с `SEED_ADMIN_*`, SSL, nginx, вход в админку; 7) учебное восстановление — дамп →
+  `restore.sh` → проверка целостности (обязательно **до** приёма денег); 8) UptimeRobot-мониторы + cron
+  `resource-check.sh`; 9) полный прогон QA_CHECKLIST на стенде; 10) **добавлено этой ревизией:** приёмка ч.8
+  (партнёрская программа) по критериям A1–A25 — см. GAP-64.
+  **Чего буквально нет в репозитории (проверено 2026-10-02 в этом дереве):** файла `.env` нет (только
+  `.env.example`); `VPS_*` существуют только как GitHub Secrets, читаемые deploy-шагом (`ci.yml:261-275`), который
+  печатает notice и скипается; домен нигде не зафиксирован — в `docker-compose.prod.yml:90,108` дефолт-плейсхолдер
+  `https://casino.example.com/api/v1`, nginx-шаблон требует `DOMAIN`/`ADMIN_DOMAIN` (`${DOMAIN:?…}`); SMTP, Turnstile и
+  боевые ключи PSP/GSP пусты или заданы dev-плейсхолдерами `dev_gsp_*`.
+- **GAP-47. Нагрузочного тестирования нет — предел конкурентности кошелька неизвестен. ✅ P3, закрыт кодом 2026-09-03, прогнан 2026-09-27.**
+  Ledger работал на Serializable-транзакциях с optimistic-lock и 3 попытками (backoff 50·n²). Закрыто:
+  1. `infra/load-tests/wallet-concurrency.js` (k6) — бьёт `POST /api/v1/provider-callback/gitslotpark/withdraw`
+     (seamless bet), генерирует валидный HMAC по контракту `CALLBACK_MESSAGE_BUILDERS.withdraw` (GAP-43), профили
+     10→50→100 VU, threshold p95<500ms / fail<1%, кастомный warn при `status=11` (DUPLICATE_TRANSACTION);
+  2. `infra/load-tests/README.md` — подготовка стенда (SQL-снипет user/wallet/game_session), env, команды;
+  3. `docs/archive/load-test-TEMPLATE.md`; 4) скрипт `pnpm load-test:wallet`. **Критерий 2 (прогон на стенде)
+     выполнен 2026-09-27** (локальный Docker-стенд: Postgres 16 + Redis 7, API из dist, k6 v2.3.0 в docker): деньги целы —
+     баланс сходится копейка в копейку (9 916 610.00 = 10 000 000.00 − 8 339 × 10.00, version совпадает с числом
+     списаний), double-spend/потеря проводок нет; но 3 retry не покрывают профиль — при 100 VU успех 30,6%
+     (Serializable → Prisma P2034), p95 825 мс. Прогон нашёл и починил 4 дефекта (k6-скрипт ×2, отсутствие ретрая P2034,
+     утечка текста ошибок) → GAP-57; отчёт `docs/archive/load-test-2026-09-27.md`.
+- **GAP-48. Последний `eslint-disable max-lines-per-function`. ✅ P3, закрыт 2026-09-04 (PR #63).**
+  `runDaily` подавлял правило и нёс `TODO(referrals): split into accrual + payout`. Оказалось устаревшим: рефакторинг
+  в рамках GAP-30 уже разнёс логику в `processUserRewards`/`processCurrencyReward`, `runDaily` — 30 строк (29 зачётных
+  по мерке ESLint `skipBlankLines`+`skipComments`). Контракт `{ processed, credited, date }` не изменён; репозиторий не
+  содержит ни одного подавления этого правила. **Возврат подавления закрыт guard'ом G14** (Tier 2,
+  `architecture-guards.yml:349`): любой `eslint-disable` этого правила роняет CI с файлом и строкой. Найдка этого
+  разбора → GAP-51 (три `TODO` ссылались на закрытый GAP-22).
+- **GAP-49. Юридика и комплаенс не закрыты — риск уровня «не запускать». ⏳ P0 организационный, HUMAN.**
+  Лицензия, KYC/AML-политика, подтверждение 18+, обработка персональных данных (152-ФЗ/GDPR), налоги, публичные
+  документы (Terms of Service, Privacy Policy, Responsible Gaming). Вне инженерной зоны, но приём **реальных** денег до
+  закрытия недопустим. **Инженерная часть по ТЗ выполнена 2026-09-03:** страницы `/legal/terms`, `/legal/privacy`,
+  `/legal/cookies`, `/legal/responsible-gaming` (компонент `LegalPage`, единый стиль); футер по ТЗ ч.5 §4.6
+  (`SiteFooter` в `MainShell`: 18+ бейдж, условия, конфиденциальность, ответственная игра); возрастной гейт 18+ на
+  регистрации (ТЗ ч.5 §16.3: чекбокс + ссылки, кнопка заблокирована до подтверждения); тексты — предварительная
+  графика для приёмки UI, помечены в исходниках комментарием GAP-49; Responsible Gaming описывает работающие
+  инструменты — самоисключение (24 ч минимум, 72-часовой cooloff, ревок сессий, `users.controller /me/self-exclude`),
+  лимит депозита 5000 ₽ без KYC; рамка владеленческих решений — `docs/LEGAL_COMPLIANCE.md`.
+  **Остаток (владелец):** в `LEGAL_COMPLIANCE.md` §2 все семь чекбоксов пусты (юрисдикция и лицензирование,
+  юридически значимые тексты, AML-пороги, возрастная верификация — серверной проверки по `date_of_birth` нет, дата
+  рождения собирается только в KYC, 152-ФЗ/GDPR, налоги, лицензия на сайте). Критерий закрытия: сервис не принимает
+  реальные деньги до заполнения §2 и замены текстов.
+- **GAP-50. Нет агрегатора ошибок (предложение, не гэп ТЗ). ✅ P2, закрыт 2026-09-04 по решению владельца.**
+  ТЗ ч.7 §12.1 прямо говорит, что Prometheus+Grafana для MVP не нужны, и предписывает UptimeRobot + health-эндпоинты +
+  просмотр логов; Sentry в ТЗ не заявлен — внедрение только как осознанное дополнение. Факт: без агрегатора 500-е и
+  необработанные исключения видны только в `docker logs` на VPS. Протокол: 1) `@sentry/node` 8.49.0 exact, DSN
+  опционален — `buildSentryOptions()` без DSN возвращает undefined, init не вызывается (в `main.ts` до NestFactory —
+  ловит и ошибки бутстрапа); 2) `tracesSampleRate: 0` + `sendDefaultPii: false` + scrubPII тем же списком
+  `LOG_REDACT_PATHS`, что у pino redact (SECURITY_BASELINE §12.3); 3) в Sentry — только unknown-исключения и Nest 5xx
+  (GlobalExceptionFilter), AppError/4xx не отправляются; 4) `SENTRY_DSN` в `.env.example` (закомментированно) +
+  ENVIRONMENT_VARIABLES §15/§22 + `env.validation` (url, optional) — D3/D7 зелёные; 5) отметка в tz-part-7 §12.
+  Спек `apps/api/test/sentry-options.spec.ts` (10 кейсов).
+- **GAP-51. Реферальный расчёт и уведомления читают таблицы чужих модулей. 🟡 P3, PARTIAL (переоткрыт 2026-10-02).**
+  Исходная формулировка: в `referrals` GGR считается через `prisma.gameTransaction.groupBy(...)` — таблица принадлежит
+  casino-модулю; в `notifications` читаются `user` и `user_settings` (модуль users) вместо `UsersFacade`. Граф
+  MODULE_BOUNDARIES §15 эти зависимости **разрешает**, но как событие/порт, а не как прямое чтение чужой таблицы.
+  Долг был помечен, но все три метки ссылались на `GAP-22`, закрытый 2026-08-31, — и в его критериях этой работы никогда
+  не было. Третья метка (админ-агрегаты дашборда по users/payments/kyc/tickets) сознательно **не** считалась долгом:
+  кросс-доменная отчётность — ответственность модуля (§13.1), берутся только read-only агрегаты, не сырые деньги.
+  **Закрытие 2026-09-04 (ADR, согласовано владельцем в сессии):** рефакторинг признан некритичным — доступ read-only не
+  ломает целостность, граф связи разрешает, money-контур (ledger) не трогается, а «порт» поверх единого Prisma-клиента —
+  тот же SQL с лишним слоем. Вместо рефакторинга: ADR зафиксирован комментариями в затронутых репозиториях
+  (рационале + условие пересмотра «вынос модуля в отдельный сервис/БД»); MODULE_BOUNDARIES §9.3 (referrals→casino:
+  read-only groupBy, ADR), §11.3 (notifications→users: read-only email/settings, ADR), граф §15 приведён к факту
+  (было «event»); метки `TODO(GAP-22)` убраны (PR #66); guard G1 и Tier 1 не задеты; **исходные критерии 1 и 4
+  (полный port-рефакторинг + прогон integration-спека) сняты решением владельца**.
+  **Что нашла сверка 2026-10-02 (почему статус PARTIAL, а не CLOSED):**
+  1. критерий 1 в букве не выполнен и не может быть выполнен — проверки `grep -rn "prisma.gameTransaction" apps/api/src/modules/referrals`
+     и `grep -rnE "prisma\.(user|userSettings)\b" apps/api/src/modules/notifications` не пусты:
+     `apps/api/src/modules/referrals/infrastructure/referral.prisma.repository.ts:29` и
+     `apps/api/src/modules/notifications/infrastructure/notification.prisma.repository.ts:57,64` — чтения на месте
+     (что соответствует ADR, но противоречит тексту критерия, снятому «на словах»);
+  2. ADR-комментарии лежат в `domain/*.repository.ts` (порты), а не там, где обход, — читать обоснование по месту
+     нарушения невозможно;
+  3. машинного гарда, который держал бы ADR в рамках («только чтение»), нет: G1 проверяет только отсутствие Prisma в
+     domain/application;
+  4. **глазное:** новый модуль `affiliate` сослался на ADR GAP-51 как на разрешение, но вышел за его границу — пишет в
+     чужие таблицы и читает деньги. Это выделено в самостоятельную позицию GAP-62, потому что чинится не комментарием.
+
+### GAP-52…GAP-55 (фронтенд по ТЗ ч.5, аудит 2026-09-13…16) — досье
+
+- **GAP-52. Фронтенд web не полностью соответствует ТЗ ч.5. ✅ P2, закрыт 2026-09-13 (branch `feat/gap52-web-tz07-frontend`).**
+  Сверка кода `apps/web` с tz-part-5 (повод — вопрос владельца «фронтенд полностью реализован?»): (а) не было маршрутов
+  `/favorites`, `/search`, `/providers/[slug]`; (б) профиль — одна форма данных, без вкладок Сессии/Настройки/Безопасность,
+  смена пароля в UI отсутствовала, `hasPassword` (OAuth-признак) API не отдавал; (в) главная без «Продолжить играть»,
+  хотя store писал `lastPlayedSlug`; (г) каталог без infinite scroll — кнопками; (д) GameCard без бейджей NEW/HOT и
+  превью по «i»; (е) SEO: не было OG/title на витрине/каталоге/игре и noindex на приватных разделах; (ж) BottomNav —
+  3 пункта вместо «Главная · Казино · Избранное · Профиль». Касса/кошелёк/KYC/support/referral были реализованы ранее
+  (GAP-10/36/44) — гэп точечный, не «всё Part 5». Для (б) потребовались минимальные аддитивные правки API:
+  `POST /auth/change-password` (ревок всех сессий кроме текущей), `DELETE /users/me/sessions` (та же семантика для
+  кнопки «завершить все кроме текущей»), `hasPassword` в `GET /users/me`, `timezone` в Zod-схеме настроек (use-case
+  поддерживал — поле не доходило из-за схемы). Закрыто: `/favorites` (оптимистичный add/remove, пустое состояние =
+  6 популярных + «В каталог»), `/search` (недавние запросы в localStorage, пустой результат → популярные), профиль —
+  4 вкладки (Данные / Безопасность — смена пароля для email-аккаунтов, OAuth пояснение без формы по `hasPassword` /
+  Сессии — IP, устройство, дата, завершить одну и все кроме текущей / Настройки — email-уведомления, часовой пояс;
+  push-чекбокс задизейблен до бэка, язык RU не показываем), главная — «Продолжить играть» (до 12, только
+  залогиненным), каталог — infinite scroll (IntersectionObserver, скелетоны, «повторить» при ошибке), GameCard —
+  бейдж NEW или HOT (не оба) + превью по «i» (провайдер/RTP/сердечко), BottomNav — 4 пункта, SEO — OG/title layout +
+  динамическая `generateMetadata` страницы игры + noindex на profile/wallet/history/kyc/support/referral/favorites/
+  search/deposit/withdraw. API: `POST /auth/change-password` (Zod `.strict()`, WeakPassword/InvalidCredentials/
+  PasswordNotSet), `DELETE /users/me/sessions` → `{ok, revoked}`, `hasPassword`, `timezone`. Тесты:
+  `apps/api/test/change-password.spec.ts` (4), web `users-api.spec.ts` (5). Проверка в момент закрытия делалась на
+  Termux: tsc api 0 (своих ошибок; 2 pre-existing sentry — FUSE-обрезка `@sentry/core`, в CI не воспроизводятся),
+  tsc web 0, vitest api 25/25 (lockout+roles+oauth+change-password), vitest web 38/38 unit; **остаток за CI** был
+  назван честно: `next lint` (на Termux не поднимается — ajv@6 обрезан FUSE) и DOM-спеки. Не является гэпом:
+  `/providers` как раздел (фильтр был в каталоге; страница — фаза 2, GAP-53), WithdrawSheet как отдельная страница
+  `/withdraw` (ТЗ §19 не обязывает лист). **Остаток:** браузерная приёмка фронта — в GAP-46.
+- **GAP-53. Phase 2 фронта (остаток GAP-52). ✅ P3, закрыт 2026-09-13 (branch `feat/gap53-phase2-frontend`).**
+  `/providers` — сетка провайдеров (название, game_count, заглушка лого), `/providers/[slug]` — игры провайдера +
+  generateMetadata («{Название} — игры провайдера | Casino»), главная — лента провайдеров последним блоком §6.1,
+  профиль — аватар (превью из `profile.avatarUrl`, multipart `POST /users/me/avatar`, клиентская валидация mime/размера
+  до отправки, обновление `me`). Тесты: `casino-api.spec.ts` (контракты providers/recent/favorites/toggle) + avatar-кейс
+  в `users-api.spec.ts`. Фиат Phase 2 (UAH/BYN/KZT/UZS, TZ-08) сюда НЕ входит: форматирование/switcher/presets готовы,
+  включение живёт за `fiatLive` в GeoConfig и ключами PSP.
+- **GAP-54. Десктоп-иконпанель и глобальный вход в поиск (вынесено из GAP-53). ✅ P3, закрыт 2026-09-14.**
+  (а) §4.5 — слева икон-панель 64–72px (Главная · Казино · Избранное · Провайдеры · Кошелёк · История · Поддержка):
+  в коде не было вообще никакой десктоп-навигации, только мобильный BottomNav; (б) §4.4 — поля поиска не было ни в
+  хедере (десктоп, Ctrl/⌘K), ни под шапкой (телефон), на `/search` не было результатов по провайдерам и last played;
+  (в) §4.7 — обвязка монтировалась в корневом layout для ВСЕХ маршрутов, включая `/login` и `/register`. Закрыто:
+  `DesktopNav` — фикс-панель `w-16` только с `md:`, 7 пунктов релиза, активный по префиксу сегмента, подпись по hover
+  (тултип) и pin (раскрытие до 200px, состояние в localStorage — переживает reload), контент `md:pl-16`/`md:pl-[200px]`;
+  запрещённые в релизе Live/Настольные/Быстрые/Бонусы не добавлены (§24); поиск — поле в хедере, лупа-ссылка на
+  телефоне, `MobileSearchBar` под шапкой на главной, `Ctrl/⌘K` → `/search` (обработчик игнорирует фокус в
+  input/textarea/contentEditable); `/search` дополнен результатами по провайдерам, last played и кнопкой «Сброс»;
+  §4.7 — обвязка не рендерится на auth-маршрутах (`isAuthPath` по `usePathname`, НЕ через `window.location` — иначе
+  hydration mismatch); листы кассы/логина остаются смонтированными, чтобы launch после входа продолжился (§5.5); чистая
+  логика вынесена в `apps/web/src/lib/ui/desktop-nav.ts` и покрыта `desktop-nav.spec.ts` (13 кейсов). Регрессия
+  шортката: `491d244` (#120) — Ctrl/⌘K не падает на синтетическом keydown без `key`.
+- **GAP-55. Остатки ТЗ ч.5 после GAP-52/53/54 — открыто списком, «чтобы не выглядело, что фронт закрыт на 100%». ✅ P3, закрыт 2026-09-16.**
+  Машинная сверка кода с tz-part-5 (2026-09-14) дала (а)–(з); закрытие по частям: (а,б) PR #83, (в,з) PR #84,
+  (г,д) PR #85, (е) PR #86, (г-остаток) PR #87, (ж) PR #88.
+  - **(а) фильтры в URL (§7):** состояние каталога живёт в query (`/casino?category=&provider=&sort=&q=`),
+    `lib/ui/catalog-filters.ts` (чистые `parseFilters`/`filtersToApiParams`/`filtersToQuery`/`catalogHref`/`hasActiveFilters`),
+    `CasinoInner` читает `useSearchParams` (Suspense-граница в `page.tsx` — без неё prerender падает, урок #80),
+    `CatalogFilterBar` меняет через `router.replace`. Пустые значения не проттекают ни в API, ни в URL; кодирование —
+    `%20`, а не `+` (ссылки шарятся и идут в SEO; `URLSearchParams.toString()` даёт `+` — двусмысленно для парсеров),
+    чтение терпит обе формы. Добавлена сортировка (`''|popular|new|name_asc`). Сброс фильтров заработал по-настоящему
+    (раньше ссылка в пустом состоянии вела на тот же смонтированный роут и состояние не менялось).
+  - **(б) чипы и полки главной (§6.1):** `HomeChips` — категории из `GET /casino/categories` с фильтром по
+    `game_count>0` + «Популярные»/«Новые»; полки «Новые» и «Избранное» выведены (последняя — только если не пустая);
+    `GameSection variant='row'` для «Продолжить играть»; порядок полок приведён к §6.1; промо-слот сознательно ВЫКЛЮЧЕН
+    (акционного движка нет — §2.8/§24 «не обещать бонус, которого нет»); `ProviderStrip` вынесен из страницы.
+    Инфраструктура избранного: `hooks/useFavorites.ts` — единый кеш `['favorites-ids']` + каноничный optimistic update
+    (onMutate правит кеш и захватывает снимок, onError откатывает, onSettled приводит к серверной правде); раньше главная
+    и страница избранного держали по своей копии мутации и списки разъезжались. Убран хардкод-фолбэк демо-игр в
+    `page.tsx` — дублировал seed с неверной формой полей и показывал карточки, которых нет в БД.
+    **CI-цикл #83 и инструмент против регресса:** первый пуш покраснел на `next lint` — 2 нарушения `import/order` и
+    1 реальное `react-hooks/exhaustive-deps` (`data?.data ?? []` как нестабильная зависимость useMemo → обёрнут в свой
+    useMemo). Причина первых двух: предыдущая версия локального чекера молчала — брала список файлов из `git status`,
+    а после коммита там остаётся только помеченное. Исправлено: `scripts/check-import-order.py` берёт `main...HEAD` +
+    рабочее дерево + untracked, печатает «проверено файлов: N» (молчание больше не похоже на успех), снабжён негативным
+    тестом (намеренная поломка порядка → exit 1) и нейтрален к комментариям между импортами.
+  - **(в) ошибки запуска — экранами (§8.4):** маппер `lib/ui/launch-error.ts` (стабильные коды API → заголовок/текст/
+    набор действий) + `components/game/LaunchErrorScreen`; страница игры показывает экран вместо toast, код ошибки
+    выводится строкой «приложите в поддержку». Из §8.4 покрыты все шесть случаев: недоступна / техработы / сессия уже
+    открыта / валюта не поддерживается / провайдер не ответил (сеть или 5xx) / недостаточно средств. Последнее оставлено
+    флоу, а не экраном: §8.2.4 прямо велит при пустых кошельках открывать DepositSheet. У каждого экрана ≥1 действия
+    (§2.3.9 «ошибка даёт следующий шаг, не тупик»); смена игры или кошелька сбрасывает ошибку. Плюс §8.3: баланс на
+    планке игры обновляется `refreshActive()` по фокусу окна (Socket.IO запрещён §2.1).
+  - **(з) WithdrawSheet как глобальный лист (§10.3/§16.1):** `components/wallet/WithdrawSheet.tsx` в корневом layout,
+    открывается из кошелька и поверх игры; чистое ядро `lib/ui/withdraw.ts` покрывает §10.3 буквально — 1) KYC-стопер без
+    формы реквизитов с одной кнопкой «Пройти верификацию», 2) «Нечего выводить» при пустых кошельках, 3) «в активной
+    пусто, в другом есть» → предложить вывести ту валюту (не открывать нулевую форму). Вывод только в валюте выбранного
+    кошелька и только на метод этой валюты (методы из GeoConfig, не список из головы; API enum card|sbp). Сеть крипты
+    видна и не меняется; валидация адреса РАЗЛИЧАЕТ сети (TRC20 не проходит как BTC и наоборот — тесты фиксируют оба
+    направления). Пресеты, минимум/максимум с символом валюты (§2.5), срок «до 24 часов», стадия подтверждения с
+    замаскированными реквизитами (§16.1 ConfirmModal на вывод), результат — номер заявки + «История».
+    **Попутно найден и исправлен реальный баг вывода:** страница `/withdraw` слала `destination` ОБЪЕКТОМ
+    ({card_number, card_holder} / {wallet_address}), а `CreateFiatWithdrawalSchema`/`CreateCryptoWithdrawalSchema`
+    ожидают строку → любой фиат-вывод давал 422, фича не работала вообще. Также она предлагала TON/TRX/LTC, запрещённые
+    релизом (§24) — см. TZ-02. Отдельные страницы кассы заменены тонкими хостами (`/deposit`, `/withdraw` открывают
+    лист — прямые ссылки и закладки не падают на 404): по §2.9 отдельных страниц кассы быть не должно.
+    **Дедупликация (по замечанию владельца о «раздутии»):** подпись валюты была вычислена инлайном в 4 местах — сведена
+    к одной `currencyLabel()` в `lib/format/currency.ts` с тестами; оболочка листа была продублирована в двух ветках
+    рендера — сведена к `SheetShell`; `WithdrawSheet` разбит на `WithdrawForm`/`WithdrawPrecheckPanel`/`ConfirmPanel`/
+    `DonePanel` (главная функция 238 → 143 зачётных строк при лимите 200). Тесты: `withdraw.spec.ts` 22,
+    `launch-error.spec.ts` 15, +5 на `currencyLabel`. Поймано локально до отправки: собственный тест поймал ошибку в
+    escape (U+02B8 `ʸ` вместо U+02BB `ʻ` в `soʻm`) — тест на формат валюты из ТЗ §2.5, а не опечатка в проде.
+  - **(г) §11 — история транзакций отдельным маршрутом:** `/wallet/transactions` (защищённый, noindex наследуется с
+    `/wallet`), фильтры тип / валюта / период в URL (тот же подход, что каталог: ссылка копируется, «назад» работает,
+    пустое не утекает), бесконечная подгрузка «Показать ещё», ошибка — с «Повторить». Сумма всегда с валютой (§11:
+    «+1 000 без валюты — ошибка UI»): `formatTxAmount` берёт знак ИЗ САМОЙ СУММЫ (ledger пишет списания отрицательными:
+    `'-' + amount` в `wallet.ledger.prisma.ts`), а не из таблицы «тип → знак» — такая таблица не может разъехаться с
+    новым типом проводки. Плюс/минус — зелёный/красный. Детали строки: сеть (только крипта), замороженная сумма
+    (`metadata.locked_amount` у WITHDRAWAL_LOCK, где amount = 0), провайдер и внешний id из `metadata`, «баланс после»,
+    id транзакции. Курс намеренно не показывается: при crypto-зачислении он не фиксировался (в metadata только
+    `actually_paid`), а §11 разрешает курс «только если реально фиксировался». `/wallet` приведён к §10.1: последние
+    5 операций активного кошелька + «Смотреть все».
+  - **(д) §12 — история ставок:** фильтры игра / провайдер / валюта / период в URL + `/casino/history` научился
+    `provider` (slug), `currency`, `from`/`to` и вернул `meta` + `stats`. Введена `roundStats` — `groupBy` по валютам, и
+    список/счётчик/агрегаты строятся ОДНИМ предикатом (`roundWhere`), иначе «ставок: 124» над отфильтрованной таблицей
+    врёт. Оборот и выигрыши показываются ТОЛЬКО когда выбрана одна валюта, при смешанной выборке — разбивка по кошелькам,
+    суммирования ₽+USDT нет (§12). P/L — только в раскрытой детали ставки, красным-героем не вынесено (§12, §24). Деньги
+    через `money`/`formatAmount`, number в проводках не появляется.
+    **Попутно найден РЕАЛЬНЫЙ ДЕФЕКТ GAP-52 (в той же работе):** web-`GameDto` был описан в snake_case (`name_ru`,
+    `is_new`, `is_popular`, `has_demo`), а `ListGamesUseCase` и `/casino/favorites|recent` отдают camelCase Prisma
+    (`nameRu`, `isNew`, `isPopular`, `hasDemo`). Следствия: бейджи NEW/HOT (§6.4, «закрытые» в #80) ФАКТИЧЕСКИ не
+    рендерились, русские названия не показывались, кнопка «Демо» на странице игры не появлялась никогда. Исправлено:
+    DTO приведён к фактическому контракту, отображение вынесено в `lib/ui/game.ts` (`gameDisplayName`/`gameBadge` с
+    приоритетом NEW над HOT по §6.4/§24, `gameRtpLabel` — Decimal приходит строкой, `gameHasDemo`) и ЗАКРЕПЛЕНО тестом
+    `game-contract.spec.ts` — без него расхождение вернулось бы так же молча.
+    **Валидация на входе:** у обоих эндпоинтов истории появились Zod-схемы запросов (`.strict()`). Раньше мусорный
+    `?type=`/`?currency=` уходил прямо в Prisma, а `?from=вчера` давал Invalid Date → 500; перечисления валидируются по
+    рантайм-источнику (`Object.values(LedgerEntryType)`, `Object.keys(ZERO)`), поэтому не могут разъехаться со схемой БД
+    и типами. `metadata` добавлена в ответ `/wallet/transactions` (аддитивно). Тесты: api `history-filters.spec.ts` (4),
+    web `history-filters.spec.ts` (15), `game-contract.spec.ts` (12).
+  - **(е) §22 Performance (PR #86):** обложки игр — `GameThumb` на `next/image` (webp/avif из `formats`, `fill`+`sizes`,
+    lazy) только для хостов из allowlist `NEXT_PUBLIC_IMAGE_HOSTS`; в `next.config.js` сознательно нет `hostname: '**'`
+    (оптимизатор стал бы по заказу браузера ходить по произвольным URL — SSRM + отравленный кеш); собственный `/uploads/`
+    идёт обычным `<img loading=lazy>` — его раздаёт nginx, а не Next, через `/_next/image` такой путь только 404-ится;
+    без обложки — прежняя emoji-заглушка (витрина не пустеет); реальные хосты CDN брендов станут известны на GAP-46,
+    тогда достаточно дописать в env; `lib/ui/thumbnail.ts` — чистые `parseImageHosts`/`isAllowedImageHost`/`thumbSource`,
+    8 тестов (поддомены, префикс-подмена `cdn.gitslotpark.com.evil.net`, битые URL). Виртуализация длинных сеток — без
+    новой зависимости: `content-visibility: auto` + `contain-intrinsic-size` на карточке (`.virtual-cell` в globals.css);
+    ручной windowing на мобиле дороже его пользы для 24-карточных полок — осознанное отклонение от буквальной
+    «виртуализации». Dynamic import iframe: play-страница грузит `GameFrame` через `dynamic(..., {ssr:false, loading})` —
+    шапка с балансом и кнопкой кассы рисуется сразу; размонтируется с роутом (§8.4 «не держать iframe в памяти»).
+    Prefetch меты игры — `router.prefetch('/casino/[slug]')` на `pointerenter`/`focus` карточки (in-view-вариант
+    запульнул бы 12–24 роута первого экрана на 90% мобильном трафике; §22 формулирует как «желательно»). ISR главной —
+    `/` переведена на серверный рендер с `export const revalidate = 60` (§20/§22); публичные полки приходят сервером
+    через новый `lib/api/server.ts` (`fetch(..., {next: {revalidate: 60}})`, ошибки глотаются — пустая полка лучше
+    упавшего prerender, и в CI API на билде не поднят); приватные полки остались клиентскими островами; бонусом —
+    у главной появилась собственная `metadata`. **Отклонения, зафиксированные честно:** (1) каталог `/casino` остаётся
+    CSR — «ISR каталога» из §22 несовместим с §7 «фильтры живут в URL» + бесконечной прокруткой: кэш по произвольным
+    комбинациям query дал бы устаревшие выдачи при неизчезнувшем клиентском fetch; вместо ISR — `staleTime`/prefetch.
+    (2) Серверную env-переменную (`API_INTERNAL_URL`) не заводил — использована существующая `NEXT_PUBLIC_API_URL`, чтобы
+    не плодить расхождение с docs-guard D3/D7. (3) KYC-загрузчик вынесен не был: он грузится внутри страницы KYC, тяжёлой
+    библиотеки там нет (обычный `FormData` + `fetch`) — benefit'а dynamic import нет, отметка в §22 снята с обоснованием.
+    **Остаток §7 закрыт этим же PR:** на телефоне фильтры каталога — чипы категорий + bottom-sheet «Фильтры»
+    (сортировка, провайдер), как требует §7, а не сайдбар; поиск и «Сбросить фильтры» доступны и на телефоне, и на
+    десктопе. Тесты: `thumbnail.spec.ts` (8).
+    **Динамика счётчиков web-unit по этапам этого гэпа (история, теперь не актуальна как цифра — см. §4):**
+    57 → 72 (п. а/б) → 112 (п. в/з) → 135 (п. г/д) → 143 (п. е) локально, «в CI с DOM» ожидалось 118 и 149
+    соответственно; фактическое число прошедших на `89881eb` в этой среде не пересчитывалось.
+  - **(г-остаток) §11 «статус заявки» — закрыто 2026-09-16 (PR #87), принято владельцем делегирование «сделай как тебе
+    удобно».** Проблема была не в UI, а в данных: проводка ledger не была присоединима к payment_request, поэтому
+    показать статус было нечем. Решение (порядок money-пути сохранён, добавлен только предсказуемый id):
+    1. `create-withdrawal.use-case.ts` генерирует `paymentRequestId` ДО блокировки и передаёт в
+       `lock({ idempotencyKey: wd_lock_<prId>, metadata: { payment_request_id } })`, затем
+       `create({ id: paymentRequestId, idempotencyKey: wd_<prId> })`; порядок «сначала lock, потом заявка» НЕ менялся: при
+       отказе блокировки заявки нет (тест), pending-сирот не появляется; уникальность ключей та же (uuid), но
+       детерминированная от id заявки — повтор по той же заявке теперь видим дедупликации (было `wd_lock_<random>`, теряющий
+       связь); 2) `unlock` (отмена) и `confirmWithdrawal` (выплата) несут ту же ссылку, ключи `wd_unlock_<prId>` /
+       `wd_confirm_<prId>`; 3) `GET /wallet/transactions` добирает статусы ОДНИМ запросом (`findMany({userId, id: {in}})`,
+       не N+1) с обязательным scope по пользователю (IDOR) и отдаёт `payment_status`; 4) UI показывает «Статус заявки» в
+       деталях строки; **строки, записанные до этого PR, остаются с `payment_status: null`** — статус не выдумывается и не
+       подгоняется эвристикой по сумме/дате (это был бы расходящийся отчёт). Маппинг `PaymentStatus` → человеческий статус и
+       цвета — в `lib/ui/history-filters.ts`, 4 теста. Условие пересмотра: если ledger и payment_requests когда-нибудь
+       разъедутся по сервисам (см. ADR GAP-51), ссылка становится внешним ключом и потребует события, а не join. Тесты:
+       `apps/api/test/withdrawal-link.spec.ts` (5: общий id в lock и create; разные id между заявками; отказ lock ⇒ нет
+       заявки; KYC до мутации баланса; amount остаётся строкой).
+  - **(ж) §5.2 капча после 5 неудачных входов — реализована 2026-09-16 (PR #88), решения приняты агентом по
+    делегированию и зафиксированы:** 1) провайдер — Cloudflare Turnstile (бесплатно, без картинок-головоломок, виджет и
+    `siteverify` не требуют SDK; обычно доступен из СНГ); замена на hCaptcha/reCAPTCHA = один файл
+    `apps/api/src/modules/auth/infrastructure/services/captcha.service.ts` (другой URL + имя поля токена); 2) политика при
+    недоступности провайдера — fail-open с warn в лог: капча второй слой, основной барьер уже стоит (GAP-18 lockout
+    10/15 мин + GAP-19 throttler 10 req/мин на `/auth`); fail-closed превратил бы сбой Cloudflare в отказ всего логина; 3) порог 5 (§5.2), конфиг `CAPTCHA_AFTER_FAILED_ATTEMPTS`; lockout на 10 срабатывает позже — капча ДО блокировки; 4) `TURNSTILE_SECRET_KEY`/`NEXT_PUBLIC_TURNSTILE_SITE_KEY` оба optional и механизм выключен, пока задан не каждый:
+    dev/CI/тесты не могут остаться без входа; 5) `remoteip` намеренно не отправляется: за nginx мы видим адрес прокси, а
+    ложный IP в verification-запросе хуже отсутствия; 6) проверка ставится до argon2-verify — у бот-волны не должно быть
+    шанса прогонять хеширование; `unknown email` по-прежнему InvalidCredentials (существование аккаунта капча не
+    раскрывает). Фронт: `<CaptchaField>` грузит скрипт Turnstile по требованию (SDK не становится зависимостью, CSP
+    `script-src … https:` его пропускает), появляется ТОЛЬКО после `CAPTCHA_REQUIRED`; store шлёт `captcha_token` только
+    когда он непустой (контракт проверен тестами), `CAPTCHA_FAILED` чистит токен и просит повторить. Тесты:
+    `apps/api/test/captcha.spec.ts` (9), `apps/web/test/auth-store-captcha.spec.ts` (4). **Остаётся непроверенным и
+    перенесено в GAP-46:** живой `siteverify` с настоящими ключами и реальный виджет в браузере (нужен публичный
+    HTTPS-домен).
+
+### GAP-56…GAP-60 — досье (инфраструктура, лок кошелька, контракты фронта, прод-сборки)
+
+- **GAP-56. Аудит преддеплойной инфраструктуры: 9 дефектов. ⚠️ P1, CLOSED_WORD (закрыто без прогона).**
+  Повод: планирование запуска (GAP-46) при отсутствии VPS/ключей — машинная сверка `docker-compose.prod.yml` ↔
+  `.env.example` ↔ `docs/ENVIRONMENT_VARIABLES.md` ↔ `infra/scripts/*` ↔ `infra/nginx/*` (2026-09-27, ветка
+  `fix/gap56-infra-drift`). Каждый дефект уронил бы первый деплой, ежедневный бэкап или мониторинг с первого дня:
+  1. `DB_USER`/`DB_PASSWORD`/`DB_NAME` читает compose (контейнер postgres + healthcheck), но 0 упоминаний в
+     `.env.example`/ENVIRONMENT_VARIABLES — слепая зона D7 (код TS их не читает) → описаны в §3 + §22 + `.env.example` с
+     требованием согласованности с `DATABASE_URL`; 2) `infra/nginx/snippets/` не смонтирован в nginx-сервис → `include
+/etc/nginx/snippets/ssl.conf` падает `[emerg]` на первом старте → добавлен mount (`docker-compose.prod.yml:135`);
+  2. тома `certbot_certs`/`certbot_www` compose именует с префиксом проекта (`casino-platform_certbot_certs`), а
+     `ssl_init.sh` и renew-cron монтируют `docker -v certbot_certs:...` буквально → сертификаты оседают в томе, которого
+     nginx не видит → томам заданы фиксированные `name:` (`:156-157`); 4) домены захардкожены (`server_name`/пути
+     сертификатов ×4 в nginx conf, build-arg `NEXT_PUBLIC_API_URL` в compose, `DOMAINS=` в ssl_init.sh — править 3 файла в
+     репо) → nginx conf переведён в envsubst-шаблон `infra/nginx/templates/casino.conf.template` (конвенция official-образа;
+     nginx-переменные `$host` не задеты), compose передаёт `DOMAIN`/`ADMIN_DOMAIN`, `ssl_init.sh` читает их из `.env`
+     (fail-closed без них), `SSL_EMAIL` опционален (дефолт `admin@$DOMAIN`); 5) `restore.sh` ссылался на несуществующие
+     контейнер `casino-db`, пользователя `postgres`, каталог `/var/backups/casino`, содержал невалидный
+     `DROP DATABASE x (FORCE)` (правильно `WITH (FORCE)`) и никогда не запускался (блокер GAP-46 п.7) → переписан:
+     контейнер через `docker compose ps -q postgres`, имена из `DB_USER`/`DB_NAME` (source `.env`), `--dry-run`,
+     `gunzip -t` до изменений, `psql -v ON_ERROR_STOP=1`, миграции и проба `/health/ready` после заливки;
+  3. `postgres-backup.sh` (cron 02:00) — молчаливые дефолты `${DB_USER:-casino}`/`${DB_NAME:-casino_prod}` могли
+     разойтись с реальными именами БД → ночной бэкап падал или снимал пустую БД → `source .env` + fail-closed;
+  4. `health-check.sh` и `resource-check.sh` пробовали `http://localhost:3001` с хоста — порт api не публикуется
+     (наружу только nginx 80/443) → проба падала всегда, `resource-check` ALERT'ил бы каждые 5 минут → проба перенесена
+     внутрь контейнера api (`compose exec api wget`, wget есть в образе — им же работает healthcheck compose);
+  5. `rollback.sh` звал `pm2 reload` и `pnpm build` — на VPS их нет, деплой идёт docker-образами → приведён к
+     `docker compose build api web admin` + `up -d` + health-check по DEPLOY.md; 9) считалка `QA_CHECKLIST.md` разошлась с
+     фактом (было 33/7/17, факт 35/10/9/16, 26 спеков вместо 22) → сведена.
+     **Гейты того PR:** `bash -n` по всем скриптам, docs-guard локально (D1–D7), commitlint; typecheck/lint/tests не задеты
+     (нет TS-изменений). Побочные проверки envsubst-механики (nginx official image: `/etc/nginx/templates/*.template` →
+     `/etc/nginx/conf.d/`, envsubst только по определённым env-именам) — задокументированы в шаблоне и compose; живая
+     проверка — на первом деплое.
+     **Почему `CLOSED_WORD` (решение этой ревизии):** ни один из девяти фиксов не был исполнен — проверялся только синтаксис
+     shell и наличие строк в YAML. Живого прогона `docker compose config`/`up` никто не делал. Прогноз сработал: через
+     4 дня аудит GAP-59 нашёл **10-й дефект того же класса** (прод-сборки web/admin не собирались ни разу; чинили #128 и
+     `7bc3598`), а GAP-60 расширил CI-гейт так, чтобы класс ловился машиной. Пункт «живой деплой» остаётся в GAP-46 п.6.
+- **GAP-57. Конкурентные мутации одного кошелька не сериализовались приложением. ✅ P1, закрыт 2026-09-30 (ADR + прогон).**
+  Найдено прогоном GAP-47: при 100 VU на одного игрока 69% ставок получали отказ (Prisma P2034 — Serializable write
+  conflict на commit). Версия «нашёл и починил» (PR 2026-09-27): 1) `withRetry` в ledger ловил только app-level
+  `OptimisticLockError` — P2034 приходил от СУБД ДО app-кода и не ретраился; 2) `PrismaWalletTransactionRunner.runInTransaction`
+  (единственная точка открытия внешних транзакций bet/win/rollback) не ретраил вовсе; 3) текст сырой Prisma-ошибки (с
+  путями машины) утекал провайдеру в HTTP-ответе коллбэка; 4) k6-скрипт был неисполняемым (чейнинг `update()` в
+  k6/crypto + `discardResponseBodies`). Остаток после того PR — 3 retry не покрывали профиль (30,6% успеха).
+  **ADR (решение владельца 2026-09-30) — вариант 1, advisory-лок:** конкурентный abort заменён явной очередью —
+  `pg_advisory_xact_lock(hashtextextended('casino.wallet:<userId>:<currency>',0))` ПЕРВОЙ операцией транзакции, до
+  чтения `wallet_accounts`; isolation `ReadCommitted` (лок сам сериализует кошелёк — SSI отменял бы в том числе
+  неконфликтующие транзакции); `lock_timeout` (env `WALLET_LOCK_TIMEOUT_MS`, дефолт 5 с) — всплеск на одном кошельке не
+  выедает пул соединений; повтор 5 раз с джиттером на P2034/55P03/`OptimisticLockError`. Почему не варианты 2/3:
+  per-wallet очередь BullMQ вносит асинхронность в путь денег (провайдер ждёт ответа на ставку синхронно),
+  in-process mutex не работает при >1 инстансе API. **Контракт:** `runInTransaction` принимает `WalletLockTarget`
+  (userId+currency) — забыть сериализацию нельзя на уровне типов; `bet`/`win`/`rollback` передают кошелёк игрока; оба
+  «денежных» пути (solo credit/debit и lock/unlock/confirm) идут через одну примитиву `runWalletTransaction`.
+  **Критерий закрытия выполнен:** прогон 10/50/100 VU — успех 100% (25 708/25 708) против 30,6% в базовом; баланс сошёлся
+  копейка в копейку (10 000 000 − 10 797×10 = 9 892 030; version 10 798 = 1+10 797; ledger 1:1). Параллелизм доказан:
+  10 кошельков → 165 rps / p95 169 мс (против ~82 rps одного кошелька) — лок пер-кошелёк, не глобальный. Кривая
+  латентности одного кошелька (1 VU → p95 21 мс … 100 VU → 1.16 с) линейна и означает очередь, а не отказ; прежний порог
+  `p(95)<500` требовал параллелизма от последовательного ресурса и заменён санитарным `<2000` мс. **Попутно исправлены
+  две ловушки:** (1) `pg_advisory_xact_lock` возвращает `void`, который Prisma не десериализует в `$queryRaw` — поймано
+  интеграционным тестом на реальном Postgres, приведено к `::text` (`wallet-transaction-lock.ts:130,150`); (2) порог k6
+  `http_req_failed` был слеп к дефекту (отказы шли как HTTP 200 + `{status:1}`, k6 показывал 0.00% при 69,4% отказов) —
+  главный гейт перенесён на `checks: rate>0.99`. Регрессия зафиксирована тестом на реальной БД: 20 параллельных списаний
+  одного кошелька — все проходят, баланс и `version` сходятся. Отчёт: `docs/archive/load-test-2026-09-30.md`.
+  Следствие для документации: README строка «Optimistic locking … retry ×3» стала ложью — это часть GAP-16.
+- **GAP-58. Аудит контрактов фронт↔API (~40 эндпоинтов): 5 сломанных мест. ✅ P1, закрыт 2026-09-27.**
+  Повод: первый локальный запуск (сессия GAP-47/56) поймал креш главной (`/casino/recent` двойная вложенность, исправлен
+  в фиксах #94) — владелец поручил систематическую сверку «форма ответа API ↔ ожидания web/admin» по всем потребляемым
+  эндпоинтам (метод: контроллер-факт с учётом ApiResponse-обёртки ↔ DTO/развороты фронтов). Дефекты были закодированы
+  номерами 1–5 без GAP-id — с этой ревизии позиция имеет ID, а нумерация осталась в досье:
+  1. **Админка: ВСЕ листинги сломаны** — `/admin/users`, `/withdrawals`, `/payment-requests`, `/transactions`,
+     `/audit-logs`, `/games` отдают `{items, meta}`, а клиент читал `data.data` как массив → `data.data.map is not a
+function`, pager total=0; `/admin/kyc` — `{items, total}`; `/admin/support/tickets`, `/admin/referrals` — ключ `data`
+     → нормализация конвертов в `apiGetFull` (`apps/admin/src/lib/api.ts:52-72`, `unwrapListPayload`), страницы не тронуты;
+     спек `apps/admin/test/api-get-full.spec.ts` (5).
+  2. **Админ-логин при неверном пароле возвращал «успех»**: `{success:false, error}` с HTTP 200 (interceptor пропускал
+     объект с ключом success) → клиент получал `data: undefined`, вход «проходил» без токена; то же для `POST /admin/admins`
+     и `/:id/deactivate` не-superadmin'ом (403-ситуации показывались как успех) → HTTP 401/403 + стандартный error-конверт
+     (`admin-auth.controller.ts:44`, `admin-admins.controller.ts`); спек `apps/api/test/admin-contract.spec.ts` (4).
+  3. **`/users/me` в `hydrate()`**: ответ `{user, profile, settings, kycStatus}` записывался целиком в `user` → после
+     перезагрузки у `user` нет id/email/role (тихая порча; спасало только `Boolean(user)`) → берём `me.user`
+     (`apps/web/src/stores/auth.ts:101`); спек `auth-store-hydrate.spec.ts` (3).
+  4. **Блок «Причина отказа» на `/kyc` никогда не показывался**: клиент ждал `rejection_reason`, API отдаёт camelCase
+     `rejectionReason` → поле сведено с фактом (`apps/web/src/lib/api/kyc.api.ts:8-12`); кейс в `kyc-page.spec.tsx`.
+  5. **`/referrals/list` — тип описывал несуществующие ключи** (`status`, `created_at`); API отдаёт
+     `{id, registered_at, is_active, total_earned, currency}` — запрос мёртвый (`void list`) → тип приведён к факту
+     (`apps/web/src/types/referral.ts`, `app/referral/page.tsx`).
+     Остальное (~30 эндпоинтов: casino/wallet/payments/auth/kyc/support/referrals/geo/admin-dashboard) — контракты сходятся;
+     `/admin/kyc/:id` с 200-ошибкой при отсутствии записи помечен как сомнительное место (потребителя нет — переделать при
+     появлении). Гейты на момент закрытия: web 161 passed, admin 11 passed, api 195 passed / 21 skipped, typecheck/lint 0 по
+     всем трём apps, commitlint OK — цифрам этого абзаца верить нельзя (см. §4: они разошлись с README и шапкой файла).
+- **GAP-59. Аудит проекта перед запуском: прод-контур, дубли спеков, счётчики. ✅ P1, закрыт 2026-10-01 (PR #128).**
+  Метод: локальный прогон всех гейтов, сборка standalone-образов web/admin, сверка compose ↔ prod-Dockerfile ↔ бандлы
+  фронтов, `vitest list` на коллекции спеков. Позиции отчёта (были без ID):
+  1. **прод-compose не передавал build-arg `NEXT_PUBLIC_API_URL` сервису `admin`** (у `web` был, у `admin` секции `args:`
+     не было); `admin.prod.Dockerfile` объявляет `ARG NEXT_PUBLIC_API_URL=https://casino.example.com/api/v1` — в образ
+     уезжал дефолт. `apps/admin/src/lib/api.ts` — axios `'use client'` с `baseURL`, все 20 страниц дашборда клиентские,
+     серверного прокси в admin нет; nginx-vhost admin не имеет `location /api/` → абсолютный URL обязателен. Итог: на любом
+     домене, отличном от `casino.example.com`, бандл админки ходил на чужой/несуществующий хост — админ-логин сломан в проде.
+     Эмпирика: две сборки одного кода с разным `NEXT_PUBLIC_API_URL` дали разные литералы в `.next/static/chunks/**` —
+     Next.js инлайнит `NEXT_PUBLIC_*` на сборке, `env_file` на build не влияет. CI не ловил: job `docker-build` собирал
+     только `api.prod`. Фикс: `args: NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-…}` как у `web`
+     (`docker-compose.prod.yml:108`) с комментарием-предупреждением про запекание.
+  2. **Guard'а на этот класс дрейфа не было** → новый guard **G23** (`.github/workflows/architecture-guards.yml:432`,
+     `scripts/check-prod-build-args.sh`): каждый `ARG` (кроме `_*`) из `*.prod.Dockerfile` обязан приехать через `build.args`
+     сервиса, который его собирает; отрицательный тест — с откатом фикса guard падает с внятным ❌ и именем переменной.
+  3. **5 спеков affiliate продублированы в двух каталогах** (`src/modules/affiliate/__tests__/*.use-case.spec.ts` и
+     `src/modules/affiliate/application/use-cases/*.use-case.spec.ts`: attribute-player, clawback-player-commissions,
+     create-commission, credit-commission, track-click) — содержимое идентично, отличаются только пути импортов;
+     `vitest list --filesOnly` собирал обе копии, прогон пары файлов давал 24 теста = те же 12 имён дважды; каждый CI-прогон
+     гонял ~68 тестов дважды, правка одной копии молча оставляла вторую устаревшей. Фикс: оставлены колокейшн-копии (в этом
+     модуле новый стиль — спек рядом с кодом: login-affiliate, qualify-attributions, register-affiliate, affiliate-daily-run
+     существуют только там), из `__tests__/` остались уникальные affiliate-jwt.service, affiliate-settings, ngr-calculator;
+     affiliate 236 → 168 тестов (17 → 12 файлов).
+  4. **Счётчики тестов в README отстали** (заявлены 157 web / 203 api) → пересчитаны: web 177, admin 11, api 468
+     unit/integration (406 прогнано локально + 62 в 12 файлах интеграций/E2E на БД — в CI; локально не стартуют,
+     `binaries.prisma.sh` недоступен). Замечание этой ревизии: это четвёртое по счёту «сведение счётчиков», и оно тоже
+     разошлось (см. §4).
+- **GAP-60. Аудит проекта, п.3 «хрупкость и гигиена». ✅ P2, закрыт 2026-10-02 (коммит `5d2bd67`).**
+  Продолжение GAP-59 (владелец выбрал пункт 3 остатков — пять подпунктов + найденный шестой):
+  1. `docker-build` собирал только `api.prod` и только на push в main (`if: github.ref == 'refs/heads/main'`) — поэтому
+     дефекты прод-сборок web/admin из GAP-59 не ловились CI и доехали бы до деплоя → job собирает все три прод-образа
+     (api/web/admin) и на PR, и на main; web/admin получают явный `build-args: NEXT_PUBLIC_API_URL` — ровно как compose
+     (`ci.yml:206-222`);
+  2. `next/font/google` тянул Inter из fonts.googleapis.com во время `next build` — сетевой отказ ронял сборку прод-образа
+     web (воспроизведено локально: «Failed to fetch Inter from Google Fonts») → Inter самохостын:
+     `@fontsource-variable/inter/wght.css` в `apps/web/src/app/layout.tsx:10`, семейство `'Inter Variable'` проброшено в
+     прежнюю переменную `--font-inter` (globals.css) — Tailwind и типографика не изменились; проверка: сборка web зелёная БЕЗ
+     доступа к Google Fonts, в `.next/static/media` лежат 7 woff2, `.next/standalone/apps/web/server.js` на месте;
+  3. базлайны техдолга отстали (CI сыпал WARN «часть базлайна погашена», реестр держал замеры 2026-09-27) → ужаты
+     `use-case-specs` (33→28) и `nest-exceptions` (5 файлов→4), `pnpm-audit` (high 20→19, moderate 28→27); замеры G16–G20
+     пересчитаны; все шесть ратчетов + audit — OK без WARN. Позже этот же базлайн обнулила #134 (`89881eb`) — детали в
+     [TECH_DEBT.md](TECH_DEBT.md);
+  4. `QA_CHECKLIST.md` заявлял 203 api / 157 web → пересчитано (api 403 unit/integration в прогоне без БД + 12 файлов
+     интеграций/E2E в CI; web 177; admin 11), разбивка пунктов 10/9/16 сверена — верна (подтверждено этой ревизией: 35
+     пунктов, 10 `[x]`, 9 `[x*]`, 16 `[ ]`);
+  5. **GAP-29 был закрыт по лживому детектору** — см. досье GAP-29 (детектор D3, 6 настоящих переменных, спек паритета);
+  6. **прод-образы web/admin не собирались ни разу — и не из-за одной причины.** Первым прогоном расширенного docker-build
+     (п.1) сборка `web` упала на `pnpm --filter @casino/web build`. Локальное воспроизведение в scratch-копии контекста
+     (ровно COPY-набор Dockerfile) дало две независимые причины: (а) корневой `.eslintrc.js` не копировался —
+     `apps/web/.eslintrc.js` его не расширяет, а наследует обходом вверх, поэтому `next lint` (шаг `next build`) парсил
+     `.ts` как скрипт: 129 × «Parsing error: The keyword 'import' is reserved»; (б) `.npmrc` (`node-linker=hoisted`) не
+     копировался — pnpm изолировал транзитивную `decimal.js` из `@casino/shared-utils` → «Cannot find module 'decimal.js'»
+     (ровно тот класс, что `api.prod.Dockerfile` уже документировал для node-типов). `admin` — тот же дефект (31 parsing-ошибка).
+     Фикс: `COPY .npmrc .eslintrc.js ./` в `web.prod.Dockerfile` и `admin.prod.Dockerfile` с комментарием-расследованием;
+     `packages/` в рантайме не нужны — `tsconfig paths` мапят `@casino/*` на `src`, код инлайнится в бандл. Проверка: scratch
+     по новому COPY-набору — оба образа собираются, `.next/standalone/apps/{web,admin}/server.js` на месте.
+
+### GAP-61…GAP-66 — Партнёрская программа (ТЗ ч.8), досье новой группы
+
+> В реестре эта часть ТЗ не была описана никогда: при целом модуле, двух миграциях и четырёх PR
+> (#105 — сам модуль, #119 — честная расшифровка начисления и ярлык «Игроков», #123 — контракт кабинета держится тестом,
+> #128 — снятие дублей спеков) в файле не было ни одной строки про affiliate. Замер 2026-10-02:
+> 46 файлов в `apps/api/src/modules/affiliate`, 13 env-переменных в `.env.example` (§ Affiliate, строки 128-153),
+> 3 задачи планировщика (`apps/api/src/modules/maintenance/application/affiliate-daily.job.ts`,
+> `affiliate-qualification.job.ts`, `affiliate-clicks-cleanup.job.ts`), 6 страниц админки
+> каталог `apps/admin/src/app/dashboard/affiliate` — страницы: index (сводка), `partners`, `partners/[id]`,
+> `commissions`, `attributions`, `settings`),
+> кабинет партнёра (`apps/web/src/app/affiliate/(cabinet)/{dashboard,commissions,players,links,settings}`,
+> `login`, `register`, публичная страница, `components/affiliate/AffiliateCodeCapture.tsx`).
+
+- **GAP-61. Ядро ч.8 реализовано. ✅ CLOSED.** Регистрация партнёра (отдельная сущность `affiliates`, свой JWT
+  `aud='affiliate'`, `apps/api/src/modules/affiliate/infrastructure/affiliate-jwt.service.ts`), трек-ссылка + deep-link,
+  endpoint клика с записью в БД, cookie и редиректом (`affiliate-tracking.controller.ts`, `Throttle` с
+  `THROTTLE_AFFILIATE_TRACKING_LIMIT`), привязка игрока при регистрации, ежедневный расчёт NGR/RevShare и начисление на
+  кошелёк партнёра (`affiliate-daily-run.use-case.ts`, `credit-commission.use-case.ts`), кабинет и admin-API/UI,
+  антифрод F1–F3, самоисключение, аудит-лог admin-действий. NGR-математика: `domain/value-objects/ngr-calculator.ts` —
+  `ggr = bet_sum − win_sum − rollback_sum`, `ngr = ggr − bonus_sum − provider_fee_sum`; отмены (`rollback`) вычитаются
+  отдельно, риск R4 ТЗ §20 («двойной вычет / занижение NGR») закрыт реализацией. Идемпотентность начислений — уникальный
+  индекс `@@unique([affiliate_id, player_id, period_start, currency])` (миграция `20260929171538_affiliate_program_initial`).
+  Покрытие: 12 spec-файлов модуля + `apps/api/test/affiliate-cabinet-contract.spec.ts` (контракт кабинета) +
+  `apps/web/test/affiliate-commissions.spec.tsx`. **Чего не было:** собственной строки в этом реестре (дефект учёта, а не
+  кода) — исправлено этой ревизией.
+- **GAP-62. Affiliate пишет в чужие таблицы и читает деньги под ярлыком ADR GAP-51. 🔴 OPEN, P2.**
+  ADR GAP-51 разрешает **только чтение** и только для referrals/notifications («money-контур не трогаем»). Факт:
+  1. записи в чужую таблицу — `apps/api/src/modules/affiliate/infrastructure/player-provisioning.prisma.repository.ts:23`
+     (`prisma.user.create`) и `:38` (`prisma.user.delete`) + чтение `kycProfile` (`:50`) и `userSettings`
+     (`affiliate.prisma.repository.ts:478`); 2) чтение денег — `affiliate.prisma.repository.ts:842` (`prisma.walletAccount.findMany`)
+     и `:852` (`prisma.ledgerEntry.groupBy`), плюс `:798` (`prisma.gameTransaction.groupBy`); 3) ссылки на GAP-51 при этом
+     стоят в `domain/repositories/affiliate.repository.ts:233,293,354` и в `affiliate.prisma.repository.ts:474,782`, то есть
+     расширение мандата оформлено комментарием там, где его никто не принимал. Аргумент «общий Prisma-клиент — тот же SQL»
+     для **записи** в `users` и для чтения **балансов** не работает: это другой класс риска (целостность денег и жизненный
+     цикл пользователя). Что нужно: либо явное решение владельца о расширении ADR (тогда — пункт с условиями пересмотра в
+     MODULE_BOUNDARIES), либо порты `UsersFacade`/`KycFacade`/`WalletFacade` и снятие ссылок на GAP-51. Смежное (не
+     дублируем): мутации из presentation в `affiliate-admin.controller.ts:175,224` и `affiliate.controller.ts:285,303`
+     учтены как В3 в [TECH_DEBT.md](TECH_DEBT.md); класс-импорты `AffiliateJwtService`/`ip-hasher` в application — В5 там же.
+- **GAP-63. Антифрод F4 (депозит ровно на порог) не реализован. 🔴 OPEN, P3.**
+  ТЗ ч.8 §13.2 требует помечать атрибуцию `needs_review` в `reject_reason`, если сумма депозита в пределах 1% от
+  `affiliate_min_deposit` (классический признак «минималки»), не блокируя её. В коде F4 нет: `attribute-player.use-case.ts`
+  реализует F1/F2 (совпадение хэша IP и UA партнёра → `rejected`, reason `self_referral`) и F3 (более 3 квалифицированных
+  игроков с одного IP за 24 ч → авто-подвес `ip_flood`), а строки с `needs_review` в модуле нет; в комментарии к
+  use-case (около строки 144) заявлено «F4 сознательно НЕ блокирует», но и не помечает — то есть правило молча
+  отсутствует (признак «минималки» не попадает ни в какой отчёт для ручной проверки).
+  Ручная квалификация/отказ (`POST .../qualify`, `POST .../reject`) и аудит-лог — есть (§13.3 закрыт).
+- **GAP-64. Критерии приёмки ч.8 (A1–A25) не прогонялись end-to-end. 🟦 CODE_DONE, P1.**
+  ТЗ ч.8 §19 задаёт 25 сценариев (A1–A11 — клик/атрибуция/антифрод, A12–A19 — ставки, NGR, идемпотентность и кредит,
+  A20–A25 — авторизация, kill-switch `AFFILIATE_ENABLED`, `revshare_rate` из `system_settings`, запрет самосмены ставки,
+  разделение JWT `aud`, cleanup кликов). Юниты и контрактные спеки модуля их частично моделируют (в т.ч. дедуп
+  `affiliate-daily`, отказ при отсутствии ключей), но ни разу не проверялись: живой клик с cookie и редиректом,
+  deep-link `?p=casino/<slug>` и отбрасывание `?p=https://evil.com` (A6 — отсутствие open redirect), реальный
+  `POST /affiliate/track` через nginx, кредит на кошелёк партнёра в связке с ledger, одновременный запуск daily (A16 —
+  `P2002` и пропуск). В чек-листе GAP-46 пункт «партнёрская программа» отсутствовал — добавлен как критерий 10.
+- **GAP-65. `provider_fee_sum` всегда 0. ⚖️ ACCEPTED, P3.** ТЗ §20 риск R2: комиссии game-провайдеров в системе нет →
+  NGR завышен на 2–8% относительно отраслевой практики. Зафиксировано в
+  `apps/api/src/modules/affiliate/README.md:67`; расчёт допускает непустое значение (`ngr-calculator.spec.ts`
+  проверяет ветку с `providerFeeSum: '200'`), так что включение — данных провайдера, а не код. Решение владельца — Q4
+  (GAP-66).
+- **GAP-66. Открытые вопросы владельца по ч.8. ⏳ HUMAN, P2.** ТЗ §20 «Открытые вопросы к владельцу»: Q1 — реализовывать
+  ли блокировку самоисключённых при атрибуции в MVP (риск R1: сейчас `login.use-case.ts:94` блокирует вход → NGR = 0 →
+  комиссии нет, ущерб ограничен, но проверка при атрибуции отсутствует); Q2 — страховой депозит (safety net) 20%
+  начислений в первые 30 дней; Q3 — минимальная сумма вывода для партнёра (без ограничений по общим правилам KYC или свой
+  порог); Q4 — учитывать ли `provider_fee` при появлении данных (автоматически или настройкой). Плюс риски R3 (открытая
+  регистрация партнёров без модерации — митигирована F1–F4, пересмотр при >100 партнёров) и R8 (отсутствие hold-периода:
+  инфраструктура статусов готова, флаг в фазе 2).
+
+### TZ-01…TZ-11 — досье построки
+
+- **TZ-01 ✅ CLOSED.** `GET /api/v1/geo/config` — `apps/api/src/modules/geo/presentation/controllers/geo.controller.ts:14`,
+  профили и методы — `packages/shared-config/src/geo.config.ts`.
+- **TZ-02 ⏳ HUMAN (P2, без ответа с 2026-08-23).** Требование: MVP-валюты RUB + USDT_TRC20 + BTC, TON/TRX/LTC убраны из
+  релиза. Проверялось дважды «убран публичный exchange-rates — проверить NOWPayments client», и два месяца ответа не было.
+  Сверка 2026-10-02: `packages/shared-config/src/geo.config.ts:3` — `CryptoCurrency = 'USDT_TRC20' | 'BTC'` (релиз
+  держится), а `apps/api/src/modules/payments/infrastructure/clients/nowpayments.client.ts:15-21` маппит `TON`, `TRX`,
+  `LTC` (строки MAP: `ton`, `trx`, `ltc`), то есть клиент способен завести платёж в валюте, исключённой из релиза; путь
+  туда из UI отсечён (WithdrawSheet и DepositSheet показывают только методы GeoConfig — см. досье GAP-55 п. з), но
+  поверхность остаётся. **Решение за владельцем:** удалить 3 позиции маппинга (и связанные ветки в
+  `nowpayments-ipn.spec.ts`) или признать их заделом фазы 2 и зафиксировать в ТЗ ч.3 и `PAYMENT_OVERVIEW.md`. Агент не
+  выбирает: любое из двух меняет контракт с провайдером.
+- **TZ-03 ✅ CLOSED.** `last_payment_method` — `packages/database/prisma/schema.prisma:130`, в baseline-миграции GAP-31;
+  `DepositProfileService` обновляет поле. Замечание: порядок методов в кассе (`sortByLastMethod`) проверен только чтением
+  DOM на стенде (`docs/UI_WAVE_5.1.md` §5, 2026-09-30), автотеста на него нет — UI-хвост ведён в GAP-46.
+- **TZ-04 ✅ CLOSED.** `limit_remaining` + `?currency=` — `apps/api/src/modules/kyc/presentation/controllers/kyc.controller.ts:55-66`,
+  спек `apps/api/test/kyc-status.spec.ts`.
+- **TZ-05 ✅ CLOSED (было ⚠️ «webhook уже uses actually_paid»).** Зачисление факта, не exact amount:
+  `apps/api/src/modules/payments/application/use-cases/process-nowpayments-webhook.use-case.ts:100-105`
+  (`actually_paid` → `pay_amount` → fallback `pr.amount`) и `:109` (идемпотентность по внешнему id, GAP-28); закрыто
+  тестом `apps/api/test/nowpayments-ipn.spec.ts` (4 обращения к `actually_paid` из 13 кейсов).
+- **TZ-06 ✅ CLOSED.** `CURRENCY_NOT_SUPPORTED` и кросс-валютный запрет —
+  `apps/api/src/modules/casino/application/use-cases/launch-game.use-case.ts`, спек `casino-launch-game.spec.ts`;
+  на фронте — `LaunchCurrencySheet` и экран ошибки (GAP-55 п. в).
+- **TZ-07 ✅ CLOSED.** Фронтенд web по ТЗ ч.5 — см. GAP-52…GAP-55 (код + спеки; браузерная приёмка — остаток GAP-46).
+- **TZ-08 ⚖️ ACCEPTED (P3).** Phase 2 фиат UAH/BYN/KZT/UZS: форматирование, switcher и пресеты готовы, включение живёт за
+  `fiatLive` (`packages/shared-config/src/geo.config.ts:22`, `false` во всех профилях кроме RU) и ключами PSP. Кодить
+  нечего до договора с PSP — это позиция «решение не делать сейчас», а не незакрытый пункт.
+- **TZ-09 🟦 CODE_DONE (P1).** Приёмка «первые 90 секунд»: гео-пресеты, депозит с `currency` + `method` — бэкенд и фронт
+  реализованы (`docs/USER_FLOW_FIRST_90_SECONDS.md`, `apps/web/src/components/wallet/DepositSheet.tsx`), покрыты
+  `deposit-sheet.spec.tsx`; прогона флоу на публичном HTTPS-домене не было → GAP-46 п.9. Прежняя формулировка
+  «web flow частично» не уточняла, что именно частично — теперь остаток назван.
+- **TZ-10 ✅ CLOSED (с продуктовой оговоркой).** Регистрация выдаёт сессию сразу: gate `emailVerified` в LoginUseCase снят,
+  RegisterUseCase переписан (сессия + access-token немедленно), письмо-верификация идёт по очереди как информационное.
+  **Оговорка, зафиксированная с 2026-08-24 и не снятая:** это продуктовое решение агента. Если для рынка СНГ верификация
+  обязательна ДО игры — вернуть gate и выдавать сессию после verify-email. Связано с GAP-49 (возрастной гейт 18+ сейчас
+  клиентский, серверной проверки `date_of_birth` при регистрации нет).
+- **TZ-11 🟡 PARTIAL (P3, новая позиция).** ТЗ ч.8 §12.1 описывает маршрут детальной статистики `/affiliate/stats`; в
+  коде — `apps/web/src/app/affiliate/(cabinet)/dashboard/page.tsx` (вкладки: dashboard, commissions, players, links,
+  settings). Содержательные блоки §12.2 (баланс, ставка, клики, игроки, NGR с разбивкой, начисления, ссылка + выход из
+  программы) на месте, прозрачность расчёта по §3.9 соблюдена (формула выведена на экране). Расхождение — имя маршрута:
+  либо правка ТЗ, либо алиас/переименование. Мелочь, но в реестре должна быть, иначе «всё ч.8 покрыто» снова станет
+  ложью.
+
+## 7. История ревизий файла (что и когда менялось в самом документе)
+
+| Дата          | Что                                                                                                                                                                                                                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-08-23    | Аудит ТЗ ↔ код: GAP-01…GAP-17, разделы «CRITICAL/HIGH/MEDIUM», TZ SYNC TZ-01…TZ-10                                                                                                                                                                                                         |
+| 2026-08-24    | Ревизия: закрыты GAP-03…GAP-12; слит параллельный WIP второго агента (geo-модуль, deposit-profile, web-компоненты — `d7a923d`, в main `8473f59a`); продуктовое решение TZ-10 (регистрация сразу выдаёт сессию)                                                                             |
+| 2026-08-28    | Ревизия аудита 2026-08-25: перенос открытых пунктов аудита (17 из 30 исправлены) как GAP-18…GAP-30; снимок — `docs/archive/audit-2026-08-25.md`                                                                                                                                            |
+| 2026-08-30/31 | Закрыты GAP-18…GAP-24, GAP-27 (ветка `security/gap-19-20-27`), P0 #3 (атомарность денег) и #4 (канонический sorted-JSON HMAC для IPN)                                                                                                                                                      |
+| 2026-09-01    | Закрыты GAP-25, GAP-26, GAP-28; CI-инфраструктура приведена в порядок (PR #20/#21/#23/#24: контекст docker-build = `casino-platform`, `@types/node`/`.npmrc` в образе, commitlint по squash-коммиту, `.gitleaks.toml` с allowlist плейсхолдеров, deploy-job пропускается без VPS-секретов) |
+| 2026-09-01    | Аудит готовности → GAP-31…GAP-38 + обязательный формат «Критерий приёмки»                                                                                                                                                                                                                  |
+| 2026-09-02    | GAP-30…GAP-38 закрыты; аудит готовности #2 (GAP-39…GAP-51) с выводом «код MVP ~85%, приёмка 0%»                                                                                                                                                                                            |
+| 2026-09-03    | GAP-39 (PR #36–55), GAP-40, GAP-41, GAP-42, GAP-43, GAP-45, GAP-47 (код), GAP-49 (инженерная часть)                                                                                                                                                                                        |
+| 2026-09-04    | GAP-48, GAP-50 (решение владельца), GAP-51 (ADR); находка про метки `TODO(GAP-22)`                                                                                                                                                                                                         |
+| 2026-09-09    | GAP-44 закрыт полностью; первый живой контур NOWPayments/Telegram (записан в GAP-46)                                                                                                                                                                                                       |
+| 2026-09-13/16 | GAP-52…GAP-55 (PR #80, #83–88)                                                                                                                                                                                                                                                             |
+| 2026-09-27    | GAP-56 (9 дефектов, `fix/gap56-infra-drift`), GAP-47 прогон + GAP-57 (часть), GAP-58 (аудит контрактов)                                                                                                                                                                                    |
+| 2026-09-30    | GAP-57 закрыт (ADR advisory-лок + прогон)                                                                                                                                                                                                                                                  |
+| 2026-10-01    | GAP-59 (аудит проекта, PR #128), GAP-60 (п.3 «хрупкость и гигиена»)                                                                                                                                                                                                                        |
+| 2026-10-02    | **Эта ревизия:** единая схема реестра, GAP-46 выделен из строки GAP-45, GAP-56/58/59/60 получили ID, добавлены GAP-61…GAP-66 и TZ-11, пересчитаны счётчики (§4), переоткрыты GAP-16 и GAP-51, закрыты по факту GAP-13 и GAP-17                                                             |
+
+## 8. Средовые заметки и процедурное (сохранено из прежней версии)
+
+**Что было найдено в структуре проекта (2026-08-22, историческая таблица):**
+
+| Проблема                                                                                                               | Статус                                                                                                                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/INDEX.md`: битые ссылки на `../tz-part-*.md`                                                                     | ✅ исправлено                                                                                                                                                                                                    |
+| В корне не было машинно-читаемых инструкций агента (`AGENTS.md`, `.cursorrules`)                                       | ✅ созданы из §1/§2 `docs/AGENT_INSTRUCTIONS.md`                                                                                                                                                                 |
+| Мусор вне git-репо (`/mnt/sdcard/Casino/apps`, `home`, `uploads` — старые копии доков)                                 | ⏳ не тронуто — решать владельцу                                                                                                                                                                                 |
+| `.env` на диске, в git только `.env.example`                                                                           | ✅ ок                                                                                                                                                                                                            |
+| Доки описывали схему как `prisma/schema/<area>.prisma` и `turbo.json`, а в реальности один `schema.prisma` и turbo нет | ✅ исправлено 2026-08-28 (AGENT_INSTRUCTIONS/MODULE_TEMPLATE/.cursorrules приведены к `schema.prisma`, упоминания turbo убраны, `events.ts` → `apps/api/src/queues/queue.types.ts`); возврат ловит docs-guard D5 |
+
+**Environment — особенности машины, на которой начиналась разработка (Android SD-card / Termux).**
+Исторически из-за них были приняты решения, которые сейчас нужно знать, чтобы «починить» обратно:
+`/mnt/sdcard` = Android FUSE — symlinks запрещены, поэтому в `.npmrc` стоит `bin-links=false`; оффлайн-store без
+registry не давал `jsonwebtoken` (JWT реализован на node:crypto) и `@types/multer` (шимы были удалены в #132, В10
+в [TECH_DEBT.md](TECH_DEBT.md)); Prisma client в той среде не генерировался, часть проверок делалась через
+hoisted-копию. На нормальной Linux-FS машине: `pnpm install && pnpm db:generate && pnpm db:migrate`.
+
+**Как добавлять позицию в этот реестр.** 1) строка в §2 (все 8 колонок заполнены, `Подтверждение` — путь или PR); 2) при необходимости — досье в §6 с критерием приёмки и обоснованием; 3) статус `HUMAN` сопровождается списком того, чего
+нет в репозитории, а не выдуманными значениями; 4) `docs-guard` (D1 ссылки, D2 пути из бэктиков) обязан быть зелёным —
+локально `sh scripts/docs-guard-local.sh`; 5) `docs/INDEX.md` §6.3: реестр обновляется в том же PR, что код.
