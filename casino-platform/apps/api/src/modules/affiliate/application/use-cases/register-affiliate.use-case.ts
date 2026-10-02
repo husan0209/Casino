@@ -12,15 +12,10 @@
  * БД не импортируется: работа идёт через порт
  * AffiliatePlayerProvisioningRepository (AI_DEVELOPMENT_RULES §3.2).
  */
-import { randomBytes } from 'node:crypto'
-
 import { Inject, Injectable } from '@nestjs/common'
 import * as argon2 from 'argon2'
 
-import {
-  AffiliateAlreadyExistsError,
-  PlayerReferralCodeGenerationError,
-} from '../../domain/errors/affiliate.errors'
+import { AffiliateAlreadyExistsError } from '../../domain/errors/affiliate.errors'
 import {
   AFFILIATE_PLAYER_PROVISIONING_REPOSITORY,
   AFFILIATE_REPOSITORY,
@@ -29,15 +24,8 @@ import {
 } from '../../domain/repositories/affiliate.repository'
 import { parseRevShareRate } from '../../domain/value-objects/revshare-rate.value-object'
 import { AffiliateJwtService } from '../../infrastructure/affiliate-jwt.service'
+import { generateUniquePlayerReferralCode } from '../affiliate-player-referral-code'
 import { AffiliateSettingsService } from '../affiliate-settings.service'
-
-/** Сколько попыток сгенерировать уникальный служебный referral_code. */
-const REFERRAL_CODE_ATTEMPTS = 5
-/** Префикс служебного кода партнёра. */
-const REFERRAL_CODE_PREFIX = 'aff'
-/** Алфавит без 0/O/1/I — как у игровых реферальных кодов. */
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-const CODE_LENGTH = 8
 
 export interface RegisterAffiliateInput {
   email: string
@@ -82,9 +70,9 @@ export class RegisterAffiliateUseCase {
     const revshareRate = parseRevShareRate(settings.defaultRevshareRate)
     const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id })
     const trackingCode = await this.affiliates.generateUniqueTrackingCode()
-    const referralCode = await this.generatePlayerReferralCode()
-
-    const player = await this.players.createPlayerUser({ referralCode })
+    const player = await this.players.createPlayerUser({
+      referralCode: await generateUniquePlayerReferralCode(this.players),
+    })
     try {
       const affiliate = await this.affiliates.create({
         userId: player.id,
@@ -112,29 +100,6 @@ export class RegisterAffiliateUseCase {
       await this.players.deletePlayerUser(player.id).catch(() => undefined)
       throw err
     }
-  }
-
-  /**
-   * Служебный referral_code для user-записи партнёра.
-   *
-   * Поле обязательное (NOT NULL) в users, хотя для партнёра оно не используется:
-   * клиентская рефералка его не показывает. Случайные буквы/цифры вместо
-   * `Math.random()` — коллизия кодов партнёров была бы видна в данных как
-   * ошибка генерации.
-   */
-  private async generatePlayerReferralCode(): Promise<string> {
-    for (let attempt = 0; attempt < REFERRAL_CODE_ATTEMPTS; attempt++) {
-      const bytes = randomBytes(CODE_LENGTH)
-      let suffix = ''
-      for (let index = 0; index < CODE_LENGTH; index++) {
-        suffix += CODE_ALPHABET[bytes[index]! % CODE_ALPHABET.length]
-      }
-      const candidate = `${REFERRAL_CODE_PREFIX}${suffix}`
-      if (await this.players.isPlayerReferralCodeAvailable(candidate)) {
-        return candidate
-      }
-    }
-    throw new PlayerReferralCodeGenerationError(REFERRAL_CODE_ATTEMPTS)
   }
 
   /** Ссылка партнёра: домен из APP_URL, как и у игровых реферальных ссылок. */

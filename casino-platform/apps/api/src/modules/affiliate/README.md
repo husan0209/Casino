@@ -40,6 +40,15 @@
 - `auth` — `RolesGuard` на admin-эндпоинтах
 - `users` — порт `RESPONSIBLE_GAMING_HOOK` (реализацию clawback поставляем мы)
 - read-only: `game_transactions`, `ledger_entries`, `kyc_profiles`, `users`
+  (кошельки/проводки читаются как компонент NGR-агрегата — см.
+  `sumPlayerBonuses`; деньги начисляются ТОЛЬКО через `WalletFacade`)
+- ⚠️ **GAP-62, не read-only**: `users` ещё и **пишется** — провижининг
+  служебной user-записи партнёра (`createPlayerUser`/`deletePlayerUser` в
+  `infrastructure/player-provisioning.prisma.repository.ts`). ADR GAP-51
+  разрешает только чтение, так что это нарушение границ, а не реализованная
+  часть ADR. Убрать нельзя, пока `UsersFacade` не отдаст
+  `provisionAffiliatePlayer(input)` и `deprovisionAffiliatePlayer(userId)` —
+  запрос зафиксирован в шапке репозитория.
 
 ## Используется в
 
