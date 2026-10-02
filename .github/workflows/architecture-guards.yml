@@ -305,7 +305,11 @@ jobs:
           if [ -z "$BR" ]; then
             BR="${{ github.ref_name }}"
           fi
-          if ! echo "$BR" | grep -qE "^(feat|fix|chore|docs|refactor|test|perf|style|security|wip)/"; then
+          # arena/* — ветки платформы Arena (agent-сессии): имя фиксирует платформа
+          # (arena/<session-id>-<slug>), переименовать нельзя. Без этого исключения
+          # любой PR из такой ветки краснел на G12 — по имени ветки, а не по делу,
+          # и job обрывался до остальных guard'ов (GAP-59: G23 не доходил до прогона).
+          if ! echo "$BR" | grep -qE "^(feat|fix|chore|docs|refactor|test|perf|style|security|wip)/|^arena/[a-z0-9._-]+$"; then
             echo "❌ G12 FAIL: branch '$BR' does not follow type/name convention."
             echo "   Use one of: feat/, fix/, chore/, docs/, refactor/, test/, perf/, style/, security/, wip/"
             echo "   See docs/CONVENTIONS.md §10.1."
@@ -418,6 +422,17 @@ jobs:
         id: g22
         run: node scripts/check-explicit-di.mjs
 
+      # R. NEXT_PUBLIC_* инлайнятся в бандл на сборке (Next.js), поэтому env_file
+      #    на build не влияет — ARG обязан приехать через build.args.
+      # Catches: GAP-59 — build-arg NEXT_PUBLIC_API_URL был у web, но не у admin;
+      #          бандл админки запекал ARG-дефолт casino.example.com и на реальном
+      #          домене уходил на чужой хост (vhost admin без location /api/).
+      #          CI не ловил: job docker-build собирает только api.prod.
+      # NOTE: детектор — scripts/check-prod-build-args.sh (grep/awk, без зависимостей)
+      - name: G23 — NEXT_PUBLIC_ args reach prod builds
+        id: g23
+        run: sh scripts/check-prod-build-args.sh
+
       # ── Final summary ─────────────────────────────────────────────
       - name: Summary
         if: always()
@@ -445,3 +460,4 @@ jobs:
           echo "- G20 money-number ratchet: ${{ steps.g20.outcome }}"
           echo "- G21 use-case specs rat.:  ${{ steps.g21.outcome }}"
           echo "- G22 explicit Nest DI:     ${{ steps.g22.outcome }}"
+          echo "- G23 NEXT_PUBLIC_ args:    ${{ steps.g23.outcome }}"

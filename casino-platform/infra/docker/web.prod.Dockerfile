@@ -3,6 +3,16 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 ARG NEXT_PUBLIC_API_URL=https://casino.example.com/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# GAP-60: без этих двух файлов сборка этого образа падала ВСЕГДА (её просто не
+# гонял ни один CI до 2026-10-01 — docker-build собирал только api.prod).
+#   .npmrc — node-linker=hoisted. Без него pnpm изолирует транзитивные зависимости
+#     (decimal.js из @casino/shared-utils) и `next build` падает на
+#     «Cannot find module 'decimal.js'» — тот же класс, что api.prod ловил на node-типах.
+#   .eslintrc.js — корневой конфиг ESLint (parser: '@typescript-eslint/parser',
+#     sourceType: module). apps/web/.eslintrc.js его НЕ расширяет, а наследует
+#     обходом вверх; без него `next lint` (шаг `next build`) парсит .ts как скрипт
+#     и даёт 129 × «Parsing error: The keyword 'import' is reserved».
+COPY .npmrc .eslintrc.js ./
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages ./packages
 COPY apps/web ./apps/web

@@ -76,7 +76,10 @@ jobs:
             fail "D3: ENVIRONMENT_VARIABLES §22 ≠ .env.example:"
             diff "$TMPD/d3_doc.txt" "$TMPD/d3_ex.txt" | sed 's/^/    /' >> "$ERR"
           fi
-          grep -oE '^  [A-Z][A-Z0-9_]+:' packages/shared-config/src/env.validation.ts | tr -d ' :' | sort -u > "$TMPD/d3_val.txt" || true
+          # GAP-59: было '^  [A-Z]…' (ровно два пробела) — ключи envSchema лежат на
+          # четырёх, детектор не находил НИ ОДНОГО и объявлял невалидированными все
+          # 99 переменных, хотя схема покрывала 98. '^ +' — любой отступ.
+          grep -oE '^ +[A-Z][A-Z0-9_]+:' packages/shared-config/src/env.validation.ts | tr -d ' :' | sort -u > "$TMPD/d3_val.txt" || true
           MISSING=$(comm -13 "$TMPD/d3_val.txt" "$TMPD/d3_ex.txt" | paste -sd, -)
           [ -n "$MISSING" ] && echo "⚠️  D3 (не блокирует): env.validation.ts не валидирует: $MISSING — см. GAP-29"
 

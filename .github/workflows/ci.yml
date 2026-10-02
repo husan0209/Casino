@@ -203,7 +203,11 @@ jobs:
   docker-build:
     runs-on: ubuntu-latest
     needs: [lint-typecheck-test]
-    if: github.ref == 'refs/heads/main'
+    # GAP-59 (п.3 аудита): было `if: github.ref == 'refs/heads/main'` и один api.prod —
+    # сборки web/admin не проверялись ни на PR, ни на main, поэтому отсутствующий
+    # output: standalone и build-arg NEXT_PUBLIC_API_URL (GAP-59) доехали до деплоя.
+    # Теперь все три прод-образа собираются и на PR, и на push в main.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
@@ -218,6 +222,29 @@ jobs:
           file: ./casino-platform/infra/docker/api.prod.Dockerfile
           push: false
           tags: casino-api:test
+      - name: Build Web (test)
+        uses: docker/build-push-action@v5
+        with:
+          # NEXT_PUBLIC_API_URL — явный build-arg, ровно как у сервиса web в
+          # docker-compose.prod.yml: иначе в образ уезжает ARG-дефолт
+          # casino.example.com (GAP-59). Шрифт самохостын (GAP-59 п.2), поэтому
+          # сборка больше не зависит от fonts.googleapis.com.
+          context: ./casino-platform
+          file: ./casino-platform/infra/docker/web.prod.Dockerfile
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://casino.example.com/api/v1
+          push: false
+          tags: casino-web:test
+      - name: Build Admin (test)
+        uses: docker/build-push-action@v5
+        with:
+          # Тот же build-arg, что и у web/admin в docker-compose.prod.yml (GAP-59).
+          context: ./casino-platform
+          file: ./casino-platform/infra/docker/admin.prod.Dockerfile
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://casino.example.com/api/v1
+          push: false
+          tags: casino-admin:test
 
   deploy:
     name: Deploy to VPS (only after green CI)
