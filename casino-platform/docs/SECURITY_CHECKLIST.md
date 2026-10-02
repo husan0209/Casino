@@ -1,75 +1,82 @@
 # Security Checklist – Casino Platform
 
-> **Статус:** ревизия 2026-08-28 по результатам аудита (снапшот: [`archive/audit-2026-08-25.md`](./archive/audit-2026-08-25.md)).
-> Открытые пункты ведут в [`IMPLEMENTATION_GAPS.md`](./IMPLEMENTATION_GAPS.md) (GAP-18..28).
+> **Статус:** ревизия 2026-10-02 — статусы сведены с кодом снапшота `5d2bd67` (перепроверен каждый пункт).
+> Исходный аудит (снапшот: [`archive/audit-2026-08-25.md`](./archive/audit-2026-08-25.md)).
+> GAP-18…GAP-28 из трекера закрыты 2026-08-30…2026-09-02; открытые пункты ведут в
+> [`IMPLEMENTATION_GAPS.md`](./IMPLEMENTATION_GAPS.md).
 > **Правило:** `[x]` ставится только если указано подтверждение (файл:строка, guard ID или ручная проверка с датой). Пустое подтверждение = пункт не выполнен.
 
 **Легенда:** ✅ подтверждено · ⚠️ частично / требует ручной проверки · ❌ не выполнено → GAP-NN
 
 ## Auth
 
-| Пункт | Статус | Подтверждение |
-|-------|--------|---------------|
-| argon2id, memoryCost 65536, timeCost 3, parallelism 4 | ⚠️ | тип argon2id ✅, но параметры не заданы (дефолты ~19MiB/2/1) → **GAP-27** (`password-hasher.service.ts:7`) |
-| JWT HS256, access 15m, refresh 30d, rotation | ✅ | `jwt.service.ts` (HS256 на node:crypto), env-дефолты `15m`/`30d` (`env.validation.ts:34-35`) |
-| Refresh token – hash only in DB | ✅ | `hashRefreshToken` через `crypto.createHash('sha256')` (аудит 2026-08-25 §5) |
-| Email verify / password reset – crypto.randomBytes(64) | ⚠️ | механизм реализован (GAP-01, токен 24ч); длина/энтропия — сверить при runtime-приёмке |
-| Rate limit: /auth/login 10/15min, /auth/register 5/h | ❌ | nginx `10r/m` есть (1 мин, не 15); app-level отсутствует → **GAP-19** |
-| Account lockout 10/15min | ❌ | **GAP-18** |
+| Пункт                                                  | Статус | Подтверждение                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| argon2id, memoryCost 65536, timeCost 3, parallelism 4  | ✅     | `password-hasher.service.ts:9-14` — все три параметра заданы явно (GAP-27 закрыт 2026-08-30); тот же профиль у админ-хешера                                                                                                                                                     |
+| JWT HS256, access 15m, refresh 30d, rotation           | ✅     | `jwt.service.ts` (HS256 на node:crypto, `alg`/`iss` проверяются), env-дефолты `15m`/`30d` (`env.validation.ts:89-90`)                                                                                                                                                           |
+| Refresh token – hash only in DB                        | ✅     | `hashRefreshToken` через `crypto.createHash('sha256')` (`jwt.service.ts:103-104`; аудит 2026-08-25 §5)                                                                                                                                                                          |
+| Email verify / password reset – crypto.randomBytes(64) | ⚠️     | reset-токен — `randomBytes(64)` (`forgot-password.use-case.ts:22`), refresh-токен — `randomBytes(64)` (`jwt.service.ts:99`); **email-verify — `randomBytes(32)`** (`register.use-case.ts:106`), то есть формально не 64 байта → сверить энтропию при runtime-приёмке            |
+| Rate limit: /auth/login 10/15min, /auth/register 5/h   | ⚠️     | app-level есть (GAP-19 закрыт 2026-08-30): глобально 120/мин (`app.module.ts:39-44`), `/auth/*` 10/мин (`auth.controller.ts:53-58`), `/auth/refresh` 30/мин; nginx `api_auth 10r/m` (`infra/nginx/nginx.conf:29`). **Норма ТЗ «/auth/register 5/час» не реализована** — остаток |
+| Account lockout 10/15min                               | ✅     | GAP-18 закрыт 2026-08-30: `login.use-case.ts:32-34` (10/15 мин → блок 30 мин), поля `failed_login_attempts/last_failed_at/locked_until` (`schema.prisma:24-26`), тест `test/account-lockout.spec.ts`                                                                            |
 
 ## API
 
-| Пункт | Статус | Подтверждение |
-|-------|--------|---------------|
-| CORS – own domains only | ✅ | `main.ts:42` `enableCors`, origins из env |
-| Helmet / security headers | ⚠️ | Nginx headers ✅ (`infra/nginx/`); app-level helmet отсутствует → **GAP-20** |
-| GlobalExceptionFilter – no stack traces in prod | ✅ | `global-exception.filter.ts` (типизация details исправлена, ревизия N12) |
-| Zod validation on all inputs | ❌ | forgot-password и payments-контроллеры без валидации → **GAP-21** |
-| Owner check (IDOR) on user-specific endpoints | ⚠️ | manual — систематическая проверка не проводилась |
-| RBAC Guard – user / admin / superadmin | ✅ | `roles.guard.ts`, `admin-auth.guard.ts`, `optional-auth.guard.ts` |
+| Пункт                                           | Статус | Подтверждение                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CORS – own domains only                         | ✅     | `main.ts:63` `enableCors`, origins из env                                                                                                                                                                                                                                                                                         |
+| Helmet / security headers                       | ✅     | GAP-20 закрыт 2026-08-30: `app.use(helmet())` в bootstrap до парсеров (`main.ts:53`); nginx-заголовки web-vhost (`infra/nginx/templates/casino.conf.template:21-25`)                                                                                                                                                              |
+| CSP: web                                        | ✅     | `apps/web/src/middleware.ts:48-76` — политика на каждый запрос; `script-src 'self' 'unsafe-inline'` (см. SECURITY_FIXES #11: nonce/`strict-dynamic` отменены)                                                                                                                                                                     |
+| CSP: admin                                      | ❌     | **открытый пункт** — у `apps/admin` middleware нет вообще (CSP не отдаётся ни на одном ответе), и в ADMIN-vhost (`infra/nginx/templates/casino.conf.template:86-88`) только `X-Frame-Options`/`X-Content-Type-Options`/HSTS. Админка живёт на своём домене без CSP → risk XSS→session                                             |
+| GlobalExceptionFilter – no stack traces in prod | ✅     | `global-exception.filter.ts` — необработанное исключение отдаёт `INTERNAL_ERROR`/`Something went wrong`, stack уходит только в лог (ревизия N12)                                                                                                                                                                                  |
+| Zod validation on all inputs                    | ✅     | GAP-21 закрыт 2026-08-30: все клиентские `@Body` через `@UsePipes(new ZodValidationPipe(Schema))` (auth incl. OAuth, users, kyc, support, admin, payments). Без схемы — только 2 провайдерских входа (`payments-webhook.controller.ts`, `provider-callback.controller.ts`), payload'ы под HMAC; остальные контроллеры без `@Body` |
+| Owner check (IDOR) on user-specific endpoints   | ⚠️     | manual — систематическая проверка не проводилась (сводится к GAP-46)                                                                                                                                                                                                                                                              |
+| RBAC Guard – user / admin / superadmin          | ✅     | `roles.guard.ts`, `auth.guard.ts`, `admin-auth.guard.ts`, `affiliate-auth.guard.ts`, `optional-auth.guard.ts` + тест `test/roles-guard.spec.ts`                                                                                                                                                                                   |
 
 ## Payments
 
-| Пункт | Статус | Подтверждение |
-|-------|--------|---------------|
-| Money = string + decimal.js, DB DECIMAL(20,8) | ✅ | `packages/shared-types/src/money.ts`, `schema.prisma` |
-| Idempotency key on every financial op | ✅ | `wallet.ledger.prisma.ts` (все операции с `idempotencyKey`); nuance формата депозита → GAP-28 (P3) |
-| Optimistic locking wallet_accounts.version | ✅ | `version: {increment: 1}` + retry ×3 (ревизия H1) |
-| All financial ops in prisma.$transaction() | ✅ | `isolationLevel: 'Serializable'` (`wallet.ledger.prisma.ts:121`, ревизия H1) |
-| Webhook signature verification | ✅ | HMAC на **raw body** (ревизия N5: `main.ts` verify + контроллер передаёт `rawBody`) |
-| Raw callback saved before processing | ✅ | `process-rukassa-webhook.use-case.ts` — «Store the EXACT raw body bytes» |
-| Always return 200 OK to provider | ✅ | вебхук-контроллеры (`payments-webhook.controller.ts`) |
+| Пункт                                         | Статус | Подтверждение                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Money = string + decimal.js, DB DECIMAL(20,8) | ✅     | `packages/shared-types/src/money.ts`, `packages/database/prisma/schema.prisma` — 29 колонок `@db.Decimal(20, 8)`; вне (20,8) только не-деньги (`rtp` 5,2 / `max_win_multiplier` 10,2 / курсы и доли 5,4) и `amount_rub` 20,2                                                                                                                                                                                                                    |
+| Idempotency key on every financial op         | ✅     | `wallet.ledger.prisma.ts:89,184-185` — дубликат-чек по `idempotencyKey` до проводки + уникальный индекс; GAP-28 закрыт 2026-09-01 (ключ депозита `deposit_${provider}_${externalId}`, тест `test/deposit-idempotency.spec.ts`)                                                                                                                                                                                                                  |
+| Optimistic locking wallet_accounts.version    | ✅     | `version: {increment: 1}` (`wallet.ledger.prisma.ts:154,258,294,335`) + повтор при конфликте. **Попыток уже 5, не 3**: `MAX_ATTEMPTS = 5` (`wallet-transaction-lock.ts:63`) — формулировка «retry ×3» из AI_DEVELOPMENT_RULES §7 устарела                                                                                                                                                                                                       |
+| All financial ops in prisma.$transaction()    | ⚠️     | было ✅ с `isolationLevel: 'Serializable'` — **с 2026-09-30 (GAP-57) кошелёк сериализуется иначе**: advisory-лок + `ReadCommitted` (`wallet-transaction-lock.ts:130,143-150`), в `wallet.ledger.prisma.ts` ноль вызовов `$transaction`. Атомарность bet/win/rollback держат тесты (`test/money-flow.spec.ts`, `test/wallet-transaction-lock.spec.ts`, `test/ledger.integration.spec.ts`), а не гард G7 — он стал вакуумным (QUALITY_GATES §3.2) |
+| Webhook signature verification                | ✅     | HMAC на **raw body** (ревизия N5: `main.ts:56-57` verify + контроллер передаёт `rawBody`)                                                                                                                                                                                                                                                                                                                                                       |
+| Raw callback saved before processing          | ✅     | `process-rukassa-webhook.use-case.ts` — «Store the EXACT raw body bytes»                                                                                                                                                                                                                                                                                                                                                                        |
+| Always return 200 OK to provider              | ✅     | `payments-webhook.controller.ts:32,47` `@HttpCode(200)`                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ## Data
 
-| Пункт | Статус | Подтверждение |
-|-------|--------|---------------|
-| Passwords never logged | ⚠️ | Nest Logger без redact — гарантий нет → **GAP-23** |
-| Tokens / secrets redacted in pino logs | ❌ | pino не подключён → **GAP-23** |
-| KYC documents outside public dir, signed route only | ⚠️ | хранение `./uploads/kyc` ✅ (вне public); подписанная выдача — manual check |
-| .env in .gitignore, secrets in GitHub Secrets | ✅ | аудит 2026-08-25 §5 |
+| Пункт                                               | Статус | Подтверждение                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Passwords never logged                              | ✅     | GAP-23 закрыт 2026-08-30: nestjs-pino вместо Nest Logger, redact-пути `password/passwordHash/new_password/current_password/old_password` в 3 уровнях вложенности (`logger.options.ts:19-79`), тест `test/logger-redact.spec.ts`                                                                                                                                                                                   |
+| Tokens / secrets redacted in pino logs              | ✅     | `logger.options.ts:26-35,66-71` — `token/refreshToken/accessToken/secret/authorization/cookie` + `req.headers.*`, `res.headers["set-cookie"]`, `req.body.*`; `GlobalExceptionFilter` логирует только type/message/stack, не `err` целиком (`global-exception.filter.ts:70-82`)                                                                                                                                    |
+| KYC documents outside public dir, signed route only | ⚠️     | хранение вне public ✅ — `./uploads/kyc` (`upload-kyc-document.use-case.ts:11`), nginx aliasует только `/uploads/avatars/` (`infra/nginx/templates/casino.conf.template:66-69`), статики в API нет. **Подписанной выдачи нет вообще**: `kyc-admin.controller.ts` отдаёт только JSON-метаданные → оператор документ не откроет; ручной проверки выдачи не было                                                     |
+| .env in .gitignore, secrets in GitHub Secrets       | ⚠️     | `.env` и `.env*.local` игнорируются, **`.env.production` — нет** (в `casino-platform/.gitignore:9-10` только эти два паттерна; `git check-ignore casino-platform/.env.production` → exit 1), а `docs/DEPLOY.md` предписывает создавать на VPS именно его → секретный файл лежит в рабочем дереве git и попадает в `git add -A`. Частичная страховка — CI-job `secrets-scan` (gitleaks) и `scripts/setup-hooks.sh` |
 
 ## Infra
 
-| Пункт | Статус | Подтверждение |
-|-------|--------|---------------|
-| UFW – allow 22,80,443 only | ⚠️ | manual — `infra/scripts/vps_init.sh`, проверяется при деплое VPS |
-| fail2ban – ssh + nginx | ⚠️ | manual — `infra/scripts/vps_init.sh` |
-| SSL Let's Encrypt, auto-renew | ⚠️ | manual — `infra/scripts/ssl_init.sh` |
-| Docker non-root | ✅ (prod) | `USER node` во всех `*.prod.Dockerfile` (ревизия N11); dev-образы root by design — [`infra/docker/README.md`](../infra/docker/README.md) |
-| PostgreSQL – no public exposure | ✅ | аудит 2026-08-25 §5: postgres не expose |
-| Redis – password auth | ✅ | аудит 2026-08-25 §5: `--requirepass ${REDIS_PASSWORD}` |
+| Пункт                           | Статус | Подтверждение                                                                                                                                                                                                                                   |
+| ------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UFW – allow 22,80,443 only      | ⚠️     | manual — `infra/scripts/vps_init.sh:10-15` (`default deny incoming`, `allow OpenSSH/80/443`), выполняется при инициализации VPS                                                                                                                 |
+| fail2ban – ssh + nginx          | ⚠️     | manual — `infra/scripts/vps_init.sh:17-28` (jail.local пишется скриптом)                                                                                                                                                                        |
+| SSL Let's Encrypt, auto-renew   | ⚠️     | manual — `infra/scripts/ssl_init.sh:24-27` выпускает сертификаты, но **cron-реnew (строка 31) закомментирован**: авто-продление оператор ставит вручную → открытый хвост GAP-46                                                                 |
+| Docker non-root                 | ✅     | `USER node` во **всех шести** `infra/docker/*.Dockerfile` — prod и dev (`api.Dockerfile:10`, `web.Dockerfile:9`), сторожит guard **G10**. Примечание: `infra/docker/README.md` по-прежнему описывает dev-образы как root — дока отстаёт от кода |
+| PostgreSQL – no public exposure | ✅     | `docker-compose.prod.yml:3-15` — у сервиса postgres нет `ports:`, наружу торчит только nginx (`:117-122`) (аудит 2026-08-25 §5)                                                                                                                 |
+| Redis – password auth           | ✅     | `docker-compose.prod.yml:19` `--requirepass ${REDIS_PASSWORD}` + healthcheck с паролем                                                                                                                                                          |
 
 ---
 
 ## Процессные уровни защиты
 
-| Уровень | Статус | Подтверждение |
-|---------|--------|---------------|
-| CI: lint/typecheck/test/build без `\|\| true` | ✅ | `.github/workflows/ci.yml` (убрано 2026-08-28) |
-| CI: architecture guards G1–G12 | ✅ | `.github/workflows/architecture-guards.yml` |
-| Branch protection в GitHub | ❌ | не настраивается кодом — вручную по [`BRANCH_PROTECTION.md`](./BRANCH_PROTECTION.md) |
-| Pre-commit (gitleaks + lint-staged) | ⚠️ | хуки есть, но на FAT/sdcard не срабатывают (filemode=false) — `scripts/setup-hooks.sh` |
-| Pre-push (typecheck + tests) | ⚠️ | SKIP на FAT/sdcard — `.husky/pre-push` |
+| Уровень                                       | Статус | Подтверждение                                                                                                                                                    |
+| --------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CI: lint/typecheck/test/build без `\|\| true` | ✅     | `.github/workflows/ci.yml` (убрано 2026-08-28): `                                                                                                                |     | true`остался только на сборке отчёта`pnpm audit --json`и на`docker compose pull` в deploy-шаге |
+| CI: architecture guards G1–G23                | ✅     | `.github/workflows/architecture-guards.yml` — 23 проверки (реестр и статусы: [`QUALITY_GATES.md`](./QUALITY_GATES.md) §3.2); G7 с 2026-09-30 ничего не проверяет |
+| Branch protection в GitHub                    | ❌     | не настраивается кодом — вручную по [`BRANCH_PROTECTION.md`](./BRANCH_PROTECTION.md)                                                                             |
+| Pre-commit (gitleaks + lint-staged)           | ⚠️     | хуки есть, но на FAT/sdcard не срабатывают (filemode=false) — `scripts/setup-hooks.sh`                                                                           |
+| Pre-push (typecheck + tests)                  | ⚠️     | SKIP на FAT/sdcard — `.husky/pre-push`                                                                                                                           |
 
-> **Обновлено:** 2026-08-28. Следующая ревизия — после закрытия GAP-18..21 (P0/P1 security).
+> **Обновлено:** 2026-10-02 (сверка каждого пункта с кодом снапшота `5d2bd67`).
+> Следующая ревизия — после закрытия открытых пунктов этой таблицы: CSP админки,
+> `.env.production` в ignore, `/auth/register` 5/час, подписанная выдача KYC,
+> cron-продление SSL, систематическая IDOR-проверка, G7 (QUALITY_GATES §3.2).

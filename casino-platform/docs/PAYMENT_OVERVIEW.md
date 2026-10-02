@@ -2,7 +2,7 @@
 title: Payment Overview
 description: Обзор payment-провайдеров, идемпотентности и webhook обработки
 status: living document
-last_updated: 2026-08-23
+last_updated: 2026-10-02
 ---
 
 # Payment Overview
@@ -15,10 +15,10 @@ last_updated: 2026-08-23
 
 ### 1.1. Обзор
 
-| Provider | Тип | Валюты MVP | Markets | Регион |
-|----------|-----|--------|---------|--------|
-| **Rukassa** | Фиат | RUB (Phase 2: UAH, BYN, KZT, UZS) | CIS | Russia + Phase 2 geo |
-| **NOWPayments** | Крипто | USDT_TRC20, BTC | Global | Worldwide |
+| Provider        | Тип    | Валюты MVP                        | Markets | Регион               |
+| --------------- | ------ | --------------------------------- | ------- | -------------------- |
+| **Rukassa**     | Фиат   | RUB (Phase 2: UAH, BYN, KZT, UZS) | CIS     | Russia + Phase 2 geo |
+| **NOWPayments** | Крипто | USDT_TRC20, BTC                   | Global  | Worldwide            |
 
 ### 1.2. Продуктовые правила (синхронизация с tz-part-5)
 
@@ -67,23 +67,23 @@ Payments Module
 
 export interface PaymentProvider {
   readonly name: 'rukassa' | 'nowpayments' | 'manual'
-  
+
   // ── Deposit ─────────────────────────────────────
   createDeposit(input: CreateDepositInput): Promise<CreateDepositResult>
   checkDepositStatus(externalId: string): Promise<ProviderStatus>
-  
+
   // ── Withdrawal ──────────────────────────────────
   createWithdrawal(input: CreateWithdrawalInput): Promise<CreateWithdrawalResult>
   checkWithdrawalStatus(externalId: string): Promise<ProviderStatus>
-  
+
   // ── Webhook ─────────────────────────────────────
   verifyWebhookSignature(rawBody: string, signature: string): boolean
-  
+
   parseWebhook(rawBody: string): ProviderWebhookEvent
 }
 
 export interface CreateDepositInput {
-  orderId: string            // payment_request.id
+  orderId: string // payment_request.id
   amount: MoneyAmount
   currency: Currency
   userId: string
@@ -94,27 +94,27 @@ export interface CreateDepositInput {
 }
 
 export interface CreateDepositResult {
-  externalId: string         // provider's invoice ID
-  paymentUrl?: string        // для redirect (фиат) или details (crypto)
-  cryptoAddress?: string     // для crypto-провайдеров
+  externalId: string // provider's invoice ID
+  paymentUrl?: string // для redirect (фиат) или details (crypto)
+  cryptoAddress?: string // для crypto-провайдеров
   cryptoAmount?: MoneyAmount // для crypto-провайдеров
-  expiresAt?: Date           // для crypto-invoice (обычно 30 минут)
+  expiresAt?: Date // для crypto-invoice (обычно 30 минут)
 }
 
 export interface ProviderStatus {
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'expired'
   amount?: MoneyAmount
   externalId: string
-  raw?: unknown              // raw provider response (для debug)
+  raw?: unknown // raw provider response (для debug)
 }
 
 export interface ProviderWebhookEvent {
   type: 'deposit.success' | 'deposit.failed' | 'withdrawal.success' | 'withdrawal.failed'
   externalId: string
-  orderId?: string           // our payment_request.id
+  orderId?: string // our payment_request.id
   amount?: MoneyAmount
   status: ProviderStatus['status']
-  raw: unknown               // full payload (for audit)
+  raw: unknown // full payload (for audit)
 }
 ```
 
@@ -197,6 +197,40 @@ Frontend → Backend → NOWPayments API → cryptoAddress + cryptoAmount
                   Backend credits wallet (по actually_paid) → ...
 ```
 
+### 3.3. Контракт NOWPayments: `price_amount` — число (решение В11)
+
+> **Money-правило (AI_DEVELOPMENT_RULES §1) действует внутри домена и в БД.** На
+> границе NOWPayments JSON-спецификация провайдера требует `price_amount`
+> **числом**, поэтому приведение типа происходит ровно в одном месте — при
+> сериализации тела `POST /v1/payment`. Это не «деньги как number»: ни домен,
+> ни DTO, ни схема БД число не хранят.
+
+Код: `apps/api/src/modules/payments/infrastructure/clients/nowpayments.client.ts:155-159`
+(комментарий с тем же обоснованием) и `:159` — само приведение.
+
+```typescript
+// nowpayments.client.ts — createPayment
+price_amount: Number(params.priceAmount), // контракт провайдера: ЧИСЛО
+price_currency: params.priceCurrency.toLowerCase(),
+```
+
+| Слой                       | Тип денежного поля                                             | Где                                      |
+| -------------------------- | -------------------------------------------------------------- | ---------------------------------------- |
+| Домен / вход клиента       | `string` (`params.priceAmount: string`)                        | `nowpayments.client.ts:133-134`          |
+| Ответ провайдера           | `string` (`payAmount`, обратно — `String(v)` для оценки курса) | `:139-145`, `:249`                       |
+| Только wire-формат запроса | `number`                                                       | `:159`                                   |
+| БД                         | `DECIMAL(20,8)`                                                | `packages/database/prisma/schema.prisma` |
+
+- **Что ещё не легализовано:** number-арифметика в dev-stub курса —
+  `nowpayments.client.ts:263` (`rates: Record<string, number>`), `:273`
+  (`Number(params.amount) / rates[to]`), `:276` (`Number(params.amount) * rates[from]`).
+  Живёт только в ветке без `NOWPAYMENTS_API_KEY` (см. `devStubPayment`, `:146-148`)
+  и не должна попасть в прод-путь; кандидат на money-хелперы `@casino/shared-utils`.
+- **Правило для нового PSP:** если схема провайдера требует число — приводить в
+  **одном** месте сериализации запроса и оставлять комментарий со ссылкой на
+  контракт провайдера; доменные поля, DTO и БД остаются `string` + `decimal.js`.
+- Трекинг решения и остатка: `docs/TECH_DEBT.md`, пункт **В11**.
+
 ---
 
 ## 4. Поток вывода (Withdrawal Flow)
@@ -256,6 +290,7 @@ Frontend → Backend → NOWPayments API → cryptoAddress + cryptoAmount
 Каждая финансовая операция **ДОЛЖНА** использовать `idempotency_key`.
 
 **Без идемпотентности возможны:**
+
 - Дублированные депозиты (webhook приходит дважды)
 - Двойные выигрыши (win + retry)
 - Потерянные средства (bet дважды на одну транзакцию)
@@ -277,13 +312,13 @@ async credit(input: CreditInput): Promise<CreditResult> {
       duplicate: true,
     }
   }
-  
+
   // 2. Perform operation в transaction
   return this.prisma.$transaction(async (tx) => {
     const wallet = await tx.walletAccount.findUnique({
       where: { userId_currency: { userId: input.userId, currency: input.currency } },
     })
-    
+
     // 3. Optimistic lock check
     const updated = await tx.walletAccount.updateMany({
       where: {
@@ -297,11 +332,11 @@ async credit(input: CreditInput): Promise<CreditResult> {
         version: { increment: 1 },
       },
     })
-    
+
     if (updated.count === 0) {
       throw new OptimisticLockError()  // retry logic kicks in
     }
-    
+
     // 4. Create ledger entry
     const entry = await tx.ledgerEntry.create({
       data: {
@@ -316,7 +351,7 @@ async credit(input: CreditInput): Promise<CreditResult> {
         referenceId: input.referenceId,
       },
     })
-    
+
     return { balanceBefore: wallet.balance, balanceAfter: entry.balanceAfter }
   })
 }
@@ -324,16 +359,16 @@ async credit(input: CreditInput): Promise<CreditResult> {
 
 ### 5.3. Конвенции ключей
 
-| Операция | Формат |
-|----------|--------|
-| Deposit | `dep_{payment_request.id}` |
-| Withdrawal | `wd_{withdrawal_request.id}` |
-| Bet | `bet_{provider_transaction_id}` |
-| Win | `win_{provider_round_id}_{index}` |
-| Rollback | `rb_{original_transaction_id}` |
+| Операция        | Формат                                         |
+| --------------- | ---------------------------------------------- |
+| Deposit         | `dep_{payment_request.id}`                     |
+| Withdrawal      | `wd_{withdrawal_request.id}`                   |
+| Bet             | `bet_{provider_transaction_id}`                |
+| Win             | `win_{provider_round_id}_{index}`              |
+| Rollback        | `rb_{original_transaction_id}`                 |
 | Referral reward | `ref_{referrer_id}_{referred_id}_{YYYY-MM-DD}` |
-| Admin credit | `adm_credit_{actor_id}_{timestamp}` |
-| Admin debit | `adm_debit_{actor_id}_{timestamp}` |
+| Admin credit    | `adm_credit_{actor_id}_{timestamp}`            |
+| Admin debit     | `adm_debit_{actor_id}_{timestamp}`             |
 
 ### 5.4. Retry logic
 
@@ -373,7 +408,7 @@ async processWebhook(provider: string, rawBody: string, headers: Record<string, 
       processed: false,
     },
   })
-  
+
   try {
     // 2. Verify signature
     const adapter = this.getAdapter(provider)
@@ -381,19 +416,19 @@ async processWebhook(provider: string, rawBody: string, headers: Record<string, 
     if (!isValid) {
       throw new InvalidSignatureError()
     }
-    
+
     // 3. Parse event
     const event = adapter.parseWebhook(rawBody)
-    
+
     // 4. Process event
     await this.processWebhookEvent(provider, event, callback.id)
-    
+
     // 5. Mark processed
     await this.prisma.paymentCallback.update({
       where: { id: callback.id },
       data: { processed: true, processedAt: new Date() },
     })
-    
+
     return { ok: true }
   } catch (err) {
     // ⚠️ Не делаем retry автоматически — оставляем для cron reconcile
@@ -432,11 +467,11 @@ async reconcilePendingPayments() {
       createdAt: { lt: subMinutes(new Date(), 30) },
     },
   })
-  
+
   for (const request of pending) {
     const adapter = this.getAdapter(request.provider)
     const status = await adapter.checkDepositStatus(request.externalId)
-    
+
     if (status.status === 'completed') {
       await this.paymentsService.confirmDeposit(request.id)
     } else if (status.status === 'expired' || status.status === 'failed') {
@@ -500,20 +535,20 @@ async reconcilePendingPayments() {
 ```typescript
 async createDeposit(input: CreateDepositInput) {
   const kycStatus = await this.kycFacade.getStatus(input.userId)
-  
+
   if (kycStatus !== 'approved') {
     // Считаем RUB-эквивалент
     const totalDepositRub = await this.paymentsRepo.sumDepositsByUserSinceRegistration(input.userId)
-    
+
     const newTotalRub = money.add(totalDepositRub, await this.exchangeService.toRub(input.amount, input.currency))
-    
+
     if (newTotalRub.gt(env.KYC_DEPOSIT_LIMIT_RUB)) {
       throw new KycRequiredError(
         `KYC required. Limit: ${env.KYC_DEPOSIT_LIMIT_RUB} RUB, used: ${totalDepositRub} RUB`
       )
     }
   }
-  
+
   // ... создание депозита
 }
 ```
@@ -523,11 +558,11 @@ async createDeposit(input: CreateDepositInput) {
 ```typescript
 async createWithdrawal(input: CreateWithdrawalInput) {
   const kycStatus = await this.kycFacade.getStatus(input.userId)
-  
+
   if (kycStatus !== 'approved') {
     throw new KycRequiredError('Withdrawal requires KYC verification')
   }
-  
+
   // ... создание withdrawal
 }
 ```
@@ -543,31 +578,34 @@ async createWithdrawal(input: CreateWithdrawalInput) {
 Каждое действие логируется:
 
 ```typescript
-logger.info({
-  module: 'payments',
-  action: 'deposit_completed',
-  userId: input.userId,
-  provider: 'rukassa',
-  amount: input.amount,
-  currency: input.currency,
-  paymentRequestId: payment.id,
-  externalId: payment.externalId,
-}, 'Deposit completed')
+logger.info(
+  {
+    module: 'payments',
+    action: 'deposit_completed',
+    userId: input.userId,
+    provider: 'rukassa',
+    amount: input.amount,
+    currency: input.currency,
+    paymentRequestId: payment.id,
+    externalId: payment.externalId,
+  },
+  'Deposit completed',
+)
 ```
 
 Логируемые события:
 
-| Event | Level |
-|-------|-------|
-| `deposit_initiated` | info |
-| `deposit_completed` | info |
-| `deposit_failed` | warn |
-| `withdrawal_requested` | info |
-| `withdrawal_approved` | info |
-| `withdrawal_rejected` | info |
-| `webhook_received` | info |
-| `webhook_signature_invalid` | warn |
-| `idempotency_duplicate_hit` | warn |
+| Event                       | Level |
+| --------------------------- | ----- |
+| `deposit_initiated`         | info  |
+| `deposit_completed`         | info  |
+| `deposit_failed`            | warn  |
+| `withdrawal_requested`      | info  |
+| `withdrawal_approved`       | info  |
+| `withdrawal_rejected`       | info  |
+| `webhook_received`          | info  |
+| `webhook_signature_invalid` | warn  |
+| `idempotency_duplicate_hit` | warn  |
 
 ---
 
@@ -580,7 +618,7 @@ logger.info({
 @Injectable()
 export class NewProviderAdapter implements PaymentProvider {
   readonly name = 'newprovider' as const
-  
+
   async createDeposit(input: CreateDepositInput) { ... }
   async checkDepositStatus(externalId: string) { ... }
   // ...
