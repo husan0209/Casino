@@ -3,6 +3,12 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 ARG NEXT_PUBLIC_API_URL=https://casino.example.com/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# GAP-60: причина та же, что у web.prod.Dockerfile — образ не собирался ни разу
+# (CI до 2026-10-01 собирал только api.prod). .npmrc — hoisted-линковка, иначе
+# pnpm изолирует транзитивные зависимости; .eslintrc.js — корневой конфиг ESLint,
+# без него `next lint` в составе `next build` парсит .ts как скрипт (31 ошибка
+# «Parsing error: The keyword 'import' is reserved»).
+COPY .npmrc .eslintrc.js ./
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages ./packages
 COPY apps/admin ./apps/admin
