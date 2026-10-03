@@ -35,3 +35,15 @@ export class InvalidAdminCredentialsError extends AppError {
     super(m)
   }
 }
+/**
+ * В3: класс переехал из `admin-finance.controller.ts` в domain — бросает его
+ * теперь application use case (одобрение/отклонение вывода), а не контроллер.
+ * Код и текст сохранены 1-в-1: HTTP-контракт не менялся.
+ */
+export class WithdrawalInvalidStatusError extends AppError {
+  readonly code = 'WITHDRAWAL_INVALID_STATUS'
+  readonly httpStatus = 409
+  constructor() {
+    super('Заявка не найдена или уже обработана')
+  }
+}

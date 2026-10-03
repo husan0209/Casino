@@ -312,17 +312,28 @@ export interface GameActivityRepository {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Хеширование IP для антифрод-сигнатур (ТЗ ч.8 §6.2, §16).
+ * Хеширование IP и нормализация клиентских отпечатков (ТЗ ч.8 §6.2, §16).
  *
  * Порт живёт в domain, реализация — в infrastructure: use case'ам нужен сам
- * хеш, но знать про SHA-256 и соль им не положено. Главное — что реализация
- * ОБЯЗАНА быть единственной: если при записи клика и при проверке атрибуции
- * хеш считается по-разному, все антифрод-правила молча перестают работать.
- * Поэтому порт инъецируется в оба места.
+ * хеш и урезанные значения колонок, но знать про SHA-256, соль и длины
+ * схемы им не положено. Главное — что реализация ОБЯЗАНА быть единственной:
+ * если при записи клика и при проверке атрибуции хеш считается по-разному,
+ * все антифрод-правила молча перестают работать. Поэтому порт инъецируется
+ * в оба места.
+ *
+ * sanitizeUserAgent/extractRefererHost добавлены сюда же (В5): это та же
+ * нормализация отпечатков клиента с теми же единственно верными границами.
+ * Раньше track-click брал их как свободные функции напрямую из
+ * infrastructure — то есть знание о длинах колонок протекало в
+ * application-слой мимо контракта.
  */
 export interface IpFingerprinter {
   /** SHA-256 от нормализованного IP с солью. Сырой IP наружу не отдаётся. */
   hash(ip: string): string
+  /** User-Agent, урезанный до длины колонки; отсутствующий → null. */
+  sanitizeUserAgent(userAgent: string | null | undefined): string | null
+  /** ТОЛЬКО host из Referer: query с токенами в БД не уходит. Невалидный → null. */
+  extractRefererHost(referer: string | null | undefined): string | null
 }
 
 export const AFFILIATE_IP_FINGERPRINTER = Symbol('AFFILIATE_IP_FINGERPRINTER')
@@ -347,23 +358,36 @@ export const AFFILIATE_GAME_ACTIVITY_REPOSITORY = Symbol('AFFILIATE_GAME_ACTIVIT
  * affiliate не имеет права импортировать их репозитории или Prisma напрямую
  * (AI_DEVELOPMENT_RULES §3.2, правило no-restricted-imports в eslint).
  *
- * Два use case'а нуждаются в этом:
+ * Нужен трём сценариям:
  *  - регистрация партнёра — создать user-запись (на неё вешается кошелёк);
+ *  - ручное создание партнёра админом (UC-AFF-17) — та же провижининг-логика;
  *  - квалификация — проверить KYC (атрибуция не проходит без него).
  *
- * ADR-обоснование прямого read-only доступа — как у ADR GAP-51: таблицы
- * users/kyc_profiles читаются, но не изменяются, кроме создания user-записи
- * партнёра. Если позже понадобится полноценная интеграция, порт заменяется
- * на фасад соответствующего модуля без изменения вызывающего кода.
+ * ⚠️ GAP-62: ЧТЕНИЕ И ЗАПИСЬ ЗДЕСЬ НЕ РАВНОЦЕННЫ. ADR GAP-51 разрешает
+ * affiliate только ЧИТАТЬ чужие таблицы (`users`, `kyc_profiles`) через общий
+ * Prisma-клиент. `createPlayerUser`/`deletePlayerUser` — это WRITE в таблицу
+ * модуля `users`, и под GAP-51 они НЕ подпадают: это незарегистрированное
+ * нарушение границ, а не «обоснованный доступ». Убрать его нельзя, потому что
+ * `UsersFacade` не имеет ни создания, ни удаления учётной записи (см. список
+ * нужных методов в шапке
+ * `infrastructure/player-provisioning.prisma.repository.ts`). Порт держит эти
+ * два метода отдельно как точку, где нарушение будет снято одним переходом на
+ * фасад, когда владелец данных их появится.
  */
 export interface AffiliatePlayerProvisioningRepository {
-  /** Создать player-запись партнёра. Возвращает id для привязки affiliates.user_id. */
+  /**
+   * GAP-62 (WRITE в чужую таблицу `users`). Создать player-запись партнёра;
+   * id идёт в `affiliates.user_id`.
+   */
   createPlayerUser(args: { referralCode: string }): Promise<{ id: string }>
-  /** Удалить созданную user-запись (компенсация, если affiliate не создался). */
+  /**
+   * GAP-62 (WRITE в чужую таблицу `users`). Удалить созданную user-запись —
+   * компенсация, если affiliate не создался.
+   */
   deletePlayerUser(userId: string): Promise<void>
-  /** Свободен ли referral_code в users. */
+  /** READ (legally по GAP-51). Свободен ли referral_code в users. */
   isPlayerReferralCodeAvailable(code: string): Promise<boolean>
-  /** Пройдено ли KYC игрока (для квалификации атрибуции). */
+  /** READ (legally по GAP-51). Пройдено ли KYC игрока (для квалификации атрибуции). */
   isKycApproved(playerId: string): Promise<boolean>
 }
 

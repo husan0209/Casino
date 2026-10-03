@@ -15,6 +15,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import { type AffiliateTokenPayload, type IAffiliateJwtService } from '../domain/affiliate.ports'
 import {
   AffiliateCredentialsInvalidError,
   AffiliateJwtSecretInvalidError,
@@ -49,18 +50,8 @@ function expiresToSeconds(value: string | undefined, fallbackSeconds: number): n
   return parseInt(match[1], 10) * multiplier
 }
 
-/** Разобранный партнёрский токен. */
-export interface AffiliateTokenPayload {
-  sub: string
-  email: string
-  aud: string
-  iat: number
-  exp: number
-  iss: string
-}
-
 @Injectable()
-export class AffiliateJwtService {
+export class AffiliateJwtService implements IAffiliateJwtService {
   constructor(@Inject(ConfigService) private readonly config: ConfigService) {}
 
   private secret(): string {

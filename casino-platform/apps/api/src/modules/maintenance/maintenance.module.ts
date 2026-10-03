@@ -44,19 +44,27 @@ import { PaymentsModule } from '../payments/payments.module'
  * - expire-deposits (5 мин): pending-депозиты старше 2ч (крипто — по expires_at) → expired;
  * - update-rates (5 мин): курсы RUB → exchange_rates + Redis TTL 5 мин (потребители — GAP-34);
  * - withdrawal-reminder (1ч): письмо активным админам о выводах в pending >24ч (дедуп 24ч);
- * - referral-daily (24ч): запуск ReferralCalcService.runDaily (GAP-32; дедуп внутри).
+ * - referral-daily (24ч): запуск ReferralsFacade.runDaily (GAP-32; дедуп внутри).
  * Ручной триггер начислений — POST /admin/referrals/run-daily (superadmin, audit-log):
  * presentation-слой этого модуля (MaintenanceAdminController, решение В2; путь
  * сохранён после переезда из referrals).
  *
  * Зависимости: PaymentsModule — PaymentsFacade.estimateRub (курсы; В1: раньше
- * тянули NOWPaymentsClient напрямую), ReferralsModule — ReferralCalcService;
- * EMAIL_QUEUE_PORT — из QueuesModule.
+ * тянули NOWPaymentsClient напрямую), ReferralsModule — ReferralsFacade (В1:
+ * раньше тянули ReferralCalcService из application/), AdminModule — AdminFacade
+ * для трейла ручного запуска, EMAIL_QUEUE_PORT — из QueuesModule.
  * AdminModule/AuditLogService для напоминаний не нужен: дедуп/трейл пишутся
  * напрямую PrismaReminderAuditRepo (audit_logs).
  */
 @Module({
-  imports: [AuthModule, AdminModule, PaymentsModule, ReferralsModule, AffiliateModule, QueuesModule],
+  imports: [
+    AuthModule,
+    AdminModule,
+    PaymentsModule,
+    ReferralsModule,
+    AffiliateModule,
+    QueuesModule,
+  ],
   controllers: [MaintenanceAdminController],
   providers: [
     MaintenanceScheduler,

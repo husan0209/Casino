@@ -42,6 +42,19 @@ export class IpHasher implements IpFingerprinter {
     const normalized = normalizeIp(ip)
     return createHash('sha256').update(`${normalized}${this.salt}`).digest('hex')
   }
+
+  /**
+   * Делегирует свободной функции ниже: границы колонок должны иметь ОДНУ
+   * реализацию (В5) — иначе application и repository усекали бы UA по-разному.
+   */
+  sanitizeUserAgent(userAgent: string | null | undefined): string | null {
+    return sanitizeUserAgent(userAgent)
+  }
+
+  /** Делегирует свободной функции: в БД уходит только host, без query-токенов. */
+  extractRefererHost(referer: string | null | undefined): string | null {
+    return extractRefererHost(referer)
+  }
 }
 
 /** Приводит IP к каноническому виду; null/undefined → пустая строка (хеш «пустого»). */

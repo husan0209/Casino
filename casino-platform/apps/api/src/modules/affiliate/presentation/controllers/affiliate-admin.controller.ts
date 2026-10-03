@@ -34,11 +34,15 @@ import { type AdminActor } from '@/common/types/req-user'
 
 import { AdminFacade } from '@modules/admin/facade/admin.facade'
 
+import { type AffiliateProfileRow } from '@casino/shared-types'
+
 import { AdminAuthGuard } from '../../../admin/presentation/admin-auth.guard'
 import { Roles, RolesGuard } from '../../../auth/presentation/guards/roles.guard'
 import { AffiliateSettingsService } from '../../application/affiliate-settings.service'
 import { AffiliateDailyRunUseCase } from '../../application/use-cases/affiliate-daily-run.use-case'
 import { ClawbackPlayerCommissionsUseCase } from '../../application/use-cases/clawback-player-commissions.use-case'
+import { CreateAffiliateByAdminUseCase } from '../../application/use-cases/create-affiliate-by-admin.use-case'
+import { UpdateAffiliateByAdminUseCase } from '../../application/use-cases/update-affiliate-by-admin.use-case'
 import { AffiliateNotFoundError } from '../../domain/errors/affiliate.errors'
 import {
   AFFILIATE_ATTRIBUTION_REPOSITORY,
@@ -48,10 +52,7 @@ import {
   type AffiliateCommissionRepository,
   type AffiliateRepository,
 } from '../../domain/repositories/affiliate.repository'
-import {
-  parseRevShareRate,
-  revShareRateToPercent,
-} from '../../domain/value-objects/revshare-rate.value-object'
+import { revShareRateToPercent } from '../../domain/value-objects/revshare-rate.value-object'
 import {
   AffiliateListQuerySchema,
   CommissionListQuerySchema,
@@ -64,8 +65,6 @@ import {
   type CreateAffiliateAdminDto,
   type UpdateAffiliateAdminDto,
 } from '../dto/affiliate.dto'
-
-import type { AffiliateEntity } from '../../domain/entities/affiliate.entity'
 
 @UseGuards(AdminAuthGuard, RolesGuard)
 @Controller('admin/affiliate')
@@ -80,6 +79,12 @@ export class AffiliateAdminController {
     @Inject(AffiliateDailyRunUseCase) private readonly dailyRun: AffiliateDailyRunUseCase,
     @Inject(ClawbackPlayerCommissionsUseCase)
     private readonly clawback: ClawbackPlayerCommissionsUseCase,
+    // В3: записи партнёра делает application-слой; порты ниже остались только
+    // на чтение (списки, карточка, сводки).
+    @Inject(CreateAffiliateByAdminUseCase)
+    private readonly createPartnerUseCase: CreateAffiliateByAdminUseCase,
+    @Inject(UpdateAffiliateByAdminUseCase)
+    private readonly updatePartnerUseCase: UpdateAffiliateByAdminUseCase,
     @Inject(AdminFacade) private readonly audit: AdminFacade,
   ) {}
 
@@ -163,6 +168,9 @@ export class AffiliateAdminController {
   /**
    * Создание партнёра вручную (UC-AFF-17) — для оффлайн-партнёров,
    * пришедших по договору, без самостоятельной регистрации.
+   *
+   * В3: владение записью (своя user-запись партнёра, хеш пароля, уникальный
+   * tracking_code) — в `CreateAffiliateByAdminUseCase`.
    */
   @Post('partners')
   @Roles('admin', 'superadmin')
@@ -172,19 +180,13 @@ export class AffiliateAdminController {
     @CurrentUser() admin: AdminActor,
     @Req() request: Request,
   ): Promise<{ id: string; tracking_code: string; revshare_rate: string }> {
-    const created = await this.affiliates.create({
-      userId: admin.id,
+    const created = await this.createPartnerUseCase.execute({
       email: body.email,
-      passwordHash: '',
-      trackingCode: await this.affiliates.generateUniqueTrackingCode(),
-      revshareRate:
-        body.revshareRate !== undefined
-          ? parseRevShareRate(body.revshareRate)
-          : parseRevShareRate((await this.settings.get()).defaultRevshareRate),
+      password: body.password,
+      revshareRate: body.revshareRate,
       payoutCurrency: body.payoutCurrency,
-      displayName: body.displayName ?? null,
-      country: body.country ?? null,
-      isAgreed: true,
+      displayName: body.displayName,
+      country: body.country,
     })
     await this.audit.logAction({
       actorType: 'admin',
@@ -218,24 +220,28 @@ export class AffiliateAdminController {
     @CurrentUser() admin: AdminActor,
     @Req() request: Request,
   ): Promise<{ id: string; revshare_rate: string; status: string }> {
-    const before = await this.requireAffiliate(id)
-    const revshareRate =
-      body.revshareRate !== undefined ? parseRevShareRate(body.revshareRate) : undefined
-    const updated = await this.affiliates.update(id, { ...body, revshareRate })
+    const result = await this.updatePartnerUseCase.execute({ affiliateId: id, changes: body })
     await this.audit.logAction({
       actorType: 'admin',
       actorId: admin.id,
-      action: revshareRate !== undefined ? 'affiliate.rate.changed' : 'affiliate.partner.updated',
+      action: result.rateRequested ? 'affiliate.rate.changed' : 'affiliate.partner.updated',
       targetType: 'affiliate',
       targetId: id,
       payload: {
-        from: { revshareRate: before.revshareRate, status: before.status },
-        to: { revshareRate: updated.revshareRate, status: updated.status },
+        from: {
+          revshareRate: result.previous.revshareRate,
+          status: result.previous.status,
+        },
+        to: { revshareRate: result.affiliate.revshareRate, status: result.affiliate.status },
         reason: body.suspendedReason ?? null,
       },
       ipAddress: request.ip,
     })
-    return { id: updated.id, revshare_rate: updated.revshareRate, status: updated.status }
+    return {
+      id: result.affiliate.id,
+      revshare_rate: result.affiliate.revshareRate,
+      status: result.affiliate.status,
+    }
   }
 
   /** Настройки программы: ставка по умолчанию, пороги, флаги (UC-AFF-21). */
@@ -496,7 +502,7 @@ export class AffiliateAdminController {
     }
   }
 
-  private async requireAffiliate(id: string): Promise<AffiliateEntity> {
+  private async requireAffiliate(id: string): Promise<AffiliateProfileRow> {
     const affiliate = await this.affiliates.findById(id)
     if (affiliate === null) {
       throw new AffiliateNotFoundError(id)

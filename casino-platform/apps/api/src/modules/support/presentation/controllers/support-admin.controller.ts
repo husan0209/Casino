@@ -18,28 +18,45 @@ import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 import { Roles, RolesGuard } from '@modules/auth/presentation/guards/roles.guard'
 import {
   type ISupportRepository,
-  type MessageRow,
   SUPPORT_REPOSITORY,
+} from '@modules/support/domain/repositories/support.repository'
+
+import {
+  type MessageRow,
   type TicketCategory,
   type TicketListItem,
   type TicketPriority,
   type TicketStatus,
-} from '@modules/support/domain/repositories/support.repository'
+} from '@casino/shared-types'
 
+import { AssignTicketUseCase } from '../../application/use-cases/assign-ticket.use-case'
 import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
 import { GetTicketUseCase } from '../../application/use-cases/get-ticket.use-case'
 import { SendMessageUseCase } from '../../application/use-cases/send-message.use-case'
-import { AddAdminMessageSchema, AssignTicketSchema, SetPrioritySchema } from '../dto/support.dto'
+import { SetTicketPriorityUseCase } from '../../application/use-cases/set-ticket-priority.use-case'
+import {
+  AddAdminMessageSchema,
+  AssignTicketSchema,
+  SetPrioritySchema,
+  type AssignTicketDto,
+  type SetPriorityDto,
+} from '../dto/support.dto'
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
 @Controller('admin/support')
 export class SupportAdminController {
   constructor(
+    // PORT используется ТОЛЬКО для чтения списков (В3: записи из
+    // presentation убраны, они ушли в use-cases ниже).
     @Inject(SUPPORT_REPOSITORY) private readonly supportRepo: ISupportRepository,
     @Inject(GetTicketUseCase) private readonly getTicketUseCase: GetTicketUseCase,
     @Inject(SendMessageUseCase) private readonly sendMessageUseCase: SendMessageUseCase,
     @Inject(CloseTicketUseCase) private readonly closeTicketUseCase: CloseTicketUseCase,
+    @Inject(AssignTicketUseCase)
+    private readonly assignTicketUseCase: AssignTicketUseCase,
+    @Inject(SetTicketPriorityUseCase)
+    private readonly setTicketPriorityUseCase: SetTicketPriorityUseCase,
   ) {}
 
   @Get('tickets')
@@ -115,20 +132,24 @@ export class SupportAdminController {
   @UsePipes(new ZodValidationPipe(AssignTicketSchema))
   async assign(
     @Param('id') ticketId: string,
-    @Body() dto: { admin_id?: string },
+    @Body() dto: AssignTicketDto,
   ): Promise<{ ok: boolean }> {
-    await this.supportRepo.assign(ticketId, dto.admin_id || null)
-    return { ok: true }
+    return await this.assignTicketUseCase.execute({
+      ticketId,
+      adminId: dto.admin_id ?? null,
+    })
   }
 
   @Patch('tickets/:id/priority')
   @UsePipes(new ZodValidationPipe(SetPrioritySchema))
   async priority(
     @Param('id') ticketId: string,
-    @Body() dto: { priority: string },
+    @Body() dto: SetPriorityDto,
   ): Promise<{ ok: boolean }> {
-    await this.supportRepo.setPriority(ticketId, dto.priority as TicketPriority)
-    return { ok: true }
+    return await this.setTicketPriorityUseCase.execute({
+      ticketId,
+      priority: dto.priority,
+    })
   }
 
   @Post('tickets/:id/close')

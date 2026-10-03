@@ -2,7 +2,7 @@
 title: Module Boundaries
 description: Границы между модулями backend casino-platform
 status: living document
-last_updated: 2026-09-28
+last_updated: 2026-10-03
 ---
 
 # Module Boundaries
@@ -90,6 +90,11 @@ admin (§12); отдельных каталогов под них нет.
 - `AuthGuard`, `RolesGuard` (+ декоратор `Roles`) — `auth/presentation/guards/`
 - `JwtTokenService` — выпуск/верификация access+refresh (exports из `auth.module.ts`)
 - NB: `CurrentUser` decorator живёт вне модуля — `apps/api/src/common/decorators/current-user.decorator.ts`
+- Публичный API без фасада (решение В6.1): guard'ы аутентификации импортируют
+  напрямую из других модулей — это узаконено, а не исключение из правила.
+  Фасада у `auth` нет, потому что межмодульного контура, кроме guard'ов, у него
+  нет (§16.2). Гард G16 (`tech-debt/cross-module-imports.txt`) такие импорты не
+  считает: детектор исключает пути, оканчивающиеся на `.guard` и `.facade`.
 
 ---
 
@@ -439,7 +444,8 @@ referral_rewards                (period, ggr, reward_amount, status)
 - `admin` (admin-API `ReferralsAdminController` — `GET /admin/referrals`,
   `GET /admin/referrals/stats`; ручной триггер `POST /admin/referrals/run-daily`
   переехал в maintenance presentation, §18 — решение В2, путь/контракт сохранены)
-- `maintenance` (job `referral-daily` запускает `ReferralCalcService.runDaily`, §18)
+- `maintenance` (job `referral-daily` и ручной триггер зовут
+  `ReferralsFacade.runDaily` — фасад referrals, решение В1; §18)
 
 ---
 
@@ -637,7 +643,31 @@ audit_logs          (actor_type, actor_id, action, target_type, target_id, paylo
 - `wallet` (WalletFacade — manual credit/debit)
 - Собственные репозитории к admin_users, audit_logs, dashboard, payment_requests
   (`PaymentRequestRepository` провайдится локально — прямой доступ к таблице payments)
-- Экспортирует наружу: `AuditLogService`, `AdminAuthGuard`, `AdminAuthService`
+
+### 13.2.1. Публичный API (наружу из `AdminModule`, exports)
+
+- `AdminFacade` (`admin/facade/admin.facade.ts`) — **санкционированный путь** для
+  записи аудита из других модулей: `logAction(input)` оборачивает
+  `AuditLogService.log` и не роняет операцию при сбое журнала. Потребители:
+  `affiliate` (affiliate-admin), `maintenance` (ручной триггер run-daily).
+- `AdminAuthGuard` (`admin/presentation/admin-auth.guard`) — публичный API по
+  решению **В6.1** (guards аутентификации = exports модуля, §16.2). Импортируют
+  напрямую: `kyc` (`KycAdminController`), `affiliate` (`AffiliateAdminController`).
+  Отдельного фасада под guard нет: guard — это middleware-контракт, а не
+  бизнес-операция.
+- `AdminAuthService` — экспорт нужен, потому что `AdminAuthGuard` инжектит его:
+  без экспорта DI в `KycModule` не резолвится (E2E, PR #15).
+- `AuditLogService` — **legacy-экспорт**: исторически его импортировал
+  `MaintenanceAdminController` напрямую (долг был заморожен в
+  `tech-debt/cross-module-imports.txt`). После В1/В6 maintenance перешёл на
+  `AdminFacade.logAction`, и сервис из exports можно убрать в PR, который трогает
+  `admin/**` (сейчас не удалён — `admin.module.ts` вне объёма этой задачи;
+  удаление надо проверять на E2E с БД, а не только на typecheck).
+
+⚠️ Гард G16 (`tech-debt/cross-module-imports`) **не считает** импорты,
+оканчивающиеся на `.guard` и `.facade`, — то есть `AdminAuthGuard` и все фасады
+формально «невидимы» для детектора. Легальность этих межмодульных импортов
+обеспечивает этот раздел (§13.2.1) и §16.2, а не гард.
 
 ---
 
@@ -714,7 +744,8 @@ admin         → wallet              (WalletFacade — manual credit/debit)
 
 health        → (standalone: readiness проверяет db/redis)
 
-maintenance   → referrals           (ReferralCalcService.runDaily — job referral-daily)
+maintenance   → referrals           (ReferralsFacade.runDaily — job referral-daily)
+              → admin               (AdminFacade.logAction — аудит ручного run-daily)
               → affiliate           (AffiliateFacade.runDaily + 3 affiliate-джоба)
               → queues              (BullMQ-очередь `maintenance`: scheduler + worker; EMAIL_QUEUE_PORT)
               → payments            (NOWPaymentsClient — импорт клиента курсов)
@@ -739,9 +770,28 @@ maintenance   → referrals           (ReferralCalcService.runDaily — job refe
 - Только через **DI** (не импорт напрямую)
 - «Facade» на практике = exported Nest-provider модуля: `UsersFacade`,
   `WalletFacade`, `GeoFacade`, а также сервисы-фасады без суффикса
-  (`KycCheckService`, `ReferralCalcService`, `AuditLogService`,
-  `NotificationService`, `ProviderAdapterFactory`)
+  (`KycCheckService`, `AuditLogService`, `NotificationService`,
+  `ProviderAdapterFactory`)
 - В Nest-DI экспорт модуля регистрирует провайдер, импортирующий модуль инжектит его (отдельного DiContainer-файла в коде нет)
+
+**Сколько фасадов нужно модулю (решение В1, 2026-10):** фасад обязателен модулю,
+который **потребляется извне**, а не «один фасад на каждый модуль». Критерий —
+греп по импортам `modules/<mod>/{domain,application,infrastructure,presentation,facade}/`
+из чужих модулей: есть потребитель → фасад нужен; нет → фасада нет, и это не
+нарушение. Так из 14 модулей фасады есть у 8 (`admin`, `affiliate`, `geo`, `kyc`,
+`payments`, `referrals`, `users`, `wallet`), а `casino`/`health`/`maintenance`/
+`notifications`/`support` не импортирует никто — заводить там файл-формальность
+значит получить 5 лишних мест дрейфа при нулевой выгоде по ограничениям.
+`auth` — частный случай: его дёргают извне только ради guard'ов, а guard'ы и есть
+его публичный API (В6.1), поэтому фасада у него нет.
+
+**Публичный API без фасада — guard'ы аутентификации (решение В6.1):**
+`AuthGuard`/`RolesGuard` (§2.5), `AdminAuthGuard` (§13.2.1),
+`AffiliateAuthGuard` (§9a) — узаконенные межмодульные импорты. Гард G16
+(`tech-debt/cross-module-imports.txt`) исключает пути, оканчивающиеся на
+`.guard` и `.facade`, поэтому такие импорты в долг не попадают **и не
+проверяются автоматически** — они легализованы именно этим текстом, а не
+«молча» остаются серой зоной.
 
 ### 16.3. Запрещено
 
@@ -777,7 +827,9 @@ maintenance   → referrals           (ReferralCalcService.runDaily — job refe
    ├── {name}.module.ts
    ```
 5. [ ] Prisma schema добавить в `packages/database/`
-6. [ ] Реализовать Facade для общения извне
+6. [ ] Реализовать Facade для общения извне — **только если модуль кто-то
+       импортирует** (правило §16.2, решение В1); модуль без внешних потребителей
+       фасада не имеет
 7. [ ] Написать unit-тесты
 8. [ ] Обновить этот файл — добавить модуль в карту
 
@@ -830,8 +882,10 @@ apps/api/src/modules/maintenance/maintenance.module.ts
 
 ### 18.4. Использует
 
-- `referrals` (ReferralCalcService — job `referral-daily` и ручной триггер)
-- `admin` (AuditLogService — audit-log ручного триггера run-daily)
+- `referrals` (ReferralsFacade.runDaily — job `referral-daily` и ручной триггер;
+  В1: до фасада тянули `ReferralCalcService` из `referrals/application/`)
+- `admin` (AdminFacade.logAction — audit-log ручного триггера run-daily; В6:
+  до этого — прямой импорт `AuditLogService`)
 - `queues` (BullMQ-планирование; EMAIL_QUEUE_PORT — письмо админам)
 - `payments` (NOWPaymentsClient — источник курсов; прямой импорт клиента
   из `payments/infrastructure/clients/`)
@@ -856,6 +910,6 @@ admin_users          (email активных админов)
 - Ручной триггер реферальных начислений — `POST /admin/referrals/run-daily`
   (`MaintenanceAdminController`, presentation maintenance; решение В2 — переехал
   из referrals-модуля, путь/guards/контракт сохранены; superadmin; audit-log
-  через `AuditLogService`), job `referral-daily` — его же автоматический запуск
+  через `AdminFacade.logAction`), job `referral-daily` — его же автоматический запуск
 - Все джобы идемпотентны: повторный тик не создаёт дублей (условные update,
   дедуп-окна, deleteMany по условию)
