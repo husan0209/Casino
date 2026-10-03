@@ -1,5 +1,5 @@
 critical	0
 high	0
-moderate	1
-low	2
+moderate	0
+low	0
 info	0
