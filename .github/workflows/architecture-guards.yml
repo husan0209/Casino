@@ -182,30 +182,23 @@ jobs:
           echo "✅ G6 OK"
 
       # ──────────────────────────────────────────────────────────────
-      # G. Wallet ledger methods must use Serializable isolation
-      # Catches: docs/archive/audit-2026-08-25.md §H1 (lock/unlock without Serializable)
-      # Rule: docs/AI_DEVELOPMENT_RULES.md §7.2
+      # G. Денежная операция кошелька идёт ТОЛЬКО через примитиву
+      #    runWalletTransaction: pg_advisory_xact_lock ДО первого чтения +
+      #    ReadCommitted + повтор при конфликте (ADR GAP-57).
+      # Catches: docs/archive/audit-2026-08-25.md §H1 и откат GAP-57
+      #          (возврат Serializable → P2034 → 69% отказов ставок).
+      # WHY: прежняя редакция была вакуумной — она считала `$transaction` и
+      #      `Serializable` в wallet.ledger.prisma.ts, где вызовов
+      #      `$transaction` 0 (код переехал в wallet-transaction-lock.ts и
+      #      wallet-transaction-runner.prisma.ts), а `if [ -f "$FILE" ]` молча
+      #      пропускал гард при удалении файла. Гард был зелёным всегда.
+      # NOTE: детектор — scripts/check-wallet-money-invariant.sh (анти-вакуум:
+      #      нет файла / нет обязательного совпадения = FAIL, не skip; печатает
+      #      список проверенных инвариантов). Работоспособность доказана G25.
       # ──────────────────────────────────────────────────────────────
-      - name: G7 — wallet ops use Serializable + retry
+      - name: G7 — wallet money ops go through the locking primitive
         id: g7
-        run: |
-          # Реальный код леджера: infrastructure/ledger/ (repositories/wallet.prisma.ts
-          # не существует — до 2026-09 гард молча но-op'ил). Паттерн в ОДИНАРНЫХ
-          # кавычках: в двойных bash съедает \$ и grep всегда возвращал 0.
-          FILE="apps/api/src/modules/wallet/infrastructure/ledger/wallet.ledger.prisma.ts"
-          if [ -f "$FILE" ]; then
-            TXNS=$(grep -c 'prisma\.\$transaction' "$FILE" 2>/dev/null || true)
-            SERIALS=$(grep -c 'isolationLevel.*Serializable' "$FILE" 2>/dev/null || true)
-            TXNS=${TXNS:-0}; SERIALS=${SERIALS:-0}
-            if [ "$TXNS" -gt "$SERIALS" ]; then
-              echo "❌ G7 FAIL: $FILE has $TXNS \$transaction calls but only $SERIALS use Serializable."
-              echo "   See docs/archive/audit-2026-08-25.md §H1."
-              echo "   Every financial \$transaction must use { isolationLevel: 'Serializable' }"
-              echo "   and retry OptimisticLockError up to 3 times."
-              exit 1
-            fi
-          fi
-          echo "✅ G7 OK"
+        run: sh scripts/check-wallet-money-invariant.sh
 
       # ──────────────────────────────────────────────────────────────
       # H. KYC upload must have fileFilter (MIME whitelist)
@@ -439,6 +432,35 @@ jobs:
         id: g23
         run: sh scripts/check-prod-build-args.sh
 
+      # ──────────────────────────────────────────────────────────────
+      # S. Чужие записи Prisma (ratchet): write по модели, владельцем которой
+      #    модуль НЕ является. ЧТЕНИЯ (find*/count/aggregate/groupBy) не
+      #    считаются — ADR GAP-51 легализует read-only межмодульный доступ.
+      # Catches: GAP-62 (affiliate писал в users) и любые новые чужие мутации;
+      #          карта владения MODEL_OWNERS в scripts/bin/tech-debt — источник
+      #          истины, пополняется при добавлении модели (иначе детектор
+      #          отказывается работать: exit 2, а не молчаливый пропуск).
+      # Rule: docs/AI_DEVELOPMENT_RULES.md §4, docs/MODULE_BOUNDARIES.md
+      # Реестр: docs/TECH_DEBT.md (строка G24), базлайн tech-debt/foreign-writes.txt
+      - name: G24 — no writes into foreign Prisma tables (ratchet)
+        id: g24
+        run: sh scripts/bin/tech-debt check foreign-writes
+
+      # ──────────────────────────────────────────────────────────────
+      # T. Анти-вакуум: каждый гард обязан доказать, что краснеет.
+      # Catches: ровно то, из-за чего G7 умер молча (зелёный гард, который
+      #          ничего не проверяет). В temp-дереве кладётся файл-ловушка /
+      #          портится примитива, прогонятся ТЕ ЖЕ детекторы (G7 и G24), и
+      #          требуется ненулевой exit-code с фирменной сигнатурой отказа;
+      #          параллельно проверяется, что на чистом дереве и на легальных
+      #          ЧТЕНИЯХ гарды зелёные (иначе «красный» гард ничего не стоит).
+      # Rule: docs/QUALITY_GATES.md §3.6
+      # NOTE: рабочий код не меняется — сценарии живут в копиях дерева.
+      # ──────────────────────────────────────────────────────────────
+      - name: G25 — guards prove they fail (anti-vacuum selftest)
+        id: g25
+        run: sh scripts/bin/guard-selftest
+
       # ── Final summary ─────────────────────────────────────────────
       - name: Summary
         if: always()
@@ -450,7 +472,7 @@ jobs:
           echo "- G4  Zod on controllers:  ${{ steps.g4.outcome }}"
           echo "- G5  webhook raw body:    ${{ steps.g5.outcome }}"
           echo "- G6  status match safe:   ${{ steps.g6.outcome }}"
-          echo "- G7  wallet Serializable: ${{ steps.g7.outcome }}"
+          echo "- G7  wallet money primitive: ${{ steps.g7.outcome }}"
           echo "- G8  KYC fileFilter:      ${{ steps.g8.outcome }}"
           echo "- G9  cookie secure:       ${{ steps.g9.outcome }}"
           echo "- G10 docker non-root:     ${{ steps.g10.outcome }}"
@@ -467,3 +489,5 @@ jobs:
           echo "- G21 use-case specs rat.:  ${{ steps.g21.outcome }}"
           echo "- G22 explicit Nest DI:     ${{ steps.g22.outcome }}"
           echo "- G23 NEXT_PUBLIC_ args:    ${{ steps.g23.outcome }}"
+          echo "- G24 foreign writes ratch.: ${{ steps.g24.outcome }}"
+          echo "- G25 anti-vacuum selftest: ${{ steps.g25.outcome }}"
