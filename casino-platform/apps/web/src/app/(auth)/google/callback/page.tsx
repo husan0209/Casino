@@ -2,10 +2,11 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, Suspense } from 'react'
 
-import { exchangeGoogleCode } from '@/components/auth/OAuthButtons'
+import { exchangeGoogleCode } from '@/components/auth/oauth'
 import { toast } from '@/components/ui/toaster'
 import { errText, setAccessToken } from '@/lib/api'
 import { type AuthState, useAuth } from '@/stores/auth'
+import { useUIStore } from '@/stores/ui'
 
 /**
  * Callback Google OAuth (pre-launch: ТЗ ч.2 UC-AUTH-08). Google возвращает
@@ -30,7 +31,11 @@ function GoogleCallbackInner(): React.JSX.Element {
       .catch((err: unknown) => {
         setStatus('Не удалось войти через Google')
         toast.error(errText(err) || 'Ошибка OAuth-входа')
-        setTimeout(() => router.push('/login'), 1600)
+        // §5: страницы входа нет — открываем лист на исходном экране.
+        setTimeout(() => {
+          useUIStore.getState().openLogin(undefined, 'login')
+          router.replace('/')
+        }, 1600)
       })
   }, [router, setSession])
 

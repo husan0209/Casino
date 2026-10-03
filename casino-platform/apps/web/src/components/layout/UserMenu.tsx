@@ -1,6 +1,6 @@
 'use client'
 
-import { History, LogOut, Settings, User, Wallet } from 'lucide-react'
+import { Handshake, History, LogOut, MessageCircle, Settings, User, Wallet } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
@@ -9,8 +9,12 @@ import { useAuth } from '@/stores/auth'
 
 /**
  * ТЗ ч.5.1 §2 пр.9: тап по аватарке → dropdown-меню.
- * Пункты: Профиль · Мои кошельки · История игр · Настройки · Выйти.
- * KYC-пункт — только если статус блокирует вывод/лимит (не в MVP).
+ * Пункты: Профиль · Мои кошельки · История игр · Партнёрская программа ·
+ * Поддержка · Настройки · Выйти. KYC-пункт — только если статус блокирует
+ * вывод/лимит (не в MVP). Партнёрская программа (ТЗ ч.8, /affiliate) и
+ * поддержка (§15, /support) живут в меню и в профиле: на телефоне
+ * десктоп-панели нет (§4.5), а таб-бар фиксирован четырьмя игровыми
+ * пунктами (§4.3) — кабинетные/сервисные разделы не повседневные пути.
  */
 
 interface MenuItem {
@@ -23,6 +27,8 @@ const MENU_ITEMS: MenuItem[] = [
   { href: '/profile', label: 'Профиль', icon: <User size={16} aria-hidden /> },
   { href: '/wallet', label: 'Мои кошельки', icon: <Wallet size={16} aria-hidden /> },
   { href: '/history', label: 'История игр', icon: <History size={16} aria-hidden /> },
+  { href: '/affiliate', label: 'Партнёрская программа', icon: <Handshake size={16} aria-hidden /> },
+  { href: '/support', label: 'Поддержка', icon: <MessageCircle size={16} aria-hidden /> },
   { href: '/profile?tab=settings', label: 'Настройки', icon: <Settings size={16} aria-hidden /> },
 ]
 

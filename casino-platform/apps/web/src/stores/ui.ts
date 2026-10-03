@@ -23,8 +23,12 @@ export interface GamePreviewOptions {
   onToggleFavorite?: ((game: GameDto) => void) | undefined
 }
 
+/** §5: единый лист авторизации — вход и регистрация, отдельные страницы больше нет. */
+export type LoginSheetMode = 'login' | 'register'
+
 interface UIState {
   loginSheet: boolean
+  loginSheetMode: LoginSheetMode
   depositSheet: boolean
   /** GAP-55 (з) §10.3/§16.1: касса вывода — глобальный sheet (открывается и поверх игры). */
   withdrawSheet: boolean
@@ -35,7 +39,7 @@ interface UIState {
   gamePreview: GamePreviewOptions | null
   pendingGameSlug: string | null
   depositCurrency?: string | undefined
-  openLogin: (gameSlug?: string) => void
+  openLogin: (gameSlug?: string, mode?: LoginSheetMode) => void
   closeLogin: () => void
   openDeposit: (currency?: string) => void
   closeDeposit: () => void
@@ -51,6 +55,7 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
   loginSheet: false,
+  loginSheetMode: 'login',
   depositSheet: false,
   withdrawSheet: false,
   walletSwitcher: false,
@@ -58,7 +63,8 @@ export const useUIStore = create<UIState>((set) => ({
   launchCurrencyOptions: null,
   gamePreview: null,
   pendingGameSlug: null,
-  openLogin: (gameSlug) => set({ loginSheet: true, pendingGameSlug: gameSlug ?? null }),
+  openLogin: (gameSlug, mode) =>
+    set({ loginSheet: true, loginSheetMode: mode ?? 'login', pendingGameSlug: gameSlug ?? null }),
   closeLogin: () => set({ loginSheet: false }),
   openDeposit: (currency) => set({ depositSheet: true, depositCurrency: currency }),
   closeDeposit: () => set({ depositSheet: false, depositCurrency: undefined }),
