@@ -6,15 +6,15 @@
  * вызова). Реальная логика тут в одном месте — `getWithTotalDeposited`:
  *  - для несуществующего профиля money-запрос обязан НЕ выполняться;
  *  - сумма депозитов проходит наружу СТРОКОЙ без приведения к number;
- *  - при отказе money-запроса карточка всё равно отдаётся, а сумма молча
- *    становится '0'. Это зафиксированное текущее поведение, а не одобрение:
- *    модератор не может отличить «депозитов не было» от «БД не ответила», и
- *    на этом основании можно одобрить KYC. См. раздел «Подозрения» в отчёте
- *    — менять поведение в рамках тестовой задачи нельзя.
+ *  - при отказе money-запроса карточка НЕ отдаётся: ошибка уходит вверх
+ *    доменным `KycDepositTotalUnavailableError` (503). Раньше отказ БД
+ *    прятался за `.catch(() => '0')`, и модератор видел «ноль депозитов» —
+ *    по выдуманным данным approving KYC можно было выпустить средства.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { KycAdminService } from '../src/modules/kyc/application/use-cases/kyc-admin.service'
+import { KycDepositTotalUnavailableError } from '../src/modules/kyc/domain/errors'
 
 import type {
   IKycRepository,
@@ -77,14 +77,28 @@ describe('KycAdminService.getWithTotalDeposited — карточка модер�
     expect(card?.profile).toEqual(profileRow)
   })
 
-  it('отказ money-запроса: карточка отдаётся, сумма молча становится нулём', async () => {
-    // Arrange — fail-soft: модератор продолжит разбор, но не увидит разницы
+  it('отказ money-запроса: карточка НЕ отдаётся, вверх идёт доменный 503 (fail-closed)', async () => {
+    // Arrange — БД не ответила про депозиты; «ноль» выглядел бы как данные
     getTotalDepositedRub.mockRejectedValue(new Error('payments unreadable'))
-    // Act
-    const card = await service.getWithTotalDeposited(PROFILE_ID)
-    // Assert — текущее поведение зафиксировано намеренно (см. шапку файла)
-    expect(card?.totalDepositedRub).toBe('0')
-    expect(card?.profile).toEqual(profileRow)
+    // Act/Assert — модератор обязан увидеть ошибку, а не выдуманное основание
+    // для одобрения KYC (прежнее `.catch(() => '0')` маскировало отказ под данные)
+    await expect(service.getWithTotalDeposited(PROFILE_ID)).rejects.toBeInstanceOf(
+      KycDepositTotalUnavailableError,
+    )
+    await expect(service.getWithTotalDeposited(PROFILE_ID)).rejects.toMatchObject({
+      code: 'KYC_DEPOSIT_TOTAL_UNAVAILABLE',
+      httpStatus: 503,
+    })
+  })
+
+  it('профиль не отдаётся даже частично при отказе сумм (ни totalDepositedRub, ни profile)', async () => {
+    // Arrange — ответ карточки целиком под вопросом: частичный профиль без
+    // цифр открывает кнопку «одобрить» в админке
+    getTotalDepositedRub.mockRejectedValue(new Error('connection reset'))
+    // Act/Assert
+    await expect(service.getWithTotalDeposited(PROFILE_ID)).rejects.toThrow(
+      KycDepositTotalUnavailableError,
+    )
   })
 
   it('userId профиля, а не id карточки, уходит в запрос сумм', async () => {

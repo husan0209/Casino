@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 
+import { errorMessage } from '@/common/utils/error-message'
 import { EMAIL_QUEUE_PORT, type EmailQueuePort } from '@/queues/queue.types'
 import { renderNotificationEmail } from '@/queues/templates'
 
@@ -8,6 +9,7 @@ import {
   type CreateNotificationInput,
   type INotificationRepository,
   type NotificationRow,
+  type UserEmailSettingsRow,
 } from '../domain/notification.repository'
 
 @Injectable()
@@ -34,36 +36,76 @@ export class NotificationService {
       message: input.message,
       data: (input.data ?? {}) as CreateNotificationInput['data'],
     }
-    const n = await this.repo.create(createData)
+    const notification = await this.repo.create(createData)
     if ((input.channel ?? 'internal') === 'email') {
-      // Check user settings before queuing email
-      const settings = await this.repo.findUserSettings(input.userId).catch(() => null)
-      const emailEnabled = settings?.notificationsEmail ?? true
-      if (!emailEnabled) {
-        this.logger.log(`Email notification ${n.id} skipped – user ${input.userId} disabled email`)
-      } else {
-        const email = await this.repo.findUserEmail(input.userId)
-        if (!email) {
-          this.logger.warn(
-            `Email notification ${n.id}: у пользователя ${input.userId} нет email – пропущено`,
-          )
-        } else {
-          // UC-NOTIF-01: постановка в очередь; sentAt проставит EmailWorker после фактической отправки
-          // GAP-02 post-MVP: html — брендированный шаблон (раньше в html уходил сырой text)
-          const mail = renderNotificationEmail({ title: input.title, message: input.message })
-          await this.emailQueue.enqueue({
-            to: email,
-            subject: mail.subject,
-            text: mail.text,
-            html: mail.html,
-            notificationId: n.id,
-          })
-        }
-      }
+      await this.dispatchEmail(notification, input)
     } else {
-      await this.repo.markSent(n.id, new Date())
+      await this.repo.markSent(notification.id, new Date())
     }
-    return n
+    return notification
+  }
+
+  /**
+   * Email-канал уведомления: проверка отказа от рассылок (fail-closed) и
+   * постановка в очередь. UC-NOTIF-01: sentAt проставит EmailWorker после
+   * фактической отправки, поэтому здесь он не выставляется.
+   */
+  private async dispatchEmail(
+    notification: NotificationRow,
+    input: { userId: string; title: string; message: string },
+  ): Promise<void> {
+    if (!(await this.isEmailDeliveryAllowed(notification.id, input.userId))) {
+      return
+    }
+    const email = await this.repo.findUserEmail(input.userId)
+    if (!email) {
+      this.logger.warn(
+        `Email notification ${notification.id}: у пользователя ${input.userId} нет email – пропущено`,
+      )
+      return
+    }
+    // GAP-02 post-MVP: html — брендированный шаблон (раньше в html уходил сырой text)
+    const mail = renderNotificationEmail({ title: input.title, message: input.message })
+    await this.emailQueue.enqueue({
+      to: email,
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
+      notificationId: notification.id,
+    })
+  }
+
+  /**
+   * Fail-closed проверка opt-out (compliance): отправка необратима, поэтому
+   * сбой чтения настроек НЕ должен превращаться в «разрешено» — письмо
+   * не уходит, факт пишется в лог (Pino через Logger).
+   *
+   * Отсутствие строки настроек — не сбой, а «явного отказа нет»: отписаться
+   * можно только записав строку (users/userSettings upsert), значит действует
+   * schema-default `notifications_email = true`.
+   */
+  private async isEmailDeliveryAllowed(notificationId: string, userId: string): Promise<boolean> {
+    let settings: UserEmailSettingsRow | null
+    try {
+      settings = await this.repo.findUserSettings(userId)
+    } catch (error) {
+      this.logger.error(
+        `Email notification ${notificationId}: настройки уведомлений пользователя ${userId} не прочитаны (${errorMessage(
+          error,
+        )}) — письмо НЕ отправлено (fail-closed)`,
+      )
+      return false
+    }
+    if (!settings) {
+      return true
+    }
+    if (settings.notificationsEmail === false) {
+      this.logger.log(
+        `Email notification ${notificationId} skipped – user ${userId} disabled email`,
+      )
+      return false
+    }
+    return true
   }
 
   async list(args: {
