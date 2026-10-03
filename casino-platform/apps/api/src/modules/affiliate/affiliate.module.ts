@@ -8,10 +8,14 @@
  * ЗАВИСИМОСТИ.
  *  - wallet  — единственный способ зачислить/списать комиссию.
  *  - users   — порт ResponsibleGamingHook (users объявляет порт, реализацию
- *              поставляем мы; обратной зависимости нет, цикла нет) И ⚠️ GAP-62:
- *              провижининг user-записи партнёра идёт прямой записью в таблицу
- *              `users`, потому что `UsersFacade` не умеет ни создавать, ни
- *              удалять учётную запись. Нарушение ADR локализовано и описано в
+ *              поставляем мы; обратной зависимости нет, цикла нет) И провижининг
+ *              user-записи партнёра: `UsersFacade.provisionAffiliatePlayer` /
+ *              `deprovisionAffiliatePlayer` (GAP-62 закрыт 2026-10-03 — запись
+ *              в чужую таблицу `users` возвращена владельцу, межмодульное
+ *              общение идёт только через фасад). В порту
+ *              AFFILIATE_PLAYER_PROVISIONING_REPOSITORY остались только
+ *              ЧТЕНИЯ чужих таблиц (referral_code, kyc_profiles) — они
+ *              легализованы ADR GAP-51 и описаны в шапке
  *              `infrastructure/player-provisioning.prisma.repository.ts`.
  *  - auth    — AuthGuard/RolesGuard по конвенции модулей (MODULE_BOUNDARIES §2.4).
  */
@@ -83,6 +87,9 @@ import { AffiliateAuthGuard } from './presentation/guards/affiliate-auth.guard'
     { provide: AFFILIATE_COMMISSION_REPOSITORY, useClass: PrismaAffiliateCommissionRepository },
     { provide: AFFILIATE_GAME_ACTIVITY_REPOSITORY, useClass: PrismaGameActivityRepository },
     { provide: AFFILIATE_SETTINGS_REPOSITORY, useClass: PrismaAffiliateSettingsRepository },
+    // После GAP-62 порт только читает чужие таблицы (referral_code / kyc),
+    // поэтому реализация остаётся: Prisma-чтения наружу через фасад users
+    // не проходят (kyc_profiles — не таблица users).
     {
       provide: AFFILIATE_PLAYER_PROVISIONING_REPOSITORY,
       useClass: PrismaPlayerProvisioningRepository,

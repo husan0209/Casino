@@ -1,6 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common'
 
+import { DeprovisionAffiliatePlayerUseCase } from '../application/use-cases/deprovision-affiliate-player.use-case'
 import { GetGeoContextUseCase } from '../application/use-cases/get-geo-context.use-case'
+import {
+  type ProvisionAffiliatePlayerInput,
+  ProvisionAffiliatePlayerUseCase,
+  type ProvisionAffiliatePlayerResult,
+} from '../application/use-cases/provision-affiliate-player.use-case'
 import { UpdateAfterDepositUseCase } from '../application/use-cases/update-after-deposit.use-case'
 import { UpdateCurrencyPreferenceUseCase } from '../application/use-cases/update-currency-preference.use-case'
 
@@ -13,6 +19,10 @@ export class UsersFacade {
     @Inject(UpdateCurrencyPreferenceUseCase)
     private updateCurrency: UpdateCurrencyPreferenceUseCase,
     @Inject(UpdateAfterDepositUseCase) private updateAfterDeposit: UpdateAfterDepositUseCase,
+    @Inject(ProvisionAffiliatePlayerUseCase)
+    private provisionAffiliatePlayerUseCase: ProvisionAffiliatePlayerUseCase,
+    @Inject(DeprovisionAffiliatePlayerUseCase)
+    private deprovisionAffiliatePlayerUseCase: DeprovisionAffiliatePlayerUseCase,
   ) {}
 
   getGeoContext(userId: string): Promise<UserGeoContext | null> {
@@ -28,5 +38,26 @@ export class UsersFacade {
 
   onDepositCompleted(userId: string, currency: string, method: string): Promise<void> {
     return this.updateAfterDeposit.execute(userId, currency, method)
+  }
+
+  /**
+   * GAP-62: создать служебную user-запись партнёра (email=null, status=active,
+   * referral_code уникален). Публичный способ получить `users.id` для
+   * `affiliates.user_id` — раньше INSERT делал сам affiliate (ADR GAP-51
+   * разрешает ему только чтение чужих таблиц).
+   */
+  provisionAffiliatePlayer(
+    input: ProvisionAffiliatePlayerInput,
+  ): Promise<ProvisionAffiliatePlayerResult> {
+    return this.provisionAffiliatePlayerUseCase.execute(input)
+  }
+
+  /**
+   * GAP-62: удалить служебную user-запись, ставшую сиротой (запись партнёра не
+   * состоялась). Удаляется только строка без email — чужой аккаунт игрока под
+   * этот метод не подпадёт.
+   */
+  deprovisionAffiliatePlayer(userId: string): Promise<void> {
+    return this.deprovisionAffiliatePlayerUseCase.execute(userId)
   }
 }
