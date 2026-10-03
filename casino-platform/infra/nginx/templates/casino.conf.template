@@ -9,6 +9,20 @@ server {
   location /.well-known/acme-challenge/ { root /var/www/certbot; }
   location / { return 301 https://$host$request_uri; }
 }
+# --- healthcheck для docker-compose (сервис nginx) ---
+# Слушает ТОЛЬКО loopback контейнера и наружу не публикуется. Вариант «allow
+# 127.0.0.1; deny all» внутри публичного 80-vhost'а проверен живым прогоном и
+# НЕ сработал: и docker-proxy, и Docker Desktop зацикливают внешнее соединение на
+# 127.0.0.1, поэтому /nginx-health отвечал 200 снаружи. Отдельный listen на
+# 127.0.0.1:8080 через published ports физически недосязаем. Probe не зависит от
+# сертификатов, в отличие от 443-хостов.
+server {
+  listen 127.0.0.1:8080;
+  server_name _;
+  access_log off;
+  location = /nginx-health { return 200 "ok"; }
+  location / { return 404; }
+}
 # --- ${DOMAIN} (web) ---
 server {
   listen 443 ssl http2;
@@ -17,18 +31,19 @@ server {
   ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
   include /etc/nginx/snippets/ssl.conf;
 
-  # security headers
+  # security headers: общий набор — в snippets/security-headers.conf (включается и
+  # здесь, и в location'ах со своими add_header — иначе nginx их теряет по наследованию).
+  include /etc/nginx/snippets/security-headers.conf;
   add_header X-Frame-Options "SAMEORIGIN" always;
-  add_header X-Content-Type-Options "nosniff" always;
-  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-  add_header X-XSS-Protection "0" always;
-  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-  # P1 #11: CSP теперь отдаёт сам Next через middleware с nonce (строгая,
-  # на каждый запрос: nonce + strict-dynamic, см. apps/web/src/middleware.ts).
-  # Здесь CSP-заголовок сознательно НЕ дублируется: браузер пересекает
-  # несколько CSP-заголовков, и strict-dynamic не пробьёт внешний
-  # 'unsafe-inline'-CSP. Остальные security-headers остаются на nginx.
+  # P1 #11: CSP здесь сознательно НЕ дублируется — его отдаёт сам Next в
+  # apps/web/src/middleware.ts (для admin-хоста — apps/admin/src/middleware.ts).
+  # Браузер пересекает несколько CSP-заголовков, и второй не «ослабит», а ужесточит
+  # первый незаметно от ревью. Остальные security-headers остаются на nginx.
   # Для /api CSP отдаёт helmet (Nest, contentSecurityPolicy default-src 'self').
+  # Политика в middleware — 'self' + 'unsafe-inline' БЕЗ nonce/'strict-dynamic':
+  # маршруты статические, nonce в собранном HTML отсутствует, а strict-dynamic
+  # отключил бы и 'self', и 'unsafe-inline' (дефект d201c1e — не исполнялся ни
+  # один скрипт). Подробности — в докблоке apps/web/src/middleware.ts.
 
   # /api -> api:3001
   location /api/ {
@@ -65,7 +80,14 @@ server {
   # uploads (kyc - protected via api, avatars - public)
   location /uploads/avatars/ {
     alias /var/www/uploads/avatars/;
-    expires 30d; add_header Cache-Control "public";
+    expires 30d;
+    add_header Cache-Control "public";
+    # Своя add_header в location ОТМЕНЯЕТ всё унаследованное от server: без этого
+    # include аватарки отдавались без nosniff / Referrer-Policy / X-XSS-Protection /
+    # HSTS / X-Frame-Options, хотя в server-блоке они объявлены. Полный набор
+    # повторяем явно (X-Frame-Options — тот же, что у веб-хоста: файл своего домена).
+    include /etc/nginx/snippets/security-headers.conf;
+    add_header X-Frame-Options "SAMEORIGIN" always;
   }
   # Next.js web
   location / {
@@ -83,9 +105,12 @@ server {
   ssl_certificate /etc/letsencrypt/live/${ADMIN_DOMAIN}/fullchain.pem;
   ssl_certificate_key /etc/letsencrypt/live/${ADMIN_DOMAIN}/privkey.pem;
   include /etc/nginx/snippets/ssl.conf;
+  # Тот же набор, что у веб-хоста: раньше сюда попадали только X-Frame-Options,
+  # nosniff и HSTS — Referrer-Policy и X-XSS-Protection на админке отсутствовали.
+  include /etc/nginx/snippets/security-headers.conf;
   add_header X-Frame-Options "DENY" always;
-  add_header X-Content-Type-Options "nosniff" always;
-  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+  # CSP не дублируем и здесь — его отдаёт Next-middleware админки
+  # (apps/admin/src/middleware.ts), см. развёрнутый комментарий в веб-хосте выше.
   # IP whitelist (optional – uncomment)
   # allow 1.2.3.4; deny all;
   location / {

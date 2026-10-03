@@ -57,6 +57,18 @@ reason() {
       printf 'рабочее дерево агента-инструмента\n'; return ;;
   esac
 
+  # Секреты окружения. .gitignore — первая линия, но он не спасает ни от
+  # `git add -f`, ни от уже отслеженного файла, ни от дерева без casino-platform/
+  # .gitignore; правило §10.4 — вторая. Из правил исключён только образец:
+  # .env.example версионируется намеренно (единственный .env* в индексе), а
+  # docs/DEPLOY.md §Первичная настройка создаёт .env.production с живыми
+  # секретами — исторически ровно он под `.gitignore` и не попадал.
+  case "$base" in
+    .env) printf 'секреты окружения (.env)\n'; return ;;
+    .env.example|.env.sample|.env.template|.env.dist) : ;;
+    .env.*) printf 'секреты окружения (.env.*)\n'; return ;;
+  esac
+
   # Временные артефакты — на любом уровне: они никогда не часть задачи.
   case "$base" in
     *.tmp.txt|*.tmp.json|*.tmp.log) printf 'tmp-дамп\n'; return ;;

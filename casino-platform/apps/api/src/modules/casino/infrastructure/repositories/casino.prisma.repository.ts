@@ -1,8 +1,30 @@
 import { Injectable } from '@nestjs/common'
 
-import { type GameSession, prisma, type Prisma } from '@casino/database'
+import {
+  type Game,
+  type GameProvider,
+  type GameSession,
+  prisma,
+  type Prisma,
+} from '@casino/database'
 
-import { type FavoriteWithGame, type GameCatalogQuery, type GameRow, type GameSessionWithGame, type GameSessionWithUser, type GameTransactionRow, type GameWithProvider, type IGameCatalogRepository, type IGameFavoritesRepository, type IGamePlayRepository, type RecentSessionRow, type RoundHistoryFilter, type RoundHistoryRow, type RoundStatsRow } from '../../domain/repositories/casino.repository'
+import {
+  type FavoriteWithGame,
+  type GameCatalogQuery,
+  type GameRow,
+  type GameSessionWithGame,
+  type GameSessionWithUser,
+  type GameTransactionRow,
+  type GameWithProvider,
+  type IGameCatalogRepository,
+  type IGameFavoritesRepository,
+  type IGamePlayRepository,
+  type IGameProviderRepository,
+  type RecentSessionRow,
+  type RoundHistoryFilter,
+  type RoundHistoryRow,
+  type RoundStatsRow,
+} from '../../domain/repositories/casino.repository'
 
 @Injectable()
 export class PrismaGameCatalogRepository implements IGameCatalogRepository {
@@ -28,6 +50,42 @@ export class PrismaGameCatalogRepository implements IGameCatalogRepository {
 
   async incrementLaunchCount(id: string): Promise<void> {
     await prisma.game.update({ where: { id }, data: { launchCount: { increment: 1 } } })
+  }
+
+  async updateGame(id: string, data: Prisma.GameUncheckedUpdateInput): Promise<void> {
+    await prisma.game.update({ where: { id }, data })
+  }
+
+  createGame(data: Prisma.GameUncheckedCreateInput): Promise<Game> {
+    return prisma.game.create({ data })
+  }
+
+  findByProviderAndExternalGameId(
+    providerId: string,
+    externalGameId: string,
+  ): Promise<Game | null> {
+    return prisma.game.findUnique({
+      where: { providerId_externalGameId: { providerId, externalGameId } },
+    })
+  }
+}
+
+/**
+ * Провайдеры игр: единственная точка, где админ-контур меняет строку
+ * провайдера (В3 — прежде эти update'ы делались прямо из контроллера).
+ */
+@Injectable()
+export class PrismaGameProviderRepository implements IGameProviderRepository {
+  findById(id: string): Promise<GameProvider | null> {
+    return prisma.gameProvider.findUnique({ where: { id } })
+  }
+
+  async setEnabled(id: string, isEnabled: boolean): Promise<void> {
+    await prisma.gameProvider.update({ where: { id }, data: { isEnabled } })
+  }
+
+  async setGameCount(id: string, gameCount: number): Promise<void> {
+    await prisma.gameProvider.update({ where: { id }, data: { gameCount } })
   }
 }
 
@@ -69,7 +127,9 @@ export class PrismaGameFavoritesRepository implements IGameFavoritesRepository {
     })
   }
 
-  findRoundsWithGame(args: RoundHistoryFilter & { skip: number; take: number }): Promise<RoundHistoryRow[]> {
+  findRoundsWithGame(
+    args: RoundHistoryFilter & { skip: number; take: number },
+  ): Promise<RoundHistoryRow[]> {
     const { skip, take } = args
     return prisma.gameRound.findMany({
       where: PrismaGameFavoritesRepository.roundWhere(args),
@@ -129,11 +189,17 @@ export class PrismaGameFavoritesRepository implements IGameFavoritesRepository {
 @Injectable()
 export class PrismaGamePlayRepository implements IGamePlayRepository {
   findSessionByTokenWithUser(token: string): Promise<GameSessionWithUser | null> {
-    return prisma.gameSession.findUnique({ where: { sessionToken: token }, include: { user: true } })
+    return prisma.gameSession.findUnique({
+      where: { sessionToken: token },
+      include: { user: true },
+    })
   }
 
   findSessionByTokenWithGame(token: string): Promise<GameSessionWithGame | null> {
-    return prisma.gameSession.findUnique({ where: { sessionToken: token }, include: { game: true } })
+    return prisma.gameSession.findUnique({
+      where: { sessionToken: token },
+      include: { game: true },
+    })
   }
 
   findSessionByToken(token: string): Promise<GameSession | null> {
@@ -160,11 +226,7 @@ export class PrismaGamePlayRepository implements IGamePlayRepository {
     await prisma.gameSession.update({ where: { id }, data: { lastActivityAt: new Date() } })
   }
 
-  async addSessionBet(
-    id: string,
-    amount: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<void> {
+  async addSessionBet(id: string, amount: string, tx?: Prisma.TransactionClient): Promise<void> {
     const client = tx ?? prisma
     await client.gameSession.update({
       where: { id },
@@ -176,11 +238,7 @@ export class PrismaGamePlayRepository implements IGamePlayRepository {
     })
   }
 
-  async addSessionWin(
-    id: string,
-    amount: string,
-    tx?: Prisma.TransactionClient,
-  ): Promise<void> {
+  async addSessionWin(id: string, amount: string, tx?: Prisma.TransactionClient): Promise<void> {
     const client = tx ?? prisma
     await client.gameSession.update({
       where: { id },

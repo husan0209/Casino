@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 # /opt/casino-platform/infra/scripts/postgres-backup.sh
+#
+# ЗАПУСКАЕТСЯ ТОЛЬКО С ХОСТА: cron на VPS, `0 2 * * * /opt/casino-platform/infra/scripts/postgres-backup.sh`
+# (docs/DEPLOY.md §Monitoring). Скрипт дергает `docker ps`/`docker exec`, поэтому внутри
+# контейнера он неработоспособен в принципе — там нет ни docker CLI, ни ./env.
+# Раньше он же монтировался в /docker-entrypoint-initdb.d/backup.sh (docker-compose.prod.yml),
+# где postgres выполнял его на первом старте с пустым томом: `set -euo pipefail` +
+# отсутствующий docker = ненулевой выход = сорванная инициализация БД и всего стека.
+# Mount убран; в initdb.d монтировать хост-скрипты нельзя.
 set -euo pipefail
 # GAP-56: имена БД берутся из .env (симлинк .env.production) — раньше молчаливые
 # дефолты ${DB_USER:-casino}/${DB_NAME:-casino_prod} могли разойтись с реальными

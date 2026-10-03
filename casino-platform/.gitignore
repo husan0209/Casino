@@ -6,8 +6,14 @@ build
 # Отдельные каталоги сборок (WEB_DIST_DIR=.next-qa у QA-харнеса): иначе попадут в git status
 .next-*
 out
+# Любые .env-варианты, кроме образца. Раньше здесь были только `.env` и `.env*.local`,
+# при этом docs/DEPLOY.md §Первичная настройка велит создать `.env.production` с
+# РЕАЛЬНЫМИ секретами и сделать `.env` симлинком на него (`ln -sf .env.production .env`) —
+# то есть игнорировался симлинк, а файл-первоисточник прод-секретов оставался
+# прозрачным для `git add -A`. `.env.stend` из корневой .gitignore — тот же класс.
 .env
-.env*.local
+.env.*
+!.env.example
 *.log
 logs
 .DS_Store
