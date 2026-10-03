@@ -825,6 +825,19 @@ export class PrismaGameActivityRepository implements GameActivityRepository {
   /**
    * Σ бонусов игрока за период по валютам (ledger_entries.type = 'BONUS').
    *
+   * ⚠️ ДЕНЕЖНЫЙ КОНТУР — ТОЛЬКО ЧТЕНИЕ (GAP-62 проверено, нарушений нет):
+   * здесь читаются `wallet_accounts` (id+currency игрока) и `ledger_entries`
+   * ( сумма `_sum(amount)` по типу BONUS). Ни INSERT, ни UPDATE, ни DELETE над
+   * чужими таблицами в этом методе нет — деньги начисляются исключительно через
+   * `WalletFacade` (см. `credit-commission.use-case.ts`), это единственный путь
+   * в ledger из affiliate.
+   *
+   * ЗАЧЕМ ЭТО ВООБЩЕ ЧИТАЕТСЯ: бонусы вычитаются из NGR (NGR = GGR − бонусы −
+   * комиссии провайдера, ТЗ ч.8 §7), то есть это компонент агрегата партнёрских
+   * начислений, а не доступ к балансу игрока. Read-only доступ к чужим таблицам
+   * через общий Prisma-клиент — принятое решение репозитория (ADR GAP-51,
+   * пересматривается при выносе wallet в отдельный сервис).
+   *
    * ВАЖНО: у ledger_entries НЕТ поля currency — валюта лежит в
    * wallet_accounts.currency, а ledger ссылается на кошелёк через
    * wallet_account_id. Prisma groupBy не умеет группировать по полю

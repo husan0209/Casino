@@ -347,23 +347,36 @@ export const AFFILIATE_GAME_ACTIVITY_REPOSITORY = Symbol('AFFILIATE_GAME_ACTIVIT
  * affiliate не имеет права импортировать их репозитории или Prisma напрямую
  * (AI_DEVELOPMENT_RULES §3.2, правило no-restricted-imports в eslint).
  *
- * Два use case'а нуждаются в этом:
+ * Нужен трём сценариям:
  *  - регистрация партнёра — создать user-запись (на неё вешается кошелёк);
+ *  - ручное создание партнёра админом (UC-AFF-17) — та же провижининг-логика;
  *  - квалификация — проверить KYC (атрибуция не проходит без него).
  *
- * ADR-обоснование прямого read-only доступа — как у ADR GAP-51: таблицы
- * users/kyc_profiles читаются, но не изменяются, кроме создания user-записи
- * партнёра. Если позже понадобится полноценная интеграция, порт заменяется
- * на фасад соответствующего модуля без изменения вызывающего кода.
+ * ⚠️ GAP-62: ЧТЕНИЕ И ЗАПИСЬ ЗДЕСЬ НЕ РАВНОЦЕННЫ. ADR GAP-51 разрешает
+ * affiliate только ЧИТАТЬ чужие таблицы (`users`, `kyc_profiles`) через общий
+ * Prisma-клиент. `createPlayerUser`/`deletePlayerUser` — это WRITE в таблицу
+ * модуля `users`, и под GAP-51 они НЕ подпадают: это незарегистрированное
+ * нарушение границ, а не «обоснованный доступ». Убрать его нельзя, потому что
+ * `UsersFacade` не имеет ни создания, ни удаления учётной записи (см. список
+ * нужных методов в шапке
+ * `infrastructure/player-provisioning.prisma.repository.ts`). Порт держит эти
+ * два метода отдельно как точку, где нарушение будет снято одним переходом на
+ * фасад, когда владелец данных их появится.
  */
 export interface AffiliatePlayerProvisioningRepository {
-  /** Создать player-запись партнёра. Возвращает id для привязки affiliates.user_id. */
+  /**
+   * GAP-62 (WRITE в чужую таблицу `users`). Создать player-запись партнёра;
+   * id идёт в `affiliates.user_id`.
+   */
   createPlayerUser(args: { referralCode: string }): Promise<{ id: string }>
-  /** Удалить созданную user-запись (компенсация, если affiliate не создался). */
+  /**
+   * GAP-62 (WRITE в чужую таблицу `users`). Удалить созданную user-запись —
+   * компенсация, если affiliate не создался.
+   */
   deletePlayerUser(userId: string): Promise<void>
-  /** Свободен ли referral_code в users. */
+  /** READ (legally по GAP-51). Свободен ли referral_code в users. */
   isPlayerReferralCodeAvailable(code: string): Promise<boolean>
-  /** Пройдено ли KYC игрока (для квалификации атрибуции). */
+  /** READ (legally по GAP-51). Пройдено ли KYC игрока (для квалификации атрибуции). */
   isKycApproved(playerId: string): Promise<boolean>
 }
 

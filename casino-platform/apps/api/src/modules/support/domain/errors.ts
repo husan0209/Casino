@@ -28,3 +28,15 @@ export class ForbiddenTicketError extends AppError {
     super('Нет доступа к тикету')
   }
 }
+/**
+ * В3: бросается `SetTicketPriorityUseCase`, если приоритет вне закрытого
+ * справочника. Через HTTP ветка недостижима (её отсекает SetPrioritySchema),
+ * но use case могут вызвать не из контроллера — молча писать мусор в БД нельзя.
+ */
+export class InvalidTicketPriorityError extends AppError {
+  readonly code = 'INVALID_TICKET_PRIORITY'
+  readonly httpStatus = 422
+  constructor(priority: string) {
+    super(`Недопустимый приоритет тикета: ${priority}`)
+  }
+}

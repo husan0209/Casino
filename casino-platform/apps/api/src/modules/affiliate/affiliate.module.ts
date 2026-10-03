@@ -7,8 +7,12 @@
  *
  * ЗАВИСИМОСТИ.
  *  - wallet  — единственный способ зачислить/списать комиссию.
- *  - users   — ТОЛЬКО ради порта ResponsibleGamingHook: users объявляет порт,
- *              его реализацию поставляем мы. Обратной зависимости нет, цикла нет.
+ *  - users   — порт ResponsibleGamingHook (users объявляет порт, реализацию
+ *              поставляем мы; обратной зависимости нет, цикла нет) И ⚠️ GAP-62:
+ *              провижининг user-записи партнёра идёт прямой записью в таблицу
+ *              `users`, потому что `UsersFacade` не умеет ни создавать, ни
+ *              удалять учётную запись. Нарушение ADR локализовано и описано в
+ *              `infrastructure/player-provisioning.prisma.repository.ts`.
  *  - auth    — AuthGuard/RolesGuard по конвенции модулей (MODULE_BOUNDARIES §2.4).
  */
 import { Module } from '@nestjs/common'
@@ -23,12 +27,16 @@ import { AffiliateSettingsService } from './application/affiliate-settings.servi
 import { AffiliateDailyRunUseCase } from './application/use-cases/affiliate-daily-run.use-case'
 import { AttributePlayerUseCase } from './application/use-cases/attribute-player.use-case'
 import { ClawbackPlayerCommissionsUseCase } from './application/use-cases/clawback-player-commissions.use-case'
+import { CreateAffiliateByAdminUseCase } from './application/use-cases/create-affiliate-by-admin.use-case'
 import { CreateCommissionUseCase } from './application/use-cases/create-commission.use-case'
 import { CreditCommissionUseCase } from './application/use-cases/credit-commission.use-case'
+import { LeaveAffiliateProgramUseCase } from './application/use-cases/leave-affiliate-program.use-case'
 import { LoginAffiliateUseCase } from './application/use-cases/login-affiliate.use-case'
 import { QualifyAttributionsUseCase } from './application/use-cases/qualify-attributions.use-case'
 import { RegisterAffiliateUseCase } from './application/use-cases/register-affiliate.use-case'
 import { TrackClickUseCase } from './application/use-cases/track-click.use-case'
+import { UpdateAffiliateByAdminUseCase } from './application/use-cases/update-affiliate-by-admin.use-case'
+import { UpdateAffiliateProfileUseCase } from './application/use-cases/update-affiliate-profile.use-case'
 import { AFFILIATE_SETTINGS_REPOSITORY } from './domain/affiliate-settings'
 import {
   AFFILIATE_ATTRIBUTION_REPOSITORY,
@@ -99,6 +107,12 @@ import { AffiliateAuthGuard } from './presentation/guards/affiliate-auth.guard'
     RegisterAffiliateUseCase,
     LoginAffiliateUseCase,
     QualifyAttributionsUseCase,
+    // В3: записи presentation-контроллеров (кабинет и admin-контур) идут
+    // только через эти сценарии.
+    CreateAffiliateByAdminUseCase,
+    UpdateAffiliateByAdminUseCase,
+    UpdateAffiliateProfileUseCase,
+    LeaveAffiliateProgramUseCase,
     AffiliateClicksCleanupService,
     AffiliateAuthGuard,
     AffiliateFacade,

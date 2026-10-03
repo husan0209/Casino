@@ -1,5 +1,3 @@
-import { randomUUID } from 'crypto'
-
 import {
   Body,
   Controller,
@@ -18,7 +16,10 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
 
-import { type IPaymentRequestRepository, PAYMENT_REQUEST_REPOSITORY } from '@modules/payments/domain/payments.ports'
+import {
+  type IPaymentRequestRepository,
+  PAYMENT_REQUEST_REPOSITORY,
+} from '@modules/payments/domain/payments.ports'
 import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
@@ -35,6 +36,12 @@ import { type Currency } from '@casino/shared-types'
 import { AppError } from '@casino/shared-utils'
 
 import { AuditLogService } from '../../application/audit-log.service'
+import { approveWithdrawal } from '../../application/use-cases/approve-withdrawal.use-case'
+import { rejectWithdrawal } from '../../application/use-cases/reject-withdrawal.use-case'
+import {
+  type WithdrawalDecisionContext,
+  type WithdrawalDecisionDependencies,
+} from '../../application/withdrawal-decision-deps'
 import { AdminForbiddenError } from '../../domain/errors'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import {
@@ -43,15 +50,6 @@ import {
   RejectWithdrawalSchema,
   WalletAdjustSchema,
 } from '../dto/admin-finance.dto'
-
-
-export class WithdrawalInvalidStatusError extends AppError {
-  readonly code = 'WITHDRAWAL_INVALID_STATUS'
-  readonly httpStatus = 409
-  constructor() {
-    super('Заявка не найдена или уже обработана')
-  }
-}
 
 /**
  * UC-PAY-18: карточка платёжной заявки для админки. Типы ВЫВОДЯТСЯ из схемы
@@ -250,59 +248,28 @@ export class AdminFinanceController {
     return { items, meta: { page, perPage, total } }
   }
 
-  /** Общая логика одобрения одной заявки (single + batch). */
-  private async approveOne(id: string, admin: AdminActor, req: Request): Promise<void> {
-    const wd = await this.payments.findById(id)
-    if (wd?.type !== 'withdrawal' || wd.status !== 'pending') {
-      throw new WithdrawalInvalidStatusError()
-    }
-    await this.wallet.confirmWithdrawal({
-      userId: wd.userId,
-      currency: wd.currency as Currency,
-      amount: wd.amount.toString(),
-      idempotencyKey: `wd_confirm_${wd.id}`,
-      // GAP-55 (§11): списание по выводу тоже несёт ссылку на заявку
-      metadata: { payment_request_id: wd.id },
-    })
-    await this.payments.updateStatus(id, 'completed', { completedAt: new Date() })
-    await this.audit.log({
-      actorType: 'admin',
-      actorId: admin.id,
-      action: 'admin.withdrawal.approved',
-      targetType: 'payment_request',
-      targetId: id,
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-    })
+  /**
+   * Порты для сценариев решения по заявке (В3).
+   *
+   * Контроллер не выполняет ни одной записи в БД: `payments.updateStatus`
+   * вызывает application use case, а сюда за зависимостями приходит тот же
+   * `PAYMENT_REQUEST_REPOSITORY`, что инжектится модулем.
+   */
+  private withdrawalDependencies(): WithdrawalDecisionDependencies {
+    return { payments: this.payments, wallet: this.wallet, audit: this.audit }
   }
 
-  /** Общая логика отклонения одной заявки (single + batch). */
-  private async rejectOne(
-    id: string,
-    reason: string | undefined,
-    admin: AdminActor,
-    req: Request,
-  ): Promise<void> {
-    const wd = await this.payments.findById(id)
-    if (wd?.type !== 'withdrawal' || wd.status !== 'pending') {
-      throw new WithdrawalInvalidStatusError()
+  /** HTTP-контекст решения: кто и откуда нажал «одобрить»/«отклонить». */
+  private decisionContext(admin: AdminActor, req: Request): WithdrawalDecisionContext {
+    return { actorId: admin.id, ipAddress: req.ip, userAgent: req.headers['user-agent'] }
+  }
+
+  /** Код ошибки для частичного успеха batch-операции (стабильный AppError.code). */
+  private failureCode(error: unknown): string {
+    if (error instanceof AppError) {
+      return error.code
     }
-    await this.wallet.unlock({
-      userId: wd.userId,
-      currency: wd.currency as Currency,
-      amount: wd.amount.toString(),
-      idempotencyKey: `wd_unlock_${wd.id}_${randomUUID()}`,
-    })
-    await this.payments.updateStatus(id, 'cancelled', { errorMessage: reason })
-    await this.audit.log({
-      actorType: 'admin',
-      actorId: admin.id,
-      action: 'admin.withdrawal.rejected',
-      targetType: 'payment_request',
-      targetId: id,
-      payload: { reason },
-      ipAddress: req.ip,
-    })
+    return error instanceof Error ? error.message : String(error)
   }
 
   // UC-PAY-11 approve
@@ -312,7 +279,10 @@ export class AdminFinanceController {
     @CurrentUser() admin: AdminActor,
     @Req() req: Request,
   ): Promise<{ ok: boolean }> {
-    await this.approveOne(id, admin, req)
+    await approveWithdrawal(this.withdrawalDependencies(), {
+      paymentRequestId: id,
+      context: this.decisionContext(admin, req),
+    })
     return { ok: true }
   }
 
@@ -325,7 +295,11 @@ export class AdminFinanceController {
     @CurrentUser() admin: AdminActor,
     @Req() req: Request,
   ): Promise<{ ok: boolean }> {
-    await this.rejectOne(id, body.reason, admin, req)
+    await rejectWithdrawal(this.withdrawalDependencies(), {
+      paymentRequestId: id,
+      reason: body.reason,
+      context: this.decisionContext(admin, req),
+    })
     return { ok: true }
   }
 
@@ -341,13 +315,13 @@ export class AdminFinanceController {
     let approved = 0
     for (const id of body.ids) {
       try {
-        await this.approveOne(id, admin, req)
-        approved++
-      } catch (e) {
-        failed.push({
-          id,
-          error: e instanceof AppError ? e.code : e instanceof Error ? e.message : String(e),
+        await approveWithdrawal(this.withdrawalDependencies(), {
+          paymentRequestId: id,
+          context: this.decisionContext(admin, req),
         })
+        approved++
+      } catch (error) {
+        failed.push({ id, error: this.failureCode(error) })
       }
     }
     await this.audit.log({
@@ -373,13 +347,14 @@ export class AdminFinanceController {
     let rejected = 0
     for (const id of body.ids) {
       try {
-        await this.rejectOne(id, body.reason, admin, req)
-        rejected++
-      } catch (e) {
-        failed.push({
-          id,
-          error: e instanceof AppError ? e.code : e instanceof Error ? e.message : String(e),
+        await rejectWithdrawal(this.withdrawalDependencies(), {
+          paymentRequestId: id,
+          reason: body.reason,
+          context: this.decisionContext(admin, req),
         })
+        rejected++
+      } catch (error) {
+        failed.push({ id, error: this.failureCode(error) })
       }
     }
     await this.audit.log({
