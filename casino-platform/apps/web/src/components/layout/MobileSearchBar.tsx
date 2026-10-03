@@ -1,5 +1,6 @@
 'use client'
 
+import { Search } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -9,6 +10,7 @@ import { searchHref } from '@/lib/ui/desktop-nav'
  * GAP-54 (ТЗ ч.5 §4.1/§4.4): поле глобального поиска под шапкой на главной —
  * телефон. На десктопе поиск живёт в хедере (§4.5), поэтому скрыто с md.
  * Enter/кнопка ведут на /search?q= — там результаты по играм и провайдерам.
+ * Иконка — lucide, не эмодзи (ч.5.1 Don't-лист §6).
  */
 export function MobileSearchBar(): React.JSX.Element {
   const router = useRouter()
@@ -29,8 +31,12 @@ export function MobileSearchBar(): React.JSX.Element {
         aria-label="Поиск"
         className="input flex-1"
       />
-      <button type="submit" className="btn px-4" aria-label="Найти">
-        🔍
+      <button
+        type="submit"
+        aria-label="Найти"
+        className="btn aspect-square shrink-0 self-stretch"
+      >
+        <Search size={20} strokeWidth={2} aria-hidden />
       </button>
     </form>
   )

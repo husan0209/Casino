@@ -91,7 +91,7 @@ export function CryptoDepositTicketPanel({
 
       <div className="rounded-xl border border-[#2A2A4A] p-4">
         <p className="text-xs text-muted">Сумма к отправке</p>
-        <p className="mt-1 text-2xl font-bold text-[#00C853]">
+        <p className="mt-1 text-2xl font-bold text-money-dark">
           {formatAmount(ticket.pay_amount, ticket.pay_currency)}
         </p>
         <p className="mt-1 text-xs text-muted">

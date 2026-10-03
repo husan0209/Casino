@@ -40,7 +40,7 @@ const PAGE_SIZE = 25
 const TX_TYPES = Object.keys(TX_TYPE_LABELS)
 
 const DIRECTION_CLASS: Record<string, string> = {
-  in: 'text-[#00C853]',
+  in: 'text-money-dark',
   out: 'text-[#FF3D71]',
   zero: 'text-muted',
 }

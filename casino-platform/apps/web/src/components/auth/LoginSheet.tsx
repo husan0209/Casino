@@ -1,5 +1,5 @@
 'use client'
-import { ArrowRight, Lock, X } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, X } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 
@@ -20,6 +20,7 @@ export function LoginSheet(): React.JSX.Element | null {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [captchaToken, setCaptchaToken] = useState('')
   const [captchaRequired, setCaptchaRequired] = useState(false)
@@ -139,16 +140,19 @@ export function LoginSheet(): React.JSX.Element | null {
             <div className="relative">
               <input
                 className="input pr-10"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="Введите пароль"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <Lock
-                size={14}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
-                aria-hidden
-              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted transition hover:text-white"
+              >
+                {showPassword ? <EyeOff size={14} aria-hidden /> : <Eye size={14} aria-hidden />}
+              </button>
             </div>
           </div>
 

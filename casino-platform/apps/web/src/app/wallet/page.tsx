@@ -55,7 +55,7 @@ function ActiveWalletCard({
       <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
         <div>
           <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-[#00E676]" />
+            <span className="flex h-2 w-2 rounded-full bg-money" />
             <span className="text-xs font-bold uppercase tracking-wider text-muted">
               Основной игровой счёт
             </span>
@@ -104,7 +104,7 @@ function TxRow({ t }: { t: WalletTxDto }): React.JSX.Element {
         <span
           className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
             dir === 'in'
-              ? 'bg-[#00E676]/10 text-[#00E676]'
+              ? 'bg-money/10 text-money'
               : dir === 'out'
                 ? 'bg-[#FF3D71]/10 text-[#FF3D71]'
                 : 'bg-white/5 text-muted'
@@ -133,7 +133,7 @@ function TxRow({ t }: { t: WalletTxDto }): React.JSX.Element {
       <div className="text-right">
         <div
           className={`font-bold ${
-            dir === 'in' ? 'text-[#00E676]' : dir === 'out' ? 'text-[#FF3D71]' : 'text-muted'
+            dir === 'in' ? 'text-money' : dir === 'out' ? 'text-[#FF3D71]' : 'text-muted'
           }`}
         >
           {formatTxAmount(t.amount, t.currency)}
@@ -317,7 +317,7 @@ export default function WalletPage(): React.JSX.Element {
       </div>
 
       <div className="flex items-center justify-center gap-2 text-center text-xs text-muted/80">
-        <ShieldCheck size={16} className="text-[#00E676]" />
+        <ShieldCheck size={16} className="text-money" />
         <span>Отдельные балансы. Без скрытой конвертации и комиссий.</span>
       </div>
     </div>

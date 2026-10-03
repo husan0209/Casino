@@ -56,7 +56,7 @@ Background card:      #16213E
 Border:               #2A2A4A
 Accent primary:       #6C63FF   — бренд, навигация, «Играть»
 Accent secondary:     #00D2FF   — редкие акценты, теги сетей, НЕ деньги
-Money / Deposit:      #00C853   — только деньги и успех
+Money / Deposit:      #34C77B   — только деньги и успех (см. уточнение Ч.5 §2.4 от 2026-10-04)
 Error:                #FF3D71
 Warning:              #FFB300
 Text primary:         #FFFFFF
