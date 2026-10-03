@@ -22,7 +22,8 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
-import { type UserProfileFull } from '@modules/users/domain/repositories/user-profile.repository'
+
+import { type UserProfileFull } from '@casino/shared-types'
 
 import { GetMeUseCase } from '../../application/use-cases/get-me.use-case'
 import { ListSessionsUseCase } from '../../application/use-cases/list-sessions.use-case'

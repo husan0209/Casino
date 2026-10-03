@@ -9,12 +9,14 @@
  * уникален, и совпадение с адресом игрока (партнёр может играть сам) сломало бы
  * регистрацию. Поэтому адрес хранится только в affiliate.
  *
- * БД не импортируется: работа идёт через порт
- * AffiliatePlayerProvisioningRepository (AI_DEVELOPMENT_RULES §3.2).
+ * БД и JWT не импортируются: работа идёт через порты domain —
+ * AffiliatePlayerProvisioningRepository и IAffiliateJwtService
+ * (AI_DEVELOPMENT_RULES §3.2, решение В5).
  */
 import { Inject, Injectable } from '@nestjs/common'
 import * as argon2 from 'argon2'
 
+import { AFFILIATE_JWT_SERVICE, type IAffiliateJwtService } from '../../domain/affiliate.ports'
 import { AffiliateAlreadyExistsError } from '../../domain/errors/affiliate.errors'
 import {
   AFFILIATE_PLAYER_PROVISIONING_REPOSITORY,
@@ -23,7 +25,6 @@ import {
   type AffiliateRepository,
 } from '../../domain/repositories/affiliate.repository'
 import { parseRevShareRate } from '../../domain/value-objects/revshare-rate.value-object'
-import { AffiliateJwtService } from '../../infrastructure/affiliate-jwt.service'
 import { generateUniquePlayerReferralCode } from '../affiliate-player-referral-code'
 import { AffiliateSettingsService } from '../affiliate-settings.service'
 
@@ -53,7 +54,7 @@ export class RegisterAffiliateUseCase {
     @Inject(AFFILIATE_PLAYER_PROVISIONING_REPOSITORY)
     private readonly players: AffiliatePlayerProvisioningRepository,
     @Inject(AffiliateSettingsService) private readonly settings: AffiliateSettingsService,
-    @Inject(AffiliateJwtService) private readonly jwt: AffiliateJwtService,
+    @Inject(AFFILIATE_JWT_SERVICE) private readonly jwt: IAffiliateJwtService,
   ) {}
 
   async execute(input: RegisterAffiliateInput): Promise<RegisterAffiliateResult> {

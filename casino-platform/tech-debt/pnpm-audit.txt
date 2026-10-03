@@ -1,5 +1,5 @@
-critical	3
-high	19
-moderate	27
-low	3
+critical	0
+high	0
+moderate	1
+low	2
 info	0

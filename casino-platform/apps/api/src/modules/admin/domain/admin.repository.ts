@@ -12,17 +12,11 @@
  */
 import { type Decimal } from 'decimal.js'
 
+import type { AdminUserRow } from '@casino/shared-types'
 
-export interface AdminUserRow {
-  id: string
-  email: string
-  firstName: string | null
-  lastName: string | null
-  role: string
-  isActive: boolean
-  lastLoginAt: Date | null
-  createdAt: Date
-}
+/** Read-модель строки админ-пользователя живёт в @casino/shared-types (В4);
+ *  тут реэкспорт для внутренних потребителей домена/application. */
+export type { AdminUserRow }
 
 export interface CreateAdminUserInput {
   email: string

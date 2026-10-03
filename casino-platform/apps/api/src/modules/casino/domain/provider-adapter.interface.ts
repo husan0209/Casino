@@ -1,3 +1,10 @@
+import type { ParsedProviderCallback } from '@casino/shared-types'
+
+/** Read-форма разобранного callback'а живёт в @casino/shared-types (В4); тут
+ *  реэкспорт: контракт адаптера и потребители application/presentation продолжают
+ *  ссылаться на то же имя. */
+export type { ParsedProviderCallback }
+
 export interface LaunchParams {
   gameExternalId: string
   sessionToken: string
@@ -8,19 +15,6 @@ export interface LaunchParams {
   isDemo: boolean
   isMobile: boolean
   ip: string
-}
-export interface ParsedProviderCallback {
-  action: 'authenticate' | 'balance' | 'bet' | 'win' | 'rollback'
-  playerToken?: string | undefined
-  playerId?: string | undefined
-  betAmount?: string | undefined
-  winAmount?: string | undefined
-  roundId?: string | undefined
-  transactionId?: string | undefined
-  rollbackTransactionId?: string | undefined
-  gameId?: string | undefined
-  rawRequest: unknown
-  currency?: string | undefined
 }
 /** Строка игрового каталога провайдера (нормализованная). */
 export interface ProviderGameRow {

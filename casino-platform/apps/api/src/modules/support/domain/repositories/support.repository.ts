@@ -1,6 +1,16 @@
-export type TicketStatus = 'open' | 'in_progress' | 'waiting_user' | 'closed'
-export type TicketCategory = 'payments' | 'games' | 'technical' | 'account' | 'other'
-export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent'
+import type {
+  MessageRow,
+  TicketCategory,
+  TicketListItem,
+  TicketPriority,
+  TicketStatus,
+} from '@casino/shared-types'
+
+/** Read-модели тикетов (статусы, категории, строка списка, строка сообщения)
+ *  живут в @casino/shared-types (В4); тут реэкспорт для внутренних потребителей
+ *  домена/application и для form-совместимых вызывающих. */
+export type { MessageRow, TicketCategory, TicketListItem, TicketPriority, TicketStatus }
+
 /** Форма тикета, возвращаемая репозиторием (Prisma SupportTicket + включённые поля). */
 export interface TicketRow {
   id: string
@@ -15,28 +25,7 @@ export interface TicketRow {
   createdAt: Date
   updatedAt: Date
 }
-/** Строка списка тикетов (Prisma select — без user-полей) + счётчик сообщений. */
-export interface TicketListItem {
-  id: string
-  subject: string
-  category: TicketCategory
-  status: TicketStatus
-  priority: TicketPriority
-  createdAt: Date
-  updatedAt: Date
-  _count: { messages: number }
-}
-/** Строка сообщения тикета (Prisma SupportMessage). */
-export interface MessageRow {
-  id: string
-  ticketId: string
-  senderType: string
-  senderId: string | null
-  message: string
-  isInternal: boolean
-  attachments: unknown // Prisma Prisma.JsonValue
-  createdAt: Date
-}
+
 /** Prisma Prisma.JsonValue-совместимый тип для JSON-полей. */
 export type PrismaJsonObject = { [key: string]: PrismaJson }
 export type PrismaJson = string | number | boolean | null | PrismaJson[] | PrismaJsonObject

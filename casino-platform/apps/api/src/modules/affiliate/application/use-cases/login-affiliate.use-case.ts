@@ -9,6 +9,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import * as argon2 from 'argon2'
 
+import { AFFILIATE_JWT_SERVICE, type IAffiliateJwtService } from '../../domain/affiliate.ports'
 import {
   AffiliateCredentialsInvalidError,
   AffiliateNotActiveError,
@@ -17,7 +18,6 @@ import {
   AFFILIATE_REPOSITORY,
   type AffiliateRepository,
 } from '../../domain/repositories/affiliate.repository'
-import { AffiliateJwtService } from '../../infrastructure/affiliate-jwt.service'
 
 export interface LoginAffiliateInput {
   email: string
@@ -37,7 +37,7 @@ export interface LoginAffiliateResult {
 export class LoginAffiliateUseCase {
   constructor(
     @Inject(AFFILIATE_REPOSITORY) private readonly affiliates: AffiliateRepository,
-    @Inject(AffiliateJwtService) private readonly jwt: AffiliateJwtService,
+    @Inject(AFFILIATE_JWT_SERVICE) private readonly jwt: IAffiliateJwtService,
   ) {}
 
   async execute(input: LoginAffiliateInput): Promise<LoginAffiliateResult> {

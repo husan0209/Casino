@@ -4,10 +4,10 @@ import { z } from 'zod'
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
-import { AuditLogService } from '../../admin/application/audit-log.service'
+import { AdminFacade } from '../../admin/facade/admin.facade'
 import { AuthGuard } from '../../auth/presentation/guards/auth.guard'
 import { Roles, RolesGuard } from '../../auth/presentation/guards/roles.guard'
-import { ReferralCalcService } from '../../referrals/application/referral-calc.service'
+import { ReferralsFacade } from '../../referrals/facade/referrals.facade'
 
 // GAP-21: ручной триггер начислений — date опционален (YYYY-MM-DD)
 export const RunDailySchema = z
@@ -26,15 +26,19 @@ export type RunDailyDto = z.infer<typeof RunDailySchema>
  * Эндпоинт переехал из referrals/presentation/referrals-admin.controller.ts
  * (решение В2) без изменений: путь admin/referrals/run-daily, guards
  * (AuthGuard + RolesGuard, superadmin), тело запроса и форма ответа сохранены.
- * ReferralCalcService инжектится через публичный экспорт ReferralsModule.
+ *
+ * Межмодульные контуры — только через фасады (В1/В6): начисления считаются
+ * ReferralsFacade.runDaily, трейл действия пишется AdminFacade.logAction.
+ * Контроллер HTTP-тонкий: бизнес-логики здесь нет, только вызов фасада,
+ * аудит и форматирование ответа.
  */
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
 @Controller('admin/referrals')
 export class MaintenanceAdminController {
   constructor(
-    @Inject(ReferralCalcService) private readonly referralCalc: ReferralCalcService,
-    @Inject(AuditLogService) private readonly audit: AuditLogService,
+    @Inject(ReferralsFacade) private readonly referrals: ReferralsFacade,
+    @Inject(AdminFacade) private readonly adminAudit: AdminFacade,
   ) {}
 
   /**
@@ -50,18 +54,24 @@ export class MaintenanceAdminController {
     @Body() dto: RunDailyDto,
     @CurrentUser() admin: { id: string; email?: string },
   ): Promise<{ date: string; processed: number; credited: number; ok: boolean }> {
-    const result = await this.referralCalc.runDaily(dto.date)
-    await this.audit.log({
+    const result = await this.referrals.runDaily(dto.date)
+    const runDate = result.date.toISOString().slice(0, 10)
+    await this.adminAudit.logAction({
       actorType: 'user',
       actorId: admin.id,
       action: 'referrals.run_daily',
       targetType: 'referral_reward',
       payload: {
-        date: result.date.toISOString().slice(0, 10),
+        date: runDate,
         processed: result.processed,
         credited: result.credited,
       },
     })
-    return { ok: true, ...result, date: result.date.toISOString().slice(0, 10) }
+    return {
+      ok: true,
+      date: runDate,
+      processed: result.processed,
+      credited: result.credited,
+    }
   }
 }

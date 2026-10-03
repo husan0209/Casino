@@ -4,10 +4,16 @@
  * Entity — чистые данные без I/O. Слой domain не импортирует Prisma/NestJS
  * (ARCHITECTURE §5.1, AI_DEVELOPMENT_RULES §3.2).
  */
+import type { AffiliateProfileRow, AffiliateStatus } from '@casino/shared-types'
+
 import type { RevShareRate } from '../value-objects/revshare-rate.value-object'
 
-/** Статус партнёра. Только `active` атрибутирует трафик (ТЗ ч.8 §7.2 п.3). */
-export type AffiliateStatus = 'active' | 'suspended' | 'rejected'
+/** Read-формы партнёра для внешних ответов API (статус и публичная строка)
+ *  живут в @casino/shared-types (В4); тут реэкспорт для потребителей домена и
+ *  репозиторных портов. Сам `AffiliateEntity` остаётся доменной сущностью:
+ *  у неё есть `passwordHash` и доменные инварианты, поэтому наружу она не
+ *  публикуется. */
+export type { AffiliateProfileRow, AffiliateStatus }
 
 /** Статус атрибуции игрока. */
 export type AffiliateAttributionStatus = 'pending' | 'qualified' | 'rejected'
@@ -67,8 +73,9 @@ export interface AffiliateEntity {
   readonly updatedAt: Date
 }
 
-/** Партнёр без хеша пароля — для всех внешних ответов API (DTO-маппинг). */
-export type AffiliatePublic = Omit<AffiliateEntity, 'passwordHash'>
+/** Партнёр без хеша пароля — для всех внешних ответов API (DTO-маппинг).
+ *  Shape объявлен в @casino/shared-types (В4), здесь только алиас имени. */
+export type AffiliatePublic = AffiliateProfileRow
 
 /** Клик по трекинг-ссылке. Содержит ТОЛЬКО хеш IP — сырой IP не сохраняется (GDPR/152-ФЗ). */
 export interface AffiliateClickEntity {
