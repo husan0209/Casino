@@ -2,22 +2,37 @@ import { createHmac, timingSafeEqual } from 'crypto'
 
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
+import { Decimal } from 'decimal.js'
 
 import { errorMessage } from '@/common/utils/error-message'
 
-import { DISPLAY_RUB_RATES } from '@casino/shared-config'
+import { DISPLAY_RUB_RATES, type DisplayCurrency } from '@casino/shared-config'
 
 import { PaymentProviderNotConfiguredError } from './rukassa.client'
 import { PaymentProviderError } from '../../domain/errors'
+import {
+  assertReleaseCryptoCurrency,
+  CRYPTO_PAY_CURRENCY_TICKERS,
+} from '../../domain/payment-currency.policy'
 
 import type { INowPaymentsClient } from '../../domain/payments.ports'
 
-const MAP: Record<string, string> = {
-  USDT_TRC20: 'usdttrc20',
-  BTC: 'btc',
-  TON: 'ton',
-  TRX: 'trx',
-  LTC: 'ltc',
+/**
+ * Тикеры NOWPayments по нашим внутренним кодам валют (TZ-02).
+ *
+ * Крипто-пары берутся из релизного набора домена (`payment-currency.policy`) —
+ * единственное место, где перечислены поддерживаемые платёжные валюты; веток
+ * под TON/TRX/LTC (исключены из релиза) здесь больше нет.
+ *
+ * `RUB` — не платёжная валюта, а служебный `currency_to` в GET /estimate
+ * (курсы для KYC-лимитов), поэтому живёт отдельно от релизного набора.
+ * Fallback `toLowerCase()` в `mapCurrency` обслуживает только estimate-пары с
+ * display-фиатом (UAH/BYN/KZT/UZS): там курс запрашивается, платёж не создаётся.
+ * Отклонение НЕподдерживаемой платёжной валюты — задача не этого словаря, а
+ * `assertReleaseCryptoCurrency` (см. `createPayment`).
+ */
+const PROVIDER_CURRENCY_TICKERS: Record<string, string> = {
+  ...CRYPTO_PAY_CURRENCY_TICKERS,
   RUB: 'rub',
 }
 
@@ -127,7 +142,7 @@ export class NOWPaymentsClient implements INowPaymentsClient {
   }
 
   mapCurrency(ours: string): string {
-    return MAP[ours] || ours.toLowerCase()
+    return PROVIDER_CURRENCY_TICKERS[ours] || ours.toLowerCase()
   }
 
   async createPayment(params: {
@@ -143,8 +158,13 @@ export class NOWPaymentsClient implements INowPaymentsClient {
     payCurrency: string
     expirationEstimateDate: string
   }> {
+    // TZ-02: платёжная валюта проверяется до ЛЮБОГО обращения к провайдеру —
+    // и до реального POST /payment, и до dev-stub (он тоже эмулирует «платёж
+    // создан»). Иначе заявка в TON/TRX/LTC уходила бы в NOWPayments с
+    // pay_currency вне релизного набора.
+    const payCurrency = assertReleaseCryptoCurrency(params.payCurrency)
     if (!this.isProd() && !this.config.get<string>('NOWPAYMENTS_API_KEY')) {
-      return this.devStubPayment(params)
+      return this.devStubPayment({ ...params, payCurrency })
     }
     const apiKey = this.assertApiKey()
     try {
@@ -158,7 +178,7 @@ export class NOWPaymentsClient implements INowPaymentsClient {
           // спецификации (docs/PAYMENT_OVERVIEW.md, решение В11).
           price_amount: Number(params.priceAmount),
           price_currency: params.priceCurrency.toLowerCase(),
-          pay_currency: this.mapCurrency(params.payCurrency),
+          pay_currency: this.mapCurrency(payCurrency),
           order_id: params.orderId,
           ipn_callback_url: params.ipnCallbackUrl,
         }),
@@ -179,7 +199,7 @@ export class NOWPaymentsClient implements INowPaymentsClient {
         paymentId,
         payAddress,
         payAmount: String(d.pay_amount ?? ''),
-        payCurrency: String(d.pay_currency ?? this.mapCurrency(params.payCurrency)),
+        payCurrency: String(d.pay_currency ?? this.mapCurrency(payCurrency)),
         expirationEstimateDate: String(
           d.expiration_estimate_date ?? new Date(Date.now() + 3600_000).toISOString(),
         ),
@@ -242,11 +262,16 @@ export class NOWPaymentsClient implements INowPaymentsClient {
         throw new PaymentProviderError(`HTTP ${res.status}`)
       }
       const d = asPspResponse<NOWPaymentsEstimateResponse>(await res.json())
-      const v = Number(d.estimated_amount)
-      if (!Number.isFinite(v) || v <= 0) {
+      // Курс остаётся строкой: `String(Number(x))` на границе терял формат
+      // ('1e-8' вместо '0.00000001') и точность — деньги/курсы number'ом не
+      // гоняем (AI_DEVELOPMENT_RULES §1, гард G20). Decimal конструктор бросает
+      // исключение на не-число — его перехватит catch ниже (null → fallback).
+      const rawEstimatedAmount = String(d.estimated_amount ?? '')
+      const estimatedAmount = new Decimal(rawEstimatedAmount)
+      if (estimatedAmount.lte(0)) {
         throw new PaymentProviderError(`bad estimate shape: ${JSON.stringify(d).slice(0, 120)}`)
       }
-      return { estimatedAmount: String(v), source: 'nowpayments' }
+      return { estimatedAmount: rawEstimatedAmount, source: 'nowpayments' }
     } catch (e) {
       this.logger.error(`NOWPayments estimate failed: ${errorMessage(e)}`)
       return null
@@ -258,22 +283,30 @@ export class NOWPaymentsClient implements INowPaymentsClient {
     currencyFrom: string
     currencyTo: string
   }): Promise<{ estimatedAmount: string }> {
-    // Dev без ключа: прежние захардкоженные курсы, чтобы флоу был проходим
+    /**
+     * Dev/STAGE-заглушка курса. Условие включения — `NODE_ENV !== 'production'`
+     * И пустой `NOWPAYMENTS_API_KEY`, т.е. в прод-контуре недостижима: envSchema
+     * (packages/shared-config/src/env.validation.ts) допускает NODE_ENV только из
+     * {development|staging|production|test}, а prod-без-ключа и так падает на
+     * assertApiKey (PAYMENT_PROVIDER_NOT_CONFIGURED/503).
+     *
+     * Курс берётся из DISPLAY_RUB_RATES (те же константы, что у dev-заглушки
+     * `estimate` выше) вместо локального словаря: так ветки TON/TRX/LTC исчезают
+     * сами собой — валют вне релизного набора в константах нет.
+     *
+     * Арифметика — Decimal, а не number: результат уходит в KYC-лимит
+     * (CreateCryptoDepositUseCase → assertCanDeposit), т.е. это денежная
+     * величина (AI_DEVELOPMENT_RULES §1, гард G20). `amount` к этому месту уже
+     * прошёл regex-валидацию DTO (`^\d+(\.\d{1,8})?$`).
+     */
     if (!this.isProd() && !this.config.get<string>('NOWPAYMENTS_API_KEY')) {
-      const rates: Record<string, number> = {
-        USDT_TRC20: 92.5,
-        BTC: 8500000,
-        TON: 450,
-        TRX: 11.3,
-        LTC: 7800,
+      const targetRateToRub = DISPLAY_RUB_RATES[params.currencyTo as DisplayCurrency]
+      if (params.currencyFrom === 'RUB' && targetRateToRub) {
+        return { estimatedAmount: new Decimal(params.amount).div(targetRateToRub).toFixed(8) }
       }
-      const from = params.currencyFrom
-      const to = params.currencyTo
-      if (from === 'RUB' && rates[to]) {
-        return { estimatedAmount: (Number(params.amount) / rates[to]).toFixed(8) }
-      }
-      if (to === 'RUB' && rates[from]) {
-        return { estimatedAmount: (Number(params.amount) * rates[from]).toFixed(2) }
+      const sourceRateToRub = DISPLAY_RUB_RATES[params.currencyFrom as DisplayCurrency]
+      if (params.currencyTo === 'RUB' && sourceRateToRub) {
+        return { estimatedAmount: new Decimal(params.amount).times(sourceRateToRub).toFixed(2) }
       }
       return { estimatedAmount: params.amount }
     }
