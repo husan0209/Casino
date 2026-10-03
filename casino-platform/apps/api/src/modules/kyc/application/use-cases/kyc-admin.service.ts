@@ -1,5 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 
+import { errorMessage } from '@/common/utils/error-message'
+
+import { KycDepositTotalUnavailableError } from '../../domain/errors'
 import {
   type IKycRepository,
   KYC_REPOSITORY,
@@ -10,6 +13,8 @@ import {
  *  прямого репозитория в контроллере (В3). */
 @Injectable()
 export class KycAdminService {
+  private readonly logger = new Logger(KycAdminService.name)
+
   constructor(@Inject(KYC_REPOSITORY) private repo: IKycRepository) {}
 
   list(
@@ -20,6 +25,13 @@ export class KycAdminService {
     return this.repo.listAdmin(status, page, perPage)
   }
 
+  /**
+   * Карточка модератора: профиль + сумма депозитов игрока.
+   *
+   * Fail-closed: отказ чтения депозитов идёт вверх как доменный
+   * `KycDepositTotalUnavailableError` (503), а не превращается в «ноль
+   * депозитов» — по выдуманным данным модератор одобрил бы выпуск средств.
+   */
   async getWithTotalDeposited(
     id: string,
   ): Promise<{ profile: KycProfileRow; totalDepositedRub: string } | null> {
@@ -27,8 +39,17 @@ export class KycAdminService {
     if (!profile) {
       return null
     }
-    // enrich with total deposited for admin view
-    const totalDepositedRub = await this.repo.getTotalDepositedRub(profile.userId).catch(() => '0')
+    let totalDepositedRub: string
+    try {
+      totalDepositedRub = await this.repo.getTotalDepositedRub(profile.userId)
+    } catch (error) {
+      this.logger.error(
+        `KYC-карточка ${id}: сумма депозитов игрока ${profile.userId} не получена (${errorMessage(
+          error,
+        )}) — решение модератора блокируется (fail-closed)`,
+      )
+      throw new KycDepositTotalUnavailableError()
+    }
     return { profile, totalDepositedRub }
   }
 
