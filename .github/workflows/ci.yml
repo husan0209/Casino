@@ -165,6 +165,12 @@ jobs:
             --to-schema-datamodel prisma/schema.prisma \
             --exit-code
           echo "✅ No drift: migrations ≡ schema.prisma"
+      # Прод-контур статичен по конфигам: проверка, что ни один nginx-location со
+      # своим add_header не остался без общего сниппета security-headers (см.
+      # infra/scripts/check-nginx-header-inheritance.sh). Дёргается здесь, а не в
+      # architecture-guards, потому что этот job — обязательный чек ruleset.
+      - name: Check nginx security-header inheritance
+        run: bash infra/scripts/check-nginx-header-inheritance.sh
       - name: Lint
         run: pnpm lint
       - name: Typecheck
@@ -246,6 +252,18 @@ jobs:
           push: false
           tags: casino-admin:test
 
+  # ВАЖНО про статус этого job'а (не «гарантия выкатки»):
+  #   1) deploy НЕ входит в список обязательных чеков ruleset (см. докблок в начале
+  #      файла: secrets-scan, commitlint, lint-typecheck-test, docker-build + guards).
+  #   2) На PR и на push не в main job не выполняется (`if:` ниже) — GitHub рисует
+  #      skipped как «пройдено», и зелёная галочка ничего не утверждает.
+  #   3) На push в main без секретов VPS_* job проходит, но НЕ ДЕЛАЕТ выкатку:
+  #      шага Deploy просто нет (steps.vps-secrets.outputs.skip). Зелёный цвет здесь
+  #      означает «CI красным не нашёл», а не «прод обновлён».
+  # Красить main при непроставленных секретах намеренно НЕ стали: каждый мерж
+  # превратился бы в ложный пожар у тех, кто прод-контур ещё не настраивал. Вместо
+  # этого факт «выкатки не было» пишется заголовком в summary runs — там, где его
+  # видно вместо зелёного кружка.
   deploy:
     name: Deploy to VPS (only after green CI)
     needs: [secrets-scan, commitlint, lint-typecheck-test, docker-build]
@@ -265,6 +283,17 @@ jobs:
           if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ] || [ -z "$VPS_SSH_KEY" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "::notice::Deploy пропущен: не настроены секреты VPS_HOST / VPS_USER / VPS_SSH_KEY (Settings → Secrets and variables → Actions)"
+            # Зелёный job без этой строки читается как «выкатка прошла» — поэтому
+            # состояние пишется в summary вкладки Runs отдельным заголовком.
+            {
+              echo "## Выкатка НЕ выполнена"
+              echo ""
+              echo "Job \`deploy\` завершился успешно, но **ничего не деплоил**: секреты"
+              echo "\`VPS_HOST\` / \`VPS_USER\` / \`VPS_SSH_KEY\` не настроены."
+              echo ""
+              echo "Зелёный статус этого job'а — не признак обновлённого прод-контура."
+              echo "Обязательные по смыслу чеки: secrets-scan, commitlint, lint-typecheck-test, docker-build."
+            } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -281,7 +310,17 @@ jobs:
             git pull origin main
             docker compose -f docker-compose.prod.yml pull || true
             docker compose -f docker-compose.prod.yml build --pull
+            # `up -d` с service_healthy-условиями (см. docker-compose.prod.yml) НЕ
+            # считается успешным, пока api/web/admin/nginx не прошли свои probe:
+            # раньше деплой «зеленел» при 502 от nginx, потому что `up -d` не ждёт
+            # готовности, а healthcheck'ов у фронта и nginx не было вовсе.
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            docker compose -f docker-compose.prod.yml exec -T api npx prisma migrate deploy
+            # Schema живёт в packages/database/prisma, а WORKDIR образа — /app, и ни в
+            # корневом package.json, ни в packages/database/package.json поля `prisma`
+            # нет. Без --schema Prisma ищет ./prisma/schema.prisma от cwd, не находит
+            # («Could not find a prisma schema file») и деплой с новой миграцией красный.
+            # pnpm в runtime-стадии нет (corepack только в builder), поэтому явный путь.
+            docker compose -f docker-compose.prod.yml exec -T api npx prisma migrate deploy \
+              --schema=packages/database/prisma/schema.prisma
             docker compose -f docker-compose.prod.yml ps
             echo "Deploy OK $(date)"
