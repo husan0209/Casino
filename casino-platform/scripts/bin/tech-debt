@@ -65,8 +65,14 @@ DIR=tech-debt
 #     отзывы сессий админом, users-модулем и клинером maintenance — чужие записи;
 #   • `exchange_rates` → maintenance (§18.6: запись курсов — её джоба, geo лишь читает);
 #   • `audit_logs`/`system_settings`/`admin_users` → admin (§12.3, §13, §9a.2).
+# Владельцы взяты из docs/MODULE_BOUNDARIES, а не из названий модулей:
+#   User    — §3.2 (users: «users (основная, базовая)») + §2.1 (auth: регистрация)
+#   Session — §2.1 (auth: session management) + §3.1 (users: terminate/просмотр)
+# Где граница разделена по ответственностям, у модели два владельца — гард тогда
+# ловит запись ТРЕТЬИХ модулей (кейс GAP-62: affiliate писал в users), а не
+# превращает в долг законную работу обоих владельцев.
 MODEL_OWNERS='
-User:auth AuthProvider:auth Session:auth EmailVerification:auth PasswordReset:auth
+User:auth User:users AuthProvider:auth Session:auth Session:users EmailVerification:auth PasswordReset:auth
 UserProfile:users UserSettings:users KycProfile:kyc KycDocument:kyc
 AdminUser:admin AuditLog:admin SystemSetting:admin
 WalletAccount:wallet LedgerEntry:wallet
@@ -220,7 +226,11 @@ detect() {
               if (pairs[i] == "") continue
               split(pairs[i], kv, ":")
               acc = tolower(substr(kv[1], 1, 1)) substr(kv[1], 2)
-              OWNER[acc] = kv[2]
+              # Модель может иметь несколько владельцев, если граница в
+              # MODULE_BOUNDARIES разделена по ответственностям (users: таблица
+              # §3.2, регистрация и сессии §2.1). Дубли ключа в карте =
+              # несколько владельцев; гард тогда ловит именно третьих.
+              OWNER[acc] = (acc in OWNER) ? OWNER[acc] " " kv[2] : kv[2]
             }
           }
           /^[[:space:]]*(\/\/|\/\*|\*)/ { next }
@@ -233,7 +243,14 @@ detect() {
               seg = substr(line, RSTART + 1, RLENGTH - 2)
               d = index(seg, ".")
               acc = substr(seg, 1, d - 1)
-              if ((acc in OWNER) && OWNER[acc] != mod) hits[file]++
+              if (acc in OWNER) {
+                isOwner = 0
+                ownerCount = split(OWNER[acc], ownerList, " ")
+                for (oi = 1; oi <= ownerCount; oi++) {
+                  if (ownerList[oi] == mod) isOwner = 1
+                }
+                if (!isOwner) hits[file]++
+              }
               line = substr(line, RSTART + RLENGTH)
             }
           }

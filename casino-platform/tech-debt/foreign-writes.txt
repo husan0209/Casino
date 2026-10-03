@@ -1,7 +1,4 @@
 apps/api/src/modules/admin/infrastructure/admin-system.prisma.repository.ts	1
 apps/api/src/modules/admin/infrastructure/repositories/admin.prisma.repository.ts	3
 apps/api/src/modules/affiliate/infrastructure/affiliate-settings.prisma.repository.ts	1
-apps/api/src/modules/affiliate/infrastructure/player-provisioning.prisma.repository.ts	2
 apps/api/src/modules/maintenance/infrastructure/maintenance.prisma.repo.ts	3
-apps/api/src/modules/users/infrastructure/repositories/user-session.prisma.ts	2
-apps/api/src/modules/users/infrastructure/repositories/user-settings.prisma.ts	1
