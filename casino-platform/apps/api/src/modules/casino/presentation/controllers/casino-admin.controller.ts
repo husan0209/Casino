@@ -1,5 +1,3 @@
-import { createHash } from 'crypto'
-
 import {
   Body,
   Controller,
@@ -29,9 +27,13 @@ import {
   type Prisma,
 } from '@casino/database'
 
-import { CasinoEntityNotFoundError } from '../../domain/errors'
-import { type ProviderGameRow } from '../../domain/provider-adapter.interface'
-import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
+import { AdminSetGameFlagsUseCase } from '../../application/use-cases/admin-set-game-flags.use-case'
+import { AdminSetProviderEnabledUseCase } from '../../application/use-cases/admin-set-provider-enabled.use-case'
+import {
+  AdminSyncProviderGamesUseCase,
+  type ProviderGamesSyncResult,
+} from '../../application/use-cases/admin-sync-provider-games.use-case'
+import { AdminUpdateGameUseCase } from '../../application/use-cases/admin-update-game.use-case'
 import { UpdateGameSchema } from '../dto/admin-game.dto'
 
 /**
@@ -47,20 +49,6 @@ type AdminSessionDetail = Prisma.GameSessionGetPayload<{
     gameRounds: { include: { gameTransactions: true } }
   }
 }>
-
-/** Стабильный slug игры: читаемая база + хэш пары (provider, externalId). */
-function gameSlug(providerSlug: string, externalGameId: string, name?: string): string {
-  const slugBase =
-    String(name || externalGameId)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '') || 'game'
-  const hash = createHash('md5')
-    .update(`${providerSlug}:${externalGameId}`)
-    .digest('hex')
-    .slice(0, 6)
-  return `${slugBase}-${hash}`
-}
 
 type AdminGamesPage = {
   items: ({ provider: { name: string; slug: string } } & {
@@ -96,13 +84,21 @@ type AdminGamesPage = {
   meta: { page: number; perPage: number; total: number }
 }
 
-
-
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
 @Controller('admin')
 export class CasinoAdminController {
-  constructor(@Inject(ProviderAdapterFactory) private adapters: ProviderAdapterFactory) {}
+  // В3: записи в таблицы каталога (gameProvider.update, game.update/create)
+  // ушли в application/use-cases — контроллер знает только про HTTP и
+  // read-only выборки (чтение через prisma легально по ADR GAP-51).
+  constructor(
+    @Inject(AdminSetProviderEnabledUseCase)
+    private readonly providerEnabledUc: AdminSetProviderEnabledUseCase,
+    @Inject(AdminSyncProviderGamesUseCase)
+    private readonly syncGamesUc: AdminSyncProviderGamesUseCase,
+    @Inject(AdminUpdateGameUseCase) private readonly updateGameUc: AdminUpdateGameUseCase,
+    @Inject(AdminSetGameFlagsUseCase) private readonly gameFlagsUc: AdminSetGameFlagsUseCase,
+  ) {}
 
   // providers
   @Get('providers')
@@ -127,101 +123,36 @@ export class CasinoAdminController {
     return prisma.gameProvider.findMany({ orderBy: { sortOrder: 'asc' } })
   }
   @Post('providers/:id/enable')
-  async providerEnable(@Param('id') id: string): Promise<{ ok: boolean }> {
-    await prisma.gameProvider.update({ where: { id }, data: { isEnabled: true } })
-    return { ok: true }
+  async providerEnable(@Param('id') providerId: string): Promise<{ ok: boolean }> {
+    return this.providerEnabledUc.execute(providerId, true)
   }
   @Post('providers/:id/disable')
-  async providerDisable(@Param('id') id: string): Promise<{ ok: boolean }> {
-    await prisma.gameProvider.update({ where: { id }, data: { isEnabled: false } })
-    return { ok: true }
+  async providerDisable(@Param('id') providerId: string): Promise<{ ok: boolean }> {
+    return this.providerEnabledUc.execute(providerId, false)
   }
-  // UC-GAME-19: синхронизация каталога через ProviderAdapter
+  // UC-GAME-19: синхронизация каталога через ProviderAdapter (цикл upsert'а
+  // и запись gameCount — в AdminSyncProviderGamesUseCase)
   @Post('providers/:id/sync-games')
-  async syncGames(
-    @Param('id') id: string,
-  ): Promise<{ added: number; updated: number; total: number; note: string }> {
-    const provider = await prisma.gameProvider.findUnique({ where: { id } })
-    if (!provider) {
-      throw new CasinoEntityNotFoundError('NOT_FOUND')
-    }
-    const adapter = this.adapters.getAdapter(provider.slug)
-    const list = await adapter.fetchGameList()
-
-    let added = 0
-    let updated = 0
-    for (const g of list) {
-      if (await this.upsertGameRow(id, provider.slug, g)) {
-        updated++
-      } else {
-        added++
-      }
-    }
-
-    const total = await prisma.game.count({ where: { providerId: id } })
-    await prisma.gameProvider.update({ where: { id }, data: { gameCount: total } })
-    return {
-      added,
-      updated,
-      total,
-      note: 'Новые игры добавлены выключенными — включите нужные в разделе «Игры»',
-    }
-  }
-
-  /**
-   * Одна строка каталога: update существующей игры либо create новой.
-   * @returns true если игра уже была (обновили), false — добавили.
-   */
-  private async upsertGameRow(
-    providerId: string,
-    providerSlug: string,
-    g: ProviderGameRow,
-  ): Promise<boolean> {
-    const data = {
-      name: g.name || g.externalGameId,
-      type: (g.type ?? 'slot') as GameType,
-      category: (g.category ?? 'slots') as GameCategory,
-      thumbnailUrl: g.thumbnailUrl ?? null,
-      hasDemo: g.hasDemo,
-      rtp: g.rtp !== undefined ? String(g.rtp) : null,
-      metadata: (g.metadata ?? {}) as Prisma.InputJsonValue,
-    }
-    const existing = await prisma.game.findUnique({
-      where: { providerId_externalGameId: { providerId, externalGameId: g.externalGameId } },
-    })
-    if (existing) {
-      await prisma.game.update({ where: { id: existing.id }, data })
-      return true
-    }
-    // UC-GAME-19 правило: новые игры добавляются ВЫКЛЮЧЕННЫМИ
-    await prisma.game.create({
-      data: {
-        ...data,
-        providerId,
-        externalGameId: g.externalGameId,
-        slug: gameSlug(providerSlug, g.externalGameId, g.name),
-        isEnabled: false,
-      },
-    })
-    return false
+  async syncGames(@Param('id') providerId: string): Promise<ProviderGamesSyncResult> {
+    return this.syncGamesUc.execute(providerId)
   }
 
   // games
   @Get('games')
-  async games(@Query() q: Record<string, string | undefined>): Promise<AdminGamesPage> {
-    const page = parseInt(q.page ?? '') || 1,
-      perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
+  async games(@Query() queryParams: Record<string, string | undefined>): Promise<AdminGamesPage> {
+    const page = parseInt(queryParams.page ?? '') || 1,
+      perPage = Math.min(parseInt(queryParams.per_page ?? '') || 50, 200)
     const where: Prisma.GameWhereInput = {}
-    if (q.provider_id) {
-      where.providerId = q.provider_id
+    if (queryParams.provider_id) {
+      where.providerId = queryParams.provider_id
     }
-    if (q.is_enabled !== undefined) {
-      where.isEnabled = q.is_enabled === 'true'
+    if (queryParams.is_enabled !== undefined) {
+      where.isEnabled = queryParams.is_enabled === 'true'
     }
-    if (q.search) {
+    if (queryParams.search) {
       where.OR = [
-        { name: { contains: q.search, mode: 'insensitive' } },
-        { nameRu: { contains: q.search, mode: 'insensitive' } },
+        { name: { contains: queryParams.search, mode: 'insensitive' } },
+        { nameRu: { contains: queryParams.search, mode: 'insensitive' } },
       ]
     }
     const [items, total] = await Promise.all([
@@ -239,9 +170,9 @@ export class CasinoAdminController {
   @Patch('games/:id')
   @UsePipes(new ZodValidationPipe(UpdateGameSchema))
   async updateGame(
-    @Param('id') id: string,
+    @Param('id') gameId: string,
     @Body()
-    b: {
+    body: {
       name_ru?: string
       is_new?: boolean
       is_popular?: boolean
@@ -250,49 +181,28 @@ export class CasinoAdminController {
       tags?: string[]
     },
   ): Promise<{ ok: boolean }> {
-    const data: Prisma.GameUpdateInput = {}
-    if (b.name_ru !== undefined) {
-      data.nameRu = b.name_ru
-    }
-    if (b.is_new !== undefined) {
-      data.isNew = b.is_new
-    }
-    if (b.is_popular !== undefined) {
-      data.isPopular = b.isPopular ?? b.is_popular
-    }
-    if (b.sort_order !== undefined) {
-      data.sortOrder = b.sort_order
-    }
-    if (b.tags !== undefined) {
-      data.tags = b.tags
-    }
-    await prisma.game.update({ where: { id }, data })
-    return { ok: true }
+    return this.updateGameUc.execute(gameId, body)
   }
   @Post('games/:id/enable')
-  async gameEnable(@Param('id') id: string): Promise<{ ok: boolean }> {
-    await prisma.game.update({ where: { id }, data: { isEnabled: true } })
-    return { ok: true }
+  async gameEnable(@Param('id') gameId: string): Promise<{ ok: boolean }> {
+    return this.gameFlagsUc.execute(gameId, { isEnabled: true })
   }
   @Post('games/:id/disable')
-  async gameDisable(@Param('id') id: string): Promise<{ ok: boolean }> {
-    await prisma.game.update({ where: { id }, data: { isEnabled: false } })
-    return { ok: true }
+  async gameDisable(@Param('id') gameId: string): Promise<{ ok: boolean }> {
+    return this.gameFlagsUc.execute(gameId, { isEnabled: false })
   }
   @Post('games/:id/feature')
-  async gameFeature(@Param('id') id: string): Promise<{ ok: boolean }> {
-    await prisma.game.update({ where: { id }, data: { isFeatured: true } })
-    return { ok: true }
+  async gameFeature(@Param('id') gameId: string): Promise<{ ok: boolean }> {
+    return this.gameFlagsUc.execute(gameId, { isFeatured: true })
   }
   @Post('games/:id/unfeature')
-  async gameUnfeature(@Param('id') id: string): Promise<{ ok: boolean }> {
-    await prisma.game.update({ where: { id }, data: { isFeatured: false } })
-    return { ok: true }
+  async gameUnfeature(@Param('id') gameId: string): Promise<{ ok: boolean }> {
+    return this.gameFlagsUc.execute(gameId, { isFeatured: false })
   }
 
   // game sessions
   @Get('game-sessions')
-  async sessions(@Query() q: Record<string, string | undefined>): Promise<{
+  async sessions(@Query() queryParams: Record<string, string | undefined>): Promise<{
     items: ({
       user: { email: string | null }
       game: { name: string; slug: string }
@@ -318,20 +228,20 @@ export class CasinoAdminController {
     })[]
     meta: { page: number; perPage: number; total: number }
   }> {
-    const page = parseInt(q.page ?? '') || 1,
-      perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
+    const page = parseInt(queryParams.page ?? '') || 1,
+      perPage = Math.min(parseInt(queryParams.per_page ?? '') || 50, 200)
     const where: Prisma.GameSessionWhereInput = {}
-    if (q.user_id) {
-      where.userId = q.user_id
+    if (queryParams.user_id) {
+      where.userId = queryParams.user_id
     }
-    if (q.game_id) {
-      where.gameId = q.game_id
+    if (queryParams.game_id) {
+      where.gameId = queryParams.game_id
     }
-    if (q.provider_id) {
-      where.providerId = q.provider_id
+    if (queryParams.provider_id) {
+      where.providerId = queryParams.provider_id
     }
-    if (q.status) {
-      where.status = q.status as GameSessionStatus
+    if (queryParams.status) {
+      where.status = queryParams.status as GameSessionStatus
     }
     const [items, total] = await Promise.all([
       prisma.gameSession.findMany({
@@ -362,7 +272,7 @@ export class CasinoAdminController {
     return session
   }
   @Get('game-transactions')
-  async gameTx(@Query() q: Record<string, string | undefined>): Promise<{
+  async gameTx(@Query() queryParams: Record<string, string | undefined>): Promise<{
     items: {
       id: string
       createdAt: Date
@@ -381,17 +291,17 @@ export class CasinoAdminController {
     }[]
     meta: { page: number; perPage: number; total: number }
   }> {
-    const page = parseInt(q.page ?? '') || 1,
-      perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
+    const page = parseInt(queryParams.page ?? '') || 1,
+      perPage = Math.min(parseInt(queryParams.per_page ?? '') || 50, 200)
     const where: Prisma.GameTransactionWhereInput = {}
-    if (q.user_id) {
-      where.userId = q.user_id
+    if (queryParams.user_id) {
+      where.userId = queryParams.user_id
     }
-    if (q.provider_id) {
-      where.providerId = q.provider_id
+    if (queryParams.provider_id) {
+      where.providerId = queryParams.provider_id
     }
-    if (q.type) {
-      where.type = q.type as GameTransactionType
+    if (queryParams.type) {
+      where.type = queryParams.type as GameTransactionType
     }
     const [items, total] = await Promise.all([
       prisma.gameTransaction.findMany({

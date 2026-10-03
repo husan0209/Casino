@@ -37,7 +37,7 @@ export interface ProcessRukassaWebhookInput {
 @Injectable()
 export class ProcessRukassaWebhookUseCase {
   private logger = new Logger(ProcessRukassaWebhookUseCase.name)
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
+
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(RUKASSA_CLIENT) private readonly rukassa: IRukassaClient,

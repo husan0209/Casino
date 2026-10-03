@@ -95,6 +95,17 @@ export function validateEnv() {
 | `ADMIN_DOMAIN`                          | string | ✅ (compose) | —                | Домен админки `admin.casino.example.com`. Читают compose (envsubst nginx-шаблона, сервис nginx) и `infra/scripts/ssl_init.sh`; код приложения — нет (GAP-56) |
 | `SSL_EMAIL`                             | email  | ❌           | `admin@<DOMAIN>` | Email для выпуска Let's Encrypt в `infra/scripts/ssl_init.sh` (GAP-56)                                                                                       |
 
+**Порты фронтендов в прод-compose.** Сервисы `web` и `admin` в
+`docker-compose.prod.yml` получают `PORT` и `HOSTNAME` прямо в `environment:` — их нет
+ни в `.env.example`, ни в `envSchema`, потому что их читает сгенерированный Next
+`server.js`, а не код `apps/*`. Обязательны оба:
+
+- `PORT` — standalone-сервер Next слушает `process.env.PORT` (дефолт **3000**), тогда
+  как nginx-хост `ADMIN_DOMAIN` проксирует `http://admin:3002`. Без `PORT: "3002"`
+  админка в проде не отвечала бы никогда; в dev это скрыто `next start -p 3002`.
+- `HOSTNAME` — docker сам проставляет его в ID контейнера, и тогда сервер bind'ится на
+  адрес eth0, из-за чего healthcheck'и compose на `127.0.0.1` не проходили бы.
+
 ---
 
 ## 3. Database

@@ -91,6 +91,15 @@ function makeController(fakes: Fakes = {}) {
   const clickStats = vi.fn(async () => fakes.clickStats ?? { total: 1284, converted: 47 })
   const getSettings = vi.fn(async () => ({ cookieDays: 30, termsVersion: '2026-09' }))
   const getBalances = vi.fn(async () => balances)
+  // В3: записи кабинета ушли в application-слой, контроллер только сериализует
+  // ответ — поэтому мокаются именно сценарии, а не репозиторий.
+  const updateProfile = vi.fn(async () => ({
+    ...AFFILIATE,
+    displayName: 'Новое имя',
+    telegram: '@partner',
+    website: 'https://partner.example',
+  }))
+  const leaveProgram = vi.fn(async () => ({ ...AFFILIATE, status: 'suspended' }))
 
   const controller = new AffiliateController(
     { findById } as never,
@@ -99,11 +108,21 @@ function makeController(fakes: Fakes = {}) {
     { stats: clickStats } as never,
     { get: getSettings } as never,
     { getBalances } as never,
+    { execute: updateProfile } as never,
+    { execute: leaveProgram } as never,
   )
 
   return {
     controller,
-    spies: { findById, listCommissions, listAttributions, getSettings, getBalances },
+    spies: {
+      findById,
+      listCommissions,
+      listAttributions,
+      getSettings,
+      getBalances,
+      updateProfile,
+      leaveProgram,
+    },
   }
 }
 

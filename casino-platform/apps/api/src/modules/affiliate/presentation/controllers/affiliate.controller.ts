@@ -16,6 +16,8 @@ import { type AffiliateActor } from '@/common/types/req-user'
 
 import { WalletFacade } from '../../../wallet/facade/wallet.facade'
 import { AffiliateSettingsService } from '../../application/affiliate-settings.service'
+import { LeaveAffiliateProgramUseCase } from '../../application/use-cases/leave-affiliate-program.use-case'
+import { UpdateAffiliateProfileUseCase } from '../../application/use-cases/update-affiliate-profile.use-case'
 import { AffiliateNotFoundError } from '../../domain/errors/affiliate.errors'
 import {
   AFFILIATE_ATTRIBUTION_REPOSITORY,
@@ -61,6 +63,11 @@ export class AffiliateController {
     @Inject(AFFILIATE_CLICK_REPOSITORY) private readonly clicks: AffiliateClickRepository,
     @Inject(AffiliateSettingsService) private readonly settings: AffiliateSettingsService,
     @Inject(WalletFacade) private readonly walletFacade: WalletFacade,
+    // В3: единственные две записи кабинета (анкета и выход) — в application.
+    @Inject(UpdateAffiliateProfileUseCase)
+    private readonly updateProfileUseCase: UpdateAffiliateProfileUseCase,
+    @Inject(LeaveAffiliateProgramUseCase)
+    private readonly leaveProgramUseCase: LeaveAffiliateProgramUseCase,
   ) {}
 
   /**
@@ -281,8 +288,10 @@ export class AffiliateController {
     body: UpdateAffiliateSelfDto,
     actor: AffiliateActor,
   ): Promise<{ display_name: string | null; telegram: string | null; website: string | null }> {
-    const affiliate = await this.requireAffiliate(actor.affiliateId)
-    const updated = await this.affiliates.updateSelf(affiliate.id, body)
+    const updated = await this.updateProfileUseCase.execute({
+      affiliateId: actor.affiliateId,
+      changes: body,
+    })
     return {
       display_name: updated.displayName,
       telegram: updated.telegram,
@@ -299,11 +308,7 @@ export class AffiliateController {
    */
   @Post('leave')
   async leave(actor: AffiliateActor): Promise<{ status: string; message: string }> {
-    const affiliate = await this.requireAffiliate(actor.affiliateId)
-    await this.affiliates.update(affiliate.id, {
-      status: 'suspended',
-      suspendedReason: 'self-service leave',
-    })
+    await this.leaveProgramUseCase.execute({ affiliateId: actor.affiliateId })
     return { status: 'suspended', message: 'Вы вышли из партнёрской программы' }
   }
 

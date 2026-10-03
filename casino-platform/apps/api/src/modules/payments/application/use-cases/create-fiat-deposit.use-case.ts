@@ -35,7 +35,6 @@ export interface CreateFiatDepositResult {
 
 @Injectable()
 export class CreateFiatDepositUseCase {
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(RUKASSA_CLIENT) private readonly rukassa: IRukassaClient,
@@ -109,7 +108,9 @@ export class CreateFiatDepositUseCase {
   }
 
   private successUrl(): string {
-    return this.config.get<string>('RUKASSA_SUCCESS_URL') || 'http://localhost:3000/?deposit=success'
+    return (
+      this.config.get<string>('RUKASSA_SUCCESS_URL') || 'http://localhost:3000/?deposit=success'
+    )
   }
 
   private failUrl(): string {

@@ -31,7 +31,6 @@ const RATES_CACHE_TTL_SECONDS = 300
  */
 @Injectable()
 export class PaymentJobHandlers {
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(ExpireDepositsJob) private readonly expire: ExpireDepositsJob,
     @Inject(UpdateRatesJob) private readonly rates: UpdateRatesJob,

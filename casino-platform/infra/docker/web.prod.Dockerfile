@@ -17,6 +17,15 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY packages ./packages
 COPY apps/web ./apps/web
 RUN pnpm install --frozen-lockfile
+# Пакеты → dist ДО сборки web (тот же порядок, что в api.prod.Dockerfile).
+# Сегодня `next build` резолвит @casino/shared-* в ИСХОДНИКИ: apps/web/tsconfig.json
+# объявляет paths → packages/*/src, поэтому TS6305 («Output file ... has not been
+# built from source file») в этом образе не возникает. Но это зависимость от одной
+# строки в tsconfig: package.json у пакетов объявляет main/types = ./dist/*, и если
+# paths пропадут (или резолвер уйдёт на node-разрешение), сборка получит либо TS6305,
+# либо пустой dist. Отдельный build-stage для этого не нужен — слои и так общие, —
+# а явный build стоит секунды и снимает класс молчаливых поломок.
+RUN pnpm --filter @casino/shared-types --filter @casino/shared-utils build
 RUN pnpm --filter @casino/web build
 
 FROM node:20-alpine

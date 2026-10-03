@@ -49,7 +49,6 @@ export type WalletBalanceView = {
 
 @Injectable()
 export class WalletFacade {
-  // eslint-disable-next-line max-params -- Nest DI: состав конструктора задаётся графом зависимостей (GAP-25)
   constructor(
     @Inject(WALLET_LEDGER) private ledger: IWalletLedger,
     @Inject(WALLET_REPOSITORY) private repo: IWalletRepository,

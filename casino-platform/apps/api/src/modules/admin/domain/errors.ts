@@ -5,7 +5,10 @@ import { AppError } from '@casino/shared-utils'
 export class AdminJwtTokenError extends AppError {
   readonly code: string
   readonly httpStatus = 401
-  constructor(code: 'BAD_SIGNATURE' | 'TOKEN_EXPIRED') {
+  // INVALID_TOKEN — отказы verify, у которых нет своей причины из JWT: битый
+  // base64, невалидный JSON payload, отсутствующий JWT_ACCESS_SECRET. Вешать на
+  // них BAD_SIGNATURE означало бы искать сломанную подпись там, где её нет.
+  constructor(code: 'BAD_SIGNATURE' | 'TOKEN_EXPIRED' | 'INVALID_TOKEN') {
     super(code)
     this.code = code
   }
@@ -30,5 +33,17 @@ export class InvalidAdminCredentialsError extends AppError {
   readonly httpStatus = 401
   constructor(m = 'Неверный email или пароль') {
     super(m)
+  }
+}
+/**
+ * В3: класс переехал из `admin-finance.controller.ts` в domain — бросает его
+ * теперь application use case (одобрение/отклонение вывода), а не контроллер.
+ * Код и текст сохранены 1-в-1: HTTP-контракт не менялся.
+ */
+export class WithdrawalInvalidStatusError extends AppError {
+  readonly code = 'WITHDRAWAL_INVALID_STATUS'
+  readonly httpStatus = 409
+  constructor() {
+    super('Заявка не найдена или уже обработана')
   }
 }
