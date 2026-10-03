@@ -25,3 +25,10 @@ function pluralRu(count: number, [one, few, many]: Forms): string {
 export function gameCountLabel(count: number): string {
   return `${count} ${pluralRu(count, GAME_FORMS)}`
 }
+
+const PLAYER_FORMS: Forms = ['игрок', 'игрока', 'игроков']
+
+/** Готовая строка счётчика игроков: `1 игрок`, `4 игрока`, `26 игроков`. */
+export function playersCountLabel(count: number): string {
+  return `${count} ${pluralRu(count, PLAYER_FORMS)}`
+}

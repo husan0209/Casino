@@ -7,7 +7,9 @@ import { createPortal } from 'react-dom'
 
 import { GameThumb } from '@/components/casino/GameThumb'
 import { apiPost } from '@/lib/api'
+import { playersCountLabel } from '@/lib/format/plural'
 import { gameBadge, gameDisplayName, gameRtpLabel } from '@/lib/ui/game'
+import { bigWinLabel, playersOnline } from '@/lib/ui/vitrine-stats'
 import { useAuth, type WebUser } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
@@ -97,41 +99,6 @@ const INITIAL_DRAG_STATE: DragState = {
   vertical: false,
   moved: false,
   startTime: 0,
-}
-
-/** djb2 с солью: детерминированные мок-цифры «дышат» по слагу, но стабильны между рендерами. */
-function hashSlug(slug: string, salt: number): number {
-  let hash = 5381 + salt
-  for (let symbolIndex = 0; symbolIndex < slug.length; symbolIndex += 1) {
-    hash = ((hash << 5) + hash + slug.charCodeAt(symbolIndex)) >>> 0
-  }
-  return hash
-}
-
-/**
- * Мок BIG WIN-плашки (§4.4 «контекстный BIG WIN»): поля «выигрыш по игре» в
- * API нет, цифра витринная; целочисленная хэш-арифметика, `toLocaleString` —
- * только отображение (никаких float-расчётов денег).
- */
-function bigWinLabel(slug: string): string {
-  const rubles = Math.round((3200 + (hashSlug(slug, 17) % 145300)) / 100) * 100
-  return `+${rubles.toLocaleString('ru-RU')} ₽`
-}
-
-function onlinePlayersCount(slug: string): number {
-  return 241 + (hashSlug(slug, 101) % 4630)
-}
-
-function pluralizePlayers(count: number): string {
-  const tens = count % 10
-  const hundreds = count % 100
-  if (tens === 1 && hundreds !== 11) {
-    return 'игрок'
-  }
-  if (tens >= 2 && tens <= 4 && (hundreds < 12 || hundreds > 14)) {
-    return 'игрока'
-  }
-  return 'игроков'
 }
 
 // Формируем колоду по ТЗ §4.4: свой (последнее) → избранное → хайп → новинки → остальные.
@@ -228,7 +195,7 @@ const DeckCardFace = memo(function DeckCardFace({
   const displayName = gameDisplayName(card.game)
   const badge = gameBadge(card.game)
   const isFavorite = favoriteSlugs.has(card.game.slug)
-  const playersOnline = onlinePlayersCount(card.game.slug)
+  const onlineCount = playersOnline(card.game.slug)
 
   return (
     <div className="absolute inset-0 overflow-hidden rounded-3xl border border-[#2A2A4A] bg-[#16213E] shadow-2xl select-none">
@@ -252,7 +219,10 @@ const DeckCardFace = memo(function DeckCardFace({
           <span className="block text-[10px] font-bold tracking-[0.18em] text-[#FFB300]">
             BIG WIN
           </span>
-          <span className="block text-sm font-extrabold leading-tight text-white">
+          <span
+            suppressHydrationWarning
+            className="block text-sm font-extrabold leading-tight text-white"
+          >
             {bigWinLabel(card.game.slug)}
           </span>
           <span className="block text-[9px] font-semibold tracking-[0.14em] text-white/50">
@@ -285,9 +255,12 @@ const DeckCardFace = memo(function DeckCardFace({
       </div>
 
       {/* «Сейчас играют» — тонкий живой бейдж на карте (§4.4) */}
-      <span className="deck-rise absolute bottom-[4.75rem] right-3 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white/85 backdrop-blur-md">
+      <span
+        suppressHydrationWarning
+        className="deck-rise absolute bottom-[4.75rem] right-3 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white/85 backdrop-blur-md"
+      >
         <span className="deck-live-dot h-1.5 w-1.5 rounded-full bg-[#FF3D71]" />
-        {playersOnline.toLocaleString('ru-RU')} {pluralizePlayers(playersOnline)} сейчас в игре
+        {playersCountLabel(onlineCount)} сейчас в игре
       </span>
 
       {/* Нижняя плашка: провайдер + бейдж + название + «Играть» (только фронт) */}
