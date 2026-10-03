@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { LoginAffiliateUseCase } from './login-affiliate.use-case'
+import { type IAffiliateJwtService } from '../../domain/affiliate.ports'
 import {
   AffiliateCredentialsInvalidError,
   AffiliateNotActiveError,
 } from '../../domain/errors/affiliate.errors'
 import { type AffiliateRepository } from '../../domain/repositories/affiliate.repository'
 import { parseRevShareRate } from '../../domain/value-objects/revshare-rate.value-object'
-import { type AffiliateJwtService } from '../../infrastructure/affiliate-jwt.service'
 
 import type { AffiliateEntity } from '../../__tests__/helpers/affiliate-test-types'
 
@@ -66,9 +66,9 @@ function makeRepo(affiliate: AffiliateEntity | null): {
   return { repo, findByEmail, touchLastLogin }
 }
 
-function makeJwt(): { jwt: AffiliateJwtService; signAccess: ReturnType<typeof vi.fn> } {
+function makeJwt(): { jwt: IAffiliateJwtService; signAccess: ReturnType<typeof vi.fn> } {
   const signAccess = vi.fn((_id: string, _email: string): string => 'issued-token')
-  const jwt = { signAccess } as unknown as AffiliateJwtService
+  const jwt = { signAccess } as unknown as IAffiliateJwtService
   return { jwt, signAccess }
 }
 

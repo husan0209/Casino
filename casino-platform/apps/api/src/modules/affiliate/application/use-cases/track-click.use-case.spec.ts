@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { sanitizePath, FALLBACK_PATH, TrackClickUseCase } from './track-click.use-case'
+import { type IpFingerprinter } from '../../domain/repositories/affiliate.repository'
 import { parseRevShareRate } from '../../domain/value-objects/revshare-rate.value-object'
-import { extractRefererHost, normalizeIp, sanitizeUserAgent } from '../../infrastructure/ip-hasher'
 
 import type {
   AffiliateClickEntity,
@@ -36,6 +36,22 @@ function makeAffiliate(overrides: Partial<AffiliateEntity> = {}): AffiliateEntit
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
+  }
+}
+
+/**
+ * Фейк порта IpFingerprinter — обязан покрывать ВСЕ методы контракта.
+ *
+ * TrackClick записывает клик в try/catch с fail-open: если фейку не хватает
+ * метода, вызов падает внутри try, ошибка глотается логом, и тест «клик
+ * записан» тихо стал бы «клик не записан». Поэтому тип здесь — сам порт,
+ * а не `as never`.
+ */
+function makeFingerprinter(): IpFingerprinter {
+  return {
+    hash: (ip: string): string => `hash-${ip}`,
+    sanitizeUserAgent: (userAgent: string | null | undefined): string | null => userAgent ?? null,
+    extractRefererHost: (referer: string | null | undefined): string | null => referer ?? null,
   }
 }
 
@@ -77,33 +93,6 @@ describe('sanitizePath', () => {
   })
 })
 
-describe('ip-hasher helpers', () => {
-  it('normalises ipv4-mapped ipv6 to plain ipv4 so one client yields one hash', () => {
-    expect(normalizeIp('::ffff:203.0.113.5')).toBe('203.0.113.5')
-  })
-
-  it('normalises missing values to an empty string', () => {
-    expect(normalizeIp(undefined)).toBe('')
-    expect(normalizeIp(null)).toBe('')
-  })
-
-  it('truncates an overlong user agent', () => {
-    expect(sanitizeUserAgent('x'.repeat(400))?.length).toBe(255)
-  })
-
-  it('returns null for an absent user agent', () => {
-    expect(sanitizeUserAgent(undefined)).toBeNull()
-  })
-
-  it('extracts only the host from a referer, dropping the query', () => {
-    expect(extractRefererHost('https://partner.example/promo?token=secret')).toBe('partner.example')
-  })
-
-  it('returns null for a malformed referer', () => {
-    expect(extractRefererHost('not a url')).toBeNull()
-  })
-})
-
 describe('TrackClickUseCase', () => {
   let useCase: TrackClickUseCase
   let affiliate: AffiliateEntity | null
@@ -142,13 +131,13 @@ describe('TrackClickUseCase', () => {
         })
       },
     }
-    const fingerprinter = { hash: (ip: string): string => `hash-${ip}` }
+    const fingerprinter = makeFingerprinter()
     const settingsService = { get: (): Promise<typeof settings> => Promise.resolve(settings) }
 
     useCase = new TrackClickUseCase(
       affiliatesRepo as never,
       clicksRepo as never,
-      fingerprinter as never,
+      fingerprinter,
       settingsService as never,
     )
   })
@@ -228,7 +217,7 @@ describe('TrackClickUseCase', () => {
     const failOpen = new TrackClickUseCase(
       affiliatesRepo as never,
       failingClicks as never,
-      { hash: (ip: string): string => `hash-${ip}` } as never,
+      makeFingerprinter(),
       { get: (): Promise<typeof settings> => Promise.resolve(settings) } as never,
     )
 

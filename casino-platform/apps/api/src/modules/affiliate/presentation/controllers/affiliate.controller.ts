@@ -14,6 +14,8 @@ import { Controller, Get, Inject, Patch, Post, UseGuards, UsePipes } from '@nest
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AffiliateActor } from '@/common/types/req-user'
 
+import { type AffiliateProfileRow } from '@casino/shared-types'
+
 import { WalletFacade } from '../../../wallet/facade/wallet.facade'
 import { AffiliateSettingsService } from '../../application/affiliate-settings.service'
 import { LeaveAffiliateProgramUseCase } from '../../application/use-cases/leave-affiliate-program.use-case'
@@ -39,8 +41,6 @@ import {
   type UpdateAffiliateSelfDto,
 } from '../dto/affiliate.dto'
 import { AffiliateAuthGuard } from '../guards/affiliate-auth.guard'
-
-import type { AffiliateEntity } from '../../domain/entities/affiliate.entity'
 
 /** Полный кошелёк партнёра в ответе кабинета. */
 interface AffiliateBalances {
@@ -312,7 +312,7 @@ export class AffiliateController {
     return { status: 'suspended', message: 'Вы вышли из партнёрской программы' }
   }
 
-  private async requireAffiliate(affiliateId: string): Promise<AffiliateEntity> {
+  private async requireAffiliate(affiliateId: string): Promise<AffiliateProfileRow> {
     const affiliate = await this.affiliates.findById(affiliateId)
     if (affiliate === null) {
       throw new AffiliateNotFoundError(affiliateId)

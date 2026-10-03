@@ -15,9 +15,9 @@ import { type Response } from 'express'
 import { errorMessage } from '@/common/utils/error-message'
 
 import { prisma } from '@casino/database'
+import { type ParsedProviderCallback } from '@casino/shared-types'
 
 import { GameCallbackService } from '../../application/services/game-callback.service'
-import { type ParsedProviderCallback } from '../../domain/provider-adapter.interface'
 import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
 
 /** Доменные ошибки -> коды результата GitSlotPark. */

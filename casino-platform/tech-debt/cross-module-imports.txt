@@ -1,5 +1,5 @@
 apps/api/src/modules/admin/admin.module.ts	2
-apps/api/src/modules/admin/presentation/controllers/admin-finance.controller.ts	2
+apps/api/src/modules/admin/presentation/controllers/admin-finance.controller.ts	1
 apps/api/src/modules/casino/application/services/game-callback.service.ts	1
 apps/api/src/modules/casino/application/use-cases/launch-game.use-case.ts	1
 apps/api/src/modules/users/application/use-cases/get-geo-context.use-case.ts	1

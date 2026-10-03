@@ -16,6 +16,14 @@ import {
   toRubEquivalent,
 } from '../domain/geo-config.policy'
 
+/** В4: presentation импортирует форму ответа только из фасада (публичный API
+ *  модуля), а не из домена. `GeoConfigResult` не уезжает в @casino/shared-types,
+ *  потому что построен из типов @casino/shared-config (LegalCountry,
+ *  FiatCurrency, PaymentMethodDef) — перенос заставил бы leaf-пакет типов
+ *  зависеть от пакета конфигурации и дублировал бы его юнионы.
+ *  Образец такого же DTO-типа фасада: WalletBalanceView (wallet.facade.ts). */
+export type { GeoConfigResult }
+
 @Injectable()
 export class GeoFacade {
   constructor(

@@ -1,4 +1,4 @@
-import type { Currency, MoneyAmount } from '@casino/shared-types'
+import type { CreditResult, Currency, MoneyAmount } from '@casino/shared-types'
 
 import type { LedgerEntryType, Prisma } from '@prisma/client'
 
@@ -26,12 +26,10 @@ export interface CreditInput {
    */
   tx?: Prisma.TransactionClient | undefined
 }
-export interface CreditResult {
-  balanceBefore: MoneyAmount
-  balanceAfter: MoneyAmount
-  ledgerEntryId: string
-  duplicate: boolean
-}
+/** Итог денежной проводки — read-модель в @casino/shared-types (В4); тут
+ *  реэкспорт для внутренних потребителей домена/application/facade. */
+export type { CreditResult }
+
 export interface IWalletRepository {
   getBalance(userId: string, currency: Currency): Promise<WalletAccount | null>
   listBalances(userId: string): Promise<WalletAccount[]>

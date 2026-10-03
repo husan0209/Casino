@@ -4,6 +4,7 @@ import {
   AFFILIATE_SETTINGS_DEFAULTS,
   type AffiliateSettings,
 } from '../../domain/affiliate-settings'
+import { type IAffiliateJwtService } from '../../domain/affiliate.ports'
 import {
   AffiliateAlreadyExistsError,
   PlayerReferralCodeGenerationError,
@@ -12,7 +13,6 @@ import {
   type AffiliatePlayerProvisioningRepository,
   type AffiliateRepository,
 } from '../../domain/repositories/affiliate.repository'
-import { type AffiliateJwtService } from '../../infrastructure/affiliate-jwt.service'
 import { type AffiliateSettingsService } from '../affiliate-settings.service'
 import { RegisterAffiliateUseCase } from './register-affiliate.use-case'
 
@@ -71,7 +71,7 @@ function makeDeps(
   affiliates: AffiliateRepository
   players: AffiliatePlayerProvisioningRepository
   settings: AffiliateSettingsService
-  jwt: AffiliateJwtService
+  jwt: IAffiliateJwtService
   findByEmail: ReturnType<typeof vi.fn>
   create: ReturnType<typeof vi.fn>
   createPlayerUser: ReturnType<typeof vi.fn>
@@ -124,7 +124,7 @@ function makeDeps(
     settings: {
       get: async () => ({ ...AFFILIATE_SETTINGS_DEFAULTS, ...options.settings }),
     } as unknown as AffiliateSettingsService,
-    jwt: { signAccess } as unknown as AffiliateJwtService,
+    jwt: { signAccess } as unknown as IAffiliateJwtService,
     findByEmail,
     create,
     createPlayerUser,
