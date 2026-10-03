@@ -2,6 +2,7 @@
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useState, Suspense } from 'react'
 
+import { PasswordField } from '@/components/ui/password-field'
 import { toast } from '@/components/ui/toaster'
 import { apiPost, errText } from '@/lib/api'
 
@@ -25,10 +26,9 @@ function ResetInner(): React.JSX.Element {
       <div className="card">
         <h1 className="text-xl font-bold mb-4">Новый пароль</h1>
         <form onSubmit={submit} className="space-y-3">
-          <input
-            className="input"
-            type="password"
+          <PasswordField
             placeholder="Новый пароль"
+            autoComplete="new-password"
             value={pw}
             onChange={(e) => setPw(e.target.value)}
             required

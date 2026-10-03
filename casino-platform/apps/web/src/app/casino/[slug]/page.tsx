@@ -64,7 +64,7 @@ function GameSpecs({ rtp }: { rtp?: string | null }): React.JSX.Element {
     <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
       <div className="rounded-xl bg-white/[0.03] p-3 border border-[#2A2A4A]/40">
         <div className="text-[11px] font-medium text-muted">Отдача (RTP)</div>
-        <div className="mt-0.5 text-base font-bold text-[#00E676]">{rtp || '96.5%'}</div>
+        <div className="mt-0.5 text-base font-bold text-money">{rtp || '96.5%'}</div>
       </div>
       <div className="rounded-xl bg-white/[0.03] p-3 border border-[#2A2A4A]/40">
         <div className="text-[11px] font-medium text-muted">Волатильность</div>

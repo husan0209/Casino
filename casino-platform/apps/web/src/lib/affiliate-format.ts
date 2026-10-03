@@ -86,7 +86,7 @@ export function statusLabel(value: string): {
 export function statusToneClass(tone: 'ok' | 'warn' | 'bad' | 'muted'): string {
   switch (tone) {
     case 'ok':
-      return 'bg-[#00C853]/15 text-[#00C853]'
+      return 'bg-money-dark/15 text-money-dark'
     case 'warn':
       return 'bg-[#FFB300]/15 text-[#FFB300]'
     case 'bad':

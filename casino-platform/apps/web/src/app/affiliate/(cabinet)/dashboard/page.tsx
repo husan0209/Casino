@@ -23,7 +23,7 @@ function Kpi({
       <div className="text-muted text-sm">{label}</div>
       <div
         className={
-          tone === 'money' ? 'text-2xl font-black mt-1 text-[#00C853]' : 'text-2xl font-black mt-1'
+          tone === 'money' ? 'text-2xl font-black mt-1 text-money-dark' : 'text-2xl font-black mt-1'
         }
       >
         {value}
@@ -63,7 +63,7 @@ export default function AffiliateDashboardPage(): React.JSX.Element {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-muted text-sm">Ваша ставка RevShare</div>
-            <div className="text-3xl font-black text-[#00C853] mt-0.5">
+            <div className="text-3xl font-black text-money-dark mt-0.5">
               {me.data ? formatRate(me.data.revshare_rate) : '…'}
             </div>
             <div className="text-muted text-xs mt-1">

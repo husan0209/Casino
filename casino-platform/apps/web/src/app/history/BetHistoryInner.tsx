@@ -177,7 +177,7 @@ export function BetHistoryInner(): React.JSX.Element {
             </div>
             <div className="card flex-1 px-4 py-3">
               <div className="text-xs text-muted">Выигрыши</div>
-              <div className="text-lg font-semibold text-[#00C853]">
+              <div className="text-lg font-semibold text-money-dark">
                 {formatAmount(singleCurrencyStats.wins, singleCurrencyStats.currency)}
               </div>
             </div>
@@ -260,7 +260,7 @@ function BetRow({
         <span className="flex-1 truncate text-sm">{row.game.name}</span>
         <span className="shrink-0 text-xs text-muted">{currencyLabel(row.currency)}</span>
         <span className="shrink-0 text-sm">{formatAmount(row.total_bet, row.currency)}</span>
-        <span className="shrink-0 text-sm text-[#00C853]">
+        <span className="shrink-0 text-sm text-money-dark">
           {formatAmount(row.total_win, row.currency)}
         </span>
         <span className="shrink-0 text-xs text-muted">{expanded ? '▲' : '▼'}</span>
@@ -277,7 +277,7 @@ function BetRow({
           </div>
           <div className="flex justify-between gap-3">
             <span>Разница по ставке</span>
-            <span className={money.isPositive(profit) ? 'text-[#00C853]' : 'text-[#FF3D71]'}>
+            <span className={money.isPositive(profit) ? 'text-money-dark' : 'text-[#FF3D71]'}>
               {formatAmount(profit, row.currency)}
             </span>
           </div>
