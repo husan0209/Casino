@@ -498,7 +498,9 @@ interface DeckHeaderProps {
 function DeckHeader({ total, position, onShuffle }: DeckHeaderProps): React.JSX.Element {
   const onFinalCard = position >= total
   return (
-    <div className="mb-3 flex items-center justify-between">
+    /* relative z-50: веер задних карт поднимается над стеком и без этого
+       рисуется ПОВЕРХ статичного заголовка — карта должна прятаться под ним. */
+    <div className="relative z-50 mb-3 flex items-center justify-between">
       <div>
         <p className="caps-label flex items-center gap-1">
           <Sparkles size={12} className="text-[#00E676]" />
