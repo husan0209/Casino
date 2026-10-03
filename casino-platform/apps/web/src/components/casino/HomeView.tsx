@@ -6,6 +6,7 @@ import { GameDeck } from '@/components/casino/GameDeck'
 import { GameSection } from '@/components/casino/GameSection'
 import { GuestHero } from '@/components/casino/GuestHero'
 import { HomeChips } from '@/components/casino/HomeChips'
+import { PartnerHero } from '@/components/casino/PartnerHero'
 import { ProviderStrip } from '@/components/casino/ProviderStrip'
 import { MobileSearchBar } from '@/components/layout/MobileSearchBar'
 import { useFavorites } from '@/hooks/useFavorites'
@@ -51,8 +52,9 @@ export function HomeView({
     <div className="container-1 py-4">
       <MobileSearchBar />
 
-      {/* §4.2: герой гостя — spinera; залогиненному маркетингового героя нет (§4.3) */}
+      {/* §4.2: герой гостя — spinera; залогиненному — партнёрский баннер (ТЗ ч.8, §6.1 п.0) */}
       {!user && <GuestHero games={popular} />}
+      {user && <PartnerHero />}
 
       {/* §4.4: GameDeck у гостя (после Hero) */}
       {!user && (

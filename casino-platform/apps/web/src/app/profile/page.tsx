@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import Link from 'next/link'
 import { useRef, useState } from 'react'
 
 import { UserAvatar } from '@/components/layout/UserAvatar'
@@ -178,6 +179,33 @@ export default function ProfilePage(): React.JSX.Element {
           {tab === 'security' && <SecurityTab me={data} onLogout={logout} />}
           {tab === 'sessions' && <SessionsTab />}
           {tab === 'settings' && <SettingsTab me={data} />}
+
+          {/* Партнёрская программа (ТЗ ч.8) и поддержка (§15): на мобиле
+              икон-панели нет, таб-бар фиксирован (§4.3) — входы дублируются
+              в меню аватара и здесь. */}
+          <div className="card mt-5 flex flex-wrap items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">Партнёрская программа</div>
+              <div className="text-sm text-muted">
+                Приводите игроков и получайте процент от NGR. Кабинет вебмастера отдельный от
+                игрового профиля.
+              </div>
+            </div>
+            <Link href="/affiliate" className="btn shrink-0 px-4 py-2 text-sm">
+              Перейти
+            </Link>
+          </div>
+          <div className="card mt-3 flex flex-wrap items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="font-medium">Нужна помощь?</div>
+              <div className="text-sm text-muted">
+                Создайте тикет — ответим в переписке. Платежи, игры, аккаунт, другое.
+              </div>
+            </div>
+            <Link href="/support" className="btn shrink-0 px-4 py-2 text-sm">
+              Написать в поддержку
+            </Link>
+          </div>
         </>
       )}
     </div>
