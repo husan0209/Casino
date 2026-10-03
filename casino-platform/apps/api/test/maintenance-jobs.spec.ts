@@ -272,28 +272,28 @@ describe('maintenance jobs (GAP-33)', () => {
   })
 
   describe('ReferralDailyJob', () => {
-    it('проксирует ReferralCalcService.runDaily и возвращает сводку (критерий 4: лог-сводка)', async () => {
+    it('проксирует ReferralsFacade.runDaily и возвращает сводку (критерий 4: лог-сводка)', async () => {
       const calls: Array<string | undefined> = []
-      const fakeCalc = {
+      const fakeFacade = {
         runDaily: async (dateStr?: string) => {
           calls.push(dateStr)
           return { processed: 2, credited: 1, date: NOW }
         },
       }
-      const res = await new ReferralDailyJob(fakeCalc as never).execute()
+      const res = await new ReferralDailyJob(fakeFacade as never).execute()
       expect(calls).toEqual([undefined])
       expect(res).toEqual({ processed: 2, credited: 1, date: NOW })
     })
 
     it('проксирует явную дату (ручной запуск за произвольный день)', async () => {
       const calls: Array<string | undefined> = []
-      const fakeCalc = {
+      const fakeFacade = {
         runDaily: async (dateStr?: string) => {
           calls.push(dateStr)
           return { processed: 0, credited: 0, date: new Date('2026-08-31T00:00:00.000Z') }
         },
       }
-      await new ReferralDailyJob(fakeCalc as never).execute('2026-08-31')
+      await new ReferralDailyJob(fakeFacade as never).execute('2026-08-31')
       expect(calls).toEqual(['2026-08-31'])
     })
   })
