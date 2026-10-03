@@ -8,7 +8,14 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { gameBadge, gameDisplayName, gameHasDemo, gameRtpLabel } from '../src/lib/ui/game'
+import {
+  gameBadge,
+  gameDisplayName,
+  gameHasDemo,
+  gameMinBetLabel,
+  gameRtpLabel,
+  gameVolatilityLabel,
+} from '../src/lib/ui/game'
 
 describe('GAP-55 имя игры (§6.4)', () => {
   it('русское название приоритетно', () => {
@@ -61,5 +68,42 @@ describe('GAP-55 демо (§8.4)', () => {
     expect(gameHasDemo(true)).toBe(true)
     expect(gameHasDemo(false)).toBe(false)
     expect(gameHasDemo(undefined)).toBe(false)
+  })
+})
+
+/**
+ * ТЗ ч.5 §8.1 (волна 5.1, остаток): превью показывает RTP, волатильность и
+ * мин. ставку. До этого страница игры рисовала «Высокая» всем слотам подряд,
+ * не заглядывая в API.
+ */
+describe('превью: волатильность (§8.1)', () => {
+  it('значения enum переводятся в человеческое слово', () => {
+    expect(gameVolatilityLabel('low')).toBe('Низкая')
+    expect(gameVolatilityLabel('medium')).toBe('Средняя')
+    expect(gameVolatilityLabel('high')).toBe('Высокая')
+    expect(gameVolatilityLabel('very_high')).toBe('Очень высокая')
+  })
+
+  it('пустоты не показываем, неизвестное значение — как есть', () => {
+    expect(gameVolatilityLabel(null)).toBeNull()
+    expect(gameVolatilityLabel(undefined)).toBeNull()
+    expect(gameVolatilityLabel('  ')).toBeNull()
+    expect(gameVolatilityLabel('extreme')).toBe('extreme')
+  })
+})
+
+describe('превью: мин. ставка (§8.1)', () => {
+  it('Decimal-строку режем до человекочитаемой суммы в активной валюте', () => {
+    expect(gameMinBetLabel('10.00000000', 'RUB')).toBe('10 ₽')
+    expect(gameMinBetLabel('1500.00', 'KZT')).toBe('1 500 ₸')
+    expect(gameMinBetLabel(0.2, 'USDT_TRC20')).toBe('0.20 USDT')
+  })
+
+  it('null/0/мусор — строки нет (иначе «Мин. ставка 0 ₽» за выдачу данных)', () => {
+    expect(gameMinBetLabel(null, 'RUB')).toBeNull()
+    expect(gameMinBetLabel(undefined, 'RUB')).toBeNull()
+    expect(gameMinBetLabel('', 'RUB')).toBeNull()
+    expect(gameMinBetLabel('0', 'RUB')).toBeNull()
+    expect(gameMinBetLabel('abc', 'RUB')).toBeNull()
   })
 })
