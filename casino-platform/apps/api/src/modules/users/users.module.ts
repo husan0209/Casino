@@ -7,6 +7,7 @@ import { ListSessionsUseCase } from './application/use-cases/list-sessions.use-c
 import { RevokeAllSessionsUseCase } from './application/use-cases/revoke-all-sessions.use-case'
 import { RevokeSessionUseCase } from './application/use-cases/revoke-session.use-case'
 import { SelfExclusionUseCase } from './application/use-cases/self-exclusion.use-case'
+import { SetAvatarUseCase } from './application/use-cases/set-avatar.use-case'
 import { UpdateAfterDepositUseCase } from './application/use-cases/update-after-deposit.use-case'
 import { UpdateCurrencyPreferenceUseCase } from './application/use-cases/update-currency-preference.use-case'
 import { UpdateProfileUseCase } from './application/use-cases/update-profile.use-case'
@@ -31,6 +32,7 @@ import { UsersController } from './presentation/controllers/users.controller'
     RevokeSessionUseCase,
     RevokeAllSessionsUseCase,
     SelfExclusionUseCase,
+    SetAvatarUseCase,
     UpdateCurrencyPreferenceUseCase,
     GetGeoContextUseCase,
     UpdateAfterDepositUseCase,

@@ -1,6 +1,3 @@
-import { randomUUID } from 'crypto'
-import { mkdirSync, writeFileSync } from 'fs'
-
 import {
   BadRequestException,
   Body,
@@ -20,7 +17,7 @@ import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
 
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
-import { extForMime, sniffDocumentMime } from '@/common/files/file-sniffer'
+import { sniffDocumentMime } from '@/common/files/file-sniffer'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type UserActor } from '@/common/types/req-user'
 
@@ -32,6 +29,7 @@ import { ListSessionsUseCase } from '../../application/use-cases/list-sessions.u
 import { RevokeAllSessionsUseCase } from '../../application/use-cases/revoke-all-sessions.use-case'
 import { RevokeSessionUseCase } from '../../application/use-cases/revoke-session.use-case'
 import { SelfExclusionUseCase } from '../../application/use-cases/self-exclusion.use-case'
+import { SetAvatarUseCase } from '../../application/use-cases/set-avatar.use-case'
 import { UpdateCurrencyPreferenceUseCase } from '../../application/use-cases/update-currency-preference.use-case'
 import { UpdateProfileUseCase } from '../../application/use-cases/update-profile.use-case'
 import { UpdateSettingsUseCase } from '../../application/use-cases/update-settings.use-case'
@@ -55,6 +53,7 @@ export class UsersController {
     @Inject(SelfExclusionUseCase) private selfExclusion: SelfExclusionUseCase,
     @Inject(UpdateCurrencyPreferenceUseCase)
     private updateCurrency: UpdateCurrencyPreferenceUseCase,
+    @Inject(SetAvatarUseCase) private setAvatar: SetAvatarUseCase,
   ) {}
 
   @Get('me')
@@ -114,25 +113,26 @@ export class UsersController {
   )
   async avatar(
     @CurrentUser() user: UserActor,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: Express.Multer.File | undefined,
   ): Promise<{ avatar_url: string }> {
-    // avatar url saving – simplified, reuse profile repo directly
-    const { PrismaUserProfileRepository } =
-      await import('../../infrastructure/repositories/user-profile.prisma.js')
-    if (file.buffer.length === 0) {
+    // В3: presentation знает только про форму запроса. Проверки ниже — это
+    // 400-ответы (multipart-часть отсутствует/пустая, контент не картинка),
+    // а сам файл и запись avatar_url делает SetAvatarUseCase через порт
+    // USER_PROFILE_REPOSITORY. Раньше здесь был динамический import()
+    // репозитория и создание его через new — то есть запись в БД
+    // в обход DI и слоёв.
+    if (!file || file.buffer.length === 0) {
       throw new BadRequestException('File is required')
     }
     const sniffed = sniffDocumentMime(file.buffer)
     if (!sniffed || sniffed === 'application/pdf') {
       throw new BadRequestException('Avatar must be a JPEG, PNG or WebP image')
     }
-    mkdirSync('./uploads/avatars', { recursive: true })
-    const filename = randomUUID() + extForMime(sniffed)
-    writeFileSync(`./uploads/avatars/${filename}`, file.buffer, { mode: 0o600 })
-    const repo = new PrismaUserProfileRepository()
-    const url = `/uploads/avatars/${filename}`
-    await repo.setAvatar(user.id, url)
-    return { avatar_url: url }
+    return this.setAvatar.execute({
+      userId: user.id,
+      buffer: file.buffer,
+      mimeType: sniffed,
+    })
   }
 
   /**
