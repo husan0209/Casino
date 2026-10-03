@@ -34,6 +34,8 @@ import { type AdminActor } from '@/common/types/req-user'
 
 import { AdminFacade } from '@modules/admin/facade/admin.facade'
 
+import { type AffiliateProfileRow } from '@casino/shared-types'
+
 import { AdminAuthGuard } from '../../../admin/presentation/admin-auth.guard'
 import { Roles, RolesGuard } from '../../../auth/presentation/guards/roles.guard'
 import { AffiliateSettingsService } from '../../application/affiliate-settings.service'
@@ -63,8 +65,6 @@ import {
   type CreateAffiliateAdminDto,
   type UpdateAffiliateAdminDto,
 } from '../dto/affiliate.dto'
-
-import type { AffiliateEntity } from '../../domain/entities/affiliate.entity'
 
 @UseGuards(AdminAuthGuard, RolesGuard)
 @Controller('admin/affiliate')
@@ -502,7 +502,7 @@ export class AffiliateAdminController {
     }
   }
 
-  private async requireAffiliate(id: string): Promise<AffiliateEntity> {
+  private async requireAffiliate(id: string): Promise<AffiliateProfileRow> {
     const affiliate = await this.affiliates.findById(id)
     if (affiliate === null) {
       throw new AffiliateNotFoundError(id)

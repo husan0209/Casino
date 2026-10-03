@@ -17,7 +17,6 @@ import {
   type AffiliateRepository,
   type IpFingerprinter,
 } from '../../domain/repositories/affiliate.repository'
-import { extractRefererHost, sanitizeUserAgent } from '../../infrastructure/ip-hasher'
 import { AffiliateSettingsService } from '../affiliate-settings.service'
 
 /** Куда уходит трафик, если deep-link невалиден или партнёр неактивен. */
@@ -126,8 +125,8 @@ export class TrackClickUseCase {
         affiliateId,
         landingPath,
         ipHash: this.fingerprinter.hash(input.ip ?? ''),
-        userAgent: sanitizeUserAgent(input.userAgent),
-        refererHost: extractRefererHost(input.referer),
+        userAgent: this.fingerprinter.sanitizeUserAgent(input.userAgent),
+        refererHost: this.fingerprinter.extractRefererHost(input.referer),
         geoCountry: input.geoCountry ?? null,
         campaignId: input.campaignId ?? null,
         subId: input.subId ?? null,

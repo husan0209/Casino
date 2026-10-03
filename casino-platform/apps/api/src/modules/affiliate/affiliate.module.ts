@@ -38,6 +38,7 @@ import { TrackClickUseCase } from './application/use-cases/track-click.use-case'
 import { UpdateAffiliateByAdminUseCase } from './application/use-cases/update-affiliate-by-admin.use-case'
 import { UpdateAffiliateProfileUseCase } from './application/use-cases/update-affiliate-profile.use-case'
 import { AFFILIATE_SETTINGS_REPOSITORY } from './domain/affiliate-settings'
+import { AFFILIATE_JWT_SERVICE } from './domain/affiliate.ports'
 import {
   AFFILIATE_ATTRIBUTION_REPOSITORY,
   AFFILIATE_CLICK_REPOSITORY,
@@ -90,6 +91,10 @@ import { AffiliateAuthGuard } from './presentation/guards/affiliate-auth.guard'
     // Соль/нормализация IP обязаны совпадать при записи клика и при проверке
     // атрибуции, иначе антифрод-правила F1/F3 молча перестанут срабатывать.
     { provide: AFFILIATE_IP_FINGERPRINTER, useExisting: IpHasher },
+    // В5: application-слой (login/register) получает JWT партнёров только через
+    // порт. useExisting — тот же экземпляр, что и у класс-токена, который
+    // по-прежнему нужен presentation-guard'у (образец: auth.module.ts).
+    { provide: AFFILIATE_JWT_SERVICE, useExisting: AffiliateJwtService },
     // Мы же реализуем порт users — поэтому тут, а не в UsersModule:
     // так users не зависит от affiliate (зависимость через порт односторонняя).
     { provide: RESPONSIBLE_GAMING_HOOK, useExisting: AffiliateResponsibleGamingHook },

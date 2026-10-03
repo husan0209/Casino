@@ -20,7 +20,6 @@ import {
   type IPaymentRequestRepository,
   PAYMENT_REQUEST_REPOSITORY,
 } from '@modules/payments/domain/payments.ports'
-import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import {
@@ -32,7 +31,7 @@ import {
   prisma,
   type Prisma,
 } from '@casino/database'
-import { type Currency } from '@casino/shared-types'
+import { type CreditResult, type Currency } from '@casino/shared-types'
 import { AppError } from '@casino/shared-utils'
 
 import { AuditLogService } from '../../application/audit-log.service'

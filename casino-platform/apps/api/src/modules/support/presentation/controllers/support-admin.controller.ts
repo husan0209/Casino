@@ -18,13 +18,16 @@ import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
 import { Roles, RolesGuard } from '@modules/auth/presentation/guards/roles.guard'
 import {
   type ISupportRepository,
-  type MessageRow,
   SUPPORT_REPOSITORY,
+} from '@modules/support/domain/repositories/support.repository'
+
+import {
+  type MessageRow,
   type TicketCategory,
   type TicketListItem,
   type TicketPriority,
   type TicketStatus,
-} from '@modules/support/domain/repositories/support.repository'
+} from '@casino/shared-types'
 
 import { AssignTicketUseCase } from '../../application/use-cases/assign-ticket.use-case'
 import { CloseTicketUseCase } from '../../application/use-cases/close-ticket.use-case'
