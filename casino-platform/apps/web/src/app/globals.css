@@ -79,6 +79,12 @@ body {
   @apply w-full rounded-xl border border-[#2A2A4A] bg-[#1A1A2E] px-3 py-2.5 text-sm outline-none transition placeholder:text-muted/70 focus:border-brand focus:ring-2 focus:ring-brand/25;
 }
 
+/* Подпись поля вне placeholder (ТЗ ч.5.1 §4): класс уже стоит в affiliate-страницах,
+   но определения в сборке не было. */
+.field-label {
+  @apply mb-1 block text-xs font-medium text-muted;
+}
+
 /* ── Шторки (sheets) ──────────────────────────────────────────────── */
 
 .sheet-backdrop {
