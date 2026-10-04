@@ -8,6 +8,7 @@ import {
   ProvisionAffiliatePlayerUseCase,
   type ProvisionAffiliatePlayerResult,
 } from '../application/use-cases/provision-affiliate-player.use-case'
+import { PurgeDeadSessionsUseCase } from '../application/use-cases/purge-dead-sessions.use-case'
 import { UnblockPlayerUseCase } from '../application/use-cases/unblock-player.use-case'
 import { UpdateAfterDepositUseCase } from '../application/use-cases/update-after-deposit.use-case'
 import { UpdateCurrencyPreferenceUseCase } from '../application/use-cases/update-currency-preference.use-case'
@@ -27,6 +28,8 @@ export class UsersFacade {
     private deprovisionAffiliatePlayerUseCase: DeprovisionAffiliatePlayerUseCase,
     @Inject(BlockPlayerUseCase) private blockPlayerUseCase: BlockPlayerUseCase,
     @Inject(UnblockPlayerUseCase) private unblockPlayerUseCase: UnblockPlayerUseCase,
+    @Inject(PurgeDeadSessionsUseCase)
+    private purgeDeadSessionsUseCase: PurgeDeadSessionsUseCase,
   ) {}
 
   getGeoContext(userId: string): Promise<UserGeoContext | null> {
@@ -79,5 +82,14 @@ export class UsersFacade {
   /** Разблокировка: только статус, отозванные сессии не возвращаются. */
   unblockPlayer(userId: string): Promise<void> {
     return this.unblockPlayerUseCase.execute(userId)
+  }
+
+  /**
+   * Уборка мёртвых сессий (G24): удаляет rows, где `expiresAt` или `revokedAt`
+   * раньше cutoff, и возвращает число удалённых. Заказчик — cron
+   * `cleanup-sessions` из maintenance: раньше он удалял чужие строки напрямую.
+   */
+  purgeDeadSessions(cutoff: Date): Promise<number> {
+    return this.purgeDeadSessionsUseCase.execute(cutoff)
   }
 }

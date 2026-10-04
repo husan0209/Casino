@@ -102,6 +102,8 @@ describe('UsersFacade и сборка модулей (G24)', () => {
       {} as never,
       { execute: block } as unknown as BlockPlayerUseCase,
       { execute: unblock } as unknown as UnblockPlayerUseCase,
+      // 8-й параметр — PurgeDeadSessionsUseCase: в этом тесте не участвует
+      { execute: async () => 0 } as never,
     )
 
     await facade.blockPlayer('u-9')

@@ -75,6 +75,19 @@ export class PaymentRequestRepository implements IPaymentRequestRepository {
       prisma.paymentRequest.count({ where }),
     ])
   }
+
+  /**
+   * Условное истечение (порт + гард G24): `status: 'pending'` в where, поэтому
+   * гонка с вебхуком не затирает completed. Условие держится здесь, а не в
+   * вызывающем коде: читатель не может гарантировать, что заявка ещё pending.
+   */
+  async expireIfPending(id: string): Promise<number> {
+    const res = await prisma.paymentRequest.updateMany({
+      where: { id, status: 'pending' },
+      data: { status: 'expired' },
+    })
+    return res.count
+  }
   saveCallback(data: {
     provider: string
     externalId?: string

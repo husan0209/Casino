@@ -4,7 +4,9 @@ import Redis from 'ioredis'
 
 import { prisma } from '@casino/database'
 
+import { AdminFacade } from '../../admin/facade/admin.facade'
 import { PaymentsFacade } from '../../payments/facade/payments.facade'
+import { UsersFacade } from '../../users/facade/users.facade'
 import { CleanupSessionsJob } from '../application/cleanup-sessions.job'
 import { ExpireDepositsJob } from '../application/expire-deposits.job'
 import { UpdateRatesJob } from '../application/update-rates.job'
@@ -58,9 +60,18 @@ export class PaymentJobHandlers {
   }
 }
 
-/** Prisma-реализация портов maintenance-задач (GAP-33). */
+/**
+ * Реализация портов maintenance-задач (GAP-33).
+ *
+ * Чужие таблицы — только через фасад владельца (гард G24): истечение заявки
+ * делает payments, запись аудита — admin. Чтения (`payment_requests`,
+ * `audit_logs`, `admin_users`) остались прямыми: межмодульное чтение разрешено
+ * ADR GAP-51, и детектор записей его не считает.
+ */
 @Injectable()
 export class PrismaMaintenanceRepo implements IPaymentMaintenanceRepo {
+  constructor(@Inject(PaymentsFacade) private readonly payments: PaymentsFacade) {}
+
   async listPendingDeposits(): Promise<MaintenancePaymentRow[]> {
     const rows = await prisma.paymentRequest.findMany({
       where: { type: 'deposit', status: 'pending' },
@@ -91,21 +102,30 @@ export class PrismaMaintenanceRepo implements IPaymentMaintenanceRepo {
     }))
   }
 
-  /** Условный update: гонка с вебхуком (completed) не затирает завершённый статус. */
+  /**
+   * Условное истечение — внутри payments (`expirePendingPayment`), чтобы
+   * гонка с вебхуком не затирала completed-статус. Здесь остаётся только
+   * решение «нулём» — это доменная ошибка maintenance, а не payments.
+   */
   async markExpired(id: string): Promise<void> {
-    const res = await prisma.paymentRequest.updateMany({
-      where: { id, status: 'pending' },
-      data: { status: 'expired' },
-    })
-    if (res.count === 0) {
+    const flipped = await this.payments.expirePendingPayment(id)
+    if (!flipped) {
       throw new PaymentRequestNotPendingError(id)
     }
   }
 }
 
-/** Audit-log как канал уведомления админов + дедуп напоминаний. */
+/**
+ * Audit-log как канал уведомления админов + дедуп напоминаний.
+ *
+ * Запись строки `audit_logs` делает admin (гард G24) через `logActionStrict`:
+ * именно строгий вариант, потому что строка здесь — состояние, а не только
+ * наблюдаемость: по ней же решается, не слать ли напоминание повторно.
+ */
 @Injectable()
 export class PrismaReminderAuditRepo implements IReminderAuditRepo {
+  constructor(@Inject(AdminFacade) private readonly audit: AdminFacade) {}
+
   async findRecentReminder(withdrawalId: string, since: Date): Promise<boolean> {
     const row = await prisma.auditLog.findFirst({
       where: { action: REMINDER_ACTION, targetId: withdrawalId, createdAt: { gte: since } },
@@ -119,15 +139,13 @@ export class PrismaReminderAuditRepo implements IReminderAuditRepo {
     adminsNotified: number
     count: number
   }): Promise<void> {
-    await prisma.auditLog.create({
-      data: {
-        actorType: 'system',
-        actorId: SYSTEM_ACTOR_ID,
-        action: REMINDER_ACTION,
-        targetType: 'payment_request',
-        targetId: input.targetId,
-        payload: { adminsNotified: input.adminsNotified, totalStale: input.count },
-      },
+    await this.audit.logActionStrict({
+      actorType: 'system',
+      actorId: SYSTEM_ACTOR_ID,
+      action: REMINDER_ACTION,
+      targetType: 'payment_request',
+      targetId: input.targetId,
+      payload: { adminsNotified: input.adminsNotified, totalStale: input.count },
     })
   }
 
@@ -199,16 +217,19 @@ export class NowPaymentsRatesProvider implements IRatesProvider {
   }
 }
 
-/** Очистка мёртвых сессий (pre-launch hardening A1). */
+/**
+ * Очистка мёртвых сессий (pre-launch hardening A1).
+ *
+ * Удаляет не maintenance: `sessions` — таблица auth/users (MODEL_OWNERS, гард
+ * G24), поэтому заказ идёт через `UsersFacade.purgeDeadSessions`. Выбор cutoff
+ * (grace-окно, чтобы admin-UI ещё видел недавние «выходы со всех устройств»)
+ * остаётся за джобой — это решение планировщика, а не владельца строк.
+ */
 @Injectable()
 export class PrismaSessionMaintenanceRepo implements ISessionMaintenanceRepo {
-  /** expired или отозванные ДО cutoff. deleteMany идемпотентен. */
+  constructor(@Inject(UsersFacade) private readonly users: UsersFacade) {}
+
   async purgeDeadSessions(cutoff: Date): Promise<number> {
-    const res = await prisma.session.deleteMany({
-      where: {
-        OR: [{ expiresAt: { lt: cutoff } }, { revokedAt: { lt: cutoff } }],
-      },
-    })
-    return res.count
+    return this.users.purgeDeadSessions(cutoff)
   }
 }
