@@ -7,13 +7,14 @@ import { LoginSheet } from '@/components/auth/LoginSheet'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { DesktopNav } from '@/components/layout/DesktopNav'
+import { LegalChrome } from '@/components/layout/LegalChrome'
 import { SiteFooter } from '@/components/layout/SiteFooter'
 import { DepositReturnHandler } from '@/components/wallet/DepositReturnHandler'
 import { DepositSheet } from '@/components/wallet/DepositSheet'
 import { LaunchCurrencySheet } from '@/components/wallet/LaunchCurrencySheet'
 import { WalletSwitcher } from '@/components/wallet/WalletSwitcher'
 import { WithdrawSheet } from '@/components/wallet/WithdrawSheet'
-import { isAuthPath, isSearchShortcut } from '@/lib/ui/desktop-nav'
+import { isAuthPath, isLegalPath, isSearchShortcut } from '@/lib/ui/desktop-nav'
 
 /** §4.5: состояние pin панели переживает reload. */
 const PIN_KEY = 'casino-web-nav-pinned'
@@ -24,7 +25,9 @@ const PIN_KEY = 'casino-web-nav-pinned'
  * - десктоп: слева икон-панель (pin — шире, контент смещается), поиск в хедере,
  *   Ctrl/⌘K ведёт на /search;
  * - страницы аутентификации (§4.7) — без казино-навигации, листы кассы/логина
- *   остаются смонтированными (после входа launch продолжается, §5.5).
+ *   остаются смонтированными (после входа launch продолжается, §5.5);
+ * - правовые документы /legal/* (GAP-49) — в нейтральной обвязке `LegalChrome`:
+ *   без бренда, логотипа, платёжных бейджей и таббара.
  */
 export function MainShell({ children }: { children: React.ReactNode }): React.JSX.Element {
   const router = useRouter()
@@ -64,17 +67,36 @@ export function MainShell({ children }: { children: React.ReactNode }): React.JS
   // §4.7: путь берём из usePathname (не window.location!) — иначе hydration
   // mismatch на серверном рендере и нерелевантность при SPA-переходах.
   const bare = isAuthPath(pathname)
+  const legal = !bare && isLegalPath(pathname)
+
+  // Листы смонтированы во всех режимах: после входа или возврата с депозита
+  // (§5.5) они должны застать открытым состояние, а не монтироваться заново.
+  const overlays = (
+    <>
+      <LoginSheet />
+      <DepositSheet />
+      <WithdrawSheet />
+      <WalletSwitcher />
+      <LaunchCurrencySheet />
+      <DepositReturnHandler />
+    </>
+  )
 
   if (bare) {
     return (
       <>
         <main className="min-h-screen">{children}</main>
-        <LoginSheet />
-        <DepositSheet />
-        <WithdrawSheet />
-        <WalletSwitcher />
-        <LaunchCurrencySheet />
-        <DepositReturnHandler />
+        {overlays}
+      </>
+    )
+  }
+
+  // GAP-49: правовые документы — в нейтральной обвязке, без бренда и навигации.
+  if (legal) {
+    return (
+      <>
+        <LegalChrome>{children}</LegalChrome>
+        {overlays}
       </>
     )
   }
@@ -92,12 +114,7 @@ export function MainShell({ children }: { children: React.ReactNode }): React.JS
         <SiteFooter />
       </div>
       <BottomNav />
-      <LoginSheet />
-      <DepositSheet />
-      <WithdrawSheet />
-      <WalletSwitcher />
-      <LaunchCurrencySheet />
-      <DepositReturnHandler />
+      {overlays}
     </>
   )
 }

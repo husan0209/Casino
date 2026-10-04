@@ -67,6 +67,18 @@ export function isAuthPath(pathname: string): boolean {
   return AUTH_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
 }
 
+/**
+ * GAP-49: правовые документы рендерятся в нейтральной обвязке (`LegalChrome`) —
+ * без бренда, тэглайна, платёжных бейджей и казино-навигации. Юридический текст
+ * не должен быть оформлен как рекламная страница и не должен содержать данных
+ * об операторе, пока реквизиты не утверждены (docs/LEGAL_COMPLIANCE.md §2).
+ */
+export const LEGAL_PATHS: readonly string[] = ['/legal']
+
+export function isLegalPath(pathname: string): boolean {
+  return LEGAL_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+}
+
 /** §4.4: Ctrl/⌘ K открывает поиск. Игнорируем, пока фокус в поле ввода. */
 export function isSearchShortcut(event: {
   key: string
