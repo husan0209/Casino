@@ -575,15 +575,23 @@ Email-джобов отдельной таблицы НЕТ: очередь `ema
 
 ### 11.4. Используется в
 
-- Никем: `NotificationsModule` импортируется только в `app.module.ts` (in-app
-  API `/notifications` — контроллер самого модуля)
+- `admin` (`NotificationsFacade.broadcastInternal`) — массовая рассылка. До
+  2026-10-04 её писал сам admin: `prisma.notification.createMany` из своего
+  репозитория (гард G24). Формат уведомления — `channel`, default `data`,
+  правило `isRead` — теперь задаёт один модуль, а не два
 - Письма о событиях (verification, reset, withdrawal-reminder) шлют `auth` и
   `maintenance` напрямую через EMAIL_QUEUE_PORT, минуя notifications-модуль
+- Больше `NotificationsModule` нигде не импортируется; in-app API
+  `/notifications` — контроллер самого модуля
 
 ### 11.5. Экспортирует
 
-- `NotificationService` (send/list/markRead/unreadCount) — но внешних
-  потребителей у экспорта сейчас нет
+- `NotificationsFacade` (`notifications/facade/notifications.facade.ts`) —
+  `broadcastInternal(rows): Promise<number>`, единственная точка входа для
+  чужих модулей (правило 4). Возвращает число вставленных строк: вызывающий
+  отдаёт оператору факт из БД, а не длину своего списка адресатов
+- `NotificationService` (send/list/markRead/unreadCount) — экспорт оставлен как
+  был, внешних потребителей у него нет
 
 ---
 
@@ -640,8 +648,9 @@ audit_logs          (actor_type, actor_id, action, target_type, target_id, paylo
   - Admin management (`AdminAdminsController`)
   - Audit-logs read-only (`AdminAuditController`, см. §12)
   - Dashboard metrics (`AdminDashboardController`)
-  - Settings: контроллер в коде есть (`AdminSettingsController`), но в
-    `admin.module.ts` пока не зарегистрирован
+  - Settings (`AdminSettingsController`) и рассылка (`AdminNotificationsController`) —
+    оба зарегистрированы в `admin.module.ts` (#135 закрыл 404 на `/admin/settings` и
+    `/admin/notifications/send`, держит `admin-module-wiring`)
 - NB: KYC review и referral run-daily админ-API живут в соответствующих
   модулях (`KycAdminController` в kyc, `ReferralsAdminController` в referrals)
 
@@ -651,6 +660,7 @@ audit_logs          (actor_type, actor_id, action, target_type, target_id, paylo
 - `users` (`UsersFacade.blockPlayer/unblockPlayer`) — блокировка игрока. Админ заказывает
   действие, а `user.status` и `session.revokedAt` пишет владелец таблиц: раньше эти три записи
   делал `admin.prisma.repository` (G24)
+- `notifications` (`NotificationsFacade.broadcastInternal`) — массовая рассылка
 - `payments` (`PaymentsFacade` — approve/reject заявки на вывод; узкий токен
   `WITHDRAWAL_REQUEST_STORE` закрывается адаптером в `admin/infrastructure`,
   порты и Prisma-класс payments наружу не импортируются — G16)

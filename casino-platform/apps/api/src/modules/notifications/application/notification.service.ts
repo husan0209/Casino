@@ -5,6 +5,7 @@ import { EMAIL_QUEUE_PORT, type EmailQueuePort } from '@/queues/queue.types'
 import { renderNotificationEmail } from '@/queues/templates'
 
 import {
+  type BroadcastNotificationInput,
   NOTIFICATION_REPOSITORY,
   type CreateNotificationInput,
   type INotificationRepository,
@@ -106,6 +107,17 @@ export class NotificationService {
       return false
     }
     return true
+  }
+
+  /**
+   * Массовая внутренняя рассылка (админ-бродкаст).
+   *
+   * Отдельный метод, а не цикл по `send()`: у рассылки нет email-канала и нет
+   * очереди — N строк одним `createMany`. Возвращает число вставленных строк:
+   * именно его админ показывает как `sentCount`.
+   */
+  broadcast(rows: BroadcastNotificationInput[]): Promise<number> {
+    return this.repo.createMany(rows)
   }
 
   async list(args: {

@@ -40,6 +40,7 @@ const CONSUMED_MODULE_SNAPSHOT = [
   'affiliate',
   'geo',
   'kyc',
+  'notifications',
   'payments',
   'referrals',
   'users',
@@ -47,7 +48,7 @@ const CONSUMED_MODULE_SNAPSHOT = [
 ]
 
 /** Модули без внешних потребителей: фасад от них требовать нельзя (В1). */
-const NO_CONSUMER_MODULE_SNAPSHOT = ['casino', 'health', 'maintenance', 'notifications', 'support']
+const NO_CONSUMER_MODULE_SNAPSHOT = ['casino', 'health', 'maintenance', 'support']
 
 /** Межмодульный импорт одного из слоёв/фасада/гарда другого модуля. */
 const CROSS_MODULE_IMPORT_PATTERN = new RegExp(`/([a-z][a-z0-9-]*)/(${MODULE_LAYERS.join('|')})/`)

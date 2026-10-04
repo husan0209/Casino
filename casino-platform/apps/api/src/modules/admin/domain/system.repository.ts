@@ -36,18 +36,16 @@ export interface ISystemSettingRepository {
 
 export const SYSTEM_SETTING_REPOSITORY = Symbol('SYSTEM_SETTING_REPOSITORY')
 
-export interface NotificationBroadcastInput {
-  userId: string
-  title: string
-  message: string
-  type: string
-  channel: 'internal'
-  isRead: boolean
-}
-
+/**
+ * Порт рассылки: у admin осталась только READ-часть — список адресатов.
+ *
+ * Запись в `notifications` делает владелец таблицы через `NotificationsFacade`
+ * (гард G24): формат уведомления — channel, default `data`, правило `isRead` —
+ * должен задавать один модуль, иначе рассинхрон молча расходится по коду.
+ * Чтение списка пользователей легализовано ADR GAP-51 (read-only).
+ */
 export interface IAdminBroadcastRepository {
   getAllUserIds(): Promise<string[]>
-  createMany(notifications: NotificationBroadcastInput[]): Promise<void>
 }
 
 export const ADMIN_BROADCAST_REPOSITORY = Symbol('ADMIN_BROADCAST_REPOSITORY')
