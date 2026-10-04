@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 
-// AdminAuthGuard (admin-JWT, reviewedBy -> AdminUser FK) экспортируется из AdminModule
-import { AdminModule } from '../admin/admin.module'
+// AdminAuthGuard (admin-JWT, aud='admin') — из AdminAuthModule, а не из всего
+// AdminModule: через AdminModule получался цикл admin → payments → kyc → admin,
+// и он же делал межмодульный долг admin незакрываемым (см. admin-auth.module.ts)
+import { AdminAuthModule } from '../admin/admin-auth.module'
 import { AuthModule } from '../auth/auth.module'
 import { GeoModule } from '../geo/geo.module'
 import { GetKycStatusUseCase } from './application/use-cases/get-kyc-status.use-case'
@@ -17,7 +19,7 @@ import { KycAdminController } from './presentation/controllers/kyc-admin.control
 import { KycController } from './presentation/controllers/kyc.controller'
 
 @Module({
-  imports: [AdminModule, AuthModule, ConfigModule, GeoModule],
+  imports: [AdminAuthModule, AuthModule, ConfigModule, GeoModule],
   controllers: [KycController, KycAdminController],
   providers: [
     { provide: KYC_REPOSITORY, useClass: PrismaKycRepository },

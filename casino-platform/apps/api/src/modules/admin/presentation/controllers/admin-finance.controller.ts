@@ -16,10 +16,6 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
 
-import {
-  type IPaymentRequestRepository,
-  PAYMENT_REQUEST_REPOSITORY,
-} from '@modules/payments/domain/payments.ports'
 import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import {
@@ -42,6 +38,10 @@ import {
   type WithdrawalDecisionDependencies,
 } from '../../application/withdrawal-decision-deps'
 import { AdminForbiddenError } from '../../domain/errors'
+import {
+  type IWithdrawalRequestStore,
+  WITHDRAWAL_REQUEST_STORE,
+} from '../../domain/withdrawal.repository'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import {
   BatchApproveSchema,
@@ -77,7 +77,7 @@ function parsePagination(q: Record<string, string | undefined>): { page: number;
 export class AdminFinanceController {
   constructor(
     @Inject(WalletFacade) private wallet: WalletFacade,
-    @Inject(PAYMENT_REQUEST_REPOSITORY) private payments: IPaymentRequestRepository,
+    @Inject(WITHDRAWAL_REQUEST_STORE) private payments: IWithdrawalRequestStore,
     @Inject(AuditLogService) private audit: AuditLogService,
   ) {}
 
@@ -251,8 +251,9 @@ export class AdminFinanceController {
    * Порты для сценариев решения по заявке (В3).
    *
    * Контроллер не выполняет ни одной записи в БД: `payments.updateStatus`
-   * вызывает application use case, а сюда за зависимостями приходит тот же
-   * `PAYMENT_REQUEST_REPOSITORY`, что инжектится модулем.
+   * вызывает application use case, а сюда за зависимостями приходит узкий порт
+   * `WITHDRAWAL_REQUEST_STORE` (реализация — адаптер над `PaymentsFacade`), а не
+   * репозиторий чужого модуля.
    */
   private withdrawalDependencies(): WithdrawalDecisionDependencies {
     return { payments: this.payments, wallet: this.wallet, audit: this.audit }

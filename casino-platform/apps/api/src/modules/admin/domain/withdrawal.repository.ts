@@ -47,3 +47,11 @@ export interface IWithdrawalRequestStore {
     },
   ): Promise<unknown>
 }
+
+/**
+ * DI-токен порта. Реализация — `PaymentsFacadeWithdrawalGateway` (infrastructure
+ * admin), которая ходит в `PaymentsFacade`: так admin остаётся потребителем
+ * публичного API payments и не тянет ни их доменные порты, ни их Prisma-класс
+ * (гвард G16 `cross-module-imports`).
+ */
+export const WITHDRAWAL_REQUEST_STORE = Symbol('WITHDRAWAL_REQUEST_STORE')
