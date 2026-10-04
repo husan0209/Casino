@@ -6,7 +6,11 @@ import { type IUserSessionRepository } from '../../domain/repositories/user-sess
 
 @Injectable()
 export class PrismaUserSessionRepository implements IUserSessionRepository {
-  async list(userId: string): Promise<{ id: string; ipAddress: string | null; userAgent: string | null; createdAt: Date; }[]> {
+  async list(
+    userId: string,
+  ): Promise<
+    { id: string; ipAddress: string | null; userAgent: string | null; createdAt: Date }[]
+  > {
     const rows = await prisma.session.findMany({
       where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' },
@@ -30,6 +34,20 @@ export class PrismaUserSessionRepository implements IUserSessionRepository {
     const res = await prisma.session.updateMany({
       where: { userId, revokedAt: null, id: { not: currentSessionId } },
       data: { revokedAt: new Date() },
+    })
+    return res.count
+  }
+
+  /**
+   * Уборка мёртвых сессий (G24, job `cleanup-sessions`). Идемпотентна: повторный
+   * запуск удаляет 0. Какой cutoff брать (grace-период) решает вызывающий —
+   * здесь только условие.
+   */
+  async purgeDead(cutoff: Date): Promise<number> {
+    const res = await prisma.session.deleteMany({
+      where: {
+        OR: [{ expiresAt: { lt: cutoff } }, { revokedAt: { lt: cutoff } }],
+      },
     })
     return res.count
   }

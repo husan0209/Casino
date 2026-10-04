@@ -675,6 +675,11 @@ audit_logs          (actor_type, actor_id, action, target_type, target_id, paylo
   записи аудита из других модулей: `logAction(input)` оборачивает
   `AuditLogService.log` и не роняет операцию при сбое журнала. Потребители:
   `affiliate` (affiliate-admin), `maintenance` (ручной триггер run-daily).
+- `AdminFacade.logActionStrict(input)` — тот же контракт, но сбой летит наружу.
+  Нужен вызывающим, для которых строка `audit_logs` является состоянием, а не
+  только наблюдакостью: `maintenance.withdrawal_reminder` служит ключом дедупа,
+  и молчаливый пропуск записи означал бы второе письмо админу через час
+  (потребитель — `maintenance`, G24).
 - `AdminAuthModule` (`admin/admin-auth.module.ts`) — провайдер и экспортер
   `AdminAuthGuard` + `AdminAuthService`. Вынесен из `AdminModule` не для красоты:
   `KycModule` импортировал весь `AdminModule` ради одного guard'а, и любая
@@ -782,9 +787,11 @@ maintenance   → referrals           (ReferralsFacade.runDaily — job referral
               → admin               (AdminFacade.logAction — аудит ручного run-daily)
               → affiliate           (AffiliateFacade.runDaily + 3 affiliate-джоба)
               → queues              (BullMQ-очередь `maintenance`: scheduler + worker; EMAIL_QUEUE_PORT)
-              → payments            (NOWPaymentsClient — импорт клиента курсов)
-              (пишет напрямую: payment_requests, exchange_rates, sessions,
-               audit_logs, admin_users — §18)
+              → payments            (PaymentsFacade — estimateRub для курсов и
+                                    expirePendingPayment для `expire-deposits`)
+              → users               (UsersFacade.purgeDeadSessions — `cleanup-sessions`)
+              (пишет напрямую только exchange_rates — это ЕГО таблица по MODEL_OWNERS;
+               чужие записи ушли фасадам владельцев, G24 и §18.3)
 ```
 
 ---
@@ -911,8 +918,19 @@ apps/api/src/modules/maintenance/maintenance.module.ts
   `RATES_PROVIDER`, `MAINTENANCE_EMAIL_PORT`), каждая джоба тестируема in-memory
 - `MaintenanceWorker` (infrastructure) — BullMQ Worker очереди `maintenance`,
   диспетчеризация по map `MAINTENANCE_HANDLERS` (job.name → хендлер)
-- Дедуп/трейл напоминаний пишутся напрямую в `audit_logs` через
-  `PrismaReminderAuditRepo` (AdminModule/AuditLogService не используется)
+- Дедуп/трейл напоминаний пишет admin: `PrismaReminderAuditRepo` заказывает строку
+  через `AdminFacade.logActionStrict` (G24, 2026-10-04). Раньше запись шла напрямую в
+  `audit_logs`. Строгий вариант фасада, а не best-effort `logAction`, выбран потому, что
+  эта строка — ключ дедупа: молчаливый пропуск записи означал бы второе письмо админу
+  через час, а падение видно в логе джобы
+- Истечение заявок (`pending → expired`) заказывается через
+  `PaymentsFacade.expirePendingPayment`, уборка сессий — через
+  `UsersFacade.purgeDeadSessions`. Условие «только pending» и OR-фильтр мёртвых строк
+  уехали вместе с записями к владельцам таблиц, иначе гарантию гонки нельзя было бы
+  сохранить на чужой стороне границы
+- Чтения чужих таблиц (`payment_requests`, `audit_logs`, `admin_users`) остались
+  прямыми через prisma: межмодульное чтение разрешено ADR GAP-51, детектор записей
+  (`tech-debt/foreign-writes.txt`) их не считает
 
 ### 18.4. Использует
 

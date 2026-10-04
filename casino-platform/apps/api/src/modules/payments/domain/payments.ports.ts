@@ -51,6 +51,17 @@ export interface IPaymentRequestRepository {
     page: number
     perPage: number
   }): Promise<[PaymentRequest[], number]>
+  /**
+   * Условное истечение заявки: `pending → expired`, только если заявка ещё
+   * pending. Нужна cron-задаче истечения депозитов (maintenance), но SQL живёт
+   * здесь: `payment_requests` принадлежит payments (MODEL_OWNERS, гард G24).
+   *
+   * Условие — в `where`, а не проверкой читателя: между SELECT и UPDATE платёж
+   * может завершиться вебхуком, и тогда истечение затёрло бы completed-статус.
+   * Возвращает число обновлённых строк; «что делать с нулём» решает вызывающий,
+   * поэтому исключения здесь нет.
+   */
+  expireIfPending(id: string): Promise<number>
   saveCallback(data: {
     provider: string
     externalId?: string

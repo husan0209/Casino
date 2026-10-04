@@ -7,6 +7,7 @@ import { GetGeoContextUseCase } from './application/use-cases/get-geo-context.us
 import { GetMeUseCase } from './application/use-cases/get-me.use-case'
 import { ListSessionsUseCase } from './application/use-cases/list-sessions.use-case'
 import { ProvisionAffiliatePlayerUseCase } from './application/use-cases/provision-affiliate-player.use-case'
+import { PurgeDeadSessionsUseCase } from './application/use-cases/purge-dead-sessions.use-case'
 import { RevokeAllSessionsUseCase } from './application/use-cases/revoke-all-sessions.use-case'
 import { RevokeSessionUseCase } from './application/use-cases/revoke-session.use-case'
 import { SelfExclusionUseCase } from './application/use-cases/self-exclusion.use-case'
@@ -46,6 +47,8 @@ import { UsersController } from './presentation/controllers/users.controller'
     // только через UsersFacade, сами use case'ы остаются внутри модуля.
     ProvisionAffiliatePlayerUseCase,
     DeprovisionAffiliatePlayerUseCase,
+    // G24: уборка мёртвых сессий — таблица общая с auth, но отзыв и чистка живут здесь
+    PurgeDeadSessionsUseCase,
     // G24: блокировка/разблокировка игрока. Статус `users` и отзыв `sessions`
     // пишет владелец этих таблиц, а не заказчик (раньше это делал admin).
     BlockPlayerUseCase,

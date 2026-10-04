@@ -50,6 +50,19 @@ export class PaymentsFacade {
     return this.repo.updateStatus(id, status, extra)
   }
 
+  /**
+   * Истечение pending-заявки: `true`, если строка flipped'нулась, `false` — если
+   * она уже не pending (вебхук успел завершить).
+   *
+   * Нужен cron-задаче `expire-deposits` из maintenance: раньше она делала
+   * `prisma.paymentRequest.updateMany` сама, то есть писала в чужую таблицу
+   * (гард G24). Условие «только pending» переехало вместе с записью — иначе
+   * гарантию гонки нельзя сохранить на другой стороне границы.
+   */
+  expirePendingPayment(id: string): Promise<boolean> {
+    return this.repo.expireIfPending(id).then((count) => count > 0)
+  }
+
   listUserPayments(
     userId: string,
     page: number,
