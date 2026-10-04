@@ -257,7 +257,7 @@ const DeckCardFace = memo(function DeckCardFace({
       {/* «Сейчас играют» — тонкий живой бейдж на карте (§4.4) */}
       <span
         suppressHydrationWarning
-        className="deck-rise absolute bottom-[4.75rem] right-3 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white/85 backdrop-blur-md"
+        className="deck-rise absolute bottom-[7.5rem] right-3 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white/85 backdrop-blur-md"
       >
         <span className="deck-live-dot h-1.5 w-1.5 rounded-full bg-[#FF3D71]" />
         {playersCountLabel(onlineCount)} сейчас в игре
@@ -1446,7 +1446,7 @@ export function GameDeck({
           onKeyDown={handleKeyDown}
           onMouseMove={handleStackMouseMove}
           onMouseLeave={handleStackMouseLeave}
-          className="deck-stack relative aspect-[16/10] w-full outline-none sm:aspect-[16/9]"
+          className="deck-stack relative aspect-[3/4] w-full outline-none sm:aspect-[4/5]"
         >
           {/* key по shuffleNonce — пересдача перемонтирует стек: фейды слоёв и вход фронта replay'ятся */}
           <div key={`deal-${shuffleNonce}`} className="absolute inset-0">
