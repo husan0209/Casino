@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { UsersFacade } from '@modules/users/facade/users.facade'
+
 import {
   AFFILIATE_SETTINGS_DEFAULTS,
   type AffiliateSettings,
@@ -66,16 +68,18 @@ function makeDeps(
     settings?: Partial<AffiliateSettings>
     create?: (input: unknown) => Promise<AffiliateEntity>
     isReferralCodeAvailable?: (code: string) => Promise<boolean>
+    deprovisionFailure?: Error
   } = {},
 ): {
   affiliates: AffiliateRepository
   players: AffiliatePlayerProvisioningRepository
+  users: UsersFacade
   settings: AffiliateSettingsService
   jwt: IAffiliateJwtService
   findByEmail: ReturnType<typeof vi.fn>
   create: ReturnType<typeof vi.fn>
-  createPlayerUser: ReturnType<typeof vi.fn>
-  deletePlayerUser: ReturnType<typeof vi.fn>
+  provisionAffiliatePlayer: ReturnType<typeof vi.fn>
+  deprovisionAffiliatePlayer: ReturnType<typeof vi.fn>
   isPlayerReferralCodeAvailable: ReturnType<typeof vi.fn>
   signAccess: ReturnType<typeof vi.fn>
 } {
@@ -103,8 +107,16 @@ function makeDeps(
       revshareRate: payload.revshareRate,
     })
   })
-  const createPlayerUser = vi.fn(async (_args: { referralCode: string }) => ({ id: 'player-1' }))
-  const deletePlayerUser = vi.fn(async (_userId: string): Promise<void> => undefined)
+  // GAP-62: write-операции над `users` ушли из порта affiliate в фасад
+  // владельца данных, поэтому здесь два разных фейка.
+  const provisionAffiliatePlayer = vi.fn(async (_args: { referralCode: string }) => ({
+    id: 'player-1',
+  }))
+  const deprovisionAffiliatePlayer = vi.fn(async (_userId: string): Promise<void> => {
+    if (options.deprovisionFailure !== undefined) {
+      throw options.deprovisionFailure
+    }
+  })
   const isPlayerReferralCodeAvailable = vi.fn(async (_code: string): Promise<boolean> =>
     options.isReferralCodeAvailable === undefined ? true : options.isReferralCodeAvailable(_code),
   )
@@ -116,19 +128,22 @@ function makeDeps(
       generateUniqueTrackingCode,
       create,
     } as unknown as AffiliateRepository,
+    // Только чтения чужих таблиц (ADR GAP-51) — create/delete из порта убраны.
     players: {
-      createPlayerUser,
-      deletePlayerUser,
       isPlayerReferralCodeAvailable,
     } as unknown as AffiliatePlayerProvisioningRepository,
+    users: {
+      provisionAffiliatePlayer,
+      deprovisionAffiliatePlayer,
+    } as unknown as UsersFacade,
     settings: {
       get: async () => ({ ...AFFILIATE_SETTINGS_DEFAULTS, ...options.settings }),
     } as unknown as AffiliateSettingsService,
     jwt: { signAccess } as unknown as IAffiliateJwtService,
     findByEmail,
     create,
-    createPlayerUser,
-    deletePlayerUser,
+    provisionAffiliatePlayer,
+    deprovisionAffiliatePlayer,
     isPlayerReferralCodeAvailable,
     signAccess,
   }
@@ -160,6 +175,7 @@ describe('RegisterAffiliateUseCase', () => {
       deps.players,
       deps.settings,
       deps.jwt,
+      deps.users,
     ).execute({ ...VALID_INPUT, email: '  Partner@Example.COM ' })
 
     expect(deps.findByEmail).toHaveBeenCalledWith('partner@example.com')
@@ -169,11 +185,15 @@ describe('RegisterAffiliateUseCase', () => {
     const deps = makeDeps({ existing: makeAffiliate() })
 
     await expect(
-      new RegisterAffiliateUseCase(deps.affiliates, deps.players, deps.settings, deps.jwt).execute(
-        VALID_INPUT,
-      ),
+      new RegisterAffiliateUseCase(
+        deps.affiliates,
+        deps.players,
+        deps.settings,
+        deps.jwt,
+        deps.users,
+      ).execute(VALID_INPUT),
     ).rejects.toBeInstanceOf(AffiliateAlreadyExistsError)
-    expect(deps.createPlayerUser).not.toHaveBeenCalled()
+    expect(deps.provisionAffiliatePlayer).not.toHaveBeenCalled()
     expect(deps.create).not.toHaveBeenCalled()
   })
 
@@ -185,6 +205,7 @@ describe('RegisterAffiliateUseCase', () => {
       deps.players,
       deps.settings,
       deps.jwt,
+      deps.users,
     ).execute(VALID_INPUT)
 
     expect(result.revshareRate).toBe('0.3500')
@@ -195,11 +216,15 @@ describe('RegisterAffiliateUseCase', () => {
     const deps = makeDeps({ settings: { defaultRevshareRate: '1.5' } })
 
     await expect(
-      new RegisterAffiliateUseCase(deps.affiliates, deps.players, deps.settings, deps.jwt).execute(
-        VALID_INPUT,
-      ),
+      new RegisterAffiliateUseCase(
+        deps.affiliates,
+        deps.players,
+        deps.settings,
+        deps.jwt,
+        deps.users,
+      ).execute(VALID_INPUT),
     ).rejects.toThrow()
-    expect(deps.createPlayerUser).not.toHaveBeenCalled()
+    expect(deps.provisionAffiliatePlayer).not.toHaveBeenCalled()
   })
 
   it('hashes the password with argon2id', async () => {
@@ -210,6 +235,7 @@ describe('RegisterAffiliateUseCase', () => {
       deps.players,
       deps.settings,
       deps.jwt,
+      deps.users,
     ).execute(VALID_INPUT)
 
     expect(hashMock).toHaveBeenCalledWith('secret', { type: 2 })
@@ -226,10 +252,11 @@ describe('RegisterAffiliateUseCase', () => {
       deps.players,
       deps.settings,
       deps.jwt,
+      deps.users,
     ).execute(VALID_INPUT)
 
-    expect(deps.createPlayerUser).toHaveBeenCalledTimes(1)
-    const args = deps.createPlayerUser.mock.calls[0]?.[0] as { referralCode: string }
+    expect(deps.provisionAffiliatePlayer).toHaveBeenCalledTimes(1)
+    const args = deps.provisionAffiliatePlayer.mock.calls[0]?.[0] as { referralCode: string }
     expect(args.referralCode.startsWith(REFERRAL_CODE_PREFIX)).toBe(true)
     expect(args.referralCode).toHaveLength(REFERRAL_CODE_PREFIX.length + 8)
     for (const char of args.referralCode.slice(REFERRAL_CODE_PREFIX.length)) {
@@ -251,6 +278,7 @@ describe('RegisterAffiliateUseCase', () => {
       deps.players,
       deps.settings,
       deps.jwt,
+      deps.users,
     ).execute(VALID_INPUT)
 
     expect(deps.isPlayerReferralCodeAvailable).toHaveBeenCalledTimes(3)
@@ -261,9 +289,13 @@ describe('RegisterAffiliateUseCase', () => {
     const deps = makeDeps({ isReferralCodeAvailable: () => Promise.resolve(false) })
 
     await expect(
-      new RegisterAffiliateUseCase(deps.affiliates, deps.players, deps.settings, deps.jwt).execute(
-        VALID_INPUT,
-      ),
+      new RegisterAffiliateUseCase(
+        deps.affiliates,
+        deps.players,
+        deps.settings,
+        deps.jwt,
+        deps.users,
+      ).execute(VALID_INPUT),
     ).rejects.toBeInstanceOf(PlayerReferralCodeGenerationError)
     expect(deps.create).not.toHaveBeenCalled()
   })
@@ -275,23 +307,52 @@ describe('RegisterAffiliateUseCase', () => {
     })
 
     await expect(
-      new RegisterAffiliateUseCase(deps.affiliates, deps.players, deps.settings, deps.jwt).execute(
-        VALID_INPUT,
-      ),
+      new RegisterAffiliateUseCase(
+        deps.affiliates,
+        deps.players,
+        deps.settings,
+        deps.jwt,
+        deps.users,
+      ).execute(VALID_INPUT),
     ).rejects.toBe(boom)
-    expect(deps.deletePlayerUser).toHaveBeenCalledWith('player-1')
+    // Сирота закрывается ровно один раз и ровно по тому id, который вернул
+    // провижининг: чужую учётную запись этот вызов удалить не должен.
+    expect(deps.provisionAffiliatePlayer).toHaveBeenCalledTimes(1)
+    expect(deps.deprovisionAffiliatePlayer).toHaveBeenCalledTimes(1)
+    expect(deps.deprovisionAffiliatePlayer).toHaveBeenCalledWith('player-1')
   })
 
   it('rethrows the original failure even if the compensating delete also fails', async () => {
     const boom = new Error('unique violation on email')
     const deps = makeDeps({ create: () => Promise.reject(boom) })
-    deps.deletePlayerUser.mockRejectedValue(new Error('cleanup failed'))
+    deps.deprovisionAffiliatePlayer.mockRejectedValue(new Error('cleanup failed'))
 
     await expect(
-      new RegisterAffiliateUseCase(deps.affiliates, deps.players, deps.settings, deps.jwt).execute(
-        VALID_INPUT,
-      ),
+      new RegisterAffiliateUseCase(
+        deps.affiliates,
+        deps.players,
+        deps.settings,
+        deps.jwt,
+        deps.users,
+      ).execute(VALID_INPUT),
     ).rejects.toBe(boom)
+    // Компенсация не перекрывает первопричину; отказ удаления при этом не
+    // молчит — его логирует use case (иначе сирота остаётся незамеченным).
+    expect(deps.deprovisionAffiliatePlayer).toHaveBeenCalledTimes(1)
+  })
+
+  it('successful registration keeps the provisioned player', async () => {
+    const deps = makeDeps()
+
+    await new RegisterAffiliateUseCase(
+      deps.affiliates,
+      deps.players,
+      deps.settings,
+      deps.jwt,
+      deps.users,
+    ).execute(VALID_INPUT)
+
+    expect(deps.deprovisionAffiliatePlayer).not.toHaveBeenCalled()
   })
 
   it('returns the cabinet payload and signs a token on success', async () => {
@@ -302,6 +363,7 @@ describe('RegisterAffiliateUseCase', () => {
       deps.players,
       deps.settings,
       deps.jwt,
+      deps.users,
     ).execute({ ...VALID_INPUT, displayName: 'Webmaster' })
 
     expect(result).toEqual({
@@ -324,6 +386,7 @@ describe('RegisterAffiliateUseCase', () => {
       deps.players,
       deps.settings,
       deps.jwt,
+      deps.users,
     ).execute(VALID_INPUT)
 
     // country намеренно не проверяется: use-case его не передаёт — страна

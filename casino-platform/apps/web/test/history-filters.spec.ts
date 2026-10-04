@@ -161,7 +161,7 @@ describe('GAP-55 §11: статус заявки', () => {
   })
 
   it('цвет: успех зелёный, ожидание янтарное, отказ красный', () => {
-    expect(paymentStatusClass('completed')).toBe('text-[#00C853]')
+    expect(paymentStatusClass('completed')).toBe('text-money-dark')
     expect(paymentStatusClass('pending')).toBe('text-[#FFB300]')
     expect(paymentStatusClass('failed')).toBe('text-[#FF3D71]')
   })

@@ -98,7 +98,7 @@ export default function AffiliateCommissionsPage(): React.JSX.Element {
                       <td className="px-3 py-2.5 text-right text-[#8888AA]">
                         {formatRate(row.revshare_rate)}
                       </td>
-                      <td className="px-3 py-2.5 font-mono text-right font-bold text-[#00C853]">
+                      <td className="px-3 py-2.5 font-mono text-right font-bold text-money-dark">
                         {formatAmount(row.commission_amount, row.currency)}
                       </td>
                       <td className="px-3 py-2.5">
@@ -129,7 +129,7 @@ export default function AffiliateCommissionsPage(): React.JSX.Element {
                       {status.label}
                     </span>
                   </div>
-                  <div className="text-lg font-black text-[#00C853] mb-2">
+                  <div className="text-lg font-black text-money-dark mb-2">
                     +{formatAmount(row.commission_amount, row.currency)} {row.currency}
                   </div>
                   <div className="text-xs text-[#8888AA] space-y-0.5">

@@ -142,7 +142,7 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
           {rtp && (
             <div className="flex items-center justify-between">
               <span className="text-muted">RTP:</span>
-              <span className="font-medium text-[#00E676]">{rtp}</span>
+              <span className="font-medium text-money">{rtp}</span>
             </div>
           )}
           <div className="flex gap-2 pt-1">

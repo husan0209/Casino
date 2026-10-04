@@ -184,7 +184,7 @@ function GamePreviewBody({ options }: { options: GamePreviewOptions }): React.JS
           {/* Деньги — зелёная точка и сумма (ТЗ ч.5.1 §2 пр.4: зелёный только за деньгами) */}
           {user && (
             <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-muted">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#00C853]" aria-hidden />
+              <span className="h-1.5 w-1.5 rounded-full bg-money-dark" aria-hidden />
               Активный баланс:
               <span className="font-bold text-white">{formatBalance(balance, currency)}</span>
             </p>

@@ -73,8 +73,8 @@ function LinksContent(): React.JSX.Element {
   return (
     <div>
       {justCreated !== null && (
-        <div className="card mb-4 border-[#00C853]/40">
-          <div className="font-semibold text-[#00C853] text-sm">Партнёрский аккаунт создан</div>
+        <div className="card mb-4 border-money-dark/40">
+          <div className="font-semibold text-money-dark text-sm">Партнёрский аккаунт создан</div>
           <div className="text-muted text-sm mt-1">
             Ваш код: <span className="font-mono text-white">{justCreated}</span>. Ссылка уже активна
             — начинайте приводить игроков.
@@ -89,7 +89,7 @@ function LinksContent(): React.JSX.Element {
         </div>
         <div className="text-muted text-xs mt-2">
           Ставка RevShare:{' '}
-          <b className="text-[#00C853]">{me.data ? formatRate(me.data.revshare_rate) : '…'}</b> ·
+          <b className="text-money-dark">{me.data ? formatRate(me.data.revshare_rate) : '…'}</b> ·
           атрибуция действует {links.data?.cookie_days ?? '…'} дней с клика
         </div>
       </div>

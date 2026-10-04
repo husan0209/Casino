@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
+import { PasswordField } from '@/components/ui/password-field'
 import { toast } from '@/components/ui/toaster'
 import { errCode, errText } from '@/lib/api'
 import {
@@ -61,17 +62,15 @@ export function SecurityTab({ me, onLogout }: { me: MeDto; onLogout: () => void 
       <div className="font-semibold">Безопасность</div>
       {me.user.hasPassword ? (
         <>
-          <input
-            className="input"
-            type="password"
+          <PasswordField
             placeholder="Текущий пароль"
+            autoComplete="current-password"
             value={passwordForm.current_password}
             onChange={(e) => setPasswordForm((f) => ({ ...f, current_password: e.target.value }))}
           />
-          <input
-            className="input"
-            type="password"
+          <PasswordField
             placeholder="Новый пароль (мин. 8 симв., 1 цифра)"
+            autoComplete="new-password"
             value={passwordForm.new_password}
             onChange={(e) => setPasswordForm((f) => ({ ...f, new_password: e.target.value }))}
           />
@@ -156,7 +155,7 @@ export function SessionsTab(): React.JSX.Element {
                 <div className="text-sm">
                   {deviceLabel(sess.userAgent)}
                   {sess.isCurrent && (
-                    <span className="badge ml-2 bg-[#00C853]/15 text-[#00C853]">текущая</span>
+                    <span className="badge ml-2 bg-money-dark/15 text-money-dark">текущая</span>
                   )}
                 </div>
                 <div className="text-xs text-muted">

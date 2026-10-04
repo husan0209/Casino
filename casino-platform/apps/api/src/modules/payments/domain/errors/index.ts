@@ -31,8 +31,8 @@ export class AmountTooLargeError extends AppError {
 export class InvalidCurrencyError extends AppError {
   readonly code = 'INVALID_CURRENCY'
   readonly httpStatus = 422
-  constructor(m = 'INVALID_CURRENCY') {
-    super(m)
+  constructor(m = 'INVALID_CURRENCY', ctx?: Record<string, unknown>) {
+    super(m, ctx)
   }
 }
 /** 400 сохранён от прежнего BadRequestException('NOT_FOUND') — контракт web. */

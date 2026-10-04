@@ -358,36 +358,26 @@ export const AFFILIATE_GAME_ACTIVITY_REPOSITORY = Symbol('AFFILIATE_GAME_ACTIVIT
  * affiliate не имеет права импортировать их репозитории или Prisma напрямую
  * (AI_DEVELOPMENT_RULES §3.2, правило no-restricted-imports в eslint).
  *
- * Нужен трём сценариям:
- *  - регистрация партнёра — создать user-запись (на неё вешается кошелёк);
- *  - ручное создание партнёра админом (UC-AFF-17) — та же провижининг-логика;
- *  - квалификация — проверить KYC (атрибуция не проходит без него).
+ * Нужен ДВУМ сценариям — оба ЧИТАЮЩИЕ:
+ *  - генерация служебного referral_code партнёра (проверить свободен ли код);
+ *  - квалификация атрибуции — проверить KYC (без него атрибуция не проходит).
  *
- * ⚠️ GAP-62: ЧТЕНИЕ И ЗАПИСЬ ЗДЕСЬ НЕ РАВНОЦЕННЫ. ADR GAP-51 разрешает
- * affiliate только ЧИТАТЬ чужие таблицы (`users`, `kyc_profiles`) через общий
- * Prisma-клиент. `createPlayerUser`/`deletePlayerUser` — это WRITE в таблицу
- * модуля `users`, и под GAP-51 они НЕ подпадают: это незарегистрированное
- * нарушение границ, а не «обоснованный доступ». Убрать его нельзя, потому что
- * `UsersFacade` не имеет ни создания, ни удаления учётной записи (см. список
- * нужных методов в шапке
- * `infrastructure/player-provisioning.prisma.repository.ts`). Порт держит эти
- * два метода отдельно как точку, где нарушение будет снято одним переходом на
- * фасад, когда владелец данных их появится.
+ * ⚠️ GAP-62 ЗАКРЫТ (2026-10-03): из порта вычеркнуты `createPlayerUser` и
+ * `deletePlayerUser`. ADR GAP-51 разрешает affiliate только ЧТЕНИЕ чужих
+ * таблиц (`users`, `kyc_profiles`) через общий Prisma-клиент; INSERT/DELETE в
+ * `users` были незарегистрированным нарушением границ. Запись вернулась
+ * владельцу — создание и компенсирующее удаление идут через `UsersFacade`
+ * (`provisionAffiliatePlayer` / `deprovisionAffiliatePlayer`), то есть по
+ * правилу MODULE_BOUNDARIES «межмодульное общение только через фасад».
+ * Порт оставлен намеренно: чтения он по-прежнему инкапсулирует (Prisma не
+ * должен протекать в application-слой), и именно поэтому он не «read-only
+ * обёртка над фасадом» — users не владеет ни `kyc_profiles`, ни политикой
+ * готовности KYC.
  */
 export interface AffiliatePlayerProvisioningRepository {
-  /**
-   * GAP-62 (WRITE в чужую таблицу `users`). Создать player-запись партнёра;
-   * id идёт в `affiliates.user_id`.
-   */
-  createPlayerUser(args: { referralCode: string }): Promise<{ id: string }>
-  /**
-   * GAP-62 (WRITE в чужую таблицу `users`). Удалить созданную user-запись —
-   * компенсация, если affiliate не создался.
-   */
-  deletePlayerUser(userId: string): Promise<void>
-  /** READ (legally по GAP-51). Свободен ли referral_code в users. */
+  /** READ (легально по GAP-51). Свободен ли referral_code в users. */
   isPlayerReferralCodeAvailable(code: string): Promise<boolean>
-  /** READ (legally по GAP-51). Пройдено ли KYC игрока (для квалификации атрибуции). */
+  /** READ (легально по GAP-51). Пройдено ли KYC игрока (для квалификации атрибуции). */
   isKycApproved(playerId: string): Promise<boolean>
 }
 

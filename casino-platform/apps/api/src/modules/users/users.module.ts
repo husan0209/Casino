@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common'
 
 import { AuthModule } from '../auth/auth.module'
+import { DeprovisionAffiliatePlayerUseCase } from './application/use-cases/deprovision-affiliate-player.use-case'
 import { GetGeoContextUseCase } from './application/use-cases/get-geo-context.use-case'
 import { GetMeUseCase } from './application/use-cases/get-me.use-case'
 import { ListSessionsUseCase } from './application/use-cases/list-sessions.use-case'
+import { ProvisionAffiliatePlayerUseCase } from './application/use-cases/provision-affiliate-player.use-case'
 import { RevokeAllSessionsUseCase } from './application/use-cases/revoke-all-sessions.use-case'
 import { RevokeSessionUseCase } from './application/use-cases/revoke-session.use-case'
 import { SelfExclusionUseCase } from './application/use-cases/self-exclusion.use-case'
@@ -36,6 +38,10 @@ import { UsersController } from './presentation/controllers/users.controller'
     UpdateCurrencyPreferenceUseCase,
     GetGeoContextUseCase,
     UpdateAfterDepositUseCase,
+    // GAP-62: провижининг/депровижининг служебной учётки партнёра — наружу
+    // только через UsersFacade, сами use case'ы остаются внутри модуля.
+    ProvisionAffiliatePlayerUseCase,
+    DeprovisionAffiliatePlayerUseCase,
     UsersFacade,
     { provide: USER_PROFILE_REPOSITORY, useClass: PrismaUserProfileRepository },
     { provide: USER_SESSION_REPOSITORY, useClass: PrismaUserSessionRepository },

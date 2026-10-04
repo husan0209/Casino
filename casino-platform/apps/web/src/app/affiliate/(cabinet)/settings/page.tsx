@@ -68,7 +68,7 @@ export default function AffiliateSettingsPage(): React.JSX.Element {
     <div className="space-y-4">
       <div className="card">
         <div className="text-muted text-sm">Ставка RevShare</div>
-        <div className="text-2xl font-black text-[#00C853] mt-1">
+        <div className="text-2xl font-black text-money-dark mt-1">
           {formatRate(me.data.revshare_rate)}
         </div>
         <div className="text-muted text-xs mt-2">
@@ -92,7 +92,7 @@ export default function AffiliateSettingsPage(): React.JSX.Element {
           </div>
           <div>
             <div className="text-muted text-xs">Баланс кошелька</div>
-            <div className="text-lg font-bold font-mono text-[#00C853]">
+            <div className="text-lg font-bold font-mono text-money-dark">
               {formatAmount(me.data.balance.RUB, 'RUB')}
             </div>
           </div>
