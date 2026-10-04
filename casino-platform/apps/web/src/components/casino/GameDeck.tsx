@@ -452,7 +452,7 @@ function DeckPreview({ card, onClose, onPlay, onDemo }: DeckPreviewProps): React
           <dl className="mb-4 grid grid-cols-2 gap-2 text-sm">
             <div className="rounded-xl bg-black/30 px-3 py-2">
               <dt className="text-[10px] uppercase tracking-[0.14em] text-white/45">RTP</dt>
-              <dd className="font-bold text-[#00E676]">{rtp ?? '—'}</dd>
+              <dd className="font-bold text-money">{rtp ?? '—'}</dd>
             </div>
             <div className="rounded-xl bg-black/30 px-3 py-2">
               <dt className="text-[10px] uppercase tracking-[0.14em] text-white/45">
