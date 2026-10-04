@@ -46,16 +46,32 @@ export class PrismaReferralRepository implements IReferralRepository {
     })
   }
 
+  findPendingRewards(limit: number): Promise<ReferralRewardRow[]> {
+    return prisma.referralReward.findMany({
+      where: { status: 'pending' },
+      orderBy: [{ createdAt: 'asc' }, { periodStart: 'asc' }],
+      take: limit,
+    })
+  }
+
   createReward(data: CreateReferralRewardInput): Promise<ReferralRewardRow> {
     return prisma.referralReward.create({
-      data: { ...data, type: data.type as never, currency: data.currency as never, status: data.status as never },
+      data: {
+        ...data,
+        type: data.type as never,
+        currency: data.currency as never,
+        status: data.status as never,
+      },
     })
   }
 
   async updateReward(id: string, data: { status: string; creditedAt?: Date }): Promise<void> {
     await prisma.referralReward.update({
       where: { id },
-      data: { status: data.status as never, ...(data.creditedAt ? { creditedAt: data.creditedAt } : {}) },
+      data: {
+        status: data.status as never,
+        ...(data.creditedAt ? { creditedAt: data.creditedAt } : {}),
+      },
     })
   }
 }
