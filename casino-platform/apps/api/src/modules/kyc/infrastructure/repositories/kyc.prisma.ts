@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma, type KycDocumentType, type KycStatus , type KycFileType } from '@casino/database'
+import { prisma, type KycDocumentType, type KycStatus, type KycFileType } from '@casino/database'
 
 import {
   type IKycRepository,
@@ -8,13 +8,19 @@ import {
   type KycProfileRow,
 } from '../../domain/repositories/kyc.repository'
 
-
 @Injectable()
 export class PrismaKycRepository implements IKycRepository {
   async getByUserId(userId: string): Promise<KycProfileRow | null> {
     return prisma.kycProfile.findUnique({ where: { userId }, include: { documents: true } })
   }
-  async getById(id: string): Promise<(KycProfileRow & { user: { id: string; email: string | null; createdAt: Date; status: string } }) | null> {
+  async getById(
+    id: string,
+  ): Promise<
+    | (KycProfileRow & {
+        user: { id: string; email: string | null; createdAt: Date; status: string }
+      })
+    | null
+  > {
     return prisma.kycProfile.findUnique({
       where: { id },
       include: {
@@ -73,7 +79,14 @@ export class PrismaKycRepository implements IKycRepository {
       },
     })
   }
-  async getStatus(userId: string): Promise<{ status: string; submittedAt: Date | null; rejectionReason: string | null; documents: string[] } | null> {
+  async getStatus(
+    userId: string,
+  ): Promise<{
+    status: string
+    submittedAt: Date | null
+    rejectionReason: string | null
+    documents: string[]
+  } | null> {
     const p = await prisma.kycProfile.findUnique({
       where: { userId },
       include: { documents: true },
@@ -88,7 +101,11 @@ export class PrismaKycRepository implements IKycRepository {
       documents: p.documents.map((d: { documentType: string }) => d.documentType),
     }
   }
-  async listAdmin(status?: string, page = 1, perPage = 20): Promise<{ items: KycProfileRow[]; total: number }> {
+  async listAdmin(
+    status?: string,
+    page = 1,
+    perPage = 20,
+  ): Promise<{ items: KycProfileRow[]; total: number }> {
     const where = status ? { status: status as KycStatus } : {}
     const [items, total] = await Promise.all([
       prisma.kycProfile.findMany({
@@ -120,6 +137,19 @@ export class PrismaKycRepository implements IKycRepository {
       },
     })
   }
+  /**
+   * Сумма пополнений игрока в RUB — база порога без KYC.
+   *
+   * Источник — только completed-заявки `type='deposit'`: это деньги, которые
+   * игрок принёс сам. `amount_rub` крипто-заявки вебхук пересчитывает по
+   * фактическому `actually_paid` (GAP-72), поэтому сумма совпадает с тем, что
+   * легло в кошелёк, а не с оценкой курса на интенте.
+   *
+   * `ADMIN_CREDIT` (проводка кошелька из админки) в базу НЕ входит: это не
+   * деньги игрока, а начисление платформы, и вывод всё равно заперт за
+   * `assertCanWithdraw`. Включать ли его в AML-оборот — решение комплаенса
+   * (GAP-49), а не техники: менять надо вместе с формулировкой порога.
+   */
   async getTotalDepositedRub(userId: string): Promise<string> {
     const res = await prisma.paymentRequest.aggregate({
       where: { userId, type: 'deposit', status: 'completed' },

@@ -16,7 +16,6 @@
 import { Logger } from '@nestjs/common'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-
 import { KycCheckService } from '../src/modules/kyc/application/use-cases/kyc-check.service'
 import { KycFacade } from '../src/modules/kyc/facade/kyc.facade'
 import { ProcessNOWPaymentsWebhookUseCase } from '../src/modules/payments/application/use-cases/process-nowpayments-webhook.use-case'
@@ -41,6 +40,10 @@ type FakeRow = {
   currency: string
   method: string | null
   amount: { toString(): string }
+  /** `amount_rub`: в Prisma это Decimal, здесь — строка (её отдаёт toString()). */
+  amountRub?: string | null
+  /** metadata заявки: для крипто-пересчёта нужен `pay_amount` (GAP-72). */
+  metadata?: Record<string, unknown>
 }
 
 type CreditCall = { userId: string; currency: string; amount: string; idempotencyKey: string }
@@ -61,10 +64,17 @@ function makePaymentRepo(rows: FakeRow[]) {
     findByExternalId: async (externalId: string) =>
       rows.find((row) => row.externalId === externalId) ?? null,
     findById: async (id: string) => rows.find((row) => row.id === id) ?? null,
-    updateStatus: async (id: string, status: string) => {
+    updateStatus: async (
+      id: string,
+      status: string,
+      extra?: { amountRub?: string | undefined },
+    ) => {
       const row = rows.find((candidate) => candidate.id === id)
       if (row) {
         row.status = status
+        if (extra?.amountRub !== undefined) {
+          row.amountRub = extra.amountRub
+        }
       }
       return (row ?? {}) as unknown as PaymentRequest
     },
@@ -74,9 +84,15 @@ function makePaymentRepo(rows: FakeRow[]) {
 
 /**
  * Фейк KYC-репозитория: `lifetimeRub` — сумма completed-депозитов игрока, то,
- * что в проде считает PrismaKycRepository.getTotalDepositedRub.
+ * что в проде считает PrismaKycRepository.getTotalDepositedRub. Функция вместо
+ * строки — когда сумма должна читаться из фейковых строк платёжек (тогда
+ * агрегат видит amountRub, перезаписанный вебхуком).
  */
-function makeKycRepo(args: { status: string; lifetimeRub: string; throws?: boolean | undefined }) {
+function makeKycRepo(args: {
+  status: string
+  lifetimeRub: string | (() => string)
+  throws?: boolean | undefined
+}) {
   return {
     getStatus: async () => {
       if (args.throws) {
@@ -84,14 +100,15 @@ function makeKycRepo(args: { status: string; lifetimeRub: string; throws?: boole
       }
       return { status: args.status, submittedAt: null, rejectionReason: null, documents: [] }
     },
-    getTotalDepositedRub: async () => args.lifetimeRub,
+    getTotalDepositedRub: async () =>
+      typeof args.lifetimeRub === 'function' ? args.lifetimeRub() : args.lifetimeRub,
   } as unknown as IKycRepository
 }
 
 /** Реальный фасад kyc поверх фейков: лог эскалации должен дойти до Logger. */
 function makeRealKycFacade(args: {
   status: string
-  lifetimeRub: string
+  lifetimeRub: string | (() => string)
   limit: string | number | undefined
   throws?: boolean | undefined
 }) {
@@ -106,7 +123,7 @@ function makeRealKycFacade(args: {
 function makeDeps(args: {
   rows: FakeRow[]
   kycStatus?: string
-  lifetimeRub?: string
+  lifetimeRub?: string | (() => string)
   limitRub?: string | number
   kycThrows?: boolean
 }) {
@@ -249,18 +266,21 @@ describe('webhook эскалация KYC-лимита: Rukassa', () => {
 
   it('число и строка в конфиге дают один и тот же порог', async () => {
     const asNumber = [depositRow({ id: 'pr-1', externalId: 'ord-1' })]
-    await makeDeps({ rows: asNumber, lifetimeRub: '8000', limitRub: 10000 })
-      .rukassaUc.execute(rukassaInput({ order_id: 'ord-1', status: 'success' }))
+    await makeDeps({ rows: asNumber, lifetimeRub: '8000', limitRub: 10000 }).rukassaUc.execute(
+      rukassaInput({ order_id: 'ord-1', status: 'success' }),
+    )
     expect(escalationLogs()).toHaveLength(0)
 
     const asString = [depositRow({ id: 'pr-2', externalId: 'ord-2' })]
-    await makeDeps({ rows: asString, lifetimeRub: '8000', limitRub: '10000' })
-      .rukassaUc.execute(rukassaInput({ order_id: 'ord-2', status: 'success' }))
+    await makeDeps({ rows: asString, lifetimeRub: '8000', limitRub: '10000' }).rukassaUc.execute(
+      rukassaInput({ order_id: 'ord-2', status: 'success' }),
+    )
     expect(escalationLogs()).toHaveLength(0)
 
     const below = [depositRow({ id: 'pr-3', externalId: 'ord-3' })]
-    await makeDeps({ rows: below, lifetimeRub: '8000', limitRub: '5000' })
-      .rukassaUc.execute(rukassaInput({ order_id: 'ord-3', status: 'success' }))
+    await makeDeps({ rows: below, lifetimeRub: '8000', limitRub: '5000' }).rukassaUc.execute(
+      rukassaInput({ order_id: 'ord-3', status: 'success' }),
+    )
     expect(escalationLogs()[0]!.threshold_rub).toBe('5000')
   })
 
@@ -381,6 +401,66 @@ describe('webhook эскалация KYC-лимита: NOWPayments', () => {
     expect(escalationLogs()).toHaveLength(0)
   })
 
+  it('переплата провайдера: amountRub заявки пересчитан, эскалация видит уже новую сумму', async () => {
+    // GAP-72. amount_rub заявки — оценка getEstimatePrice на интенте, кошелёк же
+    // получает actually_paid. Без пересчёта агрегат лимита считает не те деньги,
+    // что попали на счёт: заявка «3000 ₽» при фактической оплате вдвое больше
+    // оставалась «3000», и эскалация молчала при пройденном пороге.
+    // lifetimeRub — функция, читающая amountRub из фейковых строк, поэтому тест
+    // ломается и на арифметике, и на порядке (запись должна быть до эскалации).
+    const rows = [
+      depositRow({
+        externalId: 'np-1',
+        currency: 'USDT_TRC20',
+        amount: { toString: () => '100' },
+        amountRub: '3000',
+        metadata: { pay_amount: '100' },
+      }),
+    ]
+    const d = makeDeps({
+      rows,
+      lifetimeRub: () => rows[0]!.amountRub ?? '0',
+      limitRub: 5000,
+    })
+
+    await d.nowpaymentsUc.execute(
+      nowpaymentsInput({ payment_id: 'np-1', payment_status: 'finished', actually_paid: '200' }),
+    )
+
+    expect(rows[0]!.status).toBe('completed')
+    expect(rows[0]!.amountRub).toBe('6000.00')
+    expect(escalationLogs()).toEqual([
+      {
+        msg: 'KYC deposit limit exceeded by credited deposit',
+        event: 'kyc_deposit_limit_exceeded',
+        user_id: 'u-1',
+        payment_request_id: 'pr-1',
+        threshold_rub: '5000',
+        total_deposited_rub: '6000.00',
+      },
+    ])
+  })
+
+  it('факт равен запрошенному: amountRub не трогается, эскалация считает оценку', async () => {
+    const rows = [
+      depositRow({
+        externalId: 'np-1',
+        currency: 'USDT_TRC20',
+        amount: { toString: () => '100' },
+        amountRub: '3000',
+        metadata: { pay_amount: '100' },
+      }),
+    ]
+    const d = makeDeps({ rows, lifetimeRub: '12000', limitRub: 5000 })
+
+    await d.nowpaymentsUc.execute(
+      nowpaymentsInput({ payment_id: 'np-1', payment_status: 'finished', actually_paid: '100' }),
+    )
+
+    expect(rows[0]!.amountRub).toBe('3000')
+    expect(escalationLogs()[0]!.total_deposited_rub).toBe('12000')
+  })
+
   it('сбой зачисления — эскалации нет (деньги не зачислены, превышения нет)', async () => {
     const rows = [depositRow({ externalId: 'np-1' })]
     const payment = makePaymentRepo(rows)
@@ -396,7 +476,9 @@ describe('webhook эскалация KYC-лимита: NOWPayments', () => {
       makeRealKycFacade({ status: 'not_started', lifetimeRub: '12000', limit: 5000 }),
     )
 
-    const res = await uc.execute(nowpaymentsInput({ payment_id: 'np-1', payment_status: 'finished' }))
+    const res = await uc.execute(
+      nowpaymentsInput({ payment_id: 'np-1', payment_status: 'finished' }),
+    )
 
     expect(res).toEqual({ ok: true })
     expect(escalationLogs()).toHaveLength(0)
