@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeftRight,
   ArrowRight,
-  Bitcoin,
+  Banknote,
   Check,
   ChevronDown,
   Coins,
@@ -15,6 +15,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { CurrencyIcon } from '@/components/ui/CurrencyIcon'
 import { toast } from '@/components/ui/toaster'
 import { CryptoDepositTicketPanel } from '@/components/wallet/CryptoDepositTicket'
 import { saveDepositContext } from '@/components/wallet/DepositReturnHandler'
@@ -31,7 +32,8 @@ import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
-/** Иконка метода по подписи (в гео-конфиге только id+label, без типа). */
+/** Иконка метода по подписи (в гео-конфиге только id+label, без типа).
+    Крипта — настоящие логотипы монет, фиатные способы — нейтральные глифы. */
 function methodIcon(label: string): React.JSX.Element {
   const lower = label.toLowerCase()
   if (lower.includes('сбп')) {
@@ -41,10 +43,10 @@ function methodIcon(label: string): React.JSX.Element {
     return <ArrowLeftRight size={18} aria-hidden />
   }
   if (lower.includes('btc') || lower.includes('bitcoin')) {
-    return <Bitcoin size={18} aria-hidden />
+    return <CurrencyIcon currency="BTC" size={26} />
   }
   if (lower.includes('usdt')) {
-    return <Coins size={18} aria-hidden />
+    return <CurrencyIcon currency="USDT_TRC20" size={26} />
   }
   return <CreditCard size={18} aria-hidden />
 }
@@ -108,6 +110,7 @@ function MethodSection({
         ))}
         {cryptoMethods.length > 0 && !showCrypto && (
           <button type="button" className="btn-ghost w-full text-sm" onClick={openCrypto}>
+            <Coins size={16} aria-hidden />
             Ещё способы: {cryptoMethods.map((m) => m.label).join(', ')}
           </button>
         )}
@@ -122,13 +125,14 @@ function MethodSection({
       ))}
       <button
         type="button"
-        className="text-sm text-muted"
+        className="btn-ghost w-full text-sm"
         onClick={() => {
           setMode('fiat')
           setShowCrypto(false)
         }}
       >
-        ← Фиат
+        <Banknote size={16} aria-hidden />
+        Фиатные способы
       </button>
     </div>
   )
@@ -391,7 +395,7 @@ export function DepositSheet(): React.JSX.Element | null {
             </button>
 
             <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted">
-              <ShieldCheck size={14} aria-hidden className="text-[#00C853]" />
+              <ShieldCheck size={14} aria-hidden className="text-money-dark" />
               Платёж защищён · зачисление обычно за 1 минуту
             </p>
 

@@ -4,10 +4,10 @@ import { useQuery } from '@tanstack/react-query'
 import { ArrowDownLeft, ArrowUpRight, Check, Plus, ShieldCheck, Wallet } from 'lucide-react'
 import Link from 'next/link'
 
+import { CurrencyIcon } from '@/components/ui/CurrencyIcon'
 import { apiGet } from '@/lib/api'
 import {
   currencyFullName,
-  currencyLabel,
   formatAmount,
   formatBalance,
   isCryptoCurrency,
@@ -23,19 +23,6 @@ import type { WalletBalance } from '@/types/wallet'
 import type { WalletTxDto, WalletTxListDto } from '@/types/wallet-tx'
 
 import { money } from '@casino/shared-utils'
-
-function currencyIconClass(currency: string): string {
-  const map: Record<string, string> = {
-    RUB: 'currency-icon currency-icon-rub',
-    KZT: 'currency-icon currency-icon-kzt',
-    UAH: 'currency-icon currency-icon-uah',
-    BYN: 'currency-icon currency-icon-byn',
-    UZS: 'currency-icon currency-icon-uzs',
-    USDT_TRC20: 'currency-icon currency-icon-usdt',
-    BTC: 'currency-icon currency-icon-btc',
-  }
-  return map[currency] ?? 'currency-icon bg-white/[0.06] text-white'
-}
 
 function ActiveWalletCard({
   wallet,
@@ -55,7 +42,7 @@ function ActiveWalletCard({
       <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
         <div>
           <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 rounded-full bg-[#00E676]" />
+            <span className="flex h-2 w-2 rounded-full bg-money" />
             <span className="text-xs font-bold uppercase tracking-wider text-muted">
               Основной игровой счёт
             </span>
@@ -104,7 +91,7 @@ function TxRow({ t }: { t: WalletTxDto }): React.JSX.Element {
         <span
           className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
             dir === 'in'
-              ? 'bg-[#00E676]/10 text-[#00E676]'
+              ? 'bg-money/10 text-money'
               : dir === 'out'
                 ? 'bg-[#FF3D71]/10 text-[#FF3D71]'
                 : 'bg-white/5 text-muted'
@@ -133,7 +120,7 @@ function TxRow({ t }: { t: WalletTxDto }): React.JSX.Element {
       <div className="text-right">
         <div
           className={`font-bold ${
-            dir === 'in' ? 'text-[#00E676]' : dir === 'out' ? 'text-[#FF3D71]' : 'text-muted'
+            dir === 'in' ? 'text-money' : dir === 'out' ? 'text-[#FF3D71]' : 'text-muted'
           }`}
         >
           {formatTxAmount(t.amount, t.currency)}
@@ -214,9 +201,7 @@ export default function WalletPage(): React.JSX.Element {
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className={currencyIconClass(w.currency)}>
-                      {currencyLabel(w.currency)}
-                    </span>
+                    <CurrencyIcon currency={w.currency} size={40} />
                     <div>
                       <div className="text-xs font-semibold text-white">
                         {currencyFullName(w.currency)}
@@ -258,9 +243,7 @@ export default function WalletPage(): React.JSX.Element {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <span className={currencyIconClass(w.currency)}>
-                        {currencyLabel(w.currency)}
-                      </span>
+                      <CurrencyIcon currency={w.currency} size={40} />
                       <div>
                         <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
                           <span>{currencyFullName(w.currency)}</span>
@@ -317,7 +300,7 @@ export default function WalletPage(): React.JSX.Element {
       </div>
 
       <div className="flex items-center justify-center gap-2 text-center text-xs text-muted/80">
-        <ShieldCheck size={16} className="text-[#00E676]" />
+        <ShieldCheck size={16} className="text-money" />
         <span>Отдельные балансы. Без скрытой конвертации и комиссий.</span>
       </div>
     </div>
