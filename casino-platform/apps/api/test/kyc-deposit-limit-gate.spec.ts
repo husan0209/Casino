@@ -99,7 +99,13 @@ describe('KycCheckService.assertCanDeposit — лимит без KYC', () => {
     const attempt = service.assertCanDeposit(USER_ID, '500.00000001', DEFAULT_LIMIT)
     // Assert
     await expect(attempt).rejects.toBeInstanceOf(KycRequiredError)
-    await expect(attempt).rejects.toMatchObject({ code: 'KYC_REQUIRED', httpStatus: 422 })
+    // Код с #163 точный: DEPOSIT_LIMIT_EXCEEDED (наследник KycRequiredError),
+    // чтобы клиент различал «пройди верификацию» и «упёрся в лимит без неё».
+    // instanceof выше остаётся проверкой общей ветки «нужен KYC».
+    await expect(attempt).rejects.toMatchObject({
+      code: 'DEPOSIT_LIMIT_EXCEEDED',
+      httpStatus: 422,
+    })
   })
 
   it('профиль отсутствует (getStatus = null) — считается не-verified', async () => {
