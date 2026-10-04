@@ -10,7 +10,6 @@ import {
   CreditCard,
   ShieldCheck,
   X,
-  Zap,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -33,11 +32,12 @@ import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
 /** Иконка метода по подписи (в гео-конфиге только id+label, без типа).
-    Крипта — настоящие логотипы монет, фиатные способы — нейтральные глифы. */
+    Крипта и СБП — настоящие логотипы; карта/P2P — нейтральные глифы
+    (это категории без одного бренда, логотип Visa/MC ввели бы в заблуждение). */
 function methodIcon(label: string): React.JSX.Element {
   const lower = label.toLowerCase()
   if (lower.includes('сбп')) {
-    return <Zap size={18} aria-hidden />
+    return <img src="/currency/sbp.svg" alt="СБП" className="h-5 w-auto" draggable={false} />
   }
   if (lower.includes('p2p') || lower.includes('р2р')) {
     return <ArrowLeftRight size={18} aria-hidden />
