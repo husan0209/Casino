@@ -18,6 +18,13 @@ export interface TermsAcceptanceStatus {
   currentVersions: Readonly<Record<LegalDocumentType, string>>
   /** Есть ли хотя бы одна запись по условиям использования — т.е. акцепт доказуем. */
   hasTermsAcceptance: boolean
+  /**
+   * Гейт повторного акцепта (Terms §21): последняя принятая версия условий не
+   * совпадает с действующей — игрок обязан подтвердить новую редакцию, прежде
+   * чем договор продолжит действовать в текущей редакции. `true` и для аккаунтов,
+   * где записи нет вовсе (OAuth-провижининг до GAP-71, бэкфилл).
+   */
+  reacceptRequired: boolean
 }
 
 /**
@@ -32,10 +39,12 @@ export class ListTermsAcceptancesUseCase {
 
   async execute(userId: string): Promise<TermsAcceptanceStatus> {
     const accepted = await this.acceptances.listForUser(userId)
+    const latestTerms = accepted.find((entry) => entry.document === 'terms')
     return {
       accepted,
       currentVersions: LEGAL_DOCUMENT_VERSIONS,
-      hasTermsAcceptance: accepted.some((entry) => entry.document === 'terms'),
+      hasTermsAcceptance: latestTerms !== undefined,
+      reacceptRequired: latestTerms?.version !== LEGAL_DOCUMENT_VERSIONS.terms,
     }
   }
 }
