@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
 import { UserAvatar } from '@/components/layout/UserAvatar'
+import { useMe } from '@/hooks/useMe'
 import { useAuth } from '@/stores/auth'
 
 /**
@@ -42,6 +43,10 @@ export function UserMenu({
   const { logout } = useAuth()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+
+  // Аватар из общего профиля: пропс имеет приоритет (совместимость со старым вызовом).
+  const { me } = useMe()
+  const resolvedAvatar = avatarUrl ?? me?.profile?.avatarUrl ?? null
 
   // Закрываем по клику вне меню
   useEffect(() => {
@@ -82,14 +87,14 @@ export function UserMenu({
         aria-expanded={open}
         className="shrink-0 rounded-full transition hover:ring-2 hover:ring-brand/40"
       >
-        <UserAvatar email={email} avatarUrl={avatarUrl} size={34} />
+        <UserAvatar email={email} avatarUrl={resolvedAvatar} size={34} />
       </button>
 
       {open && (
         <div className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-[#2A2A4A]/60 bg-[#1A1A2E] shadow-xl shadow-black/30">
           {/* User info */}
           <div className="flex items-center gap-3 border-b border-[#2A2A4A]/40 px-4 py-3">
-            <UserAvatar email={email} avatarUrl={avatarUrl} size={36} />
+            <UserAvatar email={email} avatarUrl={resolvedAvatar} size={36} />
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium">{displayName}</div>
               <div className="truncate text-xs text-muted">{email}</div>

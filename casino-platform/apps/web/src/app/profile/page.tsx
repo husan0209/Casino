@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRef, useState } from 'react'
 
 import { UserAvatar } from '@/components/layout/UserAvatar'
+import { AvatarLightbox } from '@/components/profile/AvatarLightbox'
 import { SecurityTab, SessionsTab, SettingsTab } from '@/components/profile/ProfileTabs'
 import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost, errText } from '@/lib/api'
@@ -31,6 +32,7 @@ const AVATAR_MIME = ['image/jpeg', 'image/png', 'image/webp']
 
 function DataTab({ me, onSaved }: { me: MeDto; onSaved: () => void }): React.JSX.Element {
   const [form, setForm] = useState<Record<string, string>>({})
+  const [avatarPreview, setAvatarPreview] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const p = me.profile
 
@@ -70,7 +72,18 @@ function DataTab({ me, onSaved }: { me: MeDto; onSaved: () => void }): React.JSX
     <div className="card space-y-3">
       <div className="font-semibold">Личные данные</div>
       <div className="flex items-center gap-3">
-        <UserAvatar email={me.user.email} avatarUrl={p?.avatarUrl ?? null} size={56} />
+        {p?.avatarUrl ? (
+          <button
+            type="button"
+            onClick={() => setAvatarPreview(true)}
+            aria-label="Посмотреть аватар крупно"
+            className="shrink-0 rounded-full transition hover:ring-2 hover:ring-brand/40"
+          >
+            <UserAvatar email={me.user.email} avatarUrl={p.avatarUrl} size={56} />
+          </button>
+        ) : (
+          <UserAvatar email={me.user.email} avatarUrl={null} size={56} />
+        )}
         <div>
           <button
             type="button"
@@ -119,6 +132,9 @@ function DataTab({ me, onSaved }: { me: MeDto; onSaved: () => void }): React.JSX
       <button onClick={() => void save()} className="btn w-full">
         Сохранить
       </button>
+      {avatarPreview && p?.avatarUrl && (
+        <AvatarLightbox src={p.avatarUrl} onClose={() => setAvatarPreview(false)} />
+      )}
     </div>
   )
 }
