@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation'
 
 import { UserAvatar } from '@/components/layout/UserAvatar'
 import { useFavorites } from '@/hooks/useFavorites'
-import { useMe } from '@/hooks/useMe'
 import { useAuth } from '@/stores/auth'
 
 /**
@@ -20,7 +19,6 @@ export function BottomNav(): React.JSX.Element | null {
   const pathname = usePathname()
   const { user } = useAuth()
   const { favoriteSlugs } = useFavorites()
-  const { me } = useMe()
   const favCount = favoriteSlugs.size
 
   if (pathname.startsWith('/login') || pathname.startsWith('/register')) {
@@ -62,7 +60,9 @@ export function BottomNav(): React.JSX.Element | null {
         })}
         <Link href="/profile" className={linkClass(isActive('/profile'))}>
           {user ? (
-            <UserAvatar email={user.email} avatarUrl={me?.profile?.avatarUrl ?? null} size={22} />
+            /* Фото-аватар в таб-баре убрали: фото и так есть в шапке и на
+               профиле — здесь достаточно буквы на градиенте. */
+            <UserAvatar email={user.email} size={22} />
           ) : (
             <User size={22} strokeWidth={1.8} aria-hidden />
           )}
