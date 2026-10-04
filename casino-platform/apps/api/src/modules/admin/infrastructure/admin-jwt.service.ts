@@ -19,13 +19,25 @@ function hs256(secret: string, header: object, payload: object): string {
 }
 
 function hs256Verify(secret: string, token: string): Record<string, unknown> {
-  const [h, p, sig] = token.split('.') as [string, string, string]
+  const parts = token.split('.')
+  if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) {
+    throw new AdminJwtTokenError('MALFORMED_TOKEN')
+  }
+  const [h, p, sig] = parts as [string, string, string]
   const expected = createHmac('sha256', secret).update(`${h}.${p}`).digest()
-  const given = Buffer.from(sig!, 'base64url')
+  const given = Buffer.from(sig, 'base64url')
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
     throw new AdminJwtTokenError('BAD_SIGNATURE')
   }
-  return JSON.parse(Buffer.from(p!, 'base64url').toString()) as Record<string, unknown>
+  try {
+    return JSON.parse(Buffer.from(p, 'base64url').toString()) as Record<string, unknown>
+  } catch {
+    // Подпись совпала, а payload не читается как JSON. Без этого ветки сырой
+    // SyntaxError уходил наружу: guard конвертирует не-AppError в 401, но сервис
+    // экспортируется из модуля (admin.module.ts:84), и следующий потребитель
+    // получил бы 500.
+    throw new AdminJwtTokenError('MALFORMED_TOKEN')
+  }
 }
 
 @Injectable()
@@ -73,11 +85,31 @@ export class AdminAuthService {
     )
     return token
   }
+  /**
+   * Проверка админского токена.
+   *
+   * Класс `AdminAuthGuard` сверяет `aud === 'admin'` сам, но это не повод
+   * игнорировать аудит здесь: подпись игроцких и админских токенов — ОДИН
+   * секрет (`JWT_ACCESS_SECRET`, отдельного `ADMIN_JWT_SECRET` в env-схеме нет),
+   * поэтому токен игрока криптографически валиден. Вся защита контура держится на
+   * одной проверке в одном месте — достаточно нового потребителя `verify()`
+   * (сервис экспортируется наружу модуля, `admin.module.ts:84), чтобы аудит
+   * перестали смотреть. Проверяем и здесь: отказ дешевле допущения.
+   *
+   * `iss` — по той же причине: ключ `casino-platform` отличает наши токены от
+   * любого HMAC, подписанного тем же секретом вне контура.
+   */
   verify(token: string): Record<string, unknown> {
     const payload = hs256Verify(this.config.get<string>('JWT_ACCESS_SECRET')!, token)
     const exp = typeof payload['exp'] === 'number' ? payload['exp'] : 0
     if (exp * 1000 < Date.now()) {
       throw new AdminJwtTokenError('TOKEN_EXPIRED')
+    }
+    if (payload['aud'] !== 'admin') {
+      throw new AdminJwtTokenError('BAD_AUDIENCE')
+    }
+    if (payload['iss'] !== 'casino-platform') {
+      throw new AdminJwtTokenError('BAD_ISSUER')
     }
     return payload
   }
