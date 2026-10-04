@@ -8,9 +8,11 @@ import {
   type PaymentRequest,
 } from '../domain/payments.ports'
 
+import type { PaymentStatus } from '@prisma/client'
+
 /**
  * Публичный API payments-модуля (MODULE_TEMPLATE Шаг 8).
- * Потребители: maintenance (estimateRub для курсов), admin (чтение платёжек).
+ * Потребители: maintenance (estimateRub для курсов), admin (заявки на вывод).
  */
 @Injectable()
 export class PaymentsFacade {
@@ -26,6 +28,26 @@ export class PaymentsFacade {
 
   getPaymentRequest(id: string): Promise<PaymentRequest | null> {
     return this.repo.findById(id)
+  }
+
+  /**
+   * Смена статуса заявки — операция владельца решения, а не владельца таблицы.
+   *
+   * Раньше `admin-finance.controller.ts` инжектировал порт payments
+   * (`PAYMENT_REQUEST_REPOSITORY`) и вызывал `updateStatus` сам: admin тянул
+   * внутренности чужого модуля (гвард G16), а запись делал из presentation
+   * (AI_DEVELOPMENT_RULES §3.3). Здесь — единственная точка, через которую
+   * решение по заявке долетает до БД.
+   */
+  updatePaymentStatus(
+    id: string,
+    status: PaymentStatus,
+    extra?: {
+      completedAt?: Date | undefined
+      errorMessage?: string | undefined
+    },
+  ): Promise<PaymentRequest> {
+    return this.repo.updateStatus(id, status, extra)
   }
 
   listUserPayments(

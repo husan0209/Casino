@@ -937,7 +937,9 @@ off только Next.js pages с обоснованием (GAP-39 stage 9b).
      `PARTIAL` прежний. #141 (`feat/referrals-facade`) делает другое и не противоречит этому выводу: наружу вынесен
      `ReferralsFacade`, правило В1 сформулировано «фасад по внешним потребителям», базлайн `cross-module-imports`
      ужат 7→5 файла (maintenance переведён с прямых импортов на фасады), публичный API `admin` объявлен явно
-     (`exports: [AdminFacade, AuditLogService, AdminAuthGuard, AdminAuthService]`). Внутримодульные чтения чужих
+     (`exports: [AdminFacade, AuditLogService, AdminAuthGuard, AdminAuthService]`; с 2026-10-04 guard и сервис
+     живут в `AdminAuthModule`, а `AdminModule` переэкспортирует модуль — Nest не разрешает экспортировать
+     провайдер чужого модуля). Внутримодульные чтения чужих
      таблиц это не отменяет — критерий «grep пустой» по-прежнему не выполнен.
 
 ### GAP-52…GAP-55 (фронтенд по ТЗ ч.5, аудит 2026-09-13…16) — досье

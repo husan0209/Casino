@@ -308,11 +308,12 @@ payment_callbacks    (raw callbacks от провайдеров)
 
 ### 6.6. Экспортирует
 
-- Ничего (в `payments.module.ts` нет `exports`) — потребители работают через
-  собственные контроллеры/use-cases модуля
+- `PaymentsFacade` (`estimateRub`, `getPaymentRequest`, `updatePaymentStatus`) —
+  потребители: `maintenance` (курсы) и `admin` (решение по заявке на вывод)
 - NB: `PaymentProvider` — это Prisma-enum из `@casino/database`, а не interface
-  модуля; admin читает `payment_requests` напрямую (`PaymentRequestRepository`
-  провайдится в `admin.module.ts`)
+  модуля. Admin больше не провайдит `PaymentRequestRepository` у себя: доступ к
+  заявкам идёт через фасад (G16), а `PAYMENT_REQUEST_REPOSITORY` остаётся
+  внутренним портом payments
 
 ---
 
@@ -641,8 +642,13 @@ audit_logs          (actor_type, actor_id, action, target_type, target_id, paylo
 ### 13.2. Использует
 
 - `wallet` (WalletFacade — manual credit/debit)
-- Собственные репозитории к admin_users, audit_logs, dashboard, payment_requests
-  (`PaymentRequestRepository` провайдится локально — прямой доступ к таблице payments)
+- `payments` (`PaymentsFacade` — approve/reject заявки на вывод; узкий токен
+  `WITHDRAWAL_REQUEST_STORE` закрывается адаптером в `admin/infrastructure`,
+  порты и Prisma-класс payments наружу не импортируются — G16)
+- Собственные репозитории к admin_users, audit_logs, dashboard.
+  Список заявок (`payment_requests`) контроллер пока читает через `prisma`
+  напрямую — это долг В3 (presentation → БД), а не G16: таблица в этом
+  обращении не пишется
 
 ### 13.2.1. Публичный API (наружу из `AdminModule`, exports)
 
@@ -650,13 +656,22 @@ audit_logs          (actor_type, actor_id, action, target_type, target_id, paylo
   записи аудита из других модулей: `logAction(input)` оборачивает
   `AuditLogService.log` и не роняет операцию при сбое журнала. Потребители:
   `affiliate` (affiliate-admin), `maintenance` (ручной триггер run-daily).
+- `AdminAuthModule` (`admin/admin-auth.module.ts`) — провайдер и экспортер
+  `AdminAuthGuard` + `AdminAuthService`. Вынесен из `AdminModule` не для красоты:
+  `KycModule` импортировал весь `AdminModule` ради одного guard'а, и любая
+  попытка убрать deep-импорты admin собирала цикл
+  `admin → payments → kyc → admin` (payments нужен kyc для порога депозитов),
+  который eslint ловит статически по `import/no-cycle`. Теперь kyc импортирует
+  только вход в админку.
 - `AdminAuthGuard` (`admin/presentation/admin-auth.guard`) — публичный API по
   решению **В6.1** (guards аутентификации = exports модуля, §16.2). Импортируют
   напрямую: `kyc` (`KycAdminController`), `affiliate` (`AffiliateAdminController`).
   Отдельного фасада под guard нет: guard — это middleware-контракт, а не
-  бизнес-операция.
-- `AdminAuthService` — экспорт нужен, потому что `AdminAuthGuard` инжектит его:
-  без экспорта DI в `KycModule` не резолвится (E2E, PR #15).
+  бизнес-операция. Наружу он идёт через `AdminModule → exports: [AdminAuthModule]`
+  (переэкспорт модуля): Nest не позволяет экспортировать провайдер чужого модуля
+  напрямую, и падает на старте контейнера, а не на typecheck.
+- `AdminAuthService` — рядом с guard'ом потому, что `AdminAuthGuard` инжектит
+  его: без переэкспорта DI в потребителях не резолвится (E2E, PR #15).
 - `AuditLogService` — **legacy-экспорт**: исторически его импортировал
   `MaintenanceAdminController` напрямую (долг был заморожен в
   `tech-debt/cross-module-imports.txt`). После В1/В6 maintenance перешёл на
@@ -710,7 +725,7 @@ payments      → wallet              (WalletFacade.credit/debit/lock)
               → kyc                 (KycCheckService.assertCanDeposit/assertCanWithdraw)
               → users               (UsersFacade)
               → geo                 (GeoFacade)
-              exports НИЧЕГО (п.6.6)
+              exports PaymentsFacade (estimate, чтение заявки, смена статуса)
 
 casino        → wallet              (WalletFacade: launch + bet/win/rollback)
               → auth                (guards)
