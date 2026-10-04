@@ -46,7 +46,7 @@ export class VerifyEmailUseCase {
     await this.users.update(user)
     await this.verif.markUsed(rec.id)
     const { token: refreshToken, hash } = this.jwt.generateRefreshToken()
-    const expiresAt = new Date(Date.now() + 30 * 24 * 3600 * 1000)
+    const { expiresAt } = this.jwt.refreshLifetime()
     const session = await this.sessions.create({
       userId: user.id,
       refreshTokenHash: hash,

@@ -95,6 +95,11 @@ function makeDeps(over: { session?: SessionView | null; user?: User | null } = {
     verifyAccess: () => ({ sub: 'u-1', role: 'user', session_id: 'sess-1' }),
     generateRefreshToken: () => ({ token: 'refresh-new', hash: 'sha:new' }),
     hashRefreshToken: (t) => `sha:${t}`,
+    // Не 30 суток — иначе тест не отличает «порт спросили» от «посчитали сами».
+    refreshLifetime: () => ({
+      expiresAt: new Date(Date.now() + 25 * 3_600_000),
+      maxAgeMs: 25 * 3_600_000,
+    }),
   }
 
   const uc = new RefreshUseCase(sessions, users, jwt)
@@ -112,7 +117,7 @@ describe('RefreshUseCase', () => {
     expect(d.accessCalls[0]).toEqual({ userId: 'u-1', role: 'user', sessionId: 'sess-new' })
   })
 
-  it('новая сессия: ip наследуется, userAgent сбрасывается, срок 30 дней', async () => {
+  it('новая сессия: ip и устройство наследуются, срок берётся из порта', async () => {
     const d = makeDeps({ session: makeSession(), user: makeUser() })
     const before = Date.now()
     await d.uc.execute(REFRESH)
@@ -120,10 +125,13 @@ describe('RefreshUseCase', () => {
     expect(created.userId).toBe('u-1')
     expect(created.refreshTokenHash).toBe('sha:new')
     expect(created.ipAddress).toBe('10.0.0.1')
-    expect(created.userAgent).toBeNull()
-    const days = (created.expiresAt.getTime() - before) / 86_400_000
-    expect(days).toBeGreaterThan(29.9)
-    expect(days).toBeLessThan(30.1)
+    // Прежняя сборка обнуляла userAgent: ротация происходит на каждой полной
+    // загрузке страницы, поэтому уже после первого refresh устройство исчезало из
+    // `/users/sessions`, где поле отдаётся игроку (users.controller.ts:168).
+    expect(created.userAgent).toBe('old-agent')
+    const hours = (created.expiresAt.getTime() - before) / 3_600_000
+    expect(hours).toBeGreaterThan(24.9)
+    expect(hours).toBeLessThan(25.1)
   })
 
   it('сессии нет → SessionInvalidError', async () => {
