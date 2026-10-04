@@ -124,10 +124,16 @@ sessions             (refresh tokens hashed)
 
 - `geo` (UsersFacade.getGeoContext)
 - `payments` (UsersFacade — контекст пользователя, onDepositCompleted)
+- `admin` (UsersFacade.blockPlayer/unblockPlayer — блокировка игрока; G24: статус
+  `users` и отзыв `sessions` пишет владелец таблиц, а не заказчик)
 
 ### 3.5. Экспортирует
 
-- `UsersFacade` (getGeoContext, updateCurrencyPreference, onDepositCompleted) — `users/facade/users.facade.ts`
+- `UsersFacade` (getGeoContext, updateCurrencyPreference, onDepositCompleted, provisionAffiliatePlayer,
+  deprovisionAffiliatePlayer, blockPlayer, unblockPlayer) — `users/facade/users.facade.ts`
+- Блокировка игрока — порт `USER_STATUS_REPOSITORY` (`domain/repositories/user-status.repository.ts`),
+  реализация `PrismaUserStatusRepository`: `blocked` + отзыв живых сессий одной `$transaction`. Метод не
+  параметризуется флагом «отзывать сессию или нет»: отзыв — часть блокировки
 - `SelfExclusionUseCase` (самоисключение игрока)
 - NB: таблица `sessions` общая с auth — чтение/отзыв сессий здесь через `USER_SESSION_REPOSITORY`, выпуск refresh-токенов — в auth (`SESSION_REPOSITORY`)
 
@@ -642,6 +648,9 @@ audit_logs          (actor_type, actor_id, action, target_type, target_id, paylo
 ### 13.2. Использует
 
 - `wallet` (WalletFacade — manual credit/debit)
+- `users` (`UsersFacade.blockPlayer/unblockPlayer`) — блокировка игрока. Админ заказывает
+  действие, а `user.status` и `session.revokedAt` пишет владелец таблиц: раньше эти три записи
+  делал `admin.prisma.repository` (G24)
 - `payments` (`PaymentsFacade` — approve/reject заявки на вывод; узкий токен
   `WITHDRAWAL_REQUEST_STORE` закрывается адаптером в `admin/infrastructure`,
   порты и Prisma-класс payments наружу не импортируются — G16)

@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common'
 
 import { prisma, type Prisma } from '@casino/database'
 
-
 import {
   type AdminFeedBigWin,
   type AdminFeedKyc,
@@ -66,17 +65,8 @@ export class PrismaAdminUserRepository implements IAdminUserRepository {
     await prisma.adminUser.update({ where: { id }, data: { lastLoginAt: new Date() } })
   }
 
-  /** Блокировка игрока: статус + отзыв активных сессий — одна доменная операция. */
-  async blockPlayer(userId: string): Promise<void> {
-    await prisma.$transaction([
-      prisma.user.update({ where: { id: userId }, data: { status: 'blocked' } }),
-      prisma.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } }),
-    ])
-  }
-
-  async unblockPlayer(userId: string): Promise<void> {
-    await prisma.user.update({ where: { id: userId }, data: { status: 'active' } })
-  }
+  // Блокировка/разблокировка игрока отсюда убраны (G24): `users` и `sessions`
+  // пишет их владелец — admin ходит в UsersFacade.blockPlayer/unblockPlayer.
 }
 
 @Injectable()
