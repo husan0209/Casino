@@ -19,7 +19,11 @@ import type {
   PaymentRequest,
 } from '../src/modules/payments/domain/payments.ports'
 
-const RAW_BODY = JSON.stringify({ payment_id: 'np-1', payment_status: 'finished', actually_paid: '99.5' })
+const RAW_BODY = JSON.stringify({
+  payment_id: 'np-1',
+  payment_status: 'finished',
+  actually_paid: '99.5',
+})
 
 type SavedCallback = {
   id: string
@@ -39,14 +43,20 @@ type CreditArgs = {
   metadata: Record<string, unknown>
 }
 
-function makeDeps(over: {
-  signatureValid?: boolean
-  row?: PaymentRequest | null
-  creditError?: Error
-} = {}) {
+function makeDeps(
+  over: {
+    signatureValid?: boolean
+    row?: PaymentRequest | null
+    creditError?: Error
+  } = {},
+) {
   const saved: SavedCallback[] = []
   const callbackResults: Array<{ id: string; result: string | undefined }> = []
-  const statusUpdates: Array<{ id: string; status: string; extra: Record<string, unknown> | undefined }> = []
+  const statusUpdates: Array<{
+    id: string
+    status: string
+    extra: Record<string, unknown> | undefined
+  }> = []
   const credited: CreditArgs[] = []
   const depositCompleted: Array<{ userId: string; currency: string; method: string }> = []
   const ipnChecks: Array<{ rawBody: string; signature: string }> = []
@@ -78,8 +88,8 @@ function makeDeps(over: {
   const wallet = {
     credit: async (args: CreditArgs) => {
       if (over.creditError) {
-throw over.creditError
-}
+        throw over.creditError
+      }
       credited.push(args)
       return { ok: true }
     },
@@ -202,7 +212,9 @@ describe('ProcessNOWPaymentsWebhookUseCase', () => {
         metadata: { provider: 'nowpayments', external_id: 'np-1', actually_paid: '99.5' },
       },
     ])
-    expect(d.depositCompleted).toEqual([{ userId: 'u-1', currency: 'USDT_TRC20', method: 'usdt_trc20' }])
+    expect(d.depositCompleted).toEqual([
+      { userId: 'u-1', currency: 'USDT_TRC20', method: 'usdt_trc20' },
+    ])
     expect(d.statusUpdates).toHaveLength(1)
     expect(d.statusUpdates[0]!.id).toBe('pr-1')
     expect(d.statusUpdates[0]!.status).toBe('completed')
@@ -211,6 +223,91 @@ describe('ProcessNOWPaymentsWebhookUseCase', () => {
     // Эскалация KYC-лимита — ровно одна на успешное зачисление (условие и лог
     // считаются в KycCheckService, здесь — сам факт вызова после updateStatus).
     expect(d.escalations).toEqual([{ userId: 'u-1', paymentRequestId: 'pr-1' }])
+  })
+
+  /**
+   * GAP-72: `amount_rub` заявки — оценка `getEstimatePrice` на интенте, а кошелёк
+   * получает `actually_paid`. Если провайдер принял другую сумму, RUB на заявке
+   * пересчитывается тем же отношением крипто-единиц: иначе агрегат лимита без KYC
+   * (`getTotalDepositedRub`) считает не те деньги, что попали на счёт.
+   */
+  describe('пересчёт amountRub по фактически оплаченной сумме (GAP-72)', () => {
+    const cryptoRow = (payAmount: string, amountRub: string | null) =>
+      row({ amountRub: amountRub as never, metadata: { pay_amount: payAmount } })
+
+    const finished = (paid: string) =>
+      input({ body: { payment_id: 'np-1', payment_status: 'finished', actually_paid: paid } })
+
+    it('переплата 200 против 100 запрошенных: amountRub 5000 → 10000.00', async () => {
+      const d = makeDeps({ row: cryptoRow('100', '5000') })
+      await d.uc.execute(finished('200'))
+
+      expect(d.statusUpdates[0]!.extra!.amountRub).toBe('10000.00')
+    })
+
+    it('недоплата вдвое: amountRub масштабируется вниз, а не остаётся завышенным', async () => {
+      const d = makeDeps({ row: cryptoRow('100', '5000') })
+      await d.uc.execute(finished('50'))
+
+      expect(d.statusUpdates[0]!.extra!.amountRub).toBe('2500.00')
+    })
+
+    it('результат округляется до центов: amount_rub — DECIMAL(20,2)', async () => {
+      const d = makeDeps({ row: cryptoRow('3', '1000.00') })
+      await d.uc.execute(finished('1'))
+
+      expect(d.statusUpdates[0]!.extra!.amountRub).toBe('333.33')
+    })
+
+    it('факт равен запрошенному → amountRub не переписывается', async () => {
+      const d = makeDeps({ row: cryptoRow('100', '5000') })
+      await d.uc.execute(finished('100'))
+
+      expect(d.statusUpdates[0]!.extra).not.toHaveProperty('amountRub')
+    })
+
+    it('пересчёта нет, когда отношением не посчитать: без pay_amount, без оценки, pay_amount = 0', async () => {
+      const noPayAmount = makeDeps({ row: row({ amountRub: '5000' as never }) })
+      await noPayAmount.uc.execute(finished('200'))
+      expect(noPayAmount.statusUpdates[0]!.extra).not.toHaveProperty('amountRub')
+
+      const noEstimate = makeDeps({ row: cryptoRow('100', null) })
+      await noEstimate.uc.execute(finished('200'))
+      expect(noEstimate.statusUpdates[0]!.extra).not.toHaveProperty('amountRub')
+
+      // делитель ноль: Decimal не бросает, а даёт Infinity — в DECIMAL(20,2)
+      // ушла бы строка "Infinity"
+      const zeroPayAmount = makeDeps({ row: cryptoRow('0', '5000') })
+      await zeroPayAmount.uc.execute(finished('200'))
+      expect(zeroPayAmount.statusUpdates[0]!.extra).not.toHaveProperty('amountRub')
+    })
+
+    it('пересчёта нет на выдуманной провайдером сумме: минус и не-число', async () => {
+      const negative = makeDeps({ row: cryptoRow('100', '5000') })
+      await negative.uc.execute(finished('-50'))
+      expect(negative.statusUpdates[0]!.extra).not.toHaveProperty('amountRub')
+
+      const notMoney = makeDeps({ row: cryptoRow('1e400', '5000') })
+      await notMoney.uc.execute(finished('200'))
+      expect(notMoney.statusUpdates[0]!.extra).not.toHaveProperty('amountRub')
+    })
+
+    it('нулевой факт зачисления: RUB обнуляется, а не остаётся завышенным', async () => {
+      const d = makeDeps({ row: cryptoRow('100', '5000') })
+      await d.uc.execute(finished('0'))
+
+      expect(d.statusUpdates[0]!.extra!.amountRub).toBe('0.00')
+    })
+
+    it('пересчёт идёт тем же вызовом updateStatus, что и completed: одним обновлением', async () => {
+      const d = makeDeps({ row: cryptoRow('100', '5000') })
+      await d.uc.execute(finished('200'))
+
+      expect(d.statusUpdates).toHaveLength(1)
+      expect(d.statusUpdates[0]!.status).toBe('completed')
+      // и эскалация осталась ровно одна — она читает уже пересчитанную заявку
+      expect(d.escalations).toEqual([{ userId: 'u-1', paymentRequestId: 'pr-1' }])
+    })
   })
 
   it('BTC-депозит → метод onDepositCompleted = btc', async () => {

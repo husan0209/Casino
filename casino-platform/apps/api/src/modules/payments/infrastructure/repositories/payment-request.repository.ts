@@ -35,6 +35,7 @@ export class PaymentRequestRepository implements IPaymentRequestRepository {
       errorMessage?: string | undefined
       externalId?: string | undefined
       paymentUrl?: string | undefined
+      amountRub?: string | undefined
     } = {},
   ): Promise<PaymentRequest> {
     // exactOptionalPropertyTypes: Prisma не принимает явный undefined —
@@ -49,6 +50,7 @@ export class PaymentRequestRepository implements IPaymentRequestRepository {
         ...(extra.errorMessage !== undefined && { errorMessage: extra.errorMessage }),
         ...(extra.externalId !== undefined && { externalId: extra.externalId }),
         ...(extra.paymentUrl !== undefined && { paymentUrl: extra.paymentUrl }),
+        ...(extra.amountRub !== undefined && { amountRub: extra.amountRub }),
       },
     })
   }

@@ -36,6 +36,13 @@ export interface IPaymentRequestRepository {
       errorMessage?: string | undefined
       externalId?: string | undefined
       paymentUrl?: string | undefined
+      /**
+       * RUB, который реально зачислен (GAP-72). Нужен крипто-депозиту: заявка
+       * хранит оценку на интенте, а провайдер платит `actually_paid`, — без
+       * этого `amount_rub` отстаёт от кошелька, и агрегат лимита без KYC
+       * недоучитывает пополнение.
+       */
+      amountRub?: string | undefined
     },
   ): Promise<PaymentRequest>
   listUser(args: {
