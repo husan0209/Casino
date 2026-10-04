@@ -28,6 +28,7 @@ import { type UserActor } from '@/common/types/req-user'
 
 import { type UserRole } from '@casino/database'
 
+import { AcceptTermsUseCase } from '../../application/use-cases/accept-terms.use-case'
 import { ChangePasswordUseCase } from '../../application/use-cases/change-password.use-case'
 import { ForgotPasswordUseCase } from '../../application/use-cases/forgot-password.use-case'
 import {
@@ -50,6 +51,7 @@ import {
   ResetPasswordSchema,
 } from '../dto/password-reset.dto'
 import { type RegisterDto, RegisterSchema } from '../dto/register.dto'
+import { type AcceptTermsDto, AcceptTermsSchema } from '../dto/terms.dto'
 import { AuthGuard } from '../guards/auth.guard'
 
 /** Точечное сужение: req.cookies в @types/express — any (GAP-39 stage 10). */
@@ -83,6 +85,7 @@ export class AuthController {
     @Inject(TelegramLoginUseCase) private readonly telegramUc: TelegramLoginUseCase,
     @Inject(ListTermsAcceptancesUseCase)
     private readonly termsAcceptancesUc: ListTermsAcceptancesUseCase,
+    @Inject(AcceptTermsUseCase) private readonly acceptTermsUc: AcceptTermsUseCase,
   ) {}
 
   @Post('register')
@@ -149,7 +152,15 @@ export class AuthController {
     @Body() body: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: UserRole } }> {
+  ): Promise<{
+    accessToken: string
+    user: { id: string; email: string | null; role: UserRole }
+    /**
+     * Гейт повторного акцепта (GAP-73, Terms §21): условия изменились с тех пор,
+     * как игрок подтверждал их в последний раз.
+     */
+    terms_reaccept_required: boolean
+  }> {
     const result = await this.loginUc.execute({
       email: body.email,
       password: body.password,
@@ -158,7 +169,34 @@ export class AuthController {
       ...(body.captcha_token !== undefined && { captchaToken: body.captcha_token }),
     })
     setRefreshTokenCookie(res, result.refreshToken)
-    return { accessToken: result.accessToken, user: result.user }
+    const status = await this.termsAcceptancesUc.execute(result.user.id)
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+      terms_reaccept_required: status.reacceptRequired,
+    }
+  }
+
+  /**
+   * Повторный акцепт после существенных изменений Условий (GAP-73, Terms §21).
+   * Отдельный эндпоинт, а не «молча обнови строку при входе»: согласие должно
+   * быть активным действием игрока (п. 4), иначе журнал перестаёт быть
+   * доказательством.
+   */
+  @Post('terms/accept')
+  @UseGuards(AuthGuard)
+  @UsePipes(new ZodValidationPipe(AcceptTermsSchema))
+  async acceptTerms(
+    @Body() body: AcceptTermsDto,
+    @CurrentUser() user: UserActor,
+    @Req() req: Request,
+  ): Promise<TermsAcceptanceStatus> {
+    return this.acceptTermsUc.execute({
+      userId: user.id,
+      termsVersion: body.terms_version,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
   }
 
   @Post('refresh')

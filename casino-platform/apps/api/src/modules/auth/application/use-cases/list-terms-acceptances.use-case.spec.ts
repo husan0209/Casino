@@ -59,6 +59,40 @@ describe('ListTermsAcceptancesUseCase', () => {
     expect((await withTerms.uc.execute('u2')).hasTermsAcceptance).toBe(true)
   })
 
+  it('reacceptRequired — гейт Terms §21: версия игрока против действующей', async () => {
+    const current = makeUc([
+      {
+        id: 'a1',
+        document: 'terms',
+        version: LEGAL_DOCUMENT_VERSIONS.terms,
+        acceptedAt: new Date(),
+      },
+    ])
+    const outdated = makeUc([
+      { id: 'a2', document: 'terms', version: '0.9', acceptedAt: new Date() },
+    ])
+    const never = makeUc([])
+
+    expect((await current.uc.execute('u1')).reacceptRequired).toBe(false)
+    expect((await outdated.uc.execute('u2')).reacceptRequired).toBe(true)
+    // Аккаунты, созданные до GAP-71 (в т.ч. OAuth-провижининг), попадают в гейт:
+    // записи об акцепте у них нет, а договор с текущей редакцией не подтверждён.
+    expect((await never.uc.execute('u3')).reacceptRequired).toBe(true)
+  })
+
+  it('запись по другому документу не закрывает гейт по условиям', async () => {
+    const onlyPrivacy = makeUc([
+      {
+        id: 'a1',
+        document: 'privacy',
+        version: LEGAL_DOCUMENT_VERSIONS.privacy,
+        acceptedAt: new Date(),
+      },
+    ])
+
+    expect((await onlyPrivacy.uc.execute('u1')).reacceptRequired).toBe(true)
+  })
+
   it('пустой журнал — не ошибка, а доказательство отсутствия акцепта', async () => {
     const { uc } = makeUc([])
 

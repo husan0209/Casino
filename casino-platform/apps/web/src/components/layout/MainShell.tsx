@@ -9,6 +9,7 @@ import { BottomNav } from '@/components/layout/BottomNav'
 import { DesktopNav } from '@/components/layout/DesktopNav'
 import { LegalChrome } from '@/components/layout/LegalChrome'
 import { SiteFooter } from '@/components/layout/SiteFooter'
+import { TermsReacceptDialog } from '@/components/legal/TermsReacceptDialog'
 import { DepositReturnHandler } from '@/components/wallet/DepositReturnHandler'
 import { DepositSheet } from '@/components/wallet/DepositSheet'
 import { LaunchCurrencySheet } from '@/components/wallet/LaunchCurrencySheet'
@@ -79,6 +80,9 @@ export function MainShell({ children }: { children: React.ReactNode }): React.JS
       <WalletSwitcher />
       <LaunchCurrencySheet />
       <DepositReturnHandler />
+      {/* GAP-73: гейт повторного акцепта живёт в оболочке, а не в LoginSheet —
+          срабатывает и после гидрации сессии, и после OAuth-входа. */}
+      <TermsReacceptDialog />
     </>
   )
 

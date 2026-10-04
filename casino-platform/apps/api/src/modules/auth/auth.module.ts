@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 
 import { QueuesModule } from '../../queues/queues.module'
+import { AcceptTermsUseCase } from './application/use-cases/accept-terms.use-case'
 import { ChangePasswordUseCase } from './application/use-cases/change-password.use-case'
 import { ForgotPasswordUseCase } from './application/use-cases/forgot-password.use-case'
 import { ListTermsAcceptancesUseCase } from './application/use-cases/list-terms-acceptances.use-case'
@@ -74,6 +75,7 @@ import { RolesGuard } from './presentation/guards/roles.guard'
     { provide: TERMS_ACCEPTANCE_REPOSITORY, useClass: PrismaTermsAcceptanceRepository },
     RegisterUseCase,
     ListTermsAcceptancesUseCase,
+    AcceptTermsUseCase,
     VerifyEmailUseCase,
     LoginUseCase,
     RefreshUseCase,
