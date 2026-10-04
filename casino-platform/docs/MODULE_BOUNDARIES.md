@@ -627,7 +627,7 @@ Email-джобов отдельной таблицы НЕТ: очередь `ema
 ### 12.2. Где лежит
 
 ```
-apps/api/src/modules/admin/application/audit-log.service.ts          (AuditLogService.log(input))
+apps/api/src/modules/admin/application/audit-log.service.ts          (AuditLogService.log / .list)
 apps/api/src/modules/admin/domain/admin.repository.ts                (порт AUDIT_LOG_REPOSITORY)
 apps/api/src/modules/admin/infrastructure/repositories/admin.prisma.repository.ts (PrismaAuditLogRepository)
 apps/api/src/modules/admin/presentation/controllers/admin-audit.controller.ts
