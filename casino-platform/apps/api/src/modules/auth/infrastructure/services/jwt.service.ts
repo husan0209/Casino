@@ -3,22 +3,15 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import { expiresToSeconds } from '@casino/shared-utils'
+
 import { type IJwtTokenService } from '../../domain/auth.ports'
 import { JwtSecretWeakError, JwtTokenError } from '../../domain/errors'
 
 const b64url = (buf: Buffer): string => buf.toString('base64url')
 
-function expiresToSeconds(v: string | undefined, fallback: number): number {
-  if (!v) {
-    return fallback
-  }
-  const m = /^(\d+)([smhd])$/.exec(v.trim())
-  if (!m?.[1] || !m[2]) {
-    return fallback
-  }
-  const mult = { s: 1, m: 60, h: 3600, d: 86400 }[m[2] as 's' | 'm' | 'h' | 'd']!
-  return parseInt(m[1], 10) * mult
-}
+/** Резерв, если `JWT_REFRESH_EXPIRES_IN` отсутствует или разобрался криво. */
+const DEFAULT_REFRESH_LIFETIME_SECONDS = 30 * 86400
 
 interface AccessPayload {
   sub: string
@@ -98,6 +91,29 @@ export class JwtTokenService implements IJwtTokenService {
   generateRefreshToken(): { token: string; hash: string } {
     const token = randomBytes(64).toString('hex')
     return { token, hash: this.hashRefreshToken(token) }
+  }
+
+  /**
+   * Срок жизни refresh-сессии — `JWT_REFRESH_EXPIRES_IN` (резерв: 30 суток).
+   *
+   * До этого пять мест (`login`, `refresh`, `register`, `verify-email`,
+   * OAuth-провижинение) считали `30 * 24 * 3600 * 1000` каждое у себя, а переменная
+   * `JWT_REFRESH_EXPIRES_IN` была описана в env-схеме
+   * (`packages/shared-config/src/env.validation.ts:90`) и не читалась НИКТО: окно
+   * выхода из конфигурации изменить было нельзя — контракт существовал только на
+   * бумаге. Теперь источник один, и `maxAge` cookie (`common/cookies`) читает ту же
+   * переменную, чтобы кука не переживала отозванную сессию.
+   *
+   * `maxAgeMs` возвращается вместе с `expiresAt`: это одно и то же число в двух
+   * единицах, а два независимых разбора `30d` разъезжаются молча.
+   */
+  refreshLifetime(): { expiresAt: Date; maxAgeMs: number } {
+    const seconds = expiresToSeconds(
+      this.config.get<string>('JWT_REFRESH_EXPIRES_IN'),
+      DEFAULT_REFRESH_LIFETIME_SECONDS,
+    )
+    const maxAgeMs = seconds * 1000
+    return { expiresAt: new Date(Date.now() + maxAgeMs), maxAgeMs }
   }
 
   hashRefreshToken(token: string): string {

@@ -174,7 +174,7 @@ export class RegisterUseCase {
       refreshTokenHash: hash,
       ipAddress: meta?.ip || null,
       userAgent: meta?.userAgent || null,
-      expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
+      expiresAt: this.jwt.refreshLifetime().expiresAt,
       revokedAt: null,
     })
     const accessToken = this.jwt.signAccess(user.id, user.role, session.id)
