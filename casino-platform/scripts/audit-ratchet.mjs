@@ -6,8 +6,14 @@
 // это осознанно, триаж обязателен (upgrade / pnpm.auditOverrides / mute),
 // после чего базлайн ужмётся через --gen.
 //
-//   node scripts/audit-ratchet.mjs --check <audit.json>   — сверить с базлайном (CI)
-//   node scripts/audit-ratchet.mjs --gen <audit.json>     — перезаписать базлайн
+//   node scripts/audit-ratchet.mjs --check <audit.json> [baseline]  — сверить (CI)
+//   node scripts/audit-ratchet.mjs --gen   <audit.json> [baseline]  — перезаписать
+//
+// [baseline] по умолчанию tech-debt/pnpm-audit.txt. Второй базлайн нужен для
+// полного (`pnpm audit --json`) отчёта: `--prod` не видит dev-дерево, а в нём
+// живут vitest/vite/esbuild — код, который исполняется на прогоне CI и на
+// машине разработчика. Без отдельного базлайна этот контур не проверялся
+// вовсе: критическая advisory в vitest была зелёной.
 //
 // <audit.json> — вывод `pnpm audit --prod --json` (exit code audit не важен,
 // отчёт валиден и при найденных уязвимостях).
@@ -42,8 +48,9 @@ const METADATA_SLACK = 2
 const args = process.argv.slice(2)
 const mode = args[0]
 const reportPath = args[1]
+const baselinePath = args[2] ?? BASELINE
 if ((mode !== '--check' && mode !== '--gen') || !reportPath) {
-  console.error('usage: audit-ratchet.mjs --check|--gen <audit.json>')
+  console.error('usage: audit-ratchet.mjs --check|--gen <audit.json> [baseline]')
   process.exit(2)
 }
 
@@ -108,20 +115,20 @@ const detail = `видимый долг ${JSON.stringify(cur)} (advisories в о
 
 if (mode === '--gen') {
   const lines = SEV.map((s) => `${s}\t${cur[s] ?? 0}`).join('\n') + '\n'
-  writeFileSync(BASELINE, lines)
-  process.stdout.write(`baseline updated: ${BASELINE} (${detail})\n`)
+  writeFileSync(baselinePath, lines)
+  process.stdout.write(`baseline updated: ${baselinePath} (${detail})\n`)
   process.exit(0)
 }
 
 const base = {}
-for (const line of readFileSync(BASELINE, 'utf8').split('\n')) {
+for (const line of readFileSync(baselinePath, 'utf8').split('\n')) {
   const m = line.match(/^(critical|high|moderate|low|info)\t(\d+)\s*$/)
   if (m) {
     base[m[1]] = Number(m[2])
   }
 }
 if (SEV.every((s) => base[s] === undefined)) {
-  console.error(`❌ базлайн ${BASELINE} пуст или не читается`)
+  console.error(`❌ базлайн ${baselinePath} пуст или не читается`)
   process.exit(2)
 }
 
