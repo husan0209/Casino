@@ -46,8 +46,6 @@ import {
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 const CODE_LENGTH = 8
-/** 30 дней — столько же, сколько выдаёт refresh-токен. */
-const SESSION_TTL_MS = 30 * 24 * 3600 * 1000
 
 @Injectable()
 export class RegisterUseCase {
@@ -267,7 +265,8 @@ export class RegisterUseCase {
   /**
    * Сессия сразу после регистрации (§5.1: игрок входит, письмо подтверждает
    * фоном). Вынесено из execute, чтобы тело регистрации читалось как список
-   * шагов, а не как 60 строк про токены.
+   * шагов. Окно refresh берётся из конфига (jwt.refreshLifetime), а не из
+   * литерала в коде: оно обязано совпадать с тем, что проверяет refresh-путь.
    */
   private async openSession(input: {
     userId: string
@@ -281,7 +280,7 @@ export class RegisterUseCase {
       refreshTokenHash: hash,
       ipAddress: input.ip || null,
       userAgent: input.userAgent || null,
-      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+      expiresAt: this.jwt.refreshLifetime().expiresAt,
       revokedAt: null,
     })
     return { accessToken: this.jwt.signAccess(input.userId, input.role, session.id), refreshToken }

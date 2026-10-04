@@ -30,12 +30,17 @@ export class RefreshUseCase {
     }
     await this.sessions.revoke(session.id)
     const { token: newRefresh, hash: newHash } = this.jwt.generateRefreshToken()
-    const expiresAt = new Date(Date.now() + 30 * 24 * 3600 * 1000)
+    const { expiresAt } = this.jwt.refreshLifetime()
     const newSession = await this.sessions.create({
       userId: user.id,
       refreshTokenHash: newHash,
       ipAddress: session.ipAddress,
-      userAgent: null,
+      // Устройство наследуется, а не обнуляется: ротация происходит на каждой
+      // полной загрузке страницы, поэтому прежний `userAgent: null` стирал
+      // устройство из списка сессий уже после первого refresh — админ и игрок
+      // видели «неизвестное устройство» там, где вход был с конкретного девайса
+      // (пользовательский список сессий и отзыв по id опираются на это поле).
+      userAgent: session.userAgent,
       expiresAt,
       revokedAt: null,
     })

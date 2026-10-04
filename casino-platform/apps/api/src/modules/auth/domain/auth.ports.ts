@@ -23,6 +23,13 @@ export interface IJwtTokenService {
   /** Refresh token: случайные 512 бит; в БД хранится только SHA-256 хеш. */
   generateRefreshToken(): { token: string; hash: string }
   hashRefreshToken(token: string): string
+  /**
+   * Срок жизни refresh-сессии из `JWT_REFRESH_EXPIRES_IN` (резерв 30 суток).
+   * Единый источник для `sessions.create({ expiresAt })` и для `maxAge` cookie:
+   * все места создания сессии (login, refresh, OAuth) обязаны брать его отсюда,
+   * иначе конфигурация окна выхода перестаёт действовать (см. jwt.service.ts).
+   */
+  refreshLifetime(): { expiresAt: Date; maxAgeMs: number }
 }
 
 /** Продюсер писей аутентификации (verify-email / reset-password) — очередь `email`. */

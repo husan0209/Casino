@@ -99,7 +99,7 @@ export class LoginUseCase {
     user.markLogin()
     await this.users.update(user)
     const { token: refreshToken, hash } = this.jwt.generateRefreshToken()
-    const expiresAt = new Date(Date.now() + 30 * 24 * 3600 * 1000)
+    const { expiresAt } = this.jwt.refreshLifetime()
     const session = await this.sessions.create({
       userId: user.id,
       refreshTokenHash: hash,

@@ -1,8 +1,9 @@
-import { createHmac, timingSafeEqual } from 'crypto'
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 
+import { OAUTH_STATE_TTL_MS } from '@/common/cookies/oauth-state-cookie'
 import { errorMessage } from '@/common/utils/error-message'
 
 import {
@@ -22,8 +23,16 @@ const USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 
 interface StatePayload {
+  /** Время выдачи, мс. Даёт окну 10 минут (OAUTH_STATE_TTL_MS). */
   t: number
-  sig: string
+  /**
+   * Nonce — уникальность выдачи. Без него `state` = HMAC от одного таймстемпа,
+   * и два входа, начатые в одну миллисекунду (или атакующий, крутящий
+   * `/auth/google/url` в цикле), получают ОДИНАКОВУЮ строку. Тогда привязка
+   * `state` к куке перестаёт что-либо доказывать: чужой state совпадёт со своим
+   * по значению, и login CSRF пройдёт.
+   */
+  n: string
 }
 
 /**
@@ -47,16 +56,30 @@ export class GoogleOAuthUseCase {
   }
 
   private signState(): string {
-    const payload: StatePayload = { t: Date.now(), sig: '' }
-    const body = Buffer.from(JSON.stringify({ t: payload.t })).toString('base64url')
+    const payload: StatePayload = { t: Date.now(), n: randomBytes(16).toString('base64url') }
+    const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
     const sig = createHmac('sha256', this.config.get<string>('JWT_ACCESS_SECRET')!)
       .update(body)
       .digest('base64url')
     return `${body}.${sig}`
   }
 
-  private verifyState(state?: string): void {
+  /**
+   * Проверка `state`: подпись + возраст + привязка к браузеру.
+   *
+   * Подпись (HMAC по таймстемпу) доказывает, что `state` выдал наш сервер, но НЕ
+   * доказывает, что его принёс тот же клиент, который начал вход. `GET
+   * /auth/google/url` анонимный, поэтому без сверки с кукой пара `(code, state)`
+   * от атакующего логинит жертву в аккаунт атакующего (login CSRF). Требование
+   * `stateCookie === state` замыкает цепочку; совпадение строгое, потому что
+   * значение не секрет, а идентификатор сеанса входа — нормализация здесь только
+   * расширяла бы окно подмены.
+   */
+  private verifyState(state: string | undefined, stateCookie: string | undefined): void {
     if (!state) {
+      throw new OAuthStateError()
+    }
+    if (!stateCookie || stateCookie !== state) {
       throw new OAuthStateError()
     }
     const [body, sig] = state.split('.') as [string, string]
@@ -69,7 +92,7 @@ export class GoogleOAuthUseCase {
       throw new OAuthStateError()
     }
     const { t } = JSON.parse(Buffer.from(body, 'base64url').toString()) as { t: number }
-    if (Date.now() - t > 10 * 60 * 1000) {
+    if (Date.now() - t > OAUTH_STATE_TTL_MS) {
       throw new OAuthStateError()
     }
   }
@@ -93,12 +116,14 @@ export class GoogleOAuthUseCase {
     code: string
     redirectUri?: string | undefined
     state?: string | undefined
+    /** Значение `oauth_state` из куки браузера, начавшего вход. */
+    stateCookie?: string | undefined
     referralCode?: string | undefined
     ip?: string | undefined
     userAgent?: string | undefined
   }): Promise<OAuthSignInResult> {
     const { clientId, clientSecret } = this.credentials()
-    this.verifyState(input.state)
+    this.verifyState(input.state, input.stateCookie)
     const redirect =
       input.redirectUri || `${this.config.get<string>('APP_URL')}/auth/google/callback`
 

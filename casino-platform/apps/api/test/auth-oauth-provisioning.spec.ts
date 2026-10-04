@@ -95,7 +95,11 @@ let authProviders: {
   create: ReturnType<typeof vi.fn>
 }
 let sessions: { create: ReturnType<typeof vi.fn> }
-let jwt: { signAccess: ReturnType<typeof vi.fn>; generateRefreshToken: ReturnType<typeof vi.fn> }
+let jwt: {
+  signAccess: ReturnType<typeof vi.fn>
+  generateRefreshToken: ReturnType<typeof vi.fn>
+  refreshLifetime: ReturnType<typeof vi.fn>
+}
 let service: OAuthUserProvisioningService
 
 beforeEach(() => {
@@ -116,6 +120,12 @@ beforeEach(() => {
   sessions = { create: vi.fn().mockResolvedValue(sessionOf()) }
   jwt = {
     generateRefreshToken: vi.fn().mockReturnValue({ token: REFRESH_TOKEN, hash: REFRESH_HASH }),
+    // Не 30 суток: проверка на «25 часов» доказывает, что провижинение спрашивает
+    // порт, а не воспроизводит прежний хардкод окна.
+    refreshLifetime: vi.fn().mockReturnValue({
+      expiresAt: new Date(FIXED_NOW.getTime() + 25 * 3_600_000),
+      maxAgeMs: 25 * 3_600_000,
+    }),
     signAccess: vi.fn().mockImplementation((sub: string, _role: string, sid: string) => {
       return `jwt:${sub}:${sid}`
     }),
@@ -270,6 +280,6 @@ describe('OAuthUserProvisioningService.signIn — сессия и токены',
     await service.signIn(GOOGLE_INPUT)
     // Assert
     const input = sessions.create.mock.calls[0]?.[0] as SessionCreateInput
-    expect(input.expiresAt.getTime()).toBe(FIXED_NOW.getTime() + 30 * 24 * 3600 * 1000)
+    expect(input.expiresAt.getTime()).toBe(FIXED_NOW.getTime() + 25 * 3600 * 1000)
   })
 })

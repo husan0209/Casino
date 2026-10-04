@@ -55,7 +55,9 @@ function makeUser(over: Partial<UserProps> = {}): User {
   })
 }
 
-function makeUsersRepo(over: { existing?: User; referrer?: User; codeExists?: () => boolean } = {}) {
+function makeUsersRepo(
+  over: { existing?: User; referrer?: User; codeExists?: () => boolean } = {},
+) {
   const created: CreateUserInput[] = []
   const repo: IUserRepository = {
     findByEmail: async () => over.existing ?? null,
@@ -141,6 +143,10 @@ function makeJwt() {
       return { token: `refresh-${refreshSeq}`, hash: `hash-${refreshSeq}` }
     },
     hashRefreshToken: (t) => `sha:${t}`,
+    refreshLifetime: () => ({
+      expiresAt: new Date(Date.now() + 30 * 86_400_000),
+      maxAgeMs: 30 * 86_400_000,
+    }),
   }
   return { jwt, accessCalls }
 }
