@@ -23,6 +23,10 @@
 #        которая его инстанцирует (`new X(`) → ЗЕЛЁНЫЙ; сервис, упомянутый в спеке
 #        без инстанцирования → КРАСНЫЙ (упоминание в DI-wiring-спеке покрытием
 #        не считается — иначе гард превращается в ложное покрытие).
+#   14–16 presentation-db (G27): копия рабочего дерева = базлайну → ЗЕЛЁНЫЙ;
+#        `prisma.*` в presentation-файле → КРАСНЫЙ; тот же вызов в
+#        infrastructure-репозитории → ЗЕЛЁНЫЙ (правило про слой, а не про
+#        таблицу — иначе оно невыполнимо).
 #
 # Запуск:  sh scripts/bin/guard-selftest      (CI: шаг G25)
 # Выход:   0 — все гарды покраснели там, где должны;
@@ -39,6 +43,7 @@ TECH_DEBT="$BIN_DIR/tech-debt"
 LEDGER_REL='apps/api/src/modules/wallet/infrastructure/ledger'
 FW_BASELINE='tech-debt/foreign-writes.txt'
 SS_BASELINE='tech-debt/service-specs.txt'
+PDB_BASELINE='tech-debt/presentation-db.txt'
 SCHEMA='packages/database/prisma/schema.prisma'
 
 TMP=$(mktemp -d 2>/dev/null) || TMP="$PLATFORM_DIR/.guard-selftest-tmp"
@@ -133,6 +138,18 @@ svc_tree() {
   cp -R apps/api/src/modules "$T/apps/api/src/"
   cp -R apps/api/test "$T/apps/api/"
   cp "$SS_BASELINE" "$T/tech-debt/"
+  printf '%s' "$T"
+}
+
+# Дерево для presentation-db: ловушка обязана лежать именно в presentation,
+# поэтому копируется весь apps/api/src/modules — детектор сам выбирает слой,
+# и проверка идёт тем же путём, что в CI.
+pdb_tree() {
+  T="$TMP/pdb-$1"
+  rm -rf "$T"
+  mkdir -p "$T/apps/api/src" "$T/tech-debt"
+  cp -R apps/api/src/modules "$T/apps/api/src/"
+  cp "$PDB_BASELINE" "$T/tech-debt/"
   printf '%s' "$T"
 }
 
@@ -256,6 +273,44 @@ describe('service-specs selftest: только упоминание', () => {
 EOF
 expect_red "долг ВЫРОС" "service-specs: упоминание в спеке не считается покрытием" \
   env TECH_DEBT_ROOT="$SS" sh "$TECH_DEBT" check service-specs
+
+# ── 14–16. presentation-db: слой, а не таблица ───────────────────────────
+PDB=$(pdb_tree main)
+expect_green "presentation-db на копии рабочего дерева = базлайну" \
+  env TECH_DEBT_ROOT="$PDB" sh "$TECH_DEBT" check presentation-db
+
+PDB_TRAP="$PDB/apps/api/src/modules/health/presentation/selftest-trap.controller.ts"
+mkdir -p "$PDB/apps/api/src/modules/health/presentation"
+cat > "$PDB_TRAP" <<'EOF'
+import { prisma } from '@casino/database'
+
+/** Ловушка selftest: контроллер читает БД напрямую, минуя application-слой. */
+export class SelfTestPresentationDbTrap {
+  async latest(): Promise<unknown> {
+    return prisma.healthCheck.findFirst({ orderBy: { createdAt: 'desc' } })
+  }
+}
+EOF
+expect_red "долг ВЫРОС" "presentation-db: prisma.findFirst в контроллере" \
+  env TECH_DEBT_ROOT="$PDB" sh "$TECH_DEBT" check presentation-db
+
+# Тот же вызов в infrastructure-репозитории — НЕ долг: правило про слой, а не
+# про таблицу. Без этого контроля детектор нельзя отличить от «запретили prisma
+# вообще», что было бы невыполнимо.
+rm "$PDB_TRAP"
+mkdir -p "$PDB/apps/api/src/modules/health/infrastructure"
+cat > "$PDB/apps/api/src/modules/health/infrastructure/selftest-trap.repository.ts" <<'EOF'
+import { prisma } from '@casino/database'
+
+/** Ловушка-контроль: то же чтение, но в слое, которому оно и положено. */
+export class SelfTestPresentationDbRepository {
+  async latest(): Promise<unknown> {
+    return prisma.healthCheck.findFirst({ orderBy: { createdAt: 'desc' } })
+  }
+}
+EOF
+expect_green "presentation-db: чтение в infrastructure-репозитории не долг" \
+  env TECH_DEBT_ROOT="$PDB" sh "$TECH_DEBT" check presentation-db
 
 # ── Итог ────────────────────────────────────────────────────────────────
 echo ""

@@ -425,6 +425,26 @@ jobs:
         run: sh scripts/bin/tech-debt check service-specs
 
       # ──────────────────────────────────────────────────────────────
+      # U. Presentation не ходит в БД (число G27 — следующее свободное)
+      # Rule: docs/AI_DEVELOPMENT_RULES.md §3.3 (пример «❌ логика в controller»
+      #       там же — контроллер, который сам зовёт prisma), docs/ARCHITECTURE.md
+      # Catches: 9 контроллеров (admin-finance, casino-admin, referrals*,
+      #          wallet, admin-users, admin-audit, casino, provider-callback),
+      #          которые читают payment_requests / ledger_entry / каталог мимо
+      #          фасадов модулей-владельцев, и ЛЮБОЕ новое prisma/tx обращение
+      #          в presentation — включая запись в свою таблицу (её foreign-writes
+      #          не ловит: там про чужие таблицы, а не про слои).
+      # Базлайн: tech-debt/presentation-db.txt, заведён ПО ФАКТУ 2026-10-05 —
+      #          9 файлов / 37 вхождений. Рост → FAIL, погашено и не ужмят → STALE.
+      # Анти-вакуум: сценарии 14–16 в G25 — копия дерева зелёная, ловушка в
+      #          presentation красная, тот же вызов в infrastructure зелёный
+      #          (правило про слой, а не про таблицу).
+      # ──────────────────────────────────────────────────────────────
+      - name: G27 — presentation does not touch the database (ratchet)
+        id: g27
+        run: sh scripts/bin/tech-debt check presentation-db
+
+      # ──────────────────────────────────────────────────────────────
       # Q. Явный Nest-DI (гард найден при переезде на TS 6 / tsgo)
       # Catches: emitDecoratorMetadata:false → конструктор без @Inject собирается,
       #          проходит tsc и ESLint, и падает в рантайме первым же вызовом
@@ -508,4 +528,5 @@ jobs:
           echo "- G23 NEXT_PUBLIC_ args:    ${{ steps.g23.outcome }}"
           echo "- G24 foreign writes ratch.: ${{ steps.g24.outcome }}"
           echo "- G26 service specs ratchet: ${{ steps.g26.outcome }}"
+          echo "- G27 presentation-db ratchet: ${{ steps.g27.outcome }}"
           echo "- G25 anti-vacuum selftest: ${{ steps.g25.outcome }}"
