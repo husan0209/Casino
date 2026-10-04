@@ -155,10 +155,10 @@ export default function ProfilePage(): React.JSX.Element {
                 aria-label="Посмотреть аватар крупно"
                 className="shrink-0 rounded-full transition hover:ring-2 hover:ring-brand/40"
               >
-                <UserAvatar email={data.user.email} avatarUrl={data.profile.avatarUrl} size={48} />
+                <UserAvatar email={data.user.email} avatarUrl={data.profile.avatarUrl} size={64} />
               </button>
             ) : (
-              <UserAvatar email={data.user.email} avatarUrl={null} size={48} />
+              <UserAvatar email={data.user.email} avatarUrl={null} size={64} />
             )}
             <div className="flex-1">
               <div className="font-medium">{data.user.email || 'Игрок'}</div>
