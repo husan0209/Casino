@@ -8,7 +8,12 @@ import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import { type Currency } from '@casino/shared-types'
 
-import { AmountTooLargeError, AmountTooSmallError } from '../../domain/errors'
+import { AmountTooLargeError, AmountTooSmallError, InvalidAmountError } from '../../domain/errors'
+import {
+  assertWithdrawalDestination,
+  MONEY_AMOUNT_PATTERN,
+  withdrawalLimitsFor,
+} from '../../domain/payment-currency.policy'
 import {
   type IPaymentRequestRepository,
   PAYMENT_REQUEST_REPOSITORY,
@@ -26,18 +31,27 @@ export class CreateWithdrawalUseCase {
     input: { amount: string; currency: string; method?: string; destination: string },
   ): Promise<{ payment_request_id: string }> {
     await this.kyc.assertCanWithdraw(userId)
+    // Сумму проверяем до `new Decimal()`: без этого мусорный вход бросал сырую
+    // ошибку decimal.js и клиент получал 500. Паттерн тот же, что в DTO, и он же
+    // обслуживает вызывающих, минующих presentation.
+    if (!MONEY_AMOUNT_PATTERN.test(input.amount)) {
+      throw new InvalidAmountError()
+    }
     const amt = new Decimal(input.amount)
-    const min = input.currency === 'RUB' ? '500' : '0.001'
-    const max = input.currency === 'RUB' ? '200000' : '999999'
+    // Лимит берутся из `CURRENCY_LIMITS` по конкретной валюте. Прежний захардкод
+    // («RUB → 500/200000, всё остальное → 0.001/999999») для USDT_TRC20 завышал
+    // верхнюю границу в 50 раз (конфиг: 20000) и допускал заявки от 0.001 USDT
+    // при минимуме 20, то есть лимит на вывод не действовал.
+    const { min, max } = withdrawalLimitsFor(input.currency)
+    assertWithdrawalDestination(input.currency, input.destination)
     if (amt.lessThan(min)) {
       throw new AmountTooSmallError(min)
     }
     if (amt.greaterThan(max)) {
       throw new AmountTooLargeError(max)
     }
-    if (!amt.isFinite()) {
-      throw new AmountTooSmallError('0')
-    }
+    // Отдельная проверка конечности не нужна: паттерн не пропускает ни `NaN`,
+    // ни экспоненциальную форму, а сверхдлинное число отсекает `greaterThan(max)`.
     // GAP-55 (§11 «статус»): id заявки генерируется ДО блокировки, чтобы
     // проводка WITHDRAWAL_LOCK несла ссылку на payment_request — иначе строку
     // истории нечем присоединить к заявке и показать её статус. Порядок
