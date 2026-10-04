@@ -1,5 +1,7 @@
 import type { LegalSection } from '@/components/layout/LegalPage'
 
+import { LEGAL_DOCUMENT_VERSIONS } from '@casino/shared-types'
+
 import { block } from './block'
 
 /**
@@ -11,7 +13,7 @@ import { block } from './block'
  * Роли и адресата запросов, сроки по 152-ФЗ/GDPR подтверждает юрист владельца.
  */
 
-export const PRIVACY_VERSION = '1.0'
+export const PRIVACY_VERSION = LEGAL_DOCUMENT_VERSIONS.privacy
 
 export const privacySections: LegalSection[] = [
   {

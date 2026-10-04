@@ -91,8 +91,28 @@ throw over.creditError
     },
   } as never
 
-  const uc = new ProcessNOWPaymentsWebhookUseCase(repo, np, wallet, users)
-  return { uc, saved, callbackResults, statusUpdates, credited, depositCompleted, ipnChecks }
+  // Фейк KycFacade: в этом спеке проверяется конвейер IPN, а не арифметика
+  // лимита — она покрыта kyc-check.service.spec.ts и
+  // payments-webhook-kyc-escalation.spec.ts. Здесь важно, ЧТО и КОГДА
+  // вызывается эскалация (один раз на зачисление, ноль на дубликат).
+  const escalations: Array<{ userId: string; paymentRequestId: string }> = []
+  const kyc = {
+    escalateOverDepositLimit: async (args: { userId: string; paymentRequestId: string }) => {
+      escalations.push(args)
+    },
+  } as never
+
+  const uc = new ProcessNOWPaymentsWebhookUseCase(repo, np, wallet, users, kyc)
+  return {
+    uc,
+    saved,
+    callbackResults,
+    statusUpdates,
+    credited,
+    depositCompleted,
+    ipnChecks,
+    escalations,
+  }
 }
 
 function row(over: Partial<PaymentRequest> = {}): PaymentRequest {
@@ -162,6 +182,8 @@ describe('ProcessNOWPaymentsWebhookUseCase', () => {
     await d.uc.execute(input())
     expect(d.callbackResults).toEqual([{ id: 'cb-1', result: 'duplicate' }])
     expect(d.credited).toHaveLength(0)
+    // эскалация привязана к зачислению: дубликат-доставка не пишет второй раз
+    expect(d.escalations).toHaveLength(0)
   })
 
   it('finished: зачисление actually_paid с идемпотентным ключом, юзер и статус обновлены', async () => {
@@ -186,6 +208,9 @@ describe('ProcessNOWPaymentsWebhookUseCase', () => {
     expect(d.statusUpdates[0]!.status).toBe('completed')
     expect(d.statusUpdates[0]!.extra!.completedAt).toBeInstanceOf(Date)
     expect(d.callbackResults).toEqual([{ id: 'cb-1', result: 'ok' }])
+    // Эскалация KYC-лимита — ровно одна на успешное зачисление (условие и лог
+    // считаются в KycCheckService, здесь — сам факт вызова после updateStatus).
+    expect(d.escalations).toEqual([{ userId: 'u-1', paymentRequestId: 'pr-1' }])
   })
 
   it('BTC-депозит → метод onDepositCompleted = btc', async () => {
@@ -220,5 +245,7 @@ describe('ProcessNOWPaymentsWebhookUseCase', () => {
     expect(d.credited).toHaveLength(0)
     expect(d.statusUpdates).toHaveLength(0)
     expect(d.callbackResults[0]!.result).toContain('ledger down')
+    // без зачисления превышения лимита нет — эскалация не вызывается
+    expect(d.escalations).toHaveLength(0)
   })
 })

@@ -41,6 +41,11 @@ const fakeWallet = (calls: CreditCall[]) => ({
 
 const fakeUsers = { onDepositCompleted: async () => undefined }
 
+// Эскалация KYC-лимита — часть вебхука (defect #2), но не предмета этого спека:
+// здесь фиксируется ключ проводки. Поведение эскалации —
+// payments-webhook-kyc-escalation.spec.ts.
+const fakeKyc = { escalateOverDepositLimit: async () => undefined }
+
 describe('GAP-28: идемпотентность депозита по external_id провайдера', () => {
   it('NOWPayments: ключ проводки от payment_id, а не от id платёжки', async () => {
     // Две РАЗНЫЕ платёжки с одним внешним платежом (рассинхрон маппинга).
@@ -68,6 +73,7 @@ describe('GAP-28: идемпотентность депозита по external_
       { verifyIPN: () => true } as any,
       fakeWallet(calls) as any,
       fakeUsers as any,
+      fakeKyc as any,
     )
     const body = { payment_id: 42, payment_status: 'finished', actually_paid: 10 }
 
@@ -99,6 +105,7 @@ describe('GAP-28: идемпотентность депозита по external_
       { verifyIPN: () => true } as any,
       fakeWallet(calls) as any,
       fakeUsers as any,
+      fakeKyc as any,
     )
     await uc.execute({
       rawHeaders: {},
@@ -136,6 +143,7 @@ describe('GAP-28: идемпотентность депозита по external_
       { verifyCallback: () => true } as any,
       fakeWallet(calls) as any,
       fakeUsers as any,
+      fakeKyc as any,
     )
     const body = { order_id: 'ord-100', status: 'success' }
 
@@ -156,6 +164,7 @@ describe('GAP-28: идемпотентность депозита по external_
       { verifyCallback: () => true } as any,
       fakeWallet(calls) as any,
       fakeUsers as any,
+      fakeKyc as any,
     )
     await uc.execute({ rawHeaders: {}, body: { status: 'success' }, rawBody: '{}', ip: '1.2.3.4' })
     expect(calls).toHaveLength(0)

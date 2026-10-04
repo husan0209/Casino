@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common'
 import { QueuesModule } from '../../queues/queues.module'
 import { ChangePasswordUseCase } from './application/use-cases/change-password.use-case'
 import { ForgotPasswordUseCase } from './application/use-cases/forgot-password.use-case'
+import { ListTermsAcceptancesUseCase } from './application/use-cases/list-terms-acceptances.use-case'
 import { LoginUseCase } from './application/use-cases/login.use-case'
 import { LogoutUseCase } from './application/use-cases/logout.use-case'
 import { GoogleOAuthUseCase } from './application/use-cases/oauth/google-oauth.use-case'
@@ -20,6 +21,7 @@ import {
 } from './domain/auth.ports'
 import { AUTH_PROVIDER_REPOSITORY } from './domain/repositories/auth-provider.repository'
 import { SESSION_REPOSITORY } from './domain/repositories/session.repository'
+import { TERMS_ACCEPTANCE_REPOSITORY } from './domain/repositories/terms-acceptance.repository'
 import { USER_SETTINGS_REPOSITORY } from './domain/repositories/user-settings.repository'
 import { USER_REPOSITORY } from './domain/repositories/user.repository'
 import {
@@ -28,6 +30,7 @@ import {
 } from './domain/repositories/verification-token.repository'
 import { PrismaAuthProviderRepository } from './infrastructure/repositories/auth-provider.repository.prisma'
 import { PrismaSessionRepository } from './infrastructure/repositories/session.repository.prisma'
+import { PrismaTermsAcceptanceRepository } from './infrastructure/repositories/terms-acceptance.repository.prisma'
 import { PrismaUserSettingsRepository } from './infrastructure/repositories/user-settings.repository.prisma'
 import { PrismaUserRepository } from './infrastructure/repositories/user.repository.prisma'
 import {
@@ -68,7 +71,9 @@ import { RolesGuard } from './presentation/guards/roles.guard'
     { provide: USER_SETTINGS_REPOSITORY, useClass: PrismaUserSettingsRepository },
     { provide: EMAIL_VERIFICATION_REPOSITORY, useClass: PrismaEmailVerificationRepository },
     { provide: PASSWORD_RESET_REPOSITORY, useClass: PrismaPasswordResetRepository },
+    { provide: TERMS_ACCEPTANCE_REPOSITORY, useClass: PrismaTermsAcceptanceRepository },
     RegisterUseCase,
+    ListTermsAcceptancesUseCase,
     VerifyEmailUseCase,
     LoginUseCase,
     RefreshUseCase,

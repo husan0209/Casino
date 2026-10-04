@@ -42,6 +42,7 @@ model User {
   gameFavorites    GameFavorite[]
   supportTickets   SupportTicket[]
   notifications    Notification[]
+  termsAcceptances TermsAcceptance[]
   referralRewardsAsReferrer ReferralReward[] @relation("Referrer")
   referralRewardsAsReferred ReferralReward[] @relation("Referred")
   // Affiliate program (ТЗ ч.8): игрок может быть источником трафика партнёра.
@@ -245,6 +246,31 @@ enum ActorType {
   user
   admin
   system
+}
+
+/// Журнал акцепта правовых документов (GAP-71, Terms §4 и §23): одна строка на
+/// документ × версию, повторный акцепт после существенных изменений = новая строка.
+/// IP — необратимый отпечаток (sha256), сырой адрес остаётся в sessions того же
+/// входа; updatedAt нет намеренно — журнал не редактируется.
+model TermsAcceptance {
+  id         String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String            @map("user_id") @db.Uuid
+  document   LegalDocumentType
+  version    String            @db.VarChar(16)
+  ipHash     String            @map("ip_hash") @db.VarChar(64)
+  userAgent  String?           @map("user_agent") @db.VarChar(255)
+  acceptedAt DateTime          @default(now()) @map("accepted_at") @db.Timestamptz
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, document, version])
+  @@index([userId, acceptedAt])
+  @@map("terms_acceptances")
+}
+
+enum LegalDocumentType {
+  terms
+  privacy
+  cookies
+  responsible_gaming
 }
 model WalletAccount {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

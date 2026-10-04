@@ -1,5 +1,7 @@
 import type { LegalSection } from '@/components/layout/LegalPage'
 
+import { LEGAL_DOCUMENT_VERSIONS } from '@casino/shared-types'
+
 import { block } from './block'
 
 /**
@@ -10,7 +12,7 @@ import { block } from './block'
  * включения пикселя, а не после.
  */
 
-export const COOKIES_VERSION = '1.0'
+export const COOKIES_VERSION = LEGAL_DOCUMENT_VERSIONS.cookies
 
 export const cookiesSections: LegalSection[] = [
   {

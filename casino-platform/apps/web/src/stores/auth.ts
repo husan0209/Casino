@@ -36,7 +36,17 @@ export interface AuthState {
   register: (
     email: string,
     password: string,
-    codes?: { referral?: string | undefined; affiliate?: string | undefined },
+    /**
+     * `termsVersion` — версия условий, которую игрок видел на форме (GAP-71,
+     * Terms §4). Передана внутри объекта, а не четвёртым аргументом: max-params
+     * в этом пакете — 3. Обязательное поле, а не опция: без него сервер не
+     * зафиксирует акцепт.
+     */
+    input: {
+      referral?: string | undefined
+      affiliate?: string | undefined
+      termsVersion: string
+    },
   ) => Promise<void>
   logout: () => void
   /**
@@ -67,13 +77,16 @@ export const useAuth = create<AuthState>()((set, get) => ({
   /** verify-email flow */
   setAuth: (user, token) => set({ token, user }),
   /** регистрация нового пользователя (письмо-подтверждение уходит с API) */
-  register: async (email, password, codes) => {
+  register: async (email, password, input) => {
     const res = await apiPost<AuthResponse>('/auth/register', {
       email,
       password,
-      referral_code: codes?.referral,
+      referral_code: input.referral,
+      // GAP-71: согласие — часть запроса, а не следствие успешной регистрации.
+      accept_terms: true,
+      terms_version: input.termsVersion,
       // Код партнёра едет в query-параметре ref (его читает RegisterController).
-      ...(codes?.affiliate !== undefined && codes.affiliate !== '' ? { ref: codes.affiliate } : {}),
+      ...(input.affiliate !== undefined && input.affiliate !== '' ? { ref: input.affiliate } : {}),
     })
     set({ token: res.accessToken, user: res.user })
   },
