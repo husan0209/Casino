@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowRight, Banknote, Handshake } from 'lucide-react'
+import { ArrowRight, Handshake } from 'lucide-react'
 import Link from 'next/link'
 
 import { useAuth } from '@/stores/auth'
@@ -39,19 +39,6 @@ export function PartnerHero(): React.JSX.Element | null {
         className="pointer-events-none absolute right-6 top-6 text-[120px] font-black leading-none text-white/[0.03]"
       >
         %
-      </div>
-
-      {/* Медальоны валют: рубль, доллар, деньги — как платёжные иконки в футере */}
-      <div aria-hidden className="absolute right-5 top-5 flex gap-2">
-        <span className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-base font-black text-money">
-          ₽
-        </span>
-        <span className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-base font-black text-white/80">
-          $
-        </span>
-        <span className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-white/80">
-          <Banknote size={18} aria-hidden />
-        </span>
       </div>
 
       <div className="relative p-6 pb-5 md:p-8 md:pb-6">
