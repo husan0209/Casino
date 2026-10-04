@@ -1431,7 +1431,9 @@ export function GameDeck({
     <section className="mb-8 isolate overflow-x-clip">
       <DeckHeader total={deck.length} position={position} onShuffle={handleShuffle} />
 
-      <div className="relative mx-auto max-w-md">
+      {/* Мобайл: карта ~320px по центру — во всю ширину свайп тяжёлый
+          (Tinder-стандарт 300–340px); от sm ширина возвращается к max-w-md. */}
+      <div className="relative mx-auto w-full max-w-[320px] sm:max-w-md">
         {/* Свечение за колодой (по моку) */}
         <div
           aria-hidden
