@@ -209,6 +209,15 @@ export interface AffiliateAttributionRepository {
    * Начисление депозита квалифицированной атрибуции.
    * Возвращает false, если атрибуция ещё не qualified (депозит учтён, но
    * квалификация не пройдена) — тогда first_deposit_* остаётся пустым.
+   *
+   * ВЫЗЫВАЮЩЕГО СЕЙЧАС НЕТ, и это не опечатка: событие «депозит завершён» живёт
+   * в payments, а payments не может импортировать affiliate — сборался бы цикл
+   * `payments → affiliate → admin → payments` (affiliate нужен AdminFacade для
+   * аудита, admin с #171 импортирует PaymentsModule). ТЗ ч.8 §7.4 хочет именно
+   * синхронную квалификацию по событию; до её подключения квалификация читает
+   * депозиты из первоисточника — см. `sumPlayerDeposits`. Метод оставлен как
+   * сейм того самого события: удалять его — значит потерять форму, под которую
+   * оно придёт.
    */
   applyDeposit(args: {
     playerId: string
@@ -216,6 +225,26 @@ export interface AffiliateAttributionRepository {
     amount: string
     at: Date
   }): Promise<{ qualified: boolean; attributionId: string | null; isFirstDeposit: boolean }>
+  /**
+   * Депозиты игрока по данным платежей: сумма в RUB-эквиваленте, число заявок
+   * и первая из них.
+   *
+   * Источник — `payment_requests` (type=deposit, status=completed) по колонке
+   * `amount_rub`: ровно та единица, в которой задан порог `affiliate_min_deposit`
+   * (ТЗ ч.8 §7.4), и ровно та же строка, которую пересчитывает вебхук NOWPayments
+   * после фактической оплаты (GAP-72). Чтение чужой таблицы легально по ADR
+   * GAP-51; записей отсюда не делается.
+   *
+   * Нужен потому, что колонка `total_deposit` атрибуции заполнялась только из
+   * `applyDeposit`, а вызывающего у него нет (см. выше) — квалификация по
+   * накопленному не проходила никогда.
+   */
+  sumPlayerDeposits(playerId: string): Promise<{
+    totalRub: string
+    count: number
+    firstDepositId: string | null
+    firstDepositAt: Date | null
+  }>
   /** Все квалифицированные атрибуции с депозитом — вход суточного расчёта. */
   listQualifiedForCalc(args: { until: Date; page: number; perPage: number }): Promise<{
     items: AttributionForCalc[]

@@ -468,6 +468,57 @@ export class PrismaAffiliateAttributionRepository implements AffiliateAttributio
   }
 
   /**
+   * Депозиты игрока из `payment_requests` — первоисточник для квалификации.
+   *
+   * Только чтение (ADR GAP-51). Сумма — по `amount_rub`: это RUB-эквивалент, в
+   * котором задан порог `affiliate_min_deposit`, и для крипто он совпадает с
+   * фактически зачисленным после GAP-72. Заявки без `amount_rub` в сумму не
+   * попадают: складывать их с рублями нельзя (`amount` крипто-заявки — в
+   * единицах монеты), а таких в новой схеме две —Legacy-строки до миграции
+   * курсов; число (`count`) считается по всем completed, поэтому «депозит был»
+   * не потеряется, а сумма может оказаться меньше фактической — это хуже, чем
+   * завысить, и видно в админке по расхождению count/суммы.
+   */
+  async sumPlayerDeposits(playerId: string): Promise<{
+    totalRub: string
+    count: number
+    firstDepositId: string | null
+    firstDepositAt: Date | null
+  }> {
+    const where: Prisma.PaymentRequestWhereInput = {
+      userId: playerId,
+      type: 'deposit',
+      status: 'completed',
+    }
+    const agg = await prisma.paymentRequest.aggregate({
+      where,
+      _sum: { amountRub: true },
+      _count: { _all: true },
+    })
+    const count = agg._count._all
+    if (count === 0) {
+      return { totalRub: '0', count: 0, firstDepositId: null, firstDepositAt: null }
+    }
+    // Второй запрос только когда депозиты есть: джоба квалификации идёт по
+    // всем pending-атрибуциям каждый час, а у значительной их части пополнений
+    // ещё нет — второй round-trip на них был бы платным впустую.
+    const first = await prisma.paymentRequest.findFirst({
+      where,
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, completedAt: true, createdAt: true },
+    })
+    return {
+      totalRub: toMoneyString(agg._sum.amountRub),
+      count,
+      firstDepositId: first?.id ?? null,
+      // completedAt обязана быть у completed-заявки, но колонка nullable:
+      // берём createdAt как гарантированно не-пустой момент, иначе квалификация
+      // встала бы навсегда на строке без него
+      firstDepositAt: first?.completedAt ?? first?.createdAt ?? null,
+    }
+  }
+
+  /**
    * Активно ли самоисключение игрока.
    *
    * user_settings принадлежит модулю users; здесь read-only проверка для
