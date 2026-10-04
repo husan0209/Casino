@@ -1,0 +1,4 @@
+apps/api/src/modules/admin/infrastructure/admin-system.prisma.repository.ts	1
+apps/api/src/modules/admin/infrastructure/repositories/admin.prisma.repository.ts	3
+apps/api/src/modules/affiliate/infrastructure/affiliate-settings.prisma.repository.ts	1
+apps/api/src/modules/maintenance/infrastructure/maintenance.prisma.repo.ts	3
