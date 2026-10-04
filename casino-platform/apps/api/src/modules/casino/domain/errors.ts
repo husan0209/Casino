@@ -1,3 +1,4 @@
+import type { MoneyAmount } from '@casino/shared-types'
 import { AppError } from '@casino/shared-utils'
 
 export class GameNotFoundError extends AppError {
@@ -112,5 +113,26 @@ export class CasinoProviderNotConfiguredError extends AppError {
   readonly httpStatus = 503
   constructor(provider: string, keys: string) {
     super(`${provider}: отсутствуют обязательные ключи (${keys})`, { provider })
+  }
+}
+/**
+ * Недостаточно средств для запуска игры на реальные деньги.
+ *
+ * Собственный класс casino, а не импорт `InsufficientFundsError` из домена
+ * wallet: модуль бросает свои ошибки (MODULE_BOUNDARIES §16.3 — чужой Entity/
+ * домен напрямую не используется). Стабильные `code` и `httpStatus` совпадают
+ * с кошельковыми, поэтому контракт ответа для клиента не меняется.
+ */
+export class InsufficientFundsError extends AppError {
+  readonly code = 'INSUFFICIENT_FUNDS'
+  readonly httpStatus = 422
+  constructor(
+    public readonly required: MoneyAmount,
+    public readonly available: MoneyAmount,
+  ) {
+    super(`Insufficient funds: required ${required}, available ${available}`, {
+      required,
+      available,
+    })
   }
 }

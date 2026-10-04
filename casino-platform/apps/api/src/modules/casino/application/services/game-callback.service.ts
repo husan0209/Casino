@@ -1,9 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { type CreditResult } from '@modules/wallet/domain/repositories/wallet.repository'
 import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
-import { type Currency } from '@casino/shared-types'
+import { type CreditResult, type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
 import {
@@ -259,7 +258,8 @@ export class GameCallbackService {
     // GAP-57: target — кошелёк игрока (компенсация трогает те же деньги).
     return this.wallet.runInTransaction(
       { userId: session.userId, currency: session.currency as Currency },
-      (tx) => this.applyRollback({ cb, providerId, session, originalTx, rollbackAmount, isBet, tx }),
+      (tx) =>
+        this.applyRollback({ cb, providerId, session, originalTx, rollbackAmount, isBet, tx }),
     )
   }
 
