@@ -408,6 +408,23 @@ jobs:
         run: sh scripts/bin/tech-debt check use-case-specs
 
       # ──────────────────────────────────────────────────────────────
+      # R. Сервисы с тестами (число G26 — следующее свободное; порядок шагов в
+      #    файле не обязан соответствовать номерам, зато номера не переиспользуются)
+      # Rule: docs/CONVENTIONS.md §11 (тест на каждую единицу логики),
+      #       базлайн tech-debt/service-specs.txt, реестр docs/TECH_DEBT.md
+      # Критерий СТРОЖЕ G21: покрытием считается парная *.service.spec.ts ИЛИ вызов
+      #   `new <Class>(` в любом спеке. Просто упоминание имени класса — нет:
+      #   DI-wiring-спеки (admin-module-wiring, admin-contract) перечисляют все
+      #   провайдеры модуля, и при мягком критерии 85-строчная подпись админских
+      #   токенов выглядела бы протестированной, хотя ни один ассерт её не трогает.
+      # Анти-вакуум: сценарии 11–13 в G25 (guard-selftest) — ловушка красная,
+      #   `new X()` зелёная, «только упомянут» снова красная.
+      # ──────────────────────────────────────────────────────────────
+      - name: G26 — services have tests (ratchet)
+        id: g26
+        run: sh scripts/bin/tech-debt check service-specs
+
+      # ──────────────────────────────────────────────────────────────
       # Q. Явный Nest-DI (гард найден при переезде на TS 6 / tsgo)
       # Catches: emitDecoratorMetadata:false → конструктор без @Inject собирается,
       #          проходит tsc и ESLint, и падает в рантайме первым же вызовом
@@ -490,4 +507,5 @@ jobs:
           echo "- G22 explicit Nest DI:     ${{ steps.g22.outcome }}"
           echo "- G23 NEXT_PUBLIC_ args:    ${{ steps.g23.outcome }}"
           echo "- G24 foreign writes ratch.: ${{ steps.g24.outcome }}"
+          echo "- G26 service specs ratchet: ${{ steps.g26.outcome }}"
           echo "- G25 anti-vacuum selftest: ${{ steps.g25.outcome }}"

@@ -143,6 +143,33 @@ detect() {
           printf '%s\n' "$uc"
         done
       ;;
+    # Сервис без теста. Скоуп — любой *.service.ts внутри apps/api/src/modules:
+    # и application-слой (DashboardService, NotificationService), и
+    # infrastructure-сервисы (подпись админских токенов, argon2-хешер, очередь
+    # писем). Критерий покрытия ЗАМЕТНО строже, чем у use-case-specs, и вот почему:
+    # DI-wiring-спеки (admin-module-wiring.spec.ts, admin-contract.spec.ts)
+    # перечисляют ИМЕНА всех провайдеров модуля — при мягком критерии «упомянут»
+    # сервис считался бы покрытым, хотя ни один ассерт его поведение не проверяет.
+    # Это ровно тот вакуумный гард, из-за которого G7 когда-то протух.
+    # Покрытием считается только:
+    #   (а) соседний файл <имя>.service.spec.ts, ИЛИ
+    #   (б) в любом *.spec.ts (в test/ и рядом с кодом в src/) есть вызов
+    #       конструктора `new <Class>(` — то есть спека реально собирает сервис.
+    # Имя класса читается из файла, а не выводится из пути: admin-jwt.service.ts
+    # содержит класс AdminAuthService, mechanical camelCase дал бы бы AdminJwtService
+    # и гард искал бы в спеках несуществующее имя.
+    service-specs)
+      find apps/api/src/modules -name '*.service.ts' ! -name '*.spec.ts' 2>/dev/null |
+        sed 's|\\|/|g' | sort |
+        while IFS= read -r svc; do
+          [ -f "${svc%.ts}.spec.ts" ] && continue
+          CLS=$(grep -oE 'export class [A-Za-z0-9_]+' "$svc" 2>/dev/null | head -1 | awk '{print $3}')
+          [ -n "$CLS" ] || continue
+          grep -rlE "new ${CLS}[[:space:]]*\(" apps/api/test apps/api/src --include='*.spec.ts' 2>/dev/null |
+            grep -q . && continue
+          printf '%s\n' "$svc"
+        done
+      ;;
     # Кросс-модульные deep-импорты мимо Facade (MODULE_BOUNDARIES.md).
     # Разрешено (публичный API модуля): импорт *.facade и guard'ов (*.guard) —
     # MODULE_BOUNDARIES §2.5 объявляет JwtAuthGuard/RolesGuard экспортом auth,
@@ -264,7 +291,7 @@ detect() {
   esac
 }
 
-NAMES='raw-error nest-exceptions eslint-disable money-number use-case-specs cross-module-imports foreign-writes'
+NAMES='raw-error nest-exceptions eslint-disable money-number use-case-specs service-specs cross-module-imports foreign-writes'
 
 # Имя правила проверяется ДО любого редиректа в tech-debt/: `gen <опечатка>`
 # ранее создавал пустой tech-debt/<опечатка>.txt, который потом попадал в git
