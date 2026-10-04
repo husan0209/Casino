@@ -1,7 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 
+import { AdminSettingsService } from '../application/admin-settings.service'
 import { AuditLogService } from '../application/audit-log.service'
 import { type AuditLogInput } from '../domain/admin.repository'
+import { type SystemSettingRow } from '../domain/system.repository'
 
 /**
  * Публичный API admin-модуля (MODULE_TEMPLATE Шаг 8).
@@ -12,14 +14,19 @@ import { type AuditLogInput } from '../domain/admin.repository'
  * (`pnpm --filter @casino/api exec sh scripts/bin/tech-debt check
  * cross-module-imports`).
  *
- * Сейчас через фасад пишет аудит модуль affiliate: смена ставки, статуса и
- * настроек партнёра обязана попадать в `audit_logs` (ТЗ ч.8 §14.1).
+ * Сейчас через фасад пишет модуль affiliate: смена ставки, статуса и
+ * настроек партнёра обязана попадать в `audit_logs` (ТЗ ч.8 §14.1), а
+ * значения настроек программы — в `system_settings`, чей владелец — admin
+ * (карта `MODEL_OWNERS`, гард G24; GAP-62).
  */
 @Injectable()
 export class AdminFacade {
   private readonly logger = new Logger(AdminFacade.name)
 
-  constructor(@Inject(AuditLogService) private readonly audit: AuditLogService) {}
+  constructor(
+    @Inject(AuditLogService) private readonly audit: AuditLogService,
+    @Inject(AdminSettingsService) private readonly settings: AdminSettingsService,
+  ) {}
 
   /**
    * Записать действие администратора в журнал аудита.
@@ -36,5 +43,23 @@ export class AdminFacade {
         error instanceof Error ? error.stack : undefined,
       )
     }
+  }
+
+  /**
+   * Записать настройку в `system_settings`.
+   *
+   * Таблица принадлежит admin (MODEL_OWNERS), поэтому чужой модуль, которому
+   * нужно сохранить свой ключ настроек, идёт отсюда, а не через `prisma`:
+   * иначе правила ключа, `category` для админ-UI и будущая валидация живут
+   * в двух местах и расходятся молча.
+   */
+  setSystemSetting(input: {
+    key: string
+    value: string
+    type: SystemSettingRow['type']
+    updatedBy: string
+    category?: string | undefined
+  }): Promise<SystemSettingRow> {
+    return this.settings.upsert(input)
   }
 }
