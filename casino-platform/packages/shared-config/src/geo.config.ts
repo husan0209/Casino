@@ -180,9 +180,34 @@ export const COUNTRY_TO_GEO: Record<string, LegalCountry> = {
 }
 
 export function resolveLegalCountry(input?: string | null): LegalCountry {
-  if (!input) return 'RU'
+  if (!input) {
+    return 'RU'
+  }
   const code = input.toUpperCase()
   return COUNTRY_TO_GEO[code] ?? 'INTL'
+}
+
+/**
+ * Полный whitelist валют платформы (фиат + крипта) — единственный источник
+ * правды для «какую валюту вообще может прислать клиент».
+ *
+ * Список выведен из ключей `CURRENCY_LIMITS`, а этот словарь объявлен как
+ * `Record<DisplayCurrency, CurrencyLimitsDef>`: union покрыт целиком на этапе
+ * компиляции, поэтому валюта не может появиться (или исчезнуть) в whitelist
+ * раньше, чем она появится в гео-конфиге. Второй список валют в DTO/домене
+ * больше не заводится и не разъезжается с этим.
+ *
+ * Приведение к non-empty tuple — требование сигнатуры `z.enum`; ключи непусты
+ * по построению (лимиты заданы для каждой валюты релиза).
+ */
+export const SUPPORTED_CURRENCIES = Object.keys(CURRENCY_LIMITS) as [
+  DisplayCurrency,
+  ...DisplayCurrency[],
+]
+
+/** Точное (регистрозависимое) попадание в whitelist: внутренние коды — UPPER_SNAKE. */
+export function isSupportedCurrency(value: string): value is DisplayCurrency {
+  return Object.prototype.hasOwnProperty.call(CURRENCY_LIMITS, value)
 }
 
 /** MVP: only currencies with fiatLive=true accept fiat deposits */
