@@ -13,6 +13,7 @@
  *    assertCanWithdraw это единственный существующий guard, поэтому «тихий
  *    пропуск» при упавшем репозитории означал бы вывод без верификации.
  */
+import { ConfigService } from '@nestjs/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { KycCheckService } from '../src/modules/kyc/application/use-cases/kyc-check.service'
@@ -37,7 +38,16 @@ function makeService() {
   const getStatus = vi.fn()
   const getTotalDepositedRub = vi.fn()
   const repo = { getStatus, getTotalDepositedRub }
-  const service = new KycCheckService(repo as unknown as IKycRepository)
+  // GAP-72: сервис читает порог из конфига, а не из литерала. Заглушка отдаёт
+  // тот же DEFAULT_LIMIT, что тесты передают третьим аргументом, — границы
+  // «строго больше» и fail-closed ветки проверяются ровно как раньше.
+  const config = {
+    get: (key: string) => (key === 'KYC_DEPOSIT_LIMIT_RUB' ? DEFAULT_LIMIT : undefined),
+  }
+  const service = new KycCheckService(
+    repo as unknown as IKycRepository,
+    config as unknown as ConfigService,
+  )
   return { service, getStatus, getTotalDepositedRub }
 }
 
