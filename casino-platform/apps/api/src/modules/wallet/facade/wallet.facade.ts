@@ -21,10 +21,18 @@ import {
   WALLET_TRANSACTION_RUNNER,
   type CreditInput,
   type CreditResult,
+  type LedgerEntryAdminRow,
   type WalletLockTarget,
 } from '../domain/repositories/wallet.repository'
 
-import type { Prisma } from '@prisma/client'
+import type { LedgerEntry, LedgerEntryType, Prisma } from '@prisma/client'
+
+/**
+ * Read-модель админского списка проводок отдаётся через фасад (правило 4, G16):
+ * потребителю незачем импортировать domain-слой wallet, чтобы назвать тип
+ * собственного ответа.
+ */
+export type { LedgerEntryAdminRow } from '../domain/repositories/wallet.repository'
 
 /**
  * Единственная точка входа в wallet для других модулей (4-слойка, GAP-22):
@@ -100,5 +108,24 @@ export class WalletFacade {
       locked: w.locked,
       available: money.subtract(w.balance, w.locked),
     }
+  }
+
+  /**
+   * Список журнала для админки (ТЗ ч.3 UC-PAY-16) и проводки одной заявки
+   * (UC-PAY-18). Чтение `ledger_entries` отдаёт его владелец — wallet; до
+   * храповика G27 запрос собирал `admin-finance.controller.ts` напрямую.
+   */
+  listLedgerEntries(args: {
+    userId?: string | undefined
+    type?: LedgerEntryType | undefined
+    currency?: Currency | undefined
+    page: number
+    perPage: number
+  }): Promise<{ items: LedgerEntryAdminRow[]; total: number }> {
+    return this.repo.listEntries(args).then(([items, total]) => ({ items, total }))
+  }
+
+  listEntriesForPaymentRequest(paymentRequestId: string): Promise<LedgerEntry[]> {
+    return this.repo.findEntriesForPayment(paymentRequestId)
   }
 }

@@ -244,6 +244,11 @@ ledger_entries       (append-only — каждая операция)
 - `unlock({userId, currency, amount})`
 - `confirmWithdrawal({userId, currency, amount, withdrawalRequestId})`
 - `getBalance(userId, currency)`
+- `listLedgerEntries({userId, type, currency, page, perPage})` — админский список
+  журнала (UC-PAY-16); фильтр по валюте идёт через кошелёк, потому что у проводки
+  своей колонки валюты нет
+- `listEntriesForPaymentRequest(paymentRequestId)` — проводки одной заявки для
+  карточки (UC-PAY-18)
 - `getBalances(userId)`
 - `runInTransaction(fn)` — групповые проводки (casino bet/win)
 
@@ -314,8 +319,10 @@ payment_callbacks    (raw callbacks от провайдеров)
 
 ### 6.6. Экспортирует
 
-- `PaymentsFacade` (`estimateRub`, `getPaymentRequest`, `updatePaymentStatus`) —
-  потребители: `maintenance` (курсы) и `admin` (решение по заявке на вывод)
+- `PaymentsFacade` (`estimateRub`, `getPaymentRequest`, `getPaymentRequestDetail`,
+  `updatePaymentStatus`, `listPaymentRequests`) —
+  потребители: `maintenance` (курсы) и `admin` (решение по заявке на вывод,
+  списки UC-PAY-17/10 и карточка UC-PAY-18)
 - NB: `PaymentProvider` — это Prisma-enum из `@casino/database`, а не interface
   модуля. Admin больше не провайдит `PaymentRequestRepository` у себя: доступ к
   заявкам идёт через фасад (G16), а `PAYMENT_REQUEST_REPOSITORY` остаётся
@@ -778,9 +785,15 @@ notifications → queues              (EMAIL_QUEUE_PORT)
               → auth                (guards)
               (никем не импортируется; письма auth/maintenance шлют напрямую)
 
-admin         → wallet              (WalletFacade — manual credit/debit)
+admin         → wallet              (WalletFacade — manual credit/debit +
+                                      listLedgerEntries для /admin/transactions)
+              → payments            (PaymentsFacade — списки и карточка заявок;
+                                      узкий токен WITHDRAWAL_REQUEST_STORE для
+                                      approve/reject — адаптер над тем же фасадом)
               (+ audit-log — часть admin, §12; собственные репозитории к
-               admin_users, audit_logs, dashboard, payment_requests)
+               admin_users, audit_logs, dashboard. Чужих таблиц admin не читает:
+               с 2026-10-05 чтение payment_requests и ledger_entries отдаёт
+               владелец через фасад — гард G27)
 
 health        → (standalone: readiness проверяет db/redis)
 

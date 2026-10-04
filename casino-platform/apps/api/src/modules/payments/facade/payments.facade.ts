@@ -6,9 +6,18 @@ import {
   NOWPAYMENTS_CLIENT,
   PAYMENT_REQUEST_REPOSITORY,
   type PaymentRequest,
+  type PaymentRequestAdminRow,
+  type PaymentRequestDetailRow,
 } from '../domain/payments.ports'
 
-import type { PaymentStatus } from '@prisma/client'
+import type { PaymentProvider, PaymentStatus, PaymentType } from '@prisma/client'
+
+/**
+ * Read-модели админских списков отдаются через фасад (правило 4, G16): у
+ * потребителя нет основания импортировать domain-слой payments, даже чтобы
+ * назвать типы своих ответов.
+ */
+export type { PaymentRequestAdminRow, PaymentRequestDetailRow } from '../domain/payments.ports'
 
 /**
  * Публичный API payments-модуля (MODULE_TEMPLATE Шаг 8).
@@ -71,5 +80,30 @@ export class PaymentsFacade {
     return this.repo
       .listUser({ userId, type: 'deposit', page, perPage })
       .then(([items, total]) => ({ items, total }))
+  }
+
+  /**
+   * Списки заявок для админки (ТЗ ч.3 UC-PAY-17, UC-PAY-10) и карточка заявки
+   * (UC-PAY-18).
+   *
+   * До храповика G27 эти запросы собирались прямо в `admin-finance.controller.ts`:
+   * presentation читал чужую таблицу мимо владельца, а строки query кастовались
+   * к enum'ам без валидации (мусор в `?status=` давал 500 от Prisma). Здесь —
+   * только чтение; форма фильтра проверяется на входе потребителя.
+   */
+  listPaymentRequests(args: {
+    userId?: string | undefined
+    type?: PaymentType | undefined
+    status?: PaymentStatus | undefined
+    provider?: PaymentProvider | undefined
+    currency?: string | undefined
+    page: number
+    perPage: number
+  }): Promise<{ items: PaymentRequestAdminRow[]; total: number }> {
+    return this.repo.listAdmin(args).then(([items, total]) => ({ items, total }))
+  }
+
+  getPaymentRequestDetail(id: string): Promise<PaymentRequestDetailRow | null> {
+    return this.repo.findDetail(id)
   }
 }
