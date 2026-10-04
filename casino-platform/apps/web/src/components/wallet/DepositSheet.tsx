@@ -10,6 +10,7 @@ import {
   CreditCard,
   ShieldCheck,
   X,
+  Zap,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -32,12 +33,13 @@ import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
 /** Иконка метода по подписи (в гео-конфиге только id+label, без типа).
-    Крипта и СБП — настоящие логотипы; карта/P2P — нейтральные глифы
-    (это категории без одного бренда, логотип Visa/MC ввели бы в заблуждение). */
+    Крипта — настоящие логотипы монет; карта/P2P — нейтральные глифы
+    (категории без одного бренда). Логотип СБП с wordmark в плитке 40px
+    читается плохо — вернулись к нейтральной молнии (fast payments). */
 function methodIcon(label: string): React.JSX.Element {
   const lower = label.toLowerCase()
   if (lower.includes('сбп')) {
-    return <img src="/currency/sbp.svg" alt="СБП" className="h-5 w-auto" draggable={false} />
+    return <Zap size={18} aria-hidden />
   }
   if (lower.includes('p2p') || lower.includes('р2р')) {
     return <ArrowLeftRight size={18} aria-hidden />
@@ -401,7 +403,7 @@ export function DepositSheet(): React.JSX.Element | null {
 
             {kycNotApproved && limitRemaining !== undefined && !limitExhausted && (
               <p className="mt-2 text-center text-xs text-muted">
-                Без верификации осталось{' '}
+                Без верификации можно выводить до{' '}
                 {formatAmount(limitRemaining, kyc?.limit_currency ?? '', true)}
               </p>
             )}
