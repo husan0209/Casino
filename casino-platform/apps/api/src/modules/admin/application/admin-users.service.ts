@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common'
 import * as argon2 from 'argon2'
 
+import { UsersFacade } from '@modules/users/facade/users.facade'
+
 import {
   ADMIN_USER_REPOSITORY,
   type AdminUserRow,
@@ -10,7 +12,10 @@ import {
 
 @Injectable()
 export class AdminUsersService {
-  constructor(@Inject(ADMIN_USER_REPOSITORY) private readonly repo: IAdminUserRepository) {}
+  constructor(
+    @Inject(ADMIN_USER_REPOSITORY) private readonly repo: IAdminUserRepository,
+    @Inject(UsersFacade) private readonly users: UsersFacade,
+  ) {}
 
   list(page = 1, perPage = 20): Promise<{ items: AdminUserRow[]; total: number }> {
     return this.repo.list(page, perPage)
@@ -57,13 +62,19 @@ export class AdminUsersService {
     return this.repo.setActive(id, true)
   }
 
-  /** Блокировка игрока (users-контроллер): статус + отзыв сессий — через порт (В3). */
+  /**
+   * Блокировка игрока — через `UsersFacade` (G24).
+   *
+   * Таблицы `users` и `sessions` админу не принадлежат, а правило «заблокирован
+   * ⇒ живых сессий нет» принадлежит владельцу данных. Раньше этот метод звал
+   * `repo.blockPlayer`, и admin-репозиторий писал в обе чужие таблицы.
+   */
   blockPlayer(userId: string): Promise<void> {
-    return this.repo.blockPlayer(userId)
+    return this.users.blockPlayer(userId)
   }
 
   unblockPlayer(userId: string): Promise<void> {
-    return this.repo.unblockPlayer(userId)
+    return this.users.unblockPlayer(userId)
   }
 
   touchLastLogin(id: string): Promise<void> {

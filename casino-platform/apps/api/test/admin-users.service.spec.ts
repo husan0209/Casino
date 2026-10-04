@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AdminUsersService } from '../src/modules/admin/application/admin-users.service'
 
 import type { IAdminUserRepository } from '../src/modules/admin/domain/admin.repository'
+import type { UsersFacade } from '../src/modules/users/facade/users.facade'
 
 vi.mock('argon2', () => ({
   argon2id: 2,
@@ -36,11 +37,21 @@ function makeRepo() {
     setActive: vi
       .fn()
       .mockImplementation((id: string, isActive: boolean) => Promise.resolve({ id, isActive })),
-    blockPlayer: vi.fn().mockResolvedValue(undefined),
-    unblockPlayer: vi.fn().mockResolvedValue(undefined),
     touchLastLogin: vi.fn().mockResolvedValue(undefined),
   }
-  return { service: new AdminUsersService(repo as unknown as IAdminUserRepository), repo }
+  // G24: блокировкой игрока владеет users-модуль, admin только заказчик.
+  const users = {
+    blockPlayer: vi.fn().mockResolvedValue(undefined),
+    unblockPlayer: vi.fn().mockResolvedValue(undefined),
+  }
+  return {
+    service: new AdminUsersService(
+      repo as unknown as IAdminUserRepository,
+      users as unknown as UsersFacade,
+    ),
+    repo,
+    users,
+  }
 }
 
 describe('AdminUsersService.create', () => {
@@ -101,7 +112,7 @@ describe('AdminUsersService.create', () => {
 
 describe('AdminUsersService — блокировки', () => {
   it('block и unblock работают по таблице админов (setActive false/true)', async () => {
-    const { service, repo } = makeRepo()
+    const { service, repo, users } = makeRepo()
 
     await service.block('adm-3')
     await service.unblock('adm-3')
@@ -110,18 +121,24 @@ describe('AdminUsersService — блокировки', () => {
       ['adm-3', false],
       ['adm-3', true],
     ])
-    expect(repo.blockPlayer).not.toHaveBeenCalled()
+    // блокировка админа не должна задевать игроков: это другие строки и другие
+    // таблицы (и другой владелец — admin_users принадлежит admin)
+    expect(users.blockPlayer).not.toHaveBeenCalled()
+    expect(users.unblockPlayer).not.toHaveBeenCalled()
   })
 
-  it('блокировка игрока идёт своим путём и не трогает админскую таблицу', async () => {
-    const { service, repo } = makeRepo()
+  it('блокировка игрока идёт через users-модуль и не трогает админскую таблицу', async () => {
+    const { service, repo, users } = makeRepo()
 
     await service.blockPlayer('u-9')
     await service.unblockPlayer('u-9')
 
-    expect(repo.blockPlayer.mock.calls).toEqual([['u-9']])
-    expect(repo.unblockPlayer.mock.calls).toEqual([['u-9']])
+    expect(users.blockPlayer.mock.calls).toEqual([['u-9']])
+    expect(users.unblockPlayer.mock.calls).toEqual([['u-9']])
+    // `admin_users` (setActive) при блокировке игрока не при чём: это разные
+    // сущности, и смешать их — значит разблокировать админа вместо игрока.
     expect(repo.setActive).not.toHaveBeenCalled()
+    expect(repo).not.toHaveProperty('blockPlayer')
   })
 
   it('list по умолчанию — страница 1 по 20', async () => {
