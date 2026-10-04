@@ -81,12 +81,17 @@ export function isLegalPath(pathname: string): boolean {
 
 /** §4.4: Ctrl/⌘ K открывает поиск. Игнорируем, пока фокус в поле ввода. */
 export function isSearchShortcut(event: {
-  key: string
+  // `key` опционален не для красоты: синтетические keydown от расширений приходят
+  // с metaKey/ctrlKey, но без него, и `event.key.toLowerCase()` рвал обработчик.
+  key?: string
   metaKey: boolean
   ctrlKey: boolean
   target?: EventTarget | null
 }): boolean {
-  if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey)) {
+  // key отсутствует у синтетических keydown, которые шлют расширения браузера:
+  // без проверки typeof падаем на undefined.toLowerCase() и рвём обработчик.
+  const pressedKey = typeof event.key === 'string' ? event.key.toLowerCase() : ''
+  if (pressedKey !== 'k' || !(event.metaKey || event.ctrlKey)) {
     return false
   }
   const element = event.target as HTMLElement | null
