@@ -33,8 +33,13 @@ function captureRawBody(
   buf: Buffer,
   _encoding: string,
 ): void {
-  // verify-колбэк body-parser получает IncomingMessage; Request (с rawBody) — подтип
-  ;(req as RawBodyRequest).rawBody = buf.toString('utf8')
+  // verify-колбэк body-parser получает IncomingMessage; Request (с rawBody) — подтип.
+  // Присваивание идёт через локальную переменную, а не `(req as …).rawBody = …`:
+  // выражение, начинающееся со скобки, prettier защищает точкой с запятой, а eslint
+  // считает её `no-extra-semi` — на этой строке два инструмента спорили, и любой PR,
+  // тронувший main.ts, краснел в CI (проверяется `prettier --check` на файле).
+  const withRawBody = req as RawBodyRequest
+  withRawBody.rawBody = buf.toString('utf8')
 }
 
 async function bootstrap(): Promise<void> {
