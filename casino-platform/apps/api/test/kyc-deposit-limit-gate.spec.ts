@@ -13,13 +13,13 @@
  *    assertCanWithdraw это единственный существующий guard, поэтому «тихий
  *    пропуск» при упавшем репозитории означал бы вывод без верификации.
  */
-import { ConfigService } from '@nestjs/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { KycCheckService } from '../src/modules/kyc/application/use-cases/kyc-check.service'
 import { KycRequiredError } from '../src/modules/kyc/domain/errors'
 
 import type { IKycRepository } from '../src/modules/kyc/domain/repositories/kyc.repository'
+import type { ConfigService } from '@nestjs/config'
 
 const USER_ID = 'u-kyc-1'
 const DEFAULT_LIMIT = '5000'
