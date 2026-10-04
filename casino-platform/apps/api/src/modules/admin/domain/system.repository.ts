@@ -16,7 +16,22 @@ export interface SystemSettingRow {
 export interface ISystemSettingRepository {
   findMany(): Promise<SystemSettingRow[]>
   findEmailTemplates(): Promise<SystemSettingRow[]>
-  upsert(input: { key: string; value: string; type: SystemSettingType; updatedBy: string }): Promise<SystemSettingRow>
+  /**
+   * Create-or-update по уникальному `key`.
+   *
+   * `category` — группировка в админ-UI; её задаёт владелец ключа (affiliate
+   * пишет 'affiliate'). Без него create оставляет NULL — как до появления
+   * этого поля. `type` применяется и на update: заявленный тип ключа обязан
+   * совпадать с типом строки, иначе чтение из другой ветки молча получает
+   * значение чужого типа.
+   */
+  upsert(input: {
+    key: string
+    value: string
+    type: SystemSettingType
+    updatedBy: string
+    category?: string | undefined
+  }): Promise<SystemSettingRow>
 }
 
 export const SYSTEM_SETTING_REPOSITORY = Symbol('SYSTEM_SETTING_REPOSITORY')
