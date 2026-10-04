@@ -235,6 +235,23 @@ price_currency: params.priceCurrency.toLowerCase(),
 
 ## 4. Поток вывода (Withdrawal Flow)
 
+**Валюты вывода (контракт).** Вывод исполним в трёх валютах: `RUB` (фиат,
+`card`/`sbp`) и `USDT_TRC20`/`BTC` (крипта). Остальные четыре — `UAH`, `BYN`,
+`KZT`, `UZS` — **display-валюты**: у них есть кошелёк и курс для отображения, но
+платёж по ним не создаётся (`nowpayments.client.ts`), внешнего источника курса в
+MVP нет (`update-rates.job.ts` — пишутся константы), а `fiatLive: true` носит
+только `RUB`. Ни один клиент-провайдер в репозитории не делает payout
+(`rukassa.client.ts` и `nowpayments.client.ts` умеют только
+`createPayment`/`getPaymentStatus`), поэтому заявку исполняет оператор вручную —
+шаг 8 на схеме ниже.
+
+Отсюда практическое правило: `withdrawMin`/`withdrawMax` display-валют в
+`CURRENCY_LIMITS` — **границы отображаемого баланса, а не контракт выплаты**. Их
+нельзя читать как лимиты вывода: заявка прошла бы проверки и заморозила баланс на
+`lock` в очереди, которую никто не может исполнить. Гейт — `assertWithdrawableCurrency()`
+(`payments/domain/payment-currency.policy.ts`), отказ стабильным
+`INVALID_CURRENCY` (422).
+
 ```
 ┌────────┐                     ┌─────────┐                ┌───────────┐
 │  User  │                     │ Backend │                │ Provider  │

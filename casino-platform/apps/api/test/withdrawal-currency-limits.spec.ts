@@ -9,6 +9,7 @@ import {
   InvalidDestinationError,
 } from '../src/modules/payments/domain/errors'
 import {
+  assertWithdrawableCurrency,
   assertWithdrawalDestination,
   withdrawalLimitsFor,
 } from '../src/modules/payments/domain/payment-currency.policy'
@@ -78,6 +79,51 @@ describe('withdrawalLimitsFor: границы берутся из гео-кон�
   it('валюта без лимитов отклоняется, а не получает границы «на всякий случай»', () => {
     expect(() => withdrawalLimitsFor('TON')).toThrow(InvalidCurrencyError)
     expect(() => withdrawalLimitsFor('USD')).toThrow(InvalidCurrencyError)
+  })
+})
+
+/**
+ * Display-валюты (`UAH`/`BYN`/`KZT`/`UZS`) есть в `CURRENCY_LIMITS` — с
+ * `withdrawMin`/`withdrawMax`, — но payout по ним не исполняется: это границы
+ * отображаемого баланса, а не контракт выплаты. Пока гейта не было, такая
+ * заявка проходила все проверки лимитов, морозила баланс на `lock` и вставала
+ * в очередь, которую оператор не может исполнить.
+ */
+describe('assertWithdrawableCurrency: выводимая валюта ≠ валюта, у которой есть лимит', () => {
+  const DISPLAY_ONLY = ['UAH', 'BYN', 'KZT', 'UZS']
+
+  it('исполнимые валюты проходят: RUB (фиат) + релизная крипта', () => {
+    for (const currency of ['RUB', 'USDT_TRC20', 'BTC']) {
+      expect(() => assertWithdrawableCurrency(currency), `currency=${currency}`).not.toThrow()
+    }
+  })
+
+  it('display-валюты отклоняются стабильным INVALID_CURRENCY', () => {
+    for (const currency of DISPLAY_ONLY) {
+      expect(() => assertWithdrawableCurrency(currency), `currency=${currency}`).toThrow(
+        InvalidCurrencyError,
+      )
+      expect(() => withdrawalLimitsFor(currency), `currency=${currency}`).toThrow(
+        /cannot be withdrawn/,
+      )
+    }
+  })
+
+  it('неизвестный код платформы отличается от «есть, но не выводится»', () => {
+    expect(() => withdrawalLimitsFor('USD')).toThrow(/has no withdrawal limits/)
+    expect(() => withdrawalLimitsFor('UAH')).toThrow(/cannot be withdrawn/)
+  })
+
+  it('вход в сообщение обрезается — длинный код не уезжает в ответ целиком', () => {
+    const long = `UAH${'x'.repeat(40)}`
+    let message = ''
+    try {
+      assertWithdrawableCurrency(long)
+    } catch (e) {
+      message = (e as Error).message
+    }
+    expect(message).toContain('UAH')
+    expect(message).not.toContain('x'.repeat(40))
   })
 })
 
@@ -229,6 +275,19 @@ describe('CreateWithdrawalUseCase: money-контракт и границы по
     await expect(
       h.useCase.execute('u1', cryptoInput({ currency: 'BTC', destination: TRON_ADDRESS })),
     ).rejects.toThrow(InvalidDestinationError)
+    expect(h.lock).not.toHaveBeenCalled()
+    expect(h.create).not.toHaveBeenCalled()
+  })
+
+  it('заявка display-валюты (UAH) отклоняется до блокировки баланса', async () => {
+    await expect(
+      h.useCase.execute('u1', {
+        amount: '5000',
+        currency: 'UAH',
+        method: 'card',
+        destination: '380999999999',
+      }),
+    ).rejects.toThrow(InvalidCurrencyError)
     expect(h.lock).not.toHaveBeenCalled()
     expect(h.create).not.toHaveBeenCalled()
   })
