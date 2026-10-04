@@ -87,7 +87,13 @@ describe('GoogleOAuthUseCase — обмен кода (G21)', () => {
     const { uc, signIn, signInResult } = makeUc(f.fetchMock)
     const state = validState(uc)
 
-    const res = await uc.execute({ code: 'code-1', state, ip: '1.1.1.1', userAgent: 'vitest' })
+    const res = await uc.execute({
+      code: 'code-1',
+      state,
+      stateCookie: state,
+      ip: '1.1.1.1',
+      userAgent: 'vitest',
+    })
 
     expect(res).toBe(signInResult)
     expect(f.calls).toHaveLength(2)
@@ -112,7 +118,7 @@ describe('GoogleOAuthUseCase — обмен кода (G21)', () => {
     ])
     const { uc } = makeUc(f.fetchMock)
     const state = validState(uc)
-    await uc.execute({ code: 'code-1', state })
+    await uc.execute({ code: 'code-1', state, stateCookie: state })
 
     const body = String(f.calls[0]!.init.body)
     expect(body).toContain('redirect_uri=https%3A%2F%2Fexample.com%2Fauth%2Fgoogle%2Fcallback')
@@ -124,7 +130,9 @@ describe('GoogleOAuthUseCase — обмен кода (G21)', () => {
     const { uc, signIn } = makeUc(f.fetchMock)
     const state = validState(uc)
 
-    await expect(uc.execute({ code: 'x', state })).rejects.toBeInstanceOf(OAuthExchangeError)
+    await expect(uc.execute({ code: 'x', state, stateCookie: state })).rejects.toBeInstanceOf(
+      OAuthExchangeError,
+    )
     expect(signIn).not.toHaveBeenCalled()
   })
 
@@ -133,7 +141,9 @@ describe('GoogleOAuthUseCase — обмен кода (G21)', () => {
     const { uc, signIn } = makeUc(f.fetchMock)
     const state = validState(uc)
 
-    await expect(uc.execute({ code: 'x', state })).rejects.toBeInstanceOf(OAuthExchangeError)
+    await expect(uc.execute({ code: 'x', state, stateCookie: state })).rejects.toBeInstanceOf(
+      OAuthExchangeError,
+    )
     expect(signIn).not.toHaveBeenCalled()
   })
 
@@ -145,7 +155,9 @@ describe('GoogleOAuthUseCase — обмен кода (G21)', () => {
     const { uc, signIn } = makeUc(f.fetchMock)
     const state = validState(uc)
 
-    await expect(uc.execute({ code: 'x', state })).rejects.toThrow(OAuthExchangeError)
+    await expect(uc.execute({ code: 'x', state, stateCookie: state })).rejects.toThrow(
+      OAuthExchangeError,
+    )
     expect(signIn).not.toHaveBeenCalled()
   })
 
@@ -157,7 +169,9 @@ describe('GoogleOAuthUseCase — обмен кода (G21)', () => {
     const { uc, signIn } = makeUc(f.fetchMock)
     const state = validState(uc)
 
-    await expect(uc.execute({ code: 'x', state })).rejects.toBeInstanceOf(OAuthExchangeError)
+    await expect(uc.execute({ code: 'x', state, stateCookie: state })).rejects.toBeInstanceOf(
+      OAuthExchangeError,
+    )
     expect(signIn).not.toHaveBeenCalled()
   })
 
@@ -169,7 +183,9 @@ describe('GoogleOAuthUseCase — обмен кода (G21)', () => {
     const { uc, signIn } = makeUc(f.fetchMock)
     const state = validState(uc)
 
-    await expect(uc.execute({ code: 'x', state })).rejects.toBeInstanceOf(OAuthExchangeError)
+    await expect(uc.execute({ code: 'x', state, stateCookie: state })).rejects.toBeInstanceOf(
+      OAuthExchangeError,
+    )
     expect(signIn).not.toHaveBeenCalled()
   })
 
@@ -180,7 +196,9 @@ describe('GoogleOAuthUseCase — обмен кода (G21)', () => {
     const { uc, signIn } = makeUc(fetchMock)
     const state = validState(uc)
 
-    await expect(uc.execute({ code: 'x', state })).rejects.toThrow(OAuthExchangeError)
+    await expect(uc.execute({ code: 'x', state, stateCookie: state })).rejects.toThrow(
+      OAuthExchangeError,
+    )
     expect(signIn).not.toHaveBeenCalled()
   })
 
@@ -188,9 +206,9 @@ describe('GoogleOAuthUseCase — обмен кода (G21)', () => {
     const f = makeFetchQueue([])
     const { uc } = makeUc(f.fetchMock)
 
-    await expect(uc.execute({ code: 'x', state: 'garbage.sig' })).rejects.toBeInstanceOf(
-      OAuthStateError,
-    )
+    await expect(
+      uc.execute({ code: 'x', state: 'garbage.sig', stateCookie: 'garbage.sig' }),
+    ).rejects.toBeInstanceOf(OAuthStateError)
     expect(f.calls).toHaveLength(0)
   })
 })
