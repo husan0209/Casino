@@ -36,7 +36,13 @@ export interface AuthState {
   register: (
     email: string,
     password: string,
-    codes?: { referral?: string | undefined; affiliate?: string | undefined },
+    codes: { referral?: string | undefined; affiliate?: string | undefined } | undefined,
+    /**
+     * GAP-71 (Terms §4): версия условий, которую игрок видел на форме. Передаётся
+     * аргументом, а не подставляется в сторе, — иначе любой вызов register()
+     * автоматически сообщал бы серверу «согласие есть».
+     */
+    termsVersion: string,
   ) => Promise<void>
   logout: () => void
   /**
@@ -67,11 +73,14 @@ export const useAuth = create<AuthState>()((set, get) => ({
   /** verify-email flow */
   setAuth: (user, token) => set({ token, user }),
   /** регистрация нового пользователя (письмо-подтверждение уходит с API) */
-  register: async (email, password, codes) => {
+  register: async (email, password, codes, termsVersion) => {
     const res = await apiPost<AuthResponse>('/auth/register', {
       email,
       password,
       referral_code: codes?.referral,
+      // GAP-71: согласие — часть запроса, а не следствие успешной регистрации.
+      accept_terms: true,
+      terms_version: termsVersion,
       // Код партнёра едет в query-параметре ref (его читает RegisterController).
       ...(codes?.affiliate !== undefined && codes.affiliate !== '' ? { ref: codes.affiliate } : {}),
     })

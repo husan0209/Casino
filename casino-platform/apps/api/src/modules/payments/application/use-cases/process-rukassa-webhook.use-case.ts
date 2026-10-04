@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 
 import { errorMessage } from '@/common/utils/error-message'
 
+import { KycFacade } from '@modules/kyc/facade/kyc.facade'
 import { UsersFacade } from '@modules/users/facade/users.facade'
 import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
@@ -43,6 +44,9 @@ export class ProcessRukassaWebhookUseCase {
     @Inject(RUKASSA_CLIENT) private readonly rukassa: IRukassaClient,
     @Inject(WalletFacade) private wallet: WalletFacade,
     @Inject(UsersFacade) private users: UsersFacade,
+    // KycFacade, а не репозиторий kyc: межмодульный доступ только через фасад
+    // (AGENTS.md правило 4). Нужен для эскалации после зачисления — см. applyOutcome.
+    @Inject(KycFacade) private kyc: KycFacade,
   ) {}
   async execute(input: ProcessRukassaWebhookInput): Promise<{ ok: boolean }> {
     const { rawHeaders, body, rawBody, ip } = input
@@ -128,6 +132,13 @@ export class ProcessRukassaWebhookUseCase {
         completedAt: new Date(),
         externalStatus: status,
       })
+      // Эскалация, а не отказ: платёж уже принят провайдером и зачислен, «отменить»
+      // его нельзя (AI_DEVELOPMENT_RULES §8). Проверка на интенте не покрывает
+      // гонку двух депозитов и заявки, созданные до правила. Порядок после
+      // updateStatus: агрегат суммирует только completed-заявки, поэтому текущий
+      // депозит в него попадает. Повторная доставка сюда не доходит — дедуп по
+      // pr.status === 'completed' в execute, то есть эскалация не повторяется.
+      await this.kyc.escalateOverDepositLimit({ userId: pr.userId, paymentRequestId: pr.id })
     } else if (outcome === 'failure') {
       await this.repo.updateStatus(pr.id, 'failed', { externalStatus: status })
     } else {

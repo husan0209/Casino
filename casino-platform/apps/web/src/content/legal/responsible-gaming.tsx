@@ -1,5 +1,7 @@
 import type { LegalSection } from '@/components/layout/LegalPage'
 
+import { LEGAL_DOCUMENT_VERSIONS } from '@casino/shared-types'
+
 import { block } from './block'
 
 /**
@@ -15,7 +17,7 @@ import { block } from './block'
  * сверяется с IMPLEMENTATION_GAPS.md при каждом изменении.
  */
 
-export const RG_VERSION = '1.0'
+export const RG_VERSION = LEGAL_DOCUMENT_VERSIONS.responsible_gaming
 
 export const rgKeyPoints = [
   'Игра с 18 лет. Сервис не доступен лицам младше — независимо от согласия родителей.',

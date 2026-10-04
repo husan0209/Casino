@@ -25,6 +25,10 @@ import { type UserRole } from '@casino/database'
 
 import { ChangePasswordUseCase } from '../../application/use-cases/change-password.use-case'
 import { ForgotPasswordUseCase } from '../../application/use-cases/forgot-password.use-case'
+import {
+  ListTermsAcceptancesUseCase,
+  type TermsAcceptanceStatus,
+} from '../../application/use-cases/list-terms-acceptances.use-case'
 import { LoginUseCase } from '../../application/use-cases/login.use-case'
 import { LogoutUseCase } from '../../application/use-cases/logout.use-case'
 import { GoogleOAuthUseCase } from '../../application/use-cases/oauth/google-oauth.use-case'
@@ -72,6 +76,8 @@ export class AuthController {
     @Inject(ChangePasswordUseCase) private readonly changePasswordUc: ChangePasswordUseCase,
     @Inject(GoogleOAuthUseCase) private readonly googleUc: GoogleOAuthUseCase,
     @Inject(TelegramLoginUseCase) private readonly telegramUc: TelegramLoginUseCase,
+    @Inject(ListTermsAcceptancesUseCase)
+    private readonly termsAcceptancesUc: ListTermsAcceptancesUseCase,
   ) {}
 
   @Post('register')
@@ -91,7 +97,14 @@ export class AuthController {
     // affiliates.tracking_code. Совпадёт максимум один.
     const affiliateCode = typeof req.query['ref'] === 'string' ? req.query['ref'] : undefined
     const result = await this.registerUc.execute(
-      { email: body.email, password: body.password, referralCode: body.referral_code },
+      {
+        email: body.email,
+        password: body.password,
+        referralCode: body.referral_code,
+        // GAP-71: версия условий, которую игрок видел на форме. Use-case сверяет
+        // её с реестром и отказывает устаревшему клиенту.
+        termsVersion: body.terms_version,
+      },
       {
         ip: req.ip,
         userAgent: req.headers['user-agent'],
@@ -100,6 +113,16 @@ export class AuthController {
     )
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user, referralCode: result.referralCode }
+  }
+
+  /**
+   * GAP-71 (Terms §23): игрок вправе получить копию того, что он принял, —
+   * полную историю акцептов и действующие версии документов.
+   */
+  @Get('terms-acceptances')
+  @UseGuards(AuthGuard)
+  async termsAcceptances(@CurrentUser() user: UserActor): Promise<TermsAcceptanceStatus> {
+    return this.termsAcceptancesUc.execute(user.id)
   }
 
   @Get('verify-email')

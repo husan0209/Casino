@@ -58,6 +58,8 @@ vi.mock('@/components/ui/toaster', () => ({
 
 import { LoginSheet } from '@/components/auth/LoginSheet'
 
+import { LEGAL_DOCUMENT_VERSIONS } from '@casino/shared-types'
+
 beforeEach(() => {
   loginMock.mockReset()
   registerMock.mockReset()
@@ -102,10 +104,17 @@ describe('§5: LoginSheet — вход и регистрация в одном �
     fireEvent.click(submit)
 
     await waitFor(() => {
-      expect(registerMock).toHaveBeenCalledWith('t@t.t', 'Str0ng!pass', {
-        referral: 'REF9',
-        affiliate: 'AFF1',
-      })
+      // 4-й аргумент — версия условий (GAP-71): лист передаёт её из того же
+      // реестра, что и страница /legal/terms.
+      expect(registerMock).toHaveBeenCalledWith(
+        't@t.t',
+        'Str0ng!pass',
+        {
+          referral: 'REF9',
+          affiliate: 'AFF1',
+        },
+        LEGAL_DOCUMENT_VERSIONS.terms,
+      )
     })
     expect(uiState.closeLogin).toHaveBeenCalled()
   })

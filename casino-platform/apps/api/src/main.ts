@@ -48,6 +48,13 @@ async function bootstrap(): Promise<void> {
     bodyParser: false, // we wire our own to attach the verify callback
   })
 
+  // GAP-71: `req.ip` без этой настройки = адрес реверс-прокси, а не клиента.
+  // Доверяем ровно один hop (nginx проставляет X-Real-IP и X-Forwarded-For по
+  // адресу соединения, а не по заголовку клиента), поэтому подставить себе
+  // чужой адрес через XFF по-прежнему нельзя. Нужно для доказательной силы
+  // журнала акцепта (Terms §4) и записей sessions.
+  app.set('trust proxy', 1)
+
   // Security headers (GAP-20). API отдаёт только JSON, поэтому дефолтный CSP
   // безопасен; frame-ancestors 'none' блокирует clickjacking на swagger/админке.
   app.use(helmet())

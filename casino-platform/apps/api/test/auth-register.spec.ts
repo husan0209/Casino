@@ -4,13 +4,17 @@
  * Порты — in-memory фейки с записью вызовов. Affiliate-контур подменяется
  * фейковым ModuleRef: атрибуция best-effort и не должна ломать регистрацию.
  */
+import { LEGAL_DOCUMENT_VERSIONS } from '@casino/shared-types'
+
 import { RegisterUseCase } from '../src/modules/auth/application/use-cases/register.use-case'
 import { User } from '../src/modules/auth/domain/entities/user.entity'
 import {
   EmailAlreadyExistsError,
   ReferralCodeGenerationError,
+  TermsVersionOutdatedError,
   WeakPasswordError,
 } from '../src/modules/auth/domain/errors'
+
 
 import type {
   IEmailQueueService,
@@ -23,6 +27,7 @@ import type {
   SessionCreateInput,
   SessionView,
 } from '../src/modules/auth/domain/repositories/session.repository'
+import type { ITermsAcceptanceRepository } from '../src/modules/auth/domain/repositories/terms-acceptance.repository'
 import type {
   CreateUserInput,
   IUserRepository,
@@ -157,8 +162,24 @@ function makeModuleRef(impl: () => Promise<unknown>) {
   return { moduleRef, calls }
 }
 
+/** GAP-71: фейк журнала акцепта — записывает, что именно ушло в БД. */
+function makeAcceptancesRepo() {
+  const recorded: Parameters<ITermsAcceptanceRepository['recordMany']>[0] = []
+  const repo: ITermsAcceptanceRepository = {
+    recordMany: async (entries) => {
+      recorded.push(...entries)
+    },
+    listForUser: async () => [],
+  }
+  return { repo, recorded }
+}
+
 describe('RegisterUseCase', () => {
-  const BASE = { email: 'User@Example.COM ', password: 'Str0ngPass!' }
+  const BASE = {
+    email: 'User@Example.COM ',
+    password: 'Str0ngPass!',
+    termsVersion: LEGAL_DOCUMENT_VERSIONS.terms,
+  }
 
   function makeUc(over: Parameters<typeof makeUsersRepo>[0] = {}) {
     const users = makeUsersRepo(over)
@@ -167,6 +188,7 @@ describe('RegisterUseCase', () => {
     const hasher = makeHasher()
     const email = makeEmail()
     const jwt = makeJwt()
+    const acceptances = makeAcceptancesRepo()
     const uc = new RegisterUseCase(
       users.repo,
       sessions.repo,
@@ -174,8 +196,9 @@ describe('RegisterUseCase', () => {
       hasher.hasher,
       email.email,
       jwt.jwt,
+      acceptances.repo,
     )
-    return { uc, users, sessions, verif, hasher, email, jwt }
+    return { uc, users, sessions, verif, hasher, email, jwt, acceptances }
   }
 
   it('happy path: пользователь создан, код рефералки 8 символов, сессия и токены выданы', async () => {
@@ -264,6 +287,7 @@ describe('RegisterUseCase', () => {
       dOk.hasher.hasher,
       dOk.email.email,
       dOk.jwt.jwt,
+      dOk.acceptances.repo,
       ok.moduleRef,
     )
     await ucOk.execute(BASE, { ip: '10.0.0.1', affiliateCode: 'partner-1' })
@@ -282,6 +306,7 @@ describe('RegisterUseCase', () => {
       dFail.hasher.hasher,
       dFail.email.email,
       dFail.jwt.jwt,
+      dFail.acceptances.repo,
       failing.moduleRef,
     )
     const res = await ucFail.execute(BASE, { affiliateCode: 'partner-1' })
@@ -299,9 +324,48 @@ describe('RegisterUseCase', () => {
       d.hasher.hasher,
       d.email.email,
       d.jwt.jwt,
+      d.acceptances.repo,
       aff.moduleRef,
     )
     await uc.execute(BASE)
     expect(aff.calls).toHaveLength(0)
+  })
+
+  it('GAP-71: акцепт записан по каждому документу согласия, с адресом и агентом входа', async () => {
+    const d = makeUc()
+
+    await d.uc.execute(BASE, { ip: '203.0.113.9', userAgent: 'Mozilla/5.0 (Test)' })
+
+    expect(d.acceptances.recorded.map((entry) => entry.document).sort()).toEqual([
+      'privacy',
+      'terms',
+    ])
+    for (const entry of d.acceptances.recorded) {
+      expect(entry.userId).toBe('u-1')
+      expect(entry.version).toBe(LEGAL_DOCUMENT_VERSIONS[entry.document])
+      expect(entry.ip).toBe('203.0.113.9')
+      expect(entry.userAgent).toBe('Mozilla/5.0 (Test)')
+    }
+  })
+
+  it('GAP-71: устаревшая версия условий — отказ, игрок не создан, журнал пуст', async () => {
+    const d = makeUc()
+
+    await expect(
+      d.uc.execute({ ...BASE, termsVersion: '0.9' }, { ip: '203.0.113.9' }),
+    ).rejects.toThrow(TermsVersionOutdatedError)
+
+    expect(d.users.created).toHaveLength(0)
+    expect(d.acceptances.recorded).toHaveLength(0)
+  })
+
+  it('GAP-71: регистрация без ip (внутренний вызов) акцепт не отменяет', async () => {
+    const d = makeUc()
+
+    await d.uc.execute(BASE)
+
+    expect(d.acceptances.recorded).toHaveLength(2)
+    expect(d.acceptances.recorded[0]?.ip).toBeNull()
+    expect(d.acceptances.recorded[0]?.userAgent).toBeNull()
   })
 })

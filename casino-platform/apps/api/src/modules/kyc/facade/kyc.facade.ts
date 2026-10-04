@@ -18,4 +18,16 @@ export class KycFacade {
   assertCanWithdraw(userId: string): Promise<void> {
     return this.check.assertCanWithdraw(userId)
   }
+
+  /**
+   * Фиксация депозита, который превысил лимит уже ПОСЛЕ зачисления по вебхуку
+   * (эскалация, а не отказ: деньги игрока на балансе). Только для вызова из
+   * payments — см. KycCheckService.escalateOverDepositLimit.
+   */
+  escalateOverDepositLimit(args: {
+    userId: string
+    paymentRequestId: string
+  }): Promise<void> {
+    return this.check.escalateOverDepositLimit(args)
+  }
 }

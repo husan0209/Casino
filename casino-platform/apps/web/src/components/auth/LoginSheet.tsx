@@ -17,6 +17,8 @@ import { errCode, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import { type LoginSheetMode, useUIStore } from '@/stores/ui'
 
+import { LEGAL_DOCUMENT_VERSIONS } from '@casino/shared-types'
+
 /** §5.1: индикатор силы вместо отдельного «подтвердите пароль». */
 function getStrength(pass: string): { label: string; score: number; color: string } {
   if (!pass) {
@@ -221,10 +223,17 @@ export function LoginSheet(): React.JSX.Element | null {
         await login(email, password, captchaRequired ? captchaToken : undefined)
       } else {
         // §5.1: сессия создаётся сразу, письмо подтверждения уходит фоном.
-        await register(email, password, {
-          referral,
-          affiliate: getAffiliateCode() ?? undefined,
-        })
+        // Версия условий берётся из того же реестра, что и текст на /legal/terms:
+        // сервер сверит её и запишет акцепт (GAP-71, Terms §4).
+        await register(
+          email,
+          password,
+          {
+            referral,
+            affiliate: getAffiliateCode() ?? undefined,
+          },
+          LEGAL_DOCUMENT_VERSIONS.terms,
+        )
         toast.success('Аккаунт создан')
       }
       afterAuth()

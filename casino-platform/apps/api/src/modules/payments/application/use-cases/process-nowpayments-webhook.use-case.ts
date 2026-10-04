@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common'
 
 import { errorMessage } from '@/common/utils/error-message'
 
+import { KycFacade } from '@modules/kyc/facade/kyc.facade'
 import { UsersFacade } from '@modules/users/facade/users.facade'
 import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
@@ -31,6 +32,9 @@ export class ProcessNOWPaymentsWebhookUseCase {
     @Inject(NOWPAYMENTS_CLIENT) private readonly np: INowPaymentsClient,
     @Inject(WalletFacade) private wallet: WalletFacade,
     @Inject(UsersFacade) private users: UsersFacade,
+    // KycFacade, а не репозиторий kyc: межмодульный доступ только через фасад
+    // (AGENTS.md правило 4). Нужен для эскалации после зачисления — см. creditCryptoDeposit.
+    @Inject(KycFacade) private kyc: KycFacade,
   ) {}
   async execute(input: ProcessNowPaymentsWebhookInput): Promise<{ ok: boolean }> {
     const { rawHeaders, body, rawBody, ip } = input
@@ -120,5 +124,12 @@ export class ProcessNOWPaymentsWebhookUseCase {
       completedAt: new Date(),
       externalStatus: String(body.payment_status ?? ''),
     })
+    // Эскалация, а не отказ: провайдер уже принял деньги, и NOWPayments платит
+    // столько, сколько пришло фактически (actually_paid выше запрошенной суммы),
+    // поэтому лимит без KYC здесь можно и превысить. Проверка — после
+    // updateStatus: агрегат суммирует только completed-заявки, включая эту.
+    // Дубликат-доставка сюда не попадает: early-return по pr.status === 'completed'
+    // в execute, то есть эскалация не сработает второй раз для того же платежа.
+    await this.kyc.escalateOverDepositLimit({ userId: pr.userId, paymentRequestId: pr.id })
   }
 }

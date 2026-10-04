@@ -1,4 +1,5 @@
 export * from './user.repository'
 export * from './auth-provider.repository'
 export * from './session.repository'
+export * from './terms-acceptance.repository'
 export * from './verification-token.repository'
