@@ -14,6 +14,8 @@ import { type Decimal } from 'decimal.js'
 
 import type { AdminUserRow } from '@casino/shared-types'
 
+import type { AuditLog } from '@prisma/client'
+
 /** Read-модель строки админ-пользователя живёт в @casino/shared-types (В4);
  *  тут реэкспорт для внутренних потребителей домена/application. */
 export type { AdminUserRow }
@@ -49,8 +51,30 @@ export interface AuditLogInput {
   userAgent?: string | undefined
 }
 
+/**
+ * Фильтр журнала аудита для админки (`GET /admin/audit-logs`).
+ *
+ * `action` — подстрока, а не точное значение: админ ищет по фрагменту
+ * (`admin.withdrawal.` поймёт approve/reject/batch). Пустая строка сюда не
+ * приходит — форму проверяет Zod-схема на входе.
+ */
+export interface AuditLogFilter {
+  actorType?: 'user' | 'admin' | 'system' | undefined
+  actorId?: string | undefined
+  action?: string | undefined
+  targetType?: string | undefined
+  page: number
+  perPage: number
+}
+
 export interface IAuditLogRepository {
   log(input: AuditLogInput): Promise<void>
+  /**
+   * Список записей + общее число подходящих строк. Возвращает пару, как
+   * репозитории payments/wallet: счётчик считается по ТОМУ ЖЕ where, иначе
+   * `meta.total` врал бы о фильтре.
+   */
+  list(filter: AuditLogFilter): Promise<[AuditLog[], number]>
 }
 
 export const AUDIT_LOG_REPOSITORY = Symbol('AUDIT_LOG_REPOSITORY')
