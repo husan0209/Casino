@@ -18,7 +18,7 @@ import { prisma } from '@casino/database'
 import { type ParsedProviderCallback } from '@casino/shared-types'
 
 import { GameCallbackService } from '../../application/services/game-callback.service'
-import { ProviderAdapterFactory } from '../../infrastructure/providers/provider-adapter.factory'
+import { type IProviderAdapterFactory, PROVIDER_ADAPTER_FACTORY } from '../../domain/casino.ports'
 
 /** Доменные ошибки -> коды результата GitSlotPark. */
 const CALLBACK_ERROR_CODES: Record<string, string> = {
@@ -37,7 +37,7 @@ export class ProviderCallbackController {
   private readonly logger = new Logger(ProviderCallbackController.name)
 
   constructor(
-    @Inject(ProviderAdapterFactory) private adapters: ProviderAdapterFactory,
+    @Inject(PROVIDER_ADAPTER_FACTORY) private adapters: IProviderAdapterFactory,
     @Inject(GameCallbackService) private cb: GameCallbackService,
   ) {}
 
@@ -90,7 +90,7 @@ export class ProviderCallbackController {
    * в теле (спека GitSlotPark), иначе провайдер зациклит ретраи.
    */
   private async dispatch(
-    adapter: ReturnType<ProviderAdapterFactory['getAdapter']>,
+    adapter: ReturnType<IProviderAdapterFactory['getAdapter']>,
     parsed: ParsedProviderCallback,
     providerId: string,
     res: Response,
