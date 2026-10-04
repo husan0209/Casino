@@ -104,17 +104,13 @@ describe('§5: LoginSheet — вход и регистрация в одном �
     fireEvent.click(submit)
 
     await waitFor(() => {
-      // 4-й аргумент — версия условий (GAP-71): лист передаёт её из того же
-      // реестра, что и страница /legal/terms.
-      expect(registerMock).toHaveBeenCalledWith(
-        't@t.t',
-        'Str0ng!pass',
-        {
-          referral: 'REF9',
-          affiliate: 'AFF1',
-        },
-        LEGAL_DOCUMENT_VERSIONS.terms,
-      )
+      // termsVersion внутри объекта — лист передаёт ту же версию, что и страница
+      // /legal/terms (GAP-71); сервер сверяет её со своим реестром.
+      expect(registerMock).toHaveBeenCalledWith('t@t.t', 'Str0ng!pass', {
+        referral: 'REF9',
+        affiliate: 'AFF1',
+        termsVersion: LEGAL_DOCUMENT_VERSIONS.terms,
+      })
     })
     expect(uiState.closeLogin).toHaveBeenCalled()
   })

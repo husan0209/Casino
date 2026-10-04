@@ -72,7 +72,7 @@ DIR=tech-debt
 # ловит запись ТРЕТЬИХ модулей (кейс GAP-62: affiliate писал в users), а не
 # превращает в долг законную работу обоих владельцев.
 MODEL_OWNERS='
-User:auth User:users AuthProvider:auth Session:auth Session:users EmailVerification:auth PasswordReset:auth
+User:auth User:users AuthProvider:auth Session:auth Session:users EmailVerification:auth PasswordReset:auth TermsAcceptance:auth
 UserProfile:users UserSettings:users KycProfile:kyc KycDocument:kyc
 AdminUser:admin AuditLog:admin SystemSetting:admin
 WalletAccount:wallet LedgerEntry:wallet

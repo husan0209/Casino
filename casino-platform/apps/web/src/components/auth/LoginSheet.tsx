@@ -225,15 +225,11 @@ export function LoginSheet(): React.JSX.Element | null {
         // §5.1: сессия создаётся сразу, письмо подтверждения уходит фоном.
         // Версия условий берётся из того же реестра, что и текст на /legal/terms:
         // сервер сверит её и запишет акцепт (GAP-71, Terms §4).
-        await register(
-          email,
-          password,
-          {
-            referral,
-            affiliate: getAffiliateCode() ?? undefined,
-          },
-          LEGAL_DOCUMENT_VERSIONS.terms,
-        )
+        await register(email, password, {
+          referral,
+          affiliate: getAffiliateCode() ?? undefined,
+          termsVersion: LEGAL_DOCUMENT_VERSIONS.terms,
+        })
         toast.success('Аккаунт создан')
       }
       afterAuth()
