@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowRight, Handshake } from 'lucide-react'
+import { ArrowRight, Banknote, Handshake } from 'lucide-react'
 import Link from 'next/link'
 
 import { useAuth } from '@/stores/auth'
@@ -33,18 +33,25 @@ export function PartnerHero(): React.JSX.Element | null {
         className="pointer-events-none absolute -bottom-20 -left-10 h-52 w-52 rounded-full bg-[#6C63FF]/25 blur-[60px]"
       />
 
-      {/* Декоративные символы — процент и знак валюты вместо слот-семёрок */}
+      {/* Декоративный «%» — watermark RevShare */}
       <div
         aria-hidden
         className="pointer-events-none absolute right-6 top-6 text-[120px] font-black leading-none text-white/[0.03]"
       >
         %
       </div>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute right-28 top-24 text-[80px] font-black leading-none text-[#FFB300]/[0.06]"
-      >
-        ₽
+
+      {/* Медальоны валют: рубль, доллар, деньги — как платёжные иконки в футере */}
+      <div aria-hidden className="absolute right-5 top-5 flex gap-2">
+        <span className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-base font-black text-money">
+          ₽
+        </span>
+        <span className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-base font-black text-white/80">
+          $
+        </span>
+        <span className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/[0.06] text-white/80">
+          <Banknote size={18} aria-hidden />
+        </span>
       </div>
 
       <div className="relative p-6 pb-5 md:p-8 md:pb-6">
