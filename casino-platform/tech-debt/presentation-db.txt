@@ -1,5 +1,4 @@
 apps/api/src/modules/admin/presentation/controllers/admin-audit.controller.ts	2
-apps/api/src/modules/admin/presentation/controllers/admin-finance.controller.ts	7
 apps/api/src/modules/admin/presentation/controllers/admin-users.controller.ts	3
 apps/api/src/modules/casino/presentation/controllers/casino-admin.controller.ts	8
 apps/api/src/modules/casino/presentation/controllers/casino.controller.ts	3
