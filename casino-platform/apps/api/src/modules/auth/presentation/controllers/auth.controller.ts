@@ -14,6 +14,11 @@ import { Throttle } from '@nestjs/throttler'
 import { type Request, type Response } from 'express'
 
 import {
+  OAUTH_STATE_COOKIE,
+  clearOAuthStateCookie,
+  setOAuthStateCookie,
+} from '@/common/cookies/oauth-state-cookie'
+import {
   clearRefreshTokenCookie,
   setRefreshTokenCookie,
 } from '@/common/cookies/refresh-token-cookie'
@@ -204,25 +209,40 @@ export class AuthController {
   // ===== OAuth (TZ part 2) =====
 
   @Get('google/url')
-  googleUrl(@Query('redirect_uri') redirectUri?: string): { url: string; state: string } {
-    return this.googleUc.buildAuthUrl(redirectUri)
+  googleUrl(
+    @Query('redirect_uri') redirectUri: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ): { url: string; state: string } {
+    const result = this.googleUc.buildAuthUrl(redirectUri)
+    // `state` возвращается клиенту (он кладёт его в тело) и запоминается кукой:
+    // завершить вход может только тот браузер, который его начал. Подписанный
+    // state сам по себе воспроизводим — см. oauth-state-cookie.ts.
+    setOAuthStateCookie(res, result.state)
+    return result
   }
 
   @Post('google')
   @UsePipes(new ZodValidationPipe(GoogleLoginSchema))
   async google(
     @Body() body: { code: string; redirect_uri?: string; state?: string; referral_code?: string },
-    @Req() req: Request,
+    @Req() req: RequestWithCookies & Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: string } }> {
+    // `req.cookies` в @types/express объявлен как any (GAP-39, stage 10) — в
+    // пересечении `RequestWithCookies & Request` это any и побеждает. Значение
+    // берём через узкий интерфейс, иначе any уезжал бы в use-case мимо типов.
+    const { cookies } = req as RequestWithCookies
     const result = await this.googleUc.execute({
       code: body.code,
       redirectUri: body.redirect_uri,
       state: body.state,
+      stateCookie: cookies[OAUTH_STATE_COOKIE],
       referralCode: body.referral_code as string | undefined,
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     })
+    // state одноразовый: пара (code, state) больше не переиспользуется.
+    clearOAuthStateCookie(res)
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user }
   }
