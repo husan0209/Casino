@@ -210,7 +210,11 @@ export function isSupportedCurrency(value: string): value is DisplayCurrency {
   return Object.prototype.hasOwnProperty.call(CURRENCY_LIMITS, value)
 }
 
-/** MVP: only currencies with fiatLive=true accept fiat deposits */
+/**
+ * Валюты с живым фиатным процессингом. Только они исполняются и в депозите,
+ * и в выводе (см. `payment-currency.policy.ts`): `withdrawMin`/`withdrawMax`
+ * остальных валют — границы отображаемого баланса, а не контракт выплаты.
+ */
 export function liveFiatCurrencies(): FiatCurrency[] {
   return (Object.entries(CURRENCY_LIMITS) as [DisplayCurrency, CurrencyLimitsDef][])
     .filter(([c, l]) => l.fiatLive && c !== 'USDT_TRC20' && c !== 'BTC')

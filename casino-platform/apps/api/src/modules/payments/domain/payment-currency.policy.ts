@@ -1,4 +1,10 @@
-import { CURRENCY_LIMITS, type CryptoCurrency, isSupportedCurrency } from '@casino/shared-config'
+import {
+  CURRENCY_LIMITS,
+  type CryptoCurrency,
+  type FiatCurrency,
+  isSupportedCurrency,
+  liveFiatCurrencies,
+} from '@casino/shared-config'
 
 import { InvalidCurrencyError, InvalidDestinationError } from './errors'
 
@@ -70,6 +76,39 @@ export function assertReleaseCryptoCurrency(currency: string): CryptoCurrency {
 export const MONEY_AMOUNT_PATTERN = /^\d+(\.\d{1,8})?$/
 
 /**
+ * Валюты, вывод которых вообще исполним.
+ *
+ * Контракт: `UAH`/`BYN`/`KZT`/`UZS` — display-валюты. Для них считается курс
+ * (`update-rates.job.ts`: «внешнего источника в MVP нет: пишутся константы»),
+ * баланс показывается в удобной валюте, но платёж по ним не создаётся
+ * (`nowpayments.client.ts:30`), а `fiatLive: true` носит только `RUB`. Ни один
+ * клиент-провайдер в этом репозитории payout не делает (`rukassa.client.ts` и
+ * `nowpayments.client.ts` умеют только `createPayment`/`getPaymentStatus`),
+ * заявку исполняет оператор вручную.
+ *
+ * Отсюда следует, что `withdrawMin`/`withdrawMax` display-валют в `CURRENCY_LIMITS`
+ * — не контракт выплаты, а границы отображаемого баланса. Отдавать их как лимиты
+ * вывода нельзя: заявка прошла бы проверки и встала в очередь, которую никто не
+ * может исполнить (средства заморожены на `lock`, игрок ждёт).
+ *
+ * Отклоняем существующим `INVALID_CURRENCY` (422), а не новым кодом: новый код
+ * требует ветки в UI, а фронтенд в этой волне запрещён — текущий код уже
+ * сматчится и в `docs/API_CONVENTIONS.md`, и в обработчике web.
+ */
+export function assertWithdrawableCurrency(currency: string): void {
+  if (isReleaseCryptoCurrency(currency)) {
+    return
+  }
+  if (liveFiatCurrencies().includes(currency as FiatCurrency)) {
+    return
+  }
+  const safeCurrency = currency.slice(0, 32)
+  throw new InvalidCurrencyError(`Currency ${safeCurrency} cannot be withdrawn`, {
+    currency: safeCurrency,
+  })
+}
+
+/**
  * Пределы вывода по валюте — из `CURRENCY_LIMITS` (гео-конфиг), а не из
  * тернарника в use-case.
  *
@@ -80,6 +119,11 @@ export const MONEY_AMOUNT_PATTERN = /^\d+(\.\d{1,8})?$/
  * вывод (он же рисковый/AML-контроль) фактически не действовал для крипты.
  * Валюта вне whitelist отклоняется здесь же: use-case больше не полагается на
  * то, что presentation обязательно проверил вход.
+ *
+ * Порядок проверок значим: сначала «код вообще известен платформе», потом
+ * «этот код выводится». Это два разных отказа (`USD` отсутствует в наборе, `UAH`
+ * есть, но payout по нему не исполняется), и первый даёт сужение типа, поэтому
+ * словарь лимитов читается без приведения типа.
  */
 export function withdrawalLimitsFor(currency: string): { min: string; max: string } {
   if (!isSupportedCurrency(currency)) {
@@ -88,6 +132,7 @@ export function withdrawalLimitsFor(currency: string): { min: string; max: strin
       currency: safeCurrency,
     })
   }
+  assertWithdrawableCurrency(currency)
   const limits = CURRENCY_LIMITS[currency]
   return { min: limits.withdrawMin, max: limits.withdrawMax }
 }
