@@ -1,0 +1,5 @@
+apps/api/src/modules/admin/application/admin-users.service.ts
+apps/api/src/modules/admin/application/dashboard.service.ts
+apps/api/src/modules/admin/infrastructure/admin-jwt.service.ts
+apps/api/src/modules/auth/infrastructure/services/email-queue.service.ts
+apps/api/src/modules/auth/infrastructure/services/password-hasher.service.ts
