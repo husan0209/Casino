@@ -25,5 +25,8 @@ coverage
 .turbo
 uploads/*
 !uploads/.gitkeep
+# api ?8H5B 703@C7:8 2 ./uploads >B=>A8B5;L=> A2>53> cwd (= apps/api), ?>MB><C
+# ?@028;> 2KH5 8E =5 =0:@K205B: 157 MB8E AB@>: 020B0@K 8 KYC-A:0=K ?>?040NB 2 8=45:A.
+apps/api/uploads/
 
 *.tsbuildinfo
