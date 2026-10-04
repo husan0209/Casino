@@ -108,13 +108,17 @@ export function AppHeader(): React.JSX.Element {
               <button
                 type="button"
                 className="btn-ghost px-3 py-1.5 text-sm"
-                onClick={() => openLogin()}
+                onClick={() => openLogin(undefined, 'login')}
               >
                 Войти
               </button>
-              <Link href="/register" className="btn px-3 py-1.5 text-sm">
+              <button
+                type="button"
+                className="btn px-3 py-1.5 text-sm"
+                onClick={() => openLogin(undefined, 'register')}
+              >
                 Регистрация
-              </Link>
+              </button>
             </>
           )}
         </div>

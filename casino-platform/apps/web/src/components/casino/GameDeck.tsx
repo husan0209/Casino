@@ -1,15 +1,19 @@
 'use client'
 
-import { ChevronLeft, ChevronRight, Dices, Heart, Info, Play, Sparkles } from 'lucide-react'
-import Link from 'next/link'
+import { ChevronLeft, ChevronRight, Dices, Heart, Info, Play, Sparkles, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import { GameThumb } from '@/components/casino/GameThumb'
-import { gameBadge, gameDisplayName } from '@/lib/ui/game'
+import { apiPost } from '@/lib/api'
+import { playersCountLabel } from '@/lib/format/plural'
+import { gameBadge, gameDisplayName, gameRtpLabel } from '@/lib/ui/game'
+import { bigWinLabel, playersOnline } from '@/lib/ui/vitrine-stats'
 import { useAuth, type WebUser } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
-import type { GameDto } from '@/types/casino'
+import { useWalletStore } from '@/stores/wallet'
+import type { GameDto, GameLaunchDto } from '@/types/casino'
 
 interface GameDeckProps {
   games: GameDto[]
@@ -97,41 +101,6 @@ const INITIAL_DRAG_STATE: DragState = {
   startTime: 0,
 }
 
-/** djb2 с солью: детерминированные мок-цифры «дышат» по слагу, но стабильны между рендерами. */
-function hashSlug(slug: string, salt: number): number {
-  let hash = 5381 + salt
-  for (let symbolIndex = 0; symbolIndex < slug.length; symbolIndex += 1) {
-    hash = ((hash << 5) + hash + slug.charCodeAt(symbolIndex)) >>> 0
-  }
-  return hash
-}
-
-/**
- * Мок BIG WIN-плашки (§4.4 «контекстный BIG WIN»): поля «выигрыш по игре» в
- * API нет, цифра витринная; целочисленная хэш-арифметика, `toLocaleString` —
- * только отображение (никаких float-расчётов денег).
- */
-function bigWinLabel(slug: string): string {
-  const rubles = Math.round((3200 + (hashSlug(slug, 17) % 145300)) / 100) * 100
-  return `+${rubles.toLocaleString('ru-RU')} ₽`
-}
-
-function onlinePlayersCount(slug: string): number {
-  return 241 + (hashSlug(slug, 101) % 4630)
-}
-
-function pluralizePlayers(count: number): string {
-  const tens = count % 10
-  const hundreds = count % 100
-  if (tens === 1 && hundreds !== 11) {
-    return 'игрок'
-  }
-  if (tens >= 2 && tens <= 4 && (hundreds < 12 || hundreds > 14)) {
-    return 'игрока'
-  }
-  return 'игроков'
-}
-
 // Формируем колоду по ТЗ §4.4: свой (последнее) → избранное → хайп → новинки → остальные.
 function buildDeckCards({ games, recentGames, favoriteSlugs, user }: DeckInput): DeckCard[] {
   const list: DeckCard[] = []
@@ -211,6 +180,7 @@ interface DeckCardFaceProps {
   heartBurst: boolean
   onToggleFavorite: (game: GameDto) => void
   onPlay: (game: GameDto) => void
+  onPreview: (card: DeckCard) => void
 }
 
 /** Лицевая сторона карты: кавер + тег + BIG WIN + «сейчас играют» + «Играть». */
@@ -220,11 +190,12 @@ const DeckCardFace = memo(function DeckCardFace({
   heartBurst,
   onToggleFavorite,
   onPlay,
+  onPreview,
 }: DeckCardFaceProps): React.JSX.Element {
   const displayName = gameDisplayName(card.game)
   const badge = gameBadge(card.game)
   const isFavorite = favoriteSlugs.has(card.game.slug)
-  const playersOnline = onlinePlayersCount(card.game.slug)
+  const onlineCount = playersOnline(card.game.slug)
 
   return (
     <div className="absolute inset-0 overflow-hidden rounded-3xl border border-[#2A2A4A] bg-[#16213E] shadow-2xl select-none">
@@ -248,7 +219,10 @@ const DeckCardFace = memo(function DeckCardFace({
           <span className="block text-[10px] font-bold tracking-[0.18em] text-[#FFB300]">
             BIG WIN
           </span>
-          <span className="block text-sm font-extrabold leading-tight text-white">
+          <span
+            suppressHydrationWarning
+            className="block text-sm font-extrabold leading-tight text-white"
+          >
             {bigWinLabel(card.game.slug)}
           </span>
           <span className="block text-[9px] font-semibold tracking-[0.14em] text-white/50">
@@ -269,20 +243,24 @@ const DeckCardFace = memo(function DeckCardFace({
               }`}
             />
           </button>
-          <Link
-            href={`/casino/${card.game.slug}`}
-            aria-label={`Об игре «${displayName}»`}
+          <button
+            type="button"
+            onClick={() => onPreview(card)}
+            aria-label={`Превью игры «${displayName}»`}
             className="grid h-8 w-8 place-items-center rounded-full bg-black/40 text-white/80 backdrop-blur-md transition hover:scale-110 hover:text-white"
           >
             <Info size={15} />
-          </Link>
+          </button>
         </div>
       </div>
 
       {/* «Сейчас играют» — тонкий живой бейдж на карте (§4.4) */}
-      <span className="deck-rise absolute bottom-[4.75rem] right-3 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white/85 backdrop-blur-md">
+      <span
+        suppressHydrationWarning
+        className="deck-rise absolute bottom-[4.75rem] right-3 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white/85 backdrop-blur-md"
+      >
         <span className="deck-live-dot h-1.5 w-1.5 rounded-full bg-[#FF3D71]" />
-        {playersOnline.toLocaleString('ru-RU')} {pluralizePlayers(playersOnline)} сейчас в игре
+        {playersCountLabel(onlineCount)} сейчас в игре
       </span>
 
       {/* Нижняя плашка: провайдер + бейдж + название + «Играть» (только фронт) */}
@@ -334,6 +312,183 @@ function FinalCatalogCard({ gamesLeft }: FinalCatalogCardProps): React.JSX.Eleme
   )
 }
 
+const VOLATILITY_LABELS: Record<string, string> = {
+  low: 'низкая',
+  medium: 'средняя',
+  high: 'высокая',
+}
+
+function volatilityLabel(value: string | null | undefined): string {
+  if (!value) {
+    return '—'
+  }
+  return VOLATILITY_LABELS[value] ?? value
+}
+
+/**
+ * Стейт превью «i»: карта, демо-запуск и портал в body (из isolate-секции
+ * поверх шапки не подняться). Портал строится только после монтирования —
+ * на SSR document недоступен.
+ */
+function useDeckPreview(onPlayFront: () => void): {
+  previewCard: DeckCard | null
+  openPreview: (card: DeckCard) => void
+  closePreview: () => void
+  previewPortal: React.ReactNode
+} {
+  const [previewCard, setPreviewCard] = useState<DeckCard | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  const openPreview = useCallback((card: DeckCard): void => setPreviewCard(card), [])
+  const closePreview = useCallback((): void => setPreviewCard(null), [])
+
+  // Демо без регистрации (§4.7): launch_url провайдера в новой вкладке.
+  const startDemo = useCallback(async (game: GameDto): Promise<void> => {
+    const wallet = useWalletStore.getState()
+    const currency = wallet.getActiveWallet()?.currency ?? wallet.activeCurrency
+    try {
+      const launch = await apiPost<GameLaunchDto>(`/casino/games/${game.slug}/demo`, { currency })
+      if (launch.launch_url) {
+        window.open(launch.launch_url, '_blank', 'noopener')
+      }
+    } catch {
+      // демо может быть недоступно (провайдер/гео) — остаёмся в превью
+    }
+  }, [])
+
+  const previewPortal =
+    isMounted && previewCard ? (
+      <DeckPreview
+        card={previewCard}
+        onClose={closePreview}
+        onPlay={(): void => {
+          closePreview()
+          onPlayFront()
+        }}
+        onDemo={startDemo}
+      />
+    ) : null
+
+  return { previewCard, openPreview, closePreview, previewPortal }
+}
+
+interface DeckPreviewProps {
+  card: DeckCard
+  onClose: () => void
+  onPlay: () => void
+  onDemo: (game: GameDto) => Promise<void>
+}
+
+/**
+ * Превью по «i» (§4.7): RTP, волатильность, «Играть» и «Демо» без ухода со
+ * страницы. Портал в body: секция колоды изолирована (isolate против шапки),
+ * из её stacking context z-50 поверх sticky-хедера не поднять.
+ */
+function DeckPreview({ card, onClose, onPlay, onDemo }: DeckPreviewProps): React.JSX.Element {
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const [demoLoading, setDemoLoading] = useState(false)
+  const displayName = gameDisplayName(card.game)
+  const rtp = gameRtpLabel(card.game.rtp)
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    dialogRef.current?.focus()
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  const startDemo = (): void => {
+    if (demoLoading) {
+      return
+    }
+    setDemoLoading(true)
+    void onDemo(card.game).finally(() => setDemoLoading(false))
+  }
+
+  return createPortal(
+    <div
+      className="deck-preview-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Превью игры «${displayName}»`}
+        tabIndex={-1}
+        onClick={(event) => event.stopPropagation()}
+        className="deck-preview-card w-full max-w-sm overflow-hidden rounded-3xl border border-[#2A2A4A] bg-[#16213E] shadow-2xl outline-none"
+      >
+        <div className="relative aspect-[16/9] w-full">
+          <GameThumb src={card.game.thumbnailUrl} alt={displayName} sizes="384px" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#16213E] via-transparent to-transparent" />
+          <span
+            className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-bold backdrop-blur-md ${card.tagColor}`}
+          >
+            {card.tag}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Закрыть превью"
+            className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-black/50 text-white/80 backdrop-blur-md transition hover:scale-110 hover:text-white"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="p-4">
+          <p className="text-xs text-white/60">{card.game.provider?.name}</p>
+          <h3 className="mb-3 truncate text-xl font-black text-white">{displayName}</h3>
+
+          <dl className="mb-4 grid grid-cols-2 gap-2 text-sm">
+            <div className="rounded-xl bg-black/30 px-3 py-2">
+              <dt className="text-[10px] uppercase tracking-[0.14em] text-white/45">RTP</dt>
+              <dd className="font-bold text-[#00E676]">{rtp ?? '—'}</dd>
+            </div>
+            <div className="rounded-xl bg-black/30 px-3 py-2">
+              <dt className="text-[10px] uppercase tracking-[0.14em] text-white/45">
+                Волатильность
+              </dt>
+              <dd className="font-bold text-white/85">{volatilityLabel(card.game.volatility)}</dd>
+            </div>
+          </dl>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onPlay}
+              className="btn-money flex-1 py-3 text-sm font-bold"
+            >
+              <Play size={15} className="mr-1 inline fill-current" />
+              Играть
+            </button>
+            {card.game.hasDemo && (
+              <button
+                type="button"
+                onClick={startDemo}
+                disabled={demoLoading}
+                className="btn-ghost py-3 px-5 text-sm font-semibold disabled:opacity-50"
+              >
+                {demoLoading ? 'Запускаем…' : 'Демо'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 interface DeckHeaderProps {
   total: number
   position: number
@@ -343,7 +498,9 @@ interface DeckHeaderProps {
 function DeckHeader({ total, position, onShuffle }: DeckHeaderProps): React.JSX.Element {
   const onFinalCard = position >= total
   return (
-    <div className="mb-3 flex items-center justify-between">
+    /* relative z-50: веер задних карт поднимается над стеком и без этого
+       рисуется ПОВЕРХ статичного заголовка — карта должна прятаться под ним. */
+    <div className="relative z-50 mb-3 flex items-center justify-between">
       <div>
         <p className="caps-label flex items-center gap-1">
           <Sparkles size={12} className="text-money" />
@@ -518,6 +675,10 @@ function useSwipeDeck({
         if (!cancelled) {
           setFlying(null)
           flyingLockRef.current = false
+          // Haptic tick на доводке новой фронт-карты (§4.4); на десктопе no-op.
+          if (typeof navigator.vibrate === 'function') {
+            navigator.vibrate(8)
+          }
         }
       })
       .catch(() => {
@@ -992,11 +1153,29 @@ function DeckGlobalStyles(): React.JSX.Element {
           transform: scale(1);
         }
       }
+      .deck-preview-overlay {
+        animation: deckFade 180ms ease both;
+      }
+      .deck-preview-card {
+        animation: deckPreviewIn 260ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
+      }
+      @keyframes deckPreviewIn {
+        from {
+          transform: translateY(14px) scale(0.96);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0px) scale(1);
+          opacity: 1;
+        }
+      }
       @media (prefers-reduced-motion: reduce) {
         .deck-card-enter,
         .deck-card-return,
         .deck-fade,
-        .deck-rise {
+        .deck-rise,
+        .deck-preview-overlay,
+        .deck-preview-card {
           animation: deckReduced 160ms linear both;
         }
         .deck-live-dot,
@@ -1077,6 +1256,41 @@ function DeckQueue({ entries, startIndex, onJump }: DeckQueueProps): React.JSX.E
       ))}
     </div>
   )
+}
+
+interface DeckHotkeysOptions {
+  isBlocked: () => boolean
+  onSwipeNext: () => void
+  onSwipePrev: () => void
+  onLaunch: () => void
+}
+
+/** Десктоп: ← / → / Enter (матрица жестов §4.4). Превью открыто — клавиши спят. */
+function useDeckHotkeys({
+  isBlocked,
+  onSwipeNext,
+  onSwipePrev,
+  onLaunch,
+}: DeckHotkeysOptions): React.KeyboardEventHandler<HTMLDivElement> {
+  return (event): void => {
+    if (isBlocked()) {
+      return
+    }
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      onSwipeNext()
+      return
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      onSwipePrev()
+      return
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      onLaunch()
+    }
+  }
 }
 
 /**
@@ -1162,7 +1376,11 @@ export function GameDeck({
     }, 500)
   }
 
-  const isDeckBusy = (): boolean => swipeDeck.flyingLockRef.current
+  // Превью «i»: карта + демо + портал; launchFront нужен для кнопки «Играть».
+  const preview = useDeckPreview(launchFront)
+
+  // Превью открыто — жесты и клавиатура колоды спят (модал живёт своей жизнью).
+  const isDeckBusy = (): boolean => swipeDeck.flyingLockRef.current || preview.previewCard !== null
 
   const dragHandlers = useCardDrag({
     stackRef,
@@ -1184,23 +1402,12 @@ export function GameDeck({
     return !isDeckBusy() && !isCardDragging()
   })
 
-  // Десктоп: ← / → / Enter (матрица жестов §4.4).
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault()
-      flyOutNext(PROGRAMMATIC_KICK_TRANSFORM)
-      return
-    }
-    if (event.key === 'ArrowRight') {
-      event.preventDefault()
-      goPrev()
-      return
-    }
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      launchFront()
-    }
-  }
+  const handleKeyDown = useDeckHotkeys({
+    isBlocked: isDeckBusy,
+    onSwipeNext: (): void => flyOutNext(PROGRAMMATIC_KICK_TRANSFORM),
+    onSwipePrev: (): void => goPrev(),
+    onLaunch: launchFront,
+  })
 
   if (deck.length === 0) {
     return null
@@ -1258,6 +1465,7 @@ export function GameDeck({
                   heartBurst={heartBurst}
                   onToggleFavorite={(game: GameDto): void => onToggleFavorite?.(game)}
                   onPlay={launchFront}
+                  onPreview={preview.openPreview}
                 />
               </div>
             ) : (
@@ -1287,6 +1495,7 @@ export function GameDeck({
                   heartBurst={false}
                   onToggleFavorite={(game: GameDto): void => onToggleFavorite?.(game)}
                   onPlay={launchFront}
+                  onPreview={preview.openPreview}
                 />
               </div>
             ) : null}
@@ -1303,6 +1512,9 @@ export function GameDeck({
           onJump={handleJump}
         />
       </div>
+
+      {/* Портал рендерится в document.body: из isolate-секции поверх шапки не подняться */}
+      {preview.previewPortal}
 
       <DeckGlobalStyles />
     </section>

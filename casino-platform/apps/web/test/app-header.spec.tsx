@@ -14,6 +14,19 @@ const walletState = vi.hoisted(() => ({
 }))
 
 const openDepositMock = vi.hoisted(() => vi.fn())
+const openLoginMock = vi.hoisted(() => vi.fn())
+
+const authState = vi.hoisted(() => ({
+  user: {
+    id: 'u1',
+    email: 'p@p.p',
+    role: 'user',
+  } as {
+    id: string
+    email: string
+    role: string
+  } | null,
+}))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
@@ -25,8 +38,8 @@ vi.mock('@/components/layout/UserMenu', () => ({
 }))
 
 vi.mock('@/stores/auth', () => ({
-  useAuth: () => ({ user: { id: 'u1', email: 'p@p.p', role: 'user' }, logout: vi.fn() }),
-  useAuthStore: { getState: () => ({ user: { id: 'u1', email: 'p@p.p', role: 'user' } }) },
+  useAuth: () => ({ user: authState.user, logout: vi.fn() }),
+  useAuthStore: { getState: () => ({ user: authState.user }) },
 }))
 
 vi.mock('@/stores/geo', () => ({
@@ -36,7 +49,7 @@ vi.mock('@/stores/geo', () => ({
 vi.mock('@/stores/ui', () => ({
   useUIStore: () => ({
     openDeposit: openDepositMock,
-    openLogin: vi.fn(),
+    openLogin: openLoginMock,
     openWalletSwitcher: vi.fn(),
   }),
 }))
@@ -57,6 +70,8 @@ function balanceChip(): HTMLElement {
 
 beforeEach(() => {
   openDepositMock.mockReset()
+  openLoginMock.mockReset()
+  authState.user = { id: 'u1', email: 'p@p.p', role: 'user' }
   walletState.activeCurrency = 'RUB'
   walletState.active = null
 })
@@ -87,5 +102,21 @@ describe('GAP-59: метка баланса в шапке = валюта акт�
   it('без кошельков — страховка из activeCurrency, 0 ₽', () => {
     render(<AppHeader />)
     expect(balanceChip().textContent).toContain('0 ₽')
+  })
+})
+
+describe('§5: у гостя шапка открывает лист, а не отдельные страницы', () => {
+  it('«Регистрация» → openLogin(undefined, "register")', () => {
+    authState.user = null
+    render(<AppHeader />)
+    fireEvent.click(screen.getByRole('button', { name: 'Регистрация' }))
+    expect(openLoginMock).toHaveBeenCalledWith(undefined, 'register')
+  })
+
+  it('«Войти» → openLogin(undefined, "login")', () => {
+    authState.user = null
+    render(<AppHeader />)
+    fireEvent.click(screen.getByRole('button', { name: 'Войти' }))
+    expect(openLoginMock).toHaveBeenCalledWith(undefined, 'login')
   })
 })

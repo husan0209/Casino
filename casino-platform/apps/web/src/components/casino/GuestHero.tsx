@@ -4,6 +4,8 @@ import { ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
 import { GameThumb } from '@/components/casino/GameThumb'
+import { playersCountLabel } from '@/lib/format/plural'
+import { playersTodayCount } from '@/lib/ui/vitrine-stats'
 import { useAuth } from '@/stores/auth'
 import type { GameDto } from '@/types/casino'
 
@@ -100,7 +102,9 @@ export function GuestHero({ games }: { games: GameDto[] }): React.JSX.Element | 
               +
             </span>
           </div>
-          <span className="text-xs text-white/50">12 400 игроков уже сегодня</span>
+          <span suppressHydrationWarning className="text-xs text-white/50">
+            {playersCountLabel(playersTodayCount())} уже сегодня
+          </span>
         </div>
       </div>
 
