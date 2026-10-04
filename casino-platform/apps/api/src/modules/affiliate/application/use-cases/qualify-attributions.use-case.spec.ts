@@ -21,6 +21,7 @@ type PlayerDeposits = {
   count: number
   firstDepositId: string | null
   firstDepositAt: Date | null
+  firstAmountRub: string | null
 }
 
 function makeAttribution(
@@ -91,6 +92,10 @@ function makeDeps(
       count: a.depositCount,
       firstDepositId: a.firstDepositId,
       firstDepositAt: a.firstDepositAt,
+      // Сумма именно первого депозита известна только когда он один: при
+      // нескольких накопленная колонка не равна первому платежу, и честнее
+      // отдать «нет данных» (null), чем соврать через F4-флаг.
+      firstAmountRub: a.depositCount === 1 ? a.totalDeposit : null,
     }
   })
   const qualify = vi.fn(async (input: unknown): Promise<AffiliateAttributionEntity> => {
@@ -184,6 +189,7 @@ describe('QualifyAttributionsUseCase', () => {
         count: 2,
         firstDepositId: 'pay-1',
         firstDepositAt,
+        firstAmountRub: '250.00000000',
       }),
     })
 
@@ -196,6 +202,7 @@ describe('QualifyAttributionsUseCase', () => {
       firstDepositAt,
       totalDeposit: '750.00000000',
       depositCount: 2,
+      reviewReason: null,
     })
   })
 
@@ -204,7 +211,13 @@ describe('QualifyAttributionsUseCase', () => {
     // ошибки: квалификация не должна доверять накопленному, если депозита нет
     const deps = makeDeps({
       pages: [[makeAttribution({ totalDeposit: '9999.00000000' })]],
-      deposits: () => ({ totalRub: '0', count: 0, firstDepositId: null, firstDepositAt: null }),
+      deposits: () => ({
+        totalRub: '0',
+        count: 0,
+        firstDepositId: null,
+        firstDepositAt: null,
+        firstAmountRub: null,
+      }),
     })
 
     const result = await makeUseCase(deps).execute()
@@ -221,6 +234,7 @@ describe('QualifyAttributionsUseCase', () => {
         count: 1,
         firstDepositId: 'pay-9',
         firstDepositAt: new Date('2026-04-01T00:00:00.000Z'),
+        firstAmountRub: '120',
       }),
     })
 
@@ -245,6 +259,7 @@ describe('QualifyAttributionsUseCase', () => {
       firstDepositAt: attribution.firstDepositAt,
       totalDeposit: '2500.50000000',
       depositCount: 4,
+      reviewReason: null,
     })
   })
 
@@ -255,6 +270,107 @@ describe('QualifyAttributionsUseCase', () => {
 
     expect(result.qualified).toBe(1)
     expect(result.stillPending).toBe(0)
+  })
+
+  /**
+   * F4 (ТЗ ч.8 §13.2): «депозит ровно на порог» — признак перекупщика
+   * трафика. Правило ничего не блокирует: строка квалифицируется и приносит
+   * комиссию, а в `reject_reason` ложится причина для разбора администратором.
+   */
+  describe('флаг «депозит впритык к порогу»', () => {
+    it('ставит причину на депозите в коридоре, не мешая квалификации', async () => {
+      const deps = makeDeps({
+        pages: [[makeAttribution({ totalDeposit: '504.00000000' })]],
+      })
+
+      const result = await makeUseCase(deps).execute()
+
+      expect(result).toEqual({ checked: 1, qualified: 1, stillPending: 0, errors: [] })
+      expect(deps.qualify).toHaveBeenCalledWith(
+        expect.objectContaining({ reviewReason: 'near_threshold_deposit' }),
+      )
+    })
+
+    it('не ставит причину, когда первый депозит заметно выше порога', async () => {
+      const deps = makeDeps({ pages: [[makeAttribution({ totalDeposit: '900' })]] })
+
+      await makeUseCase(deps).execute()
+
+      expect(deps.qualify).toHaveBeenCalledWith(expect.objectContaining({ reviewReason: null }))
+    })
+
+    it('сравнивает с порогом первый депозит, а не накопленную сумму', async () => {
+      // накопил до порога тремя платежами — не тот сигнал, который ищет F4
+      const deps = makeDeps({
+        pages: [[makeAttribution({ totalDeposit: '500.00000000', depositCount: 3 })]],
+        deposits: () => ({
+          totalRub: '500.00000000',
+          count: 3,
+          firstDepositId: 'pay-1',
+          firstDepositAt: new Date('2026-05-01T00:00:00.000Z'),
+          firstAmountRub: '100.00000000',
+        }),
+      })
+
+      const result = await makeUseCase(deps).execute()
+
+      expect(result.qualified).toBe(1)
+      expect(deps.qualify).toHaveBeenCalledWith(expect.objectContaining({ reviewReason: null }))
+    })
+
+    it('ставит причину, если в коридоре именно первый платёж, а накопленное больше', async () => {
+      const deps = makeDeps({
+        pages: [[makeAttribution()]],
+        deposits: () => ({
+          totalRub: '1500.00000000',
+          count: 2,
+          firstDepositId: 'pay-7',
+          firstDepositAt: new Date('2026-05-02T00:00:00.000Z'),
+          firstAmountRub: '496.00000000',
+        }),
+      })
+
+      await makeUseCase(deps).execute()
+
+      expect(deps.qualify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          reviewReason: 'near_threshold_deposit',
+          totalDeposit: '1500.00000000',
+        }),
+      )
+    })
+
+    it('не ставит причину при пороге 0 («без порога»)', async () => {
+      // 1% от нуля — тоже ноль: правило при нулевом пороге теряет смысл
+      const deps = makeDeps({
+        settings: { minDepositRub: 0 },
+        pages: [[makeAttribution({ totalDeposit: '0.01000000' })]],
+      })
+
+      const result = await makeUseCase(deps).execute()
+
+      expect(result.qualified).toBe(1)
+      expect(deps.qualify).toHaveBeenCalledWith(expect.objectContaining({ reviewReason: null }))
+    })
+
+    it('не ставит причину, если у первого депозита нет RUB-эквивалента', async () => {
+      // Legacy-заявка с NULL amount_rub: сравнения нет, и выдумывать флаг нельзя
+      const deps = makeDeps({
+        pages: [[makeAttribution()]],
+        deposits: () => ({
+          totalRub: '500.00000000',
+          count: 1,
+          firstDepositId: 'pay-legacy',
+          firstDepositAt: new Date('2026-05-03T00:00:00.000Z'),
+          firstAmountRub: null,
+        }),
+      })
+
+      const result = await makeUseCase(deps).execute()
+
+      expect(result.qualified).toBe(1)
+      expect(deps.qualify).toHaveBeenCalledWith(expect.objectContaining({ reviewReason: null }))
+    })
   })
 
   it('keeps an attribution pending while the deposit is below the threshold', async () => {

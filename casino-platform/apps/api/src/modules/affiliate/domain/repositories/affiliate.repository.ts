@@ -97,6 +97,15 @@ export interface QualifyAttributionInput {
   firstDepositAt: Date | null
   totalDeposit: string
   depositCount: number
+  /**
+   * Флаг на разбор администратору (правило F4, ТЗ ч.8 §13.2).
+   *
+   * На квалифицированной строке `reject_reason` означает НЕ отказ: статус
+   * остаётся `qualified`, начисления идут (суточный расчёт фильтрует по
+   * `status`, а не по причине). Это единственное, чем квалификация может
+   * пометить «депозит ровно на порог», не наказав партнёра деньгами.
+   */
+  reviewReason?: AffiliateRejectReason | null
 }
 
 /** Данные для расчёта периода. */
@@ -244,6 +253,13 @@ export interface AffiliateAttributionRepository {
     count: number
     firstDepositId: string | null
     firstDepositAt: Date | null
+    /**
+     * RUB-эквивалент самого раннего завершённого депозита — то, с чем правило
+     * F4 сравнивает порог (`near_threshold_deposit`). Порог определяется одним
+     * платежом, а не накопленной суммой: «закинул минималку» и «накопил
+     * минималку тремя депозитами» — разные сигналы.
+     */
+    firstAmountRub: string | null
   }>
   /** Все квалифицированные атрибуции с депозитом — вход суточного расчёта. */
   listQualifiedForCalc(args: { until: Date; page: number; perPage: number }): Promise<{
@@ -270,6 +286,12 @@ export interface AffiliateAttributionRepository {
   list(args: {
     affiliateId?: string | undefined
     status?: AffiliateAttributionStatus | undefined
+    /**
+     * Разбор по причине (ТЗ ч.8 §13.3). Нужен не только для отказов: на
+     * квалифицированной строке колонка держит флаг F4, и без фильтра его
+     * пришлось бы искать по всем страницам.
+     */
+    rejectReason?: AffiliateRejectReason | undefined
     page: number
     perPage: number
   }): Promise<{ items: AffiliateAttributionEntity[]; total: number }>

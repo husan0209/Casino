@@ -6,6 +6,8 @@
  */
 import { z } from 'zod'
 
+import { AFFILIATE_REJECT_REASONS } from '../../domain/entities/affiliate.entity'
+
 /** Код трекинга: 8 символов из алфавита без 0/O/1/I. */
 export const TrackingCodeSchema = z
   .string()
@@ -126,6 +128,16 @@ export const CommissionListQuerySchema = PaginationQuerySchema.extend({
     .optional(),
 })
 
+/**
+ * Список атрибуций для ручного разбора (ТЗ ч.8 §13.3) — фильтр по статусу и по
+ * причине. Без второго флаг F4 (`near_threshold_deposit`) пришлось бы искать
+ * глазами по страницам, и правило стало бы декоративным.
+ */
+export const AttributionListQuerySchema = PaginationQuerySchema.extend({
+  status: z.enum(['pending', 'qualified', 'rejected']).optional(),
+  reject_reason: z.enum(AFFILIATE_REJECT_REASONS).optional(),
+})
+
 export const ClickQuerySchema = z.object({
   days: z.coerce.number().int().positive().max(365).default(30),
 })
@@ -137,4 +149,5 @@ export type CreateAffiliateAdminDto = z.infer<typeof CreateAffiliateAdminSchema>
 export type UpdateAffiliateAdminDto = z.infer<typeof UpdateAffiliateAdminSchema>
 export type AffiliateListQueryDto = z.infer<typeof AffiliateListQuerySchema>
 export type CommissionListQueryDto = z.infer<typeof CommissionListQuerySchema>
+export type AttributionListQueryDto = z.infer<typeof AttributionListQuerySchema>
 export type ClickQueryDto = z.infer<typeof ClickQuerySchema>

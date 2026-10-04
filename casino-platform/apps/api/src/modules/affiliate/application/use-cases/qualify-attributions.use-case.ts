@@ -18,12 +18,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { Decimal } from 'decimal.js'
 
+import { type AffiliateRejectReason } from '../../domain/entities/affiliate.entity'
 import {
   AFFILIATE_ATTRIBUTION_REPOSITORY,
   AFFILIATE_PLAYER_PROVISIONING_REPOSITORY,
   type AffiliateAttributionRepository,
   type AffiliatePlayerProvisioningRepository,
 } from '../../domain/repositories/affiliate.repository'
+import { isNearThresholdDeposit } from '../../domain/value-objects/deposit-threshold-band.value-object'
 import { AffiliateSettingsService } from '../affiliate-settings.service'
 
 /** Сколько атрибуций обрабатываем за один проход постранично. */
@@ -157,7 +159,29 @@ export class QualifyAttributionsUseCase {
       firstDepositAt: deposits.firstDepositAt,
       totalDeposit: deposits.totalRub,
       depositCount: deposits.count,
+      // F4 (ТЗ ч.8 §13.2): «депозит ровно на порог» — не отказ, а флаг на
+      // разбор. Ставка на то, что перекупщик выкупает трафик минимально
+      // допустимым платежом; честный первый платёж под ту же вилку попасть
+      // может, поэтому начисления правило не трогает.
+      reviewReason: this.reviewReasonFor(deposits.firstAmountRub, minDeposit),
     })
     return true
+  }
+
+  /**
+   * Причина для разбора или `null`. Отдельным методом, а не инлайном, чтобы
+   * сравнение с порогом жил в домене (`isNearThresholdDeposit`), а здесь только
+   * решение «помечать или нет».
+   */
+  private reviewReasonFor(
+    firstAmountRub: string | null,
+    minDeposit: Decimal,
+  ): AffiliateRejectReason | null {
+    if (firstAmountRub === null) {
+      return null
+    }
+    return isNearThresholdDeposit(firstAmountRub, minDeposit.toString())
+      ? 'near_threshold_deposit'
+      : null
   }
 }
