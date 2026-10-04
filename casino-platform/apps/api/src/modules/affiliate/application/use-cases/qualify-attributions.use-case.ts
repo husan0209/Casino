@@ -52,9 +52,17 @@ export class QualifyAttributionsUseCase {
   /**
    * Один проход по всем `pending`-атрибуциям.
    *
-   * Депозиты копятся в `total_deposit` на самой атрибуции (их инкрементит
-   * payments-модуль через `applyDeposit`), поэтому здесь достаточно сравнить
-   * накопленную сумму с порогом и статус KYC.
+   * Депозиты берутся из `payment_requests` (первоисточник), а не из колонки
+   * `total_deposit` атрибуции. Колонку заполняет только `applyDeposit`, а
+   * вызывающего у него нет: событие «депозит завершён» живёт в payments, который
+   * не может импортировать affiliate (цикл `payments → affiliate → admin →
+   * payments`). Оставаться на накопленном значении означало бы, что при
+   * любом ненулевом пороге и даже без него (`first_deposit_at` пустой всегда)
+   * не квалифицируется никто — молча, без ошибки.
+   *
+   * Квалифицируя по первоисточнику, сюда же записываем накопленное:
+   * `total_deposit`, `deposit_count`, `first_deposit_*` становятся реальными, и
+   * админ видит их без пересчёта.
    */
   async execute(): Promise<QualificationResult> {
     const result: QualificationResult = {
@@ -127,22 +135,28 @@ export class QualifyAttributionsUseCase {
     if (attribution?.status !== 'pending') {
       return false
     }
-    if (new Decimal(attribution.totalDeposit).lt(minDeposit)) {
+    const deposits = await this.attributions.sumPlayerDeposits(attribution.playerId)
+    // Порог и факт депозита — отдельные условия: `min_deposit = 0` значит «без
+    // порога», но не «квалифицируем игрока, который ничего не внёс».
+    if (deposits.count === 0 || deposits.firstDepositAt === null) {
       return false
     }
-    if (attribution.firstDepositAt === null) {
+    if (new Decimal(deposits.totalRub).lt(minDeposit)) {
       return false
     }
     if (requireKyc && !(await this.players.isKycApproved(attribution.playerId))) {
       return false
     }
 
+    // Накопленное записываем из первоисточника: админ видит total_deposit /
+    // deposit_count / first_deposit_* без пересчёта, и суточный расчёт
+    // (listQualifiedForCalc фильтрует по first_deposit_at) подхватывает их.
     await this.attributions.qualify({
       id: attributionId,
-      firstDepositId: attribution.firstDepositId,
-      firstDepositAt: attribution.firstDepositAt,
-      totalDeposit: attribution.totalDeposit,
-      depositCount: attribution.depositCount,
+      firstDepositId: deposits.firstDepositId,
+      firstDepositAt: deposits.firstDepositAt,
+      totalDeposit: deposits.totalRub,
+      depositCount: deposits.count,
     })
     return true
   }

@@ -15,6 +15,14 @@ import type { AffiliateAttributionEntity } from '../../__tests__/helpers/affilia
 
 const PAGE_SIZE = 200
 
+/** Форма, которую читает квалификация: депозиты игрока по данным платежей. */
+type PlayerDeposits = {
+  totalRub: string
+  count: number
+  firstDepositId: string | null
+  firstDepositAt: Date | null
+}
+
 function makeAttribution(
   overrides: Partial<AffiliateAttributionEntity> = {},
 ): AffiliateAttributionEntity {
@@ -43,6 +51,12 @@ function makeDeps(
     kycApproved?: boolean
     findById?: (id: string) => Promise<AffiliateAttributionEntity | null>
     qualify?: (input: unknown) => Promise<AffiliateAttributionEntity>
+    /**
+     * Что отдаёт `sumPlayerDeposits` — данные платежей, а не колонка атрибуции.
+     * По умолчанию выводятся из сущности, чтобы прежние тесты проверяли то же
+     * самое; regression-тест на мёртвый аккумулятор переопределяет их.
+     */
+    deposits?: (playerId: string) => PlayerDeposits
   } = {},
 ): {
   attributions: AffiliateAttributionRepository
@@ -52,6 +66,7 @@ function makeDeps(
   findById: ReturnType<typeof vi.fn>
   qualify: ReturnType<typeof vi.fn>
   isKycApproved: ReturnType<typeof vi.fn>
+  sumPlayerDeposits: ReturnType<typeof vi.fn>
 } {
   const pages = options.pages ?? [[]]
   const list = vi.fn(async (args: { page: number }) => {
@@ -62,9 +77,22 @@ function makeDeps(
   // подставить вместо неё заготовку с дефолтной суммой, тесты на порог и на
   // firstDepositAt проходили бы враньё.
   const byId = new Map(pages.flat().map((attribution) => [attribution.id, attribution]))
+  const byPlayer = new Map(pages.flat().map((attribution) => [attribution.playerId, attribution]))
   const findById = vi.fn(async (id: string): Promise<AffiliateAttributionEntity | null> =>
     options.findById === undefined ? (byId.get(id) ?? null) : options.findById(id),
   )
+  const sumPlayerDeposits = vi.fn(async (playerId: string): Promise<PlayerDeposits> => {
+    if (options.deposits !== undefined) {
+      return options.deposits(playerId)
+    }
+    const a = byPlayer.get(playerId) ?? makeAttribution()
+    return {
+      totalRub: a.totalDeposit,
+      count: a.depositCount,
+      firstDepositId: a.firstDepositId,
+      firstDepositAt: a.firstDepositAt,
+    }
+  })
   const qualify = vi.fn(async (input: unknown): Promise<AffiliateAttributionEntity> => {
     if (options.qualify) {
       return options.qualify(input)
@@ -76,7 +104,12 @@ function makeDeps(
   )
 
   return {
-    attributions: { list, findById, qualify } as unknown as AffiliateAttributionRepository,
+    attributions: {
+      list,
+      findById,
+      qualify,
+      sumPlayerDeposits,
+    } as unknown as AffiliateAttributionRepository,
     players: { isKycApproved } as unknown as AffiliatePlayerProvisioningRepository,
     settings: {
       get: async () => ({
@@ -89,6 +122,7 @@ function makeDeps(
     findById,
     qualify,
     isKycApproved,
+    sumPlayerDeposits,
   }
 }
 
@@ -125,6 +159,75 @@ describe('QualifyAttributionsUseCase', () => {
 
     expect(result).toEqual({ checked: 1, qualified: 1, stillPending: 0, errors: [] })
     expect(deps.qualify).toHaveBeenCalledTimes(1)
+  })
+
+  /**
+   * Regression. `applyDeposit` (единственный, кто пополнял `total_deposit` и
+   * ставил `first_deposit_at`) не вызывается нигде: событие «депозит завершён»
+   * живёт в payments, который не может импортировать affiliate (цикл
+   * payments → affiliate → admin → payments). Пока квалификация читала колонку
+   * атрибуции, не квалифицировался никто — и молча, без ошибки.
+   */
+  it('qualifies from the payment records when the attribution columns are still empty', async () => {
+    const firstDepositAt = new Date('2026-03-01T10:00:00.000Z')
+    // ровно то, что оставил бы непустой аккумулятор: pending, нули, пустые отметки
+    const attribution = makeAttribution({
+      totalDeposit: '0',
+      depositCount: 0,
+      firstDepositId: null,
+      firstDepositAt: null,
+    })
+    const deps = makeDeps({
+      pages: [[attribution]],
+      deposits: () => ({
+        totalRub: '750.00000000',
+        count: 2,
+        firstDepositId: 'pay-1',
+        firstDepositAt,
+      }),
+    })
+
+    const result = await makeUseCase(deps).execute()
+
+    expect(result.qualified).toBe(1)
+    expect(deps.qualify).toHaveBeenCalledWith({
+      id: 'attr-1',
+      firstDepositId: 'pay-1',
+      firstDepositAt,
+      totalDeposit: '750.00000000',
+      depositCount: 2,
+    })
+  })
+
+  it('does not qualify on the stored column when the player has no completed deposit', async () => {
+    // Завышенная колонка при отсутствии платежей — обратная сторона той же
+    // ошибки: квалификация не должна доверять накопленному, если депозита нет
+    const deps = makeDeps({
+      pages: [[makeAttribution({ totalDeposit: '9999.00000000' })]],
+      deposits: () => ({ totalRub: '0', count: 0, firstDepositId: null, firstDepositAt: null }),
+    })
+
+    const result = await makeUseCase(deps).execute()
+
+    expect(result).toEqual({ checked: 1, qualified: 0, stillPending: 1, errors: [] })
+    expect(deps.qualify).not.toHaveBeenCalled()
+  })
+
+  it('threshold is compared against the RUB evidence from payments', async () => {
+    const deps = makeDeps({
+      pages: [[makeAttribution({ totalDeposit: '5000.00000000' })]],
+      deposits: () => ({
+        totalRub: '120',
+        count: 1,
+        firstDepositId: 'pay-9',
+        firstDepositAt: new Date('2026-04-01T00:00:00.000Z'),
+      }),
+    })
+
+    const result = await makeUseCase(deps).execute()
+
+    expect(result.qualified).toBe(0)
+    expect(result.stillPending).toBe(1)
   })
 
   it('passes the deposit evidence through to the repository', async () => {
