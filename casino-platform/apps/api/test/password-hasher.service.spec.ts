@@ -43,7 +43,7 @@ describe('PasswordHasher', () => {
 
     await hasher.hash(long)
 
-    expect(argon2.hash.mock.calls[0]?.[0]).toBe(long)
+    expect(vi.mocked(argon2.hash).mock.calls[0]?.[0]).toBe(long)
   })
 
   it('verify делегирует argon2.verify (hash, plain) и ничего не добавляет', async () => {
