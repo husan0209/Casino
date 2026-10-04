@@ -4,9 +4,12 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
 import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
-import { type WalletBalanceView, WalletFacade } from '@modules/wallet/facade/wallet.facade'
+import {
+  type LedgerEntryOwnerRow,
+  type WalletBalanceView,
+  WalletFacade,
+} from '@modules/wallet/facade/wallet.facade'
 
-import { type LedgerEntryType, prisma, type Prisma } from '@casino/database'
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
@@ -60,28 +63,17 @@ export class WalletController {
   }> {
     const page = parseInt(queryParams.page ?? '1', 10) || 1
     const perPage = Math.min(parseInt(queryParams.per_page || '20', 10) || 20, 100)
+    const period = this.periodBounds(queryParams.from, queryParams.to)
 
-    const where: Prisma.LedgerEntryWhereInput = {
+    const { items, total } = await this.walletFacade.listOwnerTransactions({
       userId: currentUser.id,
-      ...this.periodFilter(queryParams.from, queryParams.to),
-    }
-    if (queryParams.currency) {
-      where.walletAccount = { currency: queryParams.currency }
-    }
-    if (queryParams.type) {
-      where.type = queryParams.type
-    }
-
-    const [items, total] = await Promise.all([
-      prisma.ledgerEntry.findMany({
-        where,
-        skip: (page - 1) * perPage,
-        take: perPage,
-        orderBy: { createdAt: 'desc' },
-        include: { walletAccount: { select: { currency: true } } },
-      }),
-      prisma.ledgerEntry.count({ where }),
-    ])
+      type: queryParams.type,
+      currency: queryParams.currency,
+      from: period.from,
+      to: period.to,
+      page,
+      perPage,
+    })
 
     const data = await this.attachPaymentStatuses(
       currentUser.id,
@@ -102,18 +94,7 @@ export class WalletController {
   }
 
   /** Строка ответа из записи ledger (деньги — строки, Decimal → string). */
-  private static toRow(entry: {
-    id: string
-    transactionId: string
-    type: LedgerEntryType
-    amount: Prisma.Decimal
-    balanceBefore: Prisma.Decimal
-    balanceAfter: Prisma.Decimal
-    description: string | null
-    metadata: Prisma.JsonValue
-    createdAt: Date
-    walletAccount: { currency: string }
-  }): TransactionRow {
+  private static toRow(entry: LedgerEntryOwnerRow): TransactionRow {
     return {
       id: entry.id,
       transaction_id: entry.transactionId,
@@ -144,10 +125,7 @@ export class WalletController {
     if (ids.length === 0) {
       return rows
     }
-    const requests = await prisma.paymentRequest.findMany({
-      where: { userId, id: { in: ids } },
-      select: { id: true, status: true },
-    })
+    const requests = await this.walletFacade.findPaymentStatuses(userId, ids)
     const statusById = new Map(requests.map((request) => [request.id, request.status]))
     return rows.map((row, index) => ({
       ...row,
@@ -157,20 +135,13 @@ export class WalletController {
 
   /**
    * Период §11: `from` — сутки целиком с начала, `to` — включая весь день.
-   * Формат дат уже проверен Zod-схемой (YYYY-MM-DD), поэтому здесь только сборка.
+   * Формат дат проверен Zod-схемой, поэтому здесь только превращение в границы;
+   * `gte`/`lte` из них собирает репозиторий.
    */
-  private periodFilter(
-    from?: string,
-    to?: string,
-  ): Pick<Prisma.LedgerEntryWhereInput, 'createdAt'> {
-    if (from === undefined && to === undefined) {
-      return {}
-    }
+  private periodBounds(from?: string, to?: string): { from?: Date; to?: Date } {
     return {
-      createdAt: {
-        ...(from !== undefined && { gte: new Date(`${from}T00:00:00.000Z`) }),
-        ...(to !== undefined && { lte: new Date(`${to}T23:59:59.999Z`) }),
-      },
+      ...(from !== undefined && { from: new Date(`${from}T00:00:00.000Z`) }),
+      ...(to !== undefined && { to: new Date(`${to}T23:59:59.999Z`) }),
     }
   }
 }
@@ -179,10 +150,10 @@ export class WalletController {
  * Ссылка на payment_request из метаданных проводки (GAP-55). Значение могло
  * приходить и как число-строка, и как число — нормализуем к строке uuid.
  */
-function paymentRequestIdOf(metadata: Prisma.JsonValue): string | null {
+function paymentRequestIdOf(metadata: unknown): string | null {
   if (typeof metadata !== 'object' || metadata === null || Array.isArray(metadata)) {
     return null
   }
-  const value = metadata['payment_request_id']
+  const value = (metadata as Record<string, unknown>)['payment_request_id']
   return typeof value === 'string' && value.length > 0 ? value : null
 }

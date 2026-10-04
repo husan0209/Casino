@@ -19,6 +19,8 @@ import {
   type IWalletLedger,
   type IWalletRepository,
   type LedgerEntryAdminRow,
+  type LedgerEntryOwnerRow,
+  type PaymentStatusById,
   type WalletAccount,
   type WalletLockTarget,
   type WithdrawalOpArgs,
@@ -48,6 +50,36 @@ function withdrawalMetadata(args: WithdrawalOpArgs): Prisma.InputJsonObject {
     return {}
   }
   return metadata as Prisma.InputJsonObject
+}
+
+/**
+ * Фильтр списка проводок — ОДИН на оба чтения (админский список и историю
+ * игрока). Правило «валюта берётся через кошелёк, у проводки своей колонки
+ * валюты нет» иначе лежало бы в двух местах и расходилось бы молча: второй
+ * вариант фильтра Prisma не считает ошибкой, он просто отдаёт пустой список.
+ */
+function entriesWhere(args: {
+  userId?: string | undefined
+  type?: LedgerEntryType | undefined
+  currency?: Currency | undefined
+  from?: Date | undefined
+  to?: Date | undefined
+}): Prisma.LedgerEntryWhereInput {
+  const period =
+    args.from !== undefined || args.to !== undefined
+      ? {
+          createdAt: {
+            ...(args.from !== undefined && { gte: args.from }),
+            ...(args.to !== undefined && { lte: args.to }),
+          },
+        }
+      : {}
+  return {
+    ...(args.userId !== undefined && { userId: args.userId }),
+    ...(args.type !== undefined && { type: args.type }),
+    ...(args.currency !== undefined && { walletAccount: { currency: args.currency } }),
+    ...period,
+  }
 }
 
 @Injectable()
@@ -88,11 +120,7 @@ export class PrismaWalletRepository implements IWalletRepository {
     page: number
     perPage: number
   }): Promise<[LedgerEntryAdminRow[], number]> {
-    const where: Prisma.LedgerEntryWhereInput = {
-      ...(args.userId !== undefined && { userId: args.userId }),
-      ...(args.type !== undefined && { type: args.type }),
-      ...(args.currency !== undefined && { walletAccount: { currency: args.currency } }),
-    }
+    const where = entriesWhere(args)
     return Promise.all([
       prisma.ledgerEntry.findMany({
         where,
@@ -108,9 +136,45 @@ export class PrismaWalletRepository implements IWalletRepository {
     ])
   }
 
+  /**
+   * История проводок игрока (GAP-55 §11, `GET /wallet/transactions`).
+   *
+   * От админского списка отличается составом `include`: здесь не нужен email
+   * игрока — он и есть тот, кто запросил, и джойнить `users` на каждую страницу
+   * истории незачем.
+   */
+  listOwnerEntries(args: {
+    userId: string
+    type?: LedgerEntryType | undefined
+    currency?: Currency | undefined
+    from?: Date | undefined
+    to?: Date | undefined
+    page: number
+    perPage: number
+  }): Promise<[LedgerEntryOwnerRow[], number]> {
+    const where = entriesWhere(args)
+    return Promise.all([
+      prisma.ledgerEntry.findMany({
+        where,
+        skip: (args.page - 1) * args.perPage,
+        take: args.perPage,
+        orderBy: { createdAt: 'desc' },
+        include: { walletAccount: { select: { currency: true } } },
+      }),
+      prisma.ledgerEntry.count({ where }),
+    ])
+  }
+
   findEntriesForPayment(paymentRequestId: string): Promise<LedgerEntry[]> {
     return prisma.ledgerEntry.findMany({
       where: { metadata: { path: ['payment_request_id'], equals: paymentRequestId } },
+    })
+  }
+
+  findPaymentStatuses(userId: string, ids: string[]): Promise<PaymentStatusById[]> {
+    return prisma.paymentRequest.findMany({
+      where: { userId, id: { in: ids } },
+      select: { id: true, status: true },
     })
   }
 }
