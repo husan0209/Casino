@@ -226,7 +226,11 @@ ledger_entries       (append-only — каждая операция)
 
 ### 5.3. Использует
 
-- Ничего из модулей (импортирует только `AuthModule` ради guard) — foundational module
+- Импортов других модулей нет (только `AuthModule` ради guard) — foundational module
+- Read-only по ADR GAP-51: `payment_requests` ради `payment_status` в строке
+  истории (`GET /wallet/transactions`, GAP-55 §11). Запрос живёт в
+  `PrismaWalletRepository.findPaymentStatuses`, фильтр `userId` — внутри запроса
+  (граница IDOR, а не проверка вызывающего)
 
 ### 5.4. Используется в
 
@@ -249,6 +253,10 @@ ledger_entries       (append-only — каждая операция)
   своей колонки валюты нет
 - `listEntriesForPaymentRequest(paymentRequestId)` — проводки одной заявки для
   карточки (UC-PAY-18)
+- `listOwnerTransactions({userId, type, currency, from, to, page, perPage})` —
+  история проводок игрока (`GET /wallet/transactions`); include без `users`,
+  в отличие от админского списка
+- `findPaymentStatuses(userId, ids)` — статусы заявок по id для той же истории
 - `getBalances(userId)`
 - `runInTransaction(fn)` — групповые проводки (casino bet/win)
 
@@ -750,7 +758,10 @@ kyc           → geo                 (GeoFacade.convertRubToDisplay)
               exports KycCheckService
 
 wallet        → auth                (AuthGuard)
-              ↛ NOTHING ELSE        (foundational module)
+              (ЧТЕНИЕ payment_requests: статус заявки для строки истории
+               проводок — read-only по ADR GAP-51, чужих записей wallet не
+               делает. Через PaymentsFacade сюда нельзя: `payments → wallet`
+               уже импорт модуля, обратный дал бы цикл модулей)
               exports WalletFacade
 
 payments      → wallet              (WalletFacade.credit/debit/lock)

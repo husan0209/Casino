@@ -22,17 +22,23 @@ import {
   type CreditInput,
   type CreditResult,
   type LedgerEntryAdminRow,
+  type LedgerEntryOwnerRow,
+  type PaymentStatusById,
   type WalletLockTarget,
 } from '../domain/repositories/wallet.repository'
 
 import type { LedgerEntry, LedgerEntryType, Prisma } from '@prisma/client'
 
 /**
- * Read-модель админского списка проводок отдаётся через фасад (правило 4, G16):
+ * Read-модели списков проводок отдаются через фасад (правило 4, G16):
  * потребителю незачем импортировать domain-слой wallet, чтобы назвать тип
  * собственного ответа.
  */
-export type { LedgerEntryAdminRow } from '../domain/repositories/wallet.repository'
+export type {
+  LedgerEntryAdminRow,
+  LedgerEntryOwnerRow,
+  PaymentStatusById,
+} from '../domain/repositories/wallet.repository'
 
 /**
  * Единственная точка входа в wallet для других модулей (4-слойка, GAP-22):
@@ -127,5 +133,26 @@ export class WalletFacade {
 
   listEntriesForPaymentRequest(paymentRequestId: string): Promise<LedgerEntry[]> {
     return this.repo.findEntriesForPayment(paymentRequestId)
+  }
+
+  /**
+   * История проводок игрока (`GET /wallet/transactions`, GAP-55 §11). До
+   * храповика G27 контроллер сам собирал `where` по `ledger_entries`.
+   */
+  listOwnerTransactions(args: {
+    userId: string
+    type?: LedgerEntryType | undefined
+    currency?: Currency | undefined
+    from?: Date | undefined
+    to?: Date | undefined
+    page: number
+    perPage: number
+  }): Promise<{ items: LedgerEntryOwnerRow[]; total: number }> {
+    return this.repo.listOwnerEntries(args).then(([items, total]) => ({ items, total }))
+  }
+
+  /** Статусы заявок игрока по id — для `payment_status` в строке истории. */
+  findPaymentStatuses(userId: string, ids: string[]): Promise<PaymentStatusById[]> {
+    return this.repo.findPaymentStatuses(userId, ids)
   }
 }
