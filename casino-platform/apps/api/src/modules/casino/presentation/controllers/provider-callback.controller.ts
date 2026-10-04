@@ -14,11 +14,14 @@ import { type Response } from 'express'
 
 import { errorMessage } from '@/common/utils/error-message'
 
-import { prisma } from '@casino/database'
 import { type ParsedProviderCallback } from '@casino/shared-types'
 
 import { GameCallbackService } from '../../application/services/game-callback.service'
 import { type IProviderAdapterFactory, PROVIDER_ADAPTER_FACTORY } from '../../domain/casino.ports'
+import {
+  GAME_PROVIDER_REPOSITORY,
+  type IGameProviderRepository,
+} from '../../domain/repositories/casino.repository'
 
 /** Доменные ошибки -> коды результата GitSlotPark. */
 const CALLBACK_ERROR_CODES: Record<string, string> = {
@@ -39,6 +42,7 @@ export class ProviderCallbackController {
   constructor(
     @Inject(PROVIDER_ADAPTER_FACTORY) private adapters: IProviderAdapterFactory,
     @Inject(GameCallbackService) private cb: GameCallbackService,
+    @Inject(GAME_PROVIDER_REPOSITORY) private providers: IGameProviderRepository,
   ) {}
 
   @Post(':providerSlug/:op')
@@ -70,7 +74,10 @@ export class ProviderCallbackController {
           .json(adapter.formatErrorResponse('INVALID_SIGNATURE', 'Invalid signature'))
       }
       const parsed = adapter.parseCallback(headers, body)
-      const provider = await prisma.gameProvider.findUnique({ where: { slug } })
+      // Провайдера по slug ищет владелец таблицы (гард G27): ответ этот путь
+      // отдаёт в формате провайдера, поэтому отсутствие строки — не 404, а
+      // PROVIDER_NOT_FOUND в теле с HTTP 200.
+      const provider = await this.providers.findBySlug(slug)
       if (!provider) {
         return res
           .status(200)

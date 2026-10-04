@@ -1,6 +1,5 @@
 apps/api/src/modules/admin/presentation/controllers/admin-users.controller.ts	3
 apps/api/src/modules/casino/presentation/controllers/casino-admin.controller.ts	8
 apps/api/src/modules/casino/presentation/controllers/casino.controller.ts	3
-apps/api/src/modules/casino/presentation/controllers/provider-callback.controller.ts	1
 apps/api/src/modules/referrals/presentation/referrals-admin.controller.ts	6
 apps/api/src/modules/referrals/presentation/referrals.controller.ts	7
