@@ -299,7 +299,7 @@ interface FinalCatalogCardProps {
 function FinalCatalogCard({ gamesLeft }: FinalCatalogCardProps): React.JSX.Element {
   return (
     <div className="absolute inset-0 flex select-none flex-col items-center justify-center gap-2 overflow-hidden rounded-3xl border border-dashed border-[#6C63FF]/50 bg-[#16213E]/90 text-center">
-      <Sparkles size={22} className="text-[#00E676]" />
+      <Sparkles size={22} className="text-money" />
       <p className="px-6 text-lg font-black leading-snug text-white">Всё, что выбирал для тебя</p>
       <p className="text-sm text-white/60">
         Ещё {gamesLeft.toLocaleString('ru-RU')} игр в каталоге
@@ -452,7 +452,7 @@ function DeckPreview({ card, onClose, onPlay, onDemo }: DeckPreviewProps): React
           <dl className="mb-4 grid grid-cols-2 gap-2 text-sm">
             <div className="rounded-xl bg-black/30 px-3 py-2">
               <dt className="text-[10px] uppercase tracking-[0.14em] text-white/45">RTP</dt>
-              <dd className="font-bold text-[#00E676]">{rtp ?? '—'}</dd>
+              <dd className="font-bold text-money">{rtp ?? '—'}</dd>
             </div>
             <div className="rounded-xl bg-black/30 px-3 py-2">
               <dt className="text-[10px] uppercase tracking-[0.14em] text-white/45">
@@ -503,7 +503,7 @@ function DeckHeader({ total, position, onShuffle }: DeckHeaderProps): React.JSX.
     <div className="relative z-50 mb-3 flex items-center justify-between">
       <div>
         <p className="caps-label flex items-center gap-1">
-          <Sparkles size={12} className="text-[#00E676]" />
+          <Sparkles size={12} className="text-money" />
           ВЫБОР МОМЕНТА
         </p>
         <h2 className="section-title">Колода слотов</h2>
@@ -536,15 +536,17 @@ interface DeckNavProps {
 function DeckNav({ total, position, onPrev, onNext, onJump }: DeckNavProps): React.JSX.Element {
   const activeDot = Math.min(position, total - 1)
   return (
-    <div className="mt-3 flex items-center justify-between px-2">
+    /* Телефон: свайп + тапабельные точки — текстовые кнопки дублируют жест (§4.4).
+       Десктоп: стрелки-шевроны по краям (перетаскивание мышью не всем удобно). */
+    <div className="mt-3 flex items-center justify-center gap-2 px-2 lg:justify-between">
       <button
         type="button"
         onClick={onPrev}
         disabled={position === 0}
-        className="flex items-center gap-1 text-xs font-semibold text-muted transition hover:text-white disabled:opacity-40"
+        aria-label="Предыдущая карта"
+        className="hidden h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-white/5 hover:text-white disabled:opacity-40 lg:grid"
       >
-        <ChevronLeft size={16} />
-        <span>Назад</span>
+        <ChevronLeft size={18} />
       </button>
       <div className="flex gap-1">
         {Array.from({ length: total }, (_, cardIndex) => (
@@ -562,10 +564,10 @@ function DeckNav({ total, position, onPrev, onNext, onJump }: DeckNavProps): Rea
       <button
         type="button"
         onClick={onNext}
-        className="flex items-center gap-1 text-xs font-semibold text-muted transition hover:text-white"
+        aria-label="Следующая карта"
+        className="hidden h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-white/5 hover:text-white lg:grid"
       >
-        <span>Дальше</span>
-        <ChevronRight size={16} />
+        <ChevronRight size={18} />
       </button>
     </div>
   )
