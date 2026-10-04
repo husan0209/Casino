@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common'
 
 import { AdminAuthModule } from './admin-auth.module'
+import { NotificationsModule } from '../notifications/notifications.module'
 import { PaymentsModule } from '../payments/payments.module'
 import { UsersModule } from '../users/users.module'
 import { WalletModule } from '../wallet/wallet.module'
@@ -41,9 +42,11 @@ import { AdminUsersController } from './presentation/controllers/admin-users.con
   // (approve/reject) admin делает через публичный API владельца таблицы, а не
   // через её порт и Prisma-класс (гвард G16). Цикла нет, потому что вход в
   // админку живёт в AdminAuthModule, и kyc больше не тянет AdminModule.
+  // NotificationsModule — ради NotificationsFacade: рассылку пишет владелец таблицы
+  // notifications, а не admin (гард G24).
   // UsersModule — ради UsersFacade: блокировку игрока (статус + отзыв сессий)
   // делает владелец этих таблиц, admin только заказчик (гвард G24).
-  imports: [WalletModule, PaymentsModule, UsersModule, AdminAuthModule],
+  imports: [WalletModule, PaymentsModule, UsersModule, NotificationsModule, AdminAuthModule],
   controllers: [
     AdminAuthController,
     AdminUsersController,

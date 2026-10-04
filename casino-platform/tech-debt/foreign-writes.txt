@@ -1,2 +1,1 @@
-apps/api/src/modules/admin/infrastructure/admin-system.prisma.repository.ts	1
 apps/api/src/modules/maintenance/infrastructure/maintenance.prisma.repo.ts	3

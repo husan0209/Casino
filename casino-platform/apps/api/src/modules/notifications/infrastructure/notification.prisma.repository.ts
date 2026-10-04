@@ -1,15 +1,15 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma } from '@casino/database'
+import { NotificationChannel, prisma } from '@casino/database'
 
 import {
+  type BroadcastNotificationInput,
   type CreateNotificationInput,
   type INotificationRepository,
   type NotificationRow,
 } from '../domain/notification.repository'
 
 import type { Prisma } from '@prisma/client'
-
 
 @Injectable()
 export class PrismaNotificationRepository implements INotificationRepository {
@@ -21,6 +21,25 @@ export class PrismaNotificationRepository implements INotificationRepository {
         channel: data.channel as never,
       },
     })
+  }
+
+  /**
+   * Рассылка: `channel='internal'`, `isRead=false`, `data` не задаём — у колонки
+   * default `'{}'` в схеме. `count` отдаём наружу: `sentCount` в админке должен
+   * быть числом вставленных строк, а не длиной списка адресатов.
+   */
+  async createMany(rows: BroadcastNotificationInput[]): Promise<number> {
+    const res = await prisma.notification.createMany({
+      data: rows.map((row) => ({
+        userId: row.userId,
+        type: row.type,
+        channel: NotificationChannel.internal,
+        title: row.title,
+        message: row.message,
+        isRead: false,
+      })),
+    })
+    return res.count
   }
 
   async markSent(id: string, sentAt: Date): Promise<void> {

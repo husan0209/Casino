@@ -28,6 +28,17 @@ export interface CreateNotificationInput {
 }
 
 /**
+ * Одна запись массовой рассылки (admin-бродкаст): внутренний канал, без
+ * email-диспатча и без `data` — колонка имеет default `'{}'` в схеме.
+ */
+export interface BroadcastNotificationInput {
+  userId: string
+  type: string
+  title: string
+  message: string
+}
+
+/**
  * Email-настройки пользователя ровно в том объёме, который нужен каналу
  * рассылки. Колонка `notifications_email` в схеме NOT NULL с default `true`;
  * `null` в типе — страховка на случай, если порт начнёт читать другой источник.
@@ -38,6 +49,12 @@ export interface UserEmailSettingsRow {
 
 export interface INotificationRepository {
   create(data: CreateNotificationInput): Promise<NotificationRow>
+  /**
+   * Массовая запись рассылки одним запросом. Возвращает число созданных —
+   * сервис отдаёт его админу как `sentCount`, поэтому «сколько разослал»
+   * считается фактом БД, а не длиной входа.
+   */
+  createMany(rows: BroadcastNotificationInput[]): Promise<number>
   markSent(id: string, sentAt: Date): Promise<void>
   findMany(
     where: Prisma.NotificationWhereInput,

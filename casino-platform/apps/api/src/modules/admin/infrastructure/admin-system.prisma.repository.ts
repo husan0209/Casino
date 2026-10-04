@@ -4,7 +4,6 @@ import { prisma, type SystemSettingType } from '@casino/database'
 
 import {
   type IAdminBroadcastRepository,
-  type NotificationBroadcastInput,
   type ISystemSettingRepository,
   type SystemSettingRow,
 } from '../domain/system.repository'
@@ -45,14 +44,15 @@ export class PrismaSystemSettingRepository implements ISystemSettingRepository {
   }
 }
 
+/**
+ * Список адресатов рассылки. Только ЧТЕНИЕ таблицы `users` — оно легализовано
+ * ADR GAP-51; запись в `notifications` отсюда ушла (G24): её делает
+ * `NotificationsFacade` из модуля уведомлений.
+ */
 @Injectable()
 export class PrismaAdminBroadcastRepository implements IAdminBroadcastRepository {
   async getAllUserIds(): Promise<string[]> {
     const allUsers = await prisma.user.findMany({ select: { id: true } })
     return allUsers.map((u) => u.id)
-  }
-
-  async createMany(notifications: NotificationBroadcastInput[]): Promise<void> {
-    await prisma.notification.createMany({ data: notifications })
   }
 }
