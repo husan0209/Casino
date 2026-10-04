@@ -299,7 +299,7 @@ interface FinalCatalogCardProps {
 function FinalCatalogCard({ gamesLeft }: FinalCatalogCardProps): React.JSX.Element {
   return (
     <div className="absolute inset-0 flex select-none flex-col items-center justify-center gap-2 overflow-hidden rounded-3xl border border-dashed border-[#6C63FF]/50 bg-[#16213E]/90 text-center">
-      <Sparkles size={22} className="text-[#00E676]" />
+      <Sparkles size={22} className="text-money" />
       <p className="px-6 text-lg font-black leading-snug text-white">Всё, что выбирал для тебя</p>
       <p className="text-sm text-white/60">
         Ещё {gamesLeft.toLocaleString('ru-RU')} игр в каталоге
@@ -503,7 +503,7 @@ function DeckHeader({ total, position, onShuffle }: DeckHeaderProps): React.JSX.
     <div className="relative z-50 mb-3 flex items-center justify-between">
       <div>
         <p className="caps-label flex items-center gap-1">
-          <Sparkles size={12} className="text-[#00E676]" />
+          <Sparkles size={12} className="text-money" />
           ВЫБОР МОМЕНТА
         </p>
         <h2 className="section-title">Колода слотов</h2>

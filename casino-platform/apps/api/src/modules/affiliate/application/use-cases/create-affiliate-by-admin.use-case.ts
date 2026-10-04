@@ -17,10 +17,16 @@
  *     здесь тем же argon2id, что и при регистрации.
  *
  * Компенсирующее удаление user-записи при отказе записи партнёра — как в
- * `RegisterAffiliateUseCase`: иначе в `users` оставалась бы сирота.
+ * `RegisterAffiliateUseCase`: иначе в `users` оставалась бы сирота. Обе
+ * операции с `users` (создание и удаление) идут через `UsersFacade` — GAP-62
+ * закрыт, прямого INSERT/DELETE в чужую таблицу в affiliate больше нет.
  */
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import * as argon2 from 'argon2'
+
+import { errorMessage } from '@/common/utils/error-message'
+
+import { UsersFacade } from '@modules/users/facade/users.facade'
 
 import {
   AFFILIATE_PLAYER_PROVISIONING_REPOSITORY,
@@ -47,11 +53,16 @@ export interface CreateAffiliateByAdminInput {
 
 @Injectable()
 export class CreateAffiliateByAdminUseCase {
+  private readonly logger = new Logger(CreateAffiliateByAdminUseCase.name)
+
   constructor(
     @Inject(AFFILIATE_REPOSITORY) private readonly affiliates: AffiliateRepository,
+    // Чтение чужих таблиц (свободен ли referral_code) — порт; ADR GAP-51.
     @Inject(AFFILIATE_PLAYER_PROVISIONING_REPOSITORY)
     private readonly players: AffiliatePlayerProvisioningRepository,
     @Inject(AffiliateSettingsService) private readonly settings: AffiliateSettingsService,
+    // GAP-62: запись в `users` только через фасад владельца данных.
+    @Inject(UsersFacade) private readonly users: UsersFacade,
   ) {}
 
   async execute(input: CreateAffiliateByAdminInput): Promise<AffiliateEntity> {
@@ -63,7 +74,7 @@ export class CreateAffiliateByAdminUseCase {
 
     const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id })
     const trackingCode = await this.affiliates.generateUniqueTrackingCode()
-    const player = await this.players.createPlayerUser({
+    const player = await this.users.provisionAffiliatePlayer({
       referralCode: await generateUniquePlayerReferralCode(this.players),
     })
 
@@ -82,8 +93,27 @@ export class CreateAffiliateByAdminUseCase {
         isAgreed: true,
       })
     } catch (error) {
-      await this.players.deletePlayerUser(player.id).catch(() => undefined)
+      await this.deprovisionPlayer(player.id, error)
       throw error
+    }
+  }
+
+  /**
+   * Компенсация: снятие служебной user-записи, ставшей сиротой.
+   *
+   * Ошибку удаления не поднимаем — иначе клиент вместо настоящей причины
+   * отказа (`affiliates.create`) получил бы вторую ошибку поверх неё. Но и
+   * молча проглотить её нельзя: сирота в `users` при этом остаётся, и без
+   * записи в лог о нём никто не узнает (GAP-62).
+   */
+  private async deprovisionPlayer(userId: string, cause: unknown): Promise<void> {
+    try {
+      await this.users.deprovisionAffiliatePlayer(userId)
+    } catch (cleanupError: unknown) {
+      this.logger.warn(
+        `Orphan player ${userId} left in users after affiliate create failed ` +
+          `(${errorMessage(cause)}); compensating delete failed: ${errorMessage(cleanupError)}`,
+      )
     }
   }
 }

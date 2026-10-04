@@ -27,6 +27,15 @@ export interface CreateNotificationInput {
   data: Prisma.InputJsonValue
 }
 
+/**
+ * Email-настройки пользователя ровно в том объёме, который нужен каналу
+ * рассылки. Колонка `notifications_email` в схеме NOT NULL с default `true`;
+ * `null` в типе — страховка на случай, если порт начнёт читать другой источник.
+ */
+export interface UserEmailSettingsRow {
+  notificationsEmail: boolean | null
+}
+
 export interface INotificationRepository {
   create(data: CreateNotificationInput): Promise<NotificationRow>
   markSent(id: string, sentAt: Date): Promise<void>
@@ -38,7 +47,7 @@ export interface INotificationRepository {
   count(where: Prisma.NotificationWhereInput): Promise<number>
   markRead(userId: string, id: string): Promise<void>
   markAllRead(userId: string): Promise<void>
-  findUserSettings(userId: string): Promise<{ notificationsEmail: boolean | null } | null>
+  findUserSettings(userId: string): Promise<UserEmailSettingsRow | null>
   findUserEmail(userId: string): Promise<string | null>
 }
 

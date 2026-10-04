@@ -58,11 +58,16 @@ export interface IReferralRepository {
     periodStart: Date
     currency: string
   }): Promise<ReferralRewardRow | null>
+  /**
+   * Начисления, застрявшие в `pending` (документ referralReward создан,
+   * проводки в ledger нет или она не дошла до фиксации статуса). Это вход
+   * compensation-прохода: без него отказ кредитования терял деньги навсегда,
+   * т.к. дедуп по кортежу (referrer, referred, periodStart, currency) считал
+   * такую строку уже обработанной. Отдаются старые сначала, не больше `limit`.
+   */
+  findPendingRewards(limit: number): Promise<ReferralRewardRow[]>
   createReward(data: CreateReferralRewardInput): Promise<ReferralRewardRow>
-  updateReward(
-    id: string,
-    data: { status: string; creditedAt?: Date },
-  ): Promise<void>
+  updateReward(id: string, data: { status: string; creditedAt?: Date }): Promise<void>
 }
 
 export const REFERRAL_REPOSITORY = Symbol('REFERRAL_REPOSITORY')

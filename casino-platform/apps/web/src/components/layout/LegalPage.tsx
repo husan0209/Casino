@@ -25,12 +25,14 @@ export function LegalPage({
       <div className="card">
         <h1 className="text-xl font-bold mb-1">{title}</h1>
         <p className="text-xs text-muted mb-4">Актуально на: {updated}</p>
-        <p className="text-sm text-muted mb-6">{intro}</p>
+        <p className="mb-6 text-sm leading-relaxed text-white/70">{intro}</p>
         <div className="space-y-6">
           {sections.map((s) => (
             <section key={s.heading}>
-              <h2 className="text-base font-semibold mb-2">{s.heading}</h2>
-              <div className="text-sm text-muted leading-relaxed space-y-2">{s.body}</div>
+              <h2 className="mb-2 border-b border-line pb-1.5 text-base font-semibold text-white">
+                {s.heading}
+              </h2>
+              <div className="space-y-2 text-sm leading-relaxed text-white/80">{s.body}</div>
             </section>
           ))}
         </div>

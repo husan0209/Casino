@@ -12,6 +12,14 @@
  *  - пароль из запроса хешируется argon2id: раньше в БД ложилась пустая
  *    строка, и партнёр не мог войти в кабинет никогда.
  *
+ * Компенсирующее удаление user-записи при отказе записи партнёра — как в
+ * `RegisterAffiliateUseCase`: иначе в `users` оставалась бы сирота.
+ *
+ * GAP-62: создание и удаление служебной учётки больше НЕ идут через порт
+ * affiliate (прямой write в чужую таблицу `users`) — только через
+ * `UsersFacade`. В порту остались чтения (`referral_code`), легальные по
+ * ADR GAP-51, поэтому мок фасада и мок порта живут отдельно.
+ *
  * Сэмпл для фейков портов — `test/auth-register.spec.ts` /
  * `affiliate/application/use-cases/register-affiliate.use-case.spec.ts`.
  */
@@ -58,11 +66,13 @@ function makeDeps(
     settings?: Partial<AffiliateSettings>
     referralCodeAvailable?: (code: string) => Promise<boolean>
     createError?: Error
+    provisionError?: Error
+    deprovisionError?: Error
   } = {},
 ) {
   const created: CreatedAffiliate[] = []
-  const playersCreated: Array<{ referralCode: string }> = []
-  const playersDeleted: string[] = []
+  const playersProvisioned: Array<{ referralCode: string }> = []
+  const playersDeprovisioned: string[] = []
 
   const affiliates = {
     generateUniqueTrackingCode: async () => 'TRK12345',
@@ -87,15 +97,26 @@ function makeDeps(
     },
   }
 
+  // ЧТЕНИЕ чужих таблиц — порт affiliate (ADR GAP-51): свободен ли referral_code.
   const players = {
-    createPlayerUser: async (args: { referralCode: string }) => {
-      playersCreated.push(args)
+    isPlayerReferralCodeAvailable: options.referralCodeAvailable ?? (async () => true),
+  }
+
+  // WRITE в `users` — только фасад владельца данных (GAP-62).
+  const users = {
+    provisionAffiliatePlayer: async (args: { referralCode: string }) => {
+      if (options.provisionError !== undefined) {
+        throw options.provisionError
+      }
+      playersProvisioned.push(args)
       return { id: 'partner-player-1' }
     },
-    deletePlayerUser: async (userId: string) => {
-      playersDeleted.push(userId)
+    deprovisionAffiliatePlayer: async (userId: string) => {
+      if (options.deprovisionError !== undefined) {
+        throw options.deprovisionError
+      }
+      playersDeprovisioned.push(userId)
     },
-    isPlayerReferralCodeAvailable: options.referralCodeAvailable ?? (async () => true),
   }
 
   const settings = {
@@ -106,9 +127,10 @@ function makeDeps(
     affiliates as never,
     players as never,
     settings as never,
+    users as never,
   )
 
-  return { useCase, created, playersCreated, playersDeleted }
+  return { useCase, created, playersProvisioned, playersDeprovisioned }
 }
 
 const BASE_INPUT = {
@@ -123,12 +145,12 @@ describe('CreateAffiliateByAdminUseCase', () => {
   })
 
   it('партнёр создаётся со СВОЕЙ user-записью, а не с id администратора', async () => {
-    const { useCase, created, playersCreated } = makeDeps()
+    const { useCase, created, playersProvisioned } = makeDeps()
 
     await useCase.execute(BASE_INPUT)
 
-    expect(playersCreated).toHaveLength(1)
-    expect(String(playersCreated[0]?.referralCode)).toMatch(
+    expect(playersProvisioned).toHaveLength(1)
+    expect(String(playersProvisioned[0]?.referralCode)).toMatch(
       /^aff[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/,
     )
     expect(created[0]?.userId).toBe('partner-player-1')
@@ -170,16 +192,37 @@ describe('CreateAffiliateByAdminUseCase', () => {
     })
   })
 
-  it('отказ записи партнёра компенсируется удалением user-записи', async () => {
+  it('отказ записи партнёра компенсируется удалением user-записи (сирота не остаётся)', async () => {
     const boom = new Error('unique violation on email')
-    const { useCase, playersDeleted } = makeDeps({ createError: boom })
+    const { useCase, playersProvisioned, playersDeprovisioned } = makeDeps({ createError: boom })
 
     await expect(useCase.execute(BASE_INPUT)).rejects.toBe(boom)
-    expect(playersDeleted).toEqual(['partner-player-1'])
+    // Сирота закрывается ровно тем id, который вернул провижининг.
+    expect(playersProvisioned).toHaveLength(1)
+    expect(playersDeprovisioned).toEqual(['partner-player-1'])
+  })
+
+  it('отказ самого compensate не перекрывает первопричину: наружу идёт ошибка create', async () => {
+    const boom = new Error('unique violation on email')
+    const { useCase, playersDeprovisioned } = makeDeps({
+      createError: boom,
+      deprovisionError: new Error('users недоступны'),
+    })
+
+    await expect(useCase.execute(BASE_INPUT)).rejects.toBe(boom)
+    expect(playersDeprovisioned).toEqual([])
+  })
+
+  it('успешное создание партнёра НЕ удаляет служебную учётку', async () => {
+    const { useCase, playersDeprovisioned } = makeDeps()
+
+    await useCase.execute(BASE_INPUT)
+
+    expect(playersDeprovisioned).toEqual([])
   })
 
   it('все кандидаты referral_code заняты → PlayerReferralCodeGenerationError, партнёр не создаётся', async () => {
-    const { useCase, created, playersCreated } = makeDeps({
+    const { useCase, created, playersProvisioned } = makeDeps({
       referralCodeAvailable: async () => false,
     })
 
@@ -187,16 +230,27 @@ describe('CreateAffiliateByAdminUseCase', () => {
       PlayerReferralCodeGenerationError,
     )
     expect(created).toHaveLength(0)
-    expect(playersCreated).toHaveLength(0)
+    expect(playersProvisioned).toHaveLength(0)
+  })
+
+  it('отказ провижининга (конфликт уникальности в users) — партнёр не создаётся', async () => {
+    // Коллизия referral_code между проверкой «свободен» и INSERT: ошибку
+    // не глотаем и compensating delete не зовём — удалять нечего.
+    const conflict = new Error('Unique constraint failed on the fields: (`referral_code`)')
+    const { useCase, created, playersDeprovisioned } = makeDeps({ provisionError: conflict })
+
+    await expect(useCase.execute(BASE_INPUT)).rejects.toBe(conflict)
+    expect(created).toHaveLength(0)
+    expect(playersDeprovisioned).toEqual([])
   })
 
   it('ставка вне [0,1] → AffiliateRateOutOfRangeError до каких-либо записей', async () => {
-    const { useCase, created, playersCreated } = makeDeps()
+    const { useCase, created, playersProvisioned } = makeDeps()
 
     await expect(useCase.execute({ ...BASE_INPUT, revshareRate: '1.5' })).rejects.toBeInstanceOf(
       AffiliateRateOutOfRangeError,
     )
     expect(created).toHaveLength(0)
-    expect(playersCreated).toHaveLength(0)
+    expect(playersProvisioned).toHaveLength(0)
   })
 })
