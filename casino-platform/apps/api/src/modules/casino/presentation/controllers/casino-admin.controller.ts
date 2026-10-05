@@ -13,7 +13,7 @@ import {
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
-import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+import { AdminAuthGuard } from '@modules/admin/presentation/admin-auth.guard'
 import { Roles, RolesGuard } from '@modules/auth/presentation/guards/roles.guard'
 
 import {
@@ -84,7 +84,14 @@ type AdminGamesPage = {
   meta: { page: number; perPage: number; total: number }
 }
 
-@UseGuards(AuthGuard, RolesGuard)
+/**
+ * AdminAuthGuard обязателен на admin-API: у токена админ-панели aud='admin', а
+ * плеерский AuthGuard проверяет aud='user' и отвечал 401 на каждый запрос —
+ * интерсептор apps/admin считает 401 концом сессии, и панель выкидывало на
+ * логин при открытии «Игры»/«Провайдеры». RolesGuard сохраняет прежнюю ролевую
+ * сетку: роль он берёт из req.user, который ставит AdminAuthGuard из админ-JWT.
+ */
+@UseGuards(AdminAuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
 @Controller('admin')
 export class CasinoAdminController {

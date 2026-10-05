@@ -2,7 +2,7 @@
 title: Module Boundaries
 description: Границы между модулями backend casino-platform
 status: living document
-last_updated: 2026-10-03
+last_updated: 2026-10-04
 ---
 
 # Module Boundaries
@@ -363,9 +363,14 @@ payment_callbacks    (raw callbacks от провайдеров)
 ### 7.3. Использует
 
 - `wallet` (WalletFacade — активный кошелёк при launch; debit/credit в callbacks)
-- `auth` (AuthGuard/RolesGuard, в т.ч. на admin-endpoints каталога)
-- NB: `casino.module.ts` импортирует также `AdminModule`, но его экспорты
-  (AuditLogService/AdminAuth*) внутри модуля не инжектятся
+- `auth` (AuthGuard/RolesGuard — на плеерских эндпоинтах каталога)
+- `admin` (AdminAuthGuard — на admin-endpoints каталога: /admin/games,
+  /admin/providers, /admin/game-sessions*, /admin/game-transactions; §13.2.1.
+  2026-10-04: переведены с плеерского AuthGuard — тот проверяет aud='user' и
+  отвечал 401 на админский токен, панель разлогинивалась на «Играх»/«Провайдерах»)
+- NB: `casino.module.ts` импортирует `AdminModule` (guard приходит через его
+  переэкспорт `AdminAuthModule`); остальные его экспорты внутри модуля
+  не инжектятся
 
 ### 7.4. Используется в
 
@@ -453,9 +458,12 @@ referral_rewards                (period, ggr, reward_amount, status)
 ### 9.3. Использует
 
 - `wallet` (WalletFacade.credit для reward)
-- `auth` (только AuthGuard; событие USER_REGISTERED не используется — referral
-  code и привязка `referred_by` выполняются в самом `register.use-case` /
-  `oauth-user-provisioning.service`)
+- `auth` (только AuthGuard на плеерских эндпоинтах; событие USER_REGISTERED не
+  используется — referral code и привязка `referred_by` выполняются в самом
+  `register.use-case` / `oauth-user-provisioning.service`)
+- `admin` (AdminAuthGuard на ReferralsAdminController через переэкспорт
+  `AdminAuthModule` в `AdminModule`; §13.2.1 — 2026-10-04; AuditLogService в
+  referrals-admin)
 - read-only groupBy по `game_transactions` для расчёта GGR — ADR GAP-51:
   принят прямой доступ через общий Prisma-клиент (`prisma.gameTransaction.groupBy`);
   порт/событие — при выносе casino в отдельный сервис
@@ -554,8 +562,10 @@ support_messages    (ticket, sender_type, message, attachments, is_internal)
 
 ### 10.3. Использует
 
-- Только `auth` (AuthGuard/RolesGuard). NB: `notifications` и `audit`
-  support-модуль НЕ импортирует (email при reply в коде не отправляется)
+- `auth` (AuthGuard/RolesGuard — на плеерских эндпоинтах)
+- `admin` (AdminAuthModule на SupportAdminController, §13.2.1 — 2026-10-04).
+  NB: `notifications` и `audit` support-модуль НЕ импортирует (email при reply
+  в коде не отправляется)
 
 ### 10.4. Используется в
 
@@ -705,11 +715,17 @@ audit_logs          (actor_type, actor_id, action, target_type, target_id, paylo
   только вход в админку.
 - `AdminAuthGuard` (`admin/presentation/admin-auth.guard`) — публичный API по
   решению **В6.1** (guards аутентификации = exports модуля, §16.2). Импортируют
-  напрямую: `kyc` (`KycAdminController`), `affiliate` (`AffiliateAdminController`).
-  Отдельного фасада под guard нет: guard — это middleware-контракт, а не
-  бизнес-операция. Наружу он идёт через `AdminModule → exports: [AdminAuthModule]`
-  (переэкспорт модуля): Nest не позволяет экспортировать провайдер чужого модуля
-  напрямую, и падает на старте контейнера, а не на typecheck.
+  напрямую: `kyc` (`KycAdminController`), `affiliate` (`AffiliateAdminController`),
+  `casino` (`CasinoAdminController` — через переэкспорт в `AdminModule`),
+  `referrals` (`ReferralsAdminController` — так же), `support`
+  (`SupportAdminController` — через `AdminAuthModule`) — три последних переведены
+  2026-10-04 с плеерского AuthGuard, который проверял aud='user' и отвечал 401
+  на админский токен: панель разлогинивалась при открытии «Игр», «Провайдеров»,
+  «Поддержки» и «Рефералов». Отдельного фасада под guard нет: guard — это
+  middleware-контракт, а не бизнес-операция. Наружу он идёт через
+  `AdminModule → exports: [AdminAuthModule]` (переэкспорт модуля): Nest не
+  позволяет экспортировать провайдер чужого модуля напрямую, и падает на старте
+  контейнера, а не на typecheck.
 - `AdminAuthService` — рядом с guard'ом потому, что `AdminAuthGuard` инжектит
   его: без переэкспорта DI в потребителях не резолвится (E2E, PR #15).
 - `AuditLogService` — **legacy-экспорт**: исторически его импортировал
@@ -771,11 +787,13 @@ payments      → wallet              (WalletFacade.credit/debit/lock)
               exports PaymentsFacade (estimate, чтение заявки, смена статуса)
 
 casino        → wallet              (WalletFacade: launch + bet/win/rollback)
-              → auth                (guards)
+              → auth                (guards — плеерские эндпоинты)
+              → admin               (AdminAuthGuard — admin-endpoints каталога, §7.3)
               (+ game-sessions — часть этого же модуля, §8)
 
 referrals     → wallet              (WalletFacade.credit для reward)
-              → admin               (AuditLogService в referrals-admin)
+              → admin               (AuditLogService в referrals-admin +
+                                     AdminAuthGuard — ReferralsAdminController)
               (read-only prisma.gameTransaction.groupBy для GGR — ADR GAP-51)
 
 affiliate     → wallet              (WalletFacade.credit/debit — комиссия и clawback)
@@ -790,7 +808,8 @@ affiliate     → wallet              (WalletFacade.credit/debit — комис�
 auth          ↛ affiliate           (цикл разорван: привязка через ModuleRef,
                                      см. §9a.5. ПРЯМОЙ ИМПОРТ ЗАПРЕЩЁН)
 
-support       → auth                (guards) — больше ничего
+support       → auth                (guards — плеерские эндпоинты)
+              → admin               (AdminAuthModule — SupportAdminController)
 
 notifications → queues              (EMAIL_QUEUE_PORT)
               → auth                (guards)

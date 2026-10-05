@@ -14,7 +14,7 @@ import {
 import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
-import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
+import { AdminAuthGuard } from '@modules/admin/presentation/admin-auth.guard'
 import { Roles, RolesGuard } from '@modules/auth/presentation/guards/roles.guard'
 import {
   type ISupportRepository,
@@ -42,7 +42,10 @@ import {
   type SetPriorityDto,
 } from '../dto/support.dto'
 
-@UseGuards(AuthGuard, RolesGuard)
+// AdminAuthGuard — токен админ-панели aud='admin': плеерский AuthGuard
+// (aud='user') отвечал 401, и панель разлогинивалась на «Поддержке».
+// Сетка ролей прежняя: роль RolesGuard берёт из админ-JWT.
+@UseGuards(AdminAuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
 @Controller('admin/support')
 export class SupportAdminController {

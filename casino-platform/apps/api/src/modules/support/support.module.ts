@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 
+import { AdminAuthModule } from '../admin/admin-auth.module'
 import { AuthModule } from '../auth/auth.module'
 import { AssignTicketUseCase } from './application/use-cases/assign-ticket.use-case'
 import { CloseTicketUseCase } from './application/use-cases/close-ticket.use-case'
@@ -14,7 +15,7 @@ import { SupportAdminController } from './presentation/controllers/support-admin
 import { SupportController } from './presentation/controllers/support.controller'
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, AdminAuthModule],
   controllers: [SupportController, SupportAdminController],
   providers: [
     { provide: SUPPORT_REPOSITORY, useClass: PrismaSupportRepository },
