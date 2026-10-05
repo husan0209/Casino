@@ -51,10 +51,11 @@ describe('Каталог: тулбар фильтров', () => {
     expect(onChangeMock).toHaveBeenCalledWith({ category: 'slots' })
   })
 
-  it('провайдерского фильтра в тулбаре нет (ленты чипов и свайпов нет)', () => {
+  it('провайдерского фильтра в тулбаре нет; лист «Фильтры» — дубль, тоже убран', () => {
     renderBar()
     expect(screen.queryByRole('group', { name: 'Провайдеры' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'RG provider' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Фильтры' })).toBeNull()
   })
 
   it('сортировка — кастомный дропдаун: открыть, выбрать, меню закрылось', () => {

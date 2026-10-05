@@ -20,7 +20,8 @@ import type { ProviderDto } from '@/types/casino'
  * фильтра в UI НЕТ (по фидбеку: игроки не думают провайдерами — ищут игру по
  * названию); параметр ?provider= из старых ссылок honoured: если он в URL,
  * показывается съёмный чип. Активные фильтры — съёмные чипы + «Сбросить всё».
- * Состояние — в URL (родитель); поиск с debounce. На телефоне — bottom sheet.
+ * Состояние — в URL (родитель); поиск с debounce. Отдельный лист «Фильтры»
+ * не нужен: каждый фильтр доступен прямо в тулбаре и на телефоне.
  */
 const SEARCH_DEBOUNCE_MS = 300
 
@@ -187,10 +188,6 @@ export function CatalogFilterBar({
   })
 
   const [draft, setDraft] = useState(filters.q)
-  const [sheet, setSheet] = useState(false)
-  const activeCount = [filters.sort, filters.provider, filters.category, filters.q].filter(
-    (value) => value.length > 0,
-  ).length
 
   // URL — источник истины: при сбросе/переходе по ссылке подтягиваем поле
   useEffect(() => {
@@ -271,52 +268,6 @@ export function CatalogFilterBar({
         providers={providers ?? []}
         onChange={onChange}
       />
-
-      {/* §7: на телефоне фильтры дублируются в bottom sheet */}
-      <button
-        type="button"
-        className="btn-ghost w-full py-1.5 text-xs md:hidden"
-        onClick={() => setSheet(true)}
-      >
-        Фильтры{activeCount > 0 ? ` · ${String(activeCount)}` : ''}
-      </button>
-
-      {sheet && (
-        <>
-          <div className="sheet-backdrop" onClick={() => setSheet(false)} />
-          <div className="sheet-panel space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Фильтры</h2>
-              <button
-                type="button"
-                onClick={() => setSheet(false)}
-                aria-label="Закрыть"
-                className="text-muted"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-1.5">
-              <p className="caps-label">Сортировка</p>
-              <div className="flex flex-wrap gap-1.5">
-                {SORT_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => onChange({ sort: option.value })}
-                    className={chipClass(filters.sort === option.value)}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <button type="button" className="btn w-full" onClick={() => setSheet(false)}>
-              Готово
-            </button>
-          </div>
-        </>
-      )}
     </div>
   )
 }
