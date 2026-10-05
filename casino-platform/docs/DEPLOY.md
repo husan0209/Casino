@@ -77,10 +77,13 @@ curl -sS -o /dev/null -w '%{http_code}\n' "https://$DOMAIN/"
 curl -sS -o /dev/null -w '%{http_code}\n' "https://$ADMIN_DOMAIN/"
 # 3. маршрут возврата Google существует (несовпадение с redirect_uri в oauth.tsx
 #    даёт 404 уже ПОСЛЕ успешного входа в аккаунт Google — выглядит как «не работает»)
-curl -sS -o /dev/null -w '%{http_code}\n' "https://$DOMAIN/google/callback"
-# 4. публичные ключи попали в бандл: без build-arg'ов кнопка Google/капча молча
-#    отсутствуют, и по HTTP-коду это не видно — смотреть наличие data-client-id в HTML
-curl -sS "https://$DOMAIN/" | grep -c 'accounts.google.com\|google'
+curl -sS -o /dev/null -w '%{http_code}\n' "https://$DOMAIN/auth/google/callback"
+# 4. публичные ключи попали в бандл: NEXT_PUBLIC_* инлайнятся в JS-чанк во время
+#    `next build` и в HTML не встречаются, поэтому искать их надо в чанке layout, а не
+#    в разметке. Отличительный случай: сборка, стартовавшая ДО появления ключа в .env,
+#    проходит успешно и просто не печатает кнопку (проверено 2026-10-05 на стенде).
+CHUNK=$(curl -sS "https://$DOMAIN/" | grep -o '/_next/static/chunks/app/layout-[a-f0-9]*\.js' | head -1)
+curl -sS "https://$DOMAIN$CHUNK" | grep -c "$NEXT_PUBLIC_GOOGLE_CLIENT_ID"
 ```
 
 ## Первичная инициализация админа (обязательно)
