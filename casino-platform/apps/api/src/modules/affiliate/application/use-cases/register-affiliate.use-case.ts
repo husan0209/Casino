@@ -10,11 +10,17 @@
  * регистрацию. Поэтому адрес хранится только в affiliate.
  *
  * БД и JWT не импортируются: работа идёт через порты domain —
- * AffiliatePlayerProvisioningRepository и IAffiliateJwtService
- * (AI_DEVELOPMENT_RULES §3.2, решение В5).
+ * AffiliatePlayerProvisioningRepository (только ЧТЕНИЯ, ADR GAP-51) и
+ * IAffiliateJwtService (AI_DEVELOPMENT_RULES §3.2, решение В5). Запись в
+ * `users` — через `UsersFacade` (GAP-62 закрыт: межмодульное общение только
+ * через фасад, MODULE_BOUNDARIES).
  */
-import { Inject, Injectable } from '@nestjs/common'
+import { Inject, Injectable, Logger } from '@nestjs/common'
 import * as argon2 from 'argon2'
+
+import { errorMessage } from '@/common/utils/error-message'
+
+import { UsersFacade } from '@modules/users/facade/users.facade'
 
 import { AFFILIATE_JWT_SERVICE, type IAffiliateJwtService } from '../../domain/affiliate.ports'
 import { AffiliateAlreadyExistsError } from '../../domain/errors/affiliate.errors'
@@ -49,12 +55,17 @@ export interface RegisterAffiliateResult {
 
 @Injectable()
 export class RegisterAffiliateUseCase {
+  private readonly logger = new Logger(RegisterAffiliateUseCase.name)
+
   constructor(
     @Inject(AFFILIATE_REPOSITORY) private readonly affiliates: AffiliateRepository,
+    // Чтение чужих таблиц (свободен ли referral_code) — порт; ADR GAP-51.
     @Inject(AFFILIATE_PLAYER_PROVISIONING_REPOSITORY)
     private readonly players: AffiliatePlayerProvisioningRepository,
     @Inject(AffiliateSettingsService) private readonly settings: AffiliateSettingsService,
     @Inject(AFFILIATE_JWT_SERVICE) private readonly jwt: IAffiliateJwtService,
+    // GAP-62: запись в `users` только через фасад владельца данных.
+    @Inject(UsersFacade) private readonly users: UsersFacade,
   ) {}
 
   async execute(input: RegisterAffiliateInput): Promise<RegisterAffiliateResult> {
@@ -71,7 +82,7 @@ export class RegisterAffiliateUseCase {
     const revshareRate = parseRevShareRate(settings.defaultRevshareRate)
     const passwordHash = await argon2.hash(input.password, { type: argon2.argon2id })
     const trackingCode = await this.affiliates.generateUniqueTrackingCode()
-    const player = await this.players.createPlayerUser({
+    const player = await this.users.provisionAffiliatePlayer({
       referralCode: await generateUniquePlayerReferralCode(this.players),
     })
     try {
@@ -97,9 +108,30 @@ export class RegisterAffiliateUseCase {
       }
     } catch (err) {
       // Компенсирующая проводка: без неё user-запись осталась бы сиротой
-      // (например, при гонке на уникальном email).
-      await this.players.deletePlayerUser(player.id).catch(() => undefined)
+      // (например, при гонке на уникальном email). try покрывает и выдачу
+      // токена: отказ JWT после успешной записи тоже должен откатывать пару
+      // строк, иначе партнёр останется без токена и не сможет войти.
+      await this.deprovisionPlayer(player.id, err)
       throw err
+    }
+  }
+
+  /**
+   * Компенсация: снятие служебной user-записи, ставшей сиротой.
+   *
+   * Ошибку удаления не поднимаем — иначе клиент вместо настоящей причины
+   * отказа (`affiliates.create`) получил бы вторую ошибку поверх неё. Но и
+   * молча проглотить её нельзя: сирота в `users` при этом остаётся, и без
+   * записи в лог о нём никто не узнает (GAP-62).
+   */
+  private async deprovisionPlayer(userId: string, cause: unknown): Promise<void> {
+    try {
+      await this.users.deprovisionAffiliatePlayer(userId)
+    } catch (cleanupError: unknown) {
+      this.logger.warn(
+        `Orphan player ${userId} left in users after affiliate register failed ` +
+          `(${errorMessage(cause)}); compensating delete failed: ${errorMessage(cleanupError)}`,
+      )
     }
   }
 

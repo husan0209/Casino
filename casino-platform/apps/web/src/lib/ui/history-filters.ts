@@ -179,7 +179,7 @@ export function paymentStatusLabel(status: string | null): string | null {
 /** Цвет статуса: ожидающий — нейтральный, успех — зелёный, остальное — красным. */
 export function paymentStatusClass(status: string | null): string {
   if (status === 'completed') {
-    return 'text-[#00C853]'
+    return 'text-money-dark'
   }
   if (status === 'pending' || status === 'processing') {
     return 'text-[#FFB300]'

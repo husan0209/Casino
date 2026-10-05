@@ -11,6 +11,7 @@ type ProfileUpdateFields = {
 import { prisma, type Prisma } from '@casino/database'
 
 import {
+  type CreateServiceUserInput,
   type IUserProfileRepository,
   type UserProfileFull,
   type UserGeoContext,
@@ -100,7 +101,10 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
     }
   }
 
-  private profileCreateData(data: ProfileUpdateFields, userId: string): Prisma.UserProfileUncheckedCreateInput {
+  private profileCreateData(
+    data: ProfileUpdateFields,
+    userId: string,
+  ): Prisma.UserProfileUncheckedCreateInput {
     return {
       userId,
       firstName: data.firstName ?? null,
@@ -122,7 +126,9 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
     await prisma.userSettings.upsert({
       where: { userId },
       update: {
-        ...(data.notificationsEmail !== undefined && { notificationsEmail: data.notificationsEmail }),
+        ...(data.notificationsEmail !== undefined && {
+          notificationsEmail: data.notificationsEmail,
+        }),
         ...(data.notificationsPush !== undefined && { notificationsPush: data.notificationsPush }),
         ...(data.language !== undefined && { language: data.language }),
         ...(data.timezone !== undefined && { timezone: data.timezone }),
@@ -142,5 +148,43 @@ export class PrismaUserProfileRepository implements IUserProfileRepository {
       update: { avatarUrl },
       create: { userId, avatarUrl },
     })
+  }
+
+  /**
+   * GAP-62: служебная учётная запись создаётся здесь, а не в модуле-потребителе.
+   *
+   * Колонки берёт из input без «улучшений»: решение «email = null, status =
+   * 'active'» принимает application-слой (`ProvisionAffiliatePlayerUseCase`),
+   * инфраструктура лишь кладёт их в строку. Никаких `authProviders`: у
+   * служебной записи нет способа входа (пароль партнёра живёт в
+   * `affiliates.password_hash`), а `passwordHash` остаётся NULL — как и было,
+   * когда INSERT делал affiliate.
+   */
+  async createServiceUser(input: CreateServiceUserInput): Promise<{ id: string }> {
+    const user = await prisma.user.create({
+      data: {
+        email: input.email,
+        status: input.status,
+        referralCode: input.referralCode,
+      },
+      select: { id: true },
+    })
+    return user
+  }
+
+  /**
+   * GAP-62: compensate-удаление сироты.
+   *
+   * `deleteMany` с условием `email: null`, а не `delete({ id })`: `delete`
+   * бросил бы P2025 на уже отсутствующей строке и, главное, удалял бы ЛЮБУЮ
+   * учётную запись по id — включая аккаунт игрока, на котором каскадом
+   * (`onDelete: Cascade` у wallets/ledger/sessions) уехали бы кошелёк и вся
+   * история. Условия в where — единственный предохранитель на уровне запроса.
+   */
+  async deleteServiceUser(userId: string): Promise<boolean> {
+    const deleted = await prisma.user.deleteMany({
+      where: { id: userId, email: null },
+    })
+    return deleted.count > 0
   }
 }

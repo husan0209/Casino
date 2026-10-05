@@ -67,7 +67,7 @@ export default function AffiliateProgramPage(): React.JSX.Element {
       <div className="grid md:grid-cols-3 gap-4 mb-8">
         <div className="card">
           <div className="text-muted text-sm">Ваш RevShare</div>
-          <div className="text-3xl font-black text-[#00C853] mt-1">
+          <div className="text-3xl font-black text-money-dark mt-1">
             {ratePercent !== null ? `${ratePercent}%` : '…'}
           </div>
           <div className="text-muted text-xs mt-1">от NGR ваших игроков</div>
@@ -97,7 +97,7 @@ export default function AffiliateProgramPage(): React.JSX.Element {
               >
                 <span
                   className={
-                    row.term === '= NGR' ? 'font-bold text-[#00C853]' : 'font-medium text-white'
+                    row.term === '= NGR' ? 'font-bold text-money-dark' : 'font-medium text-white'
                   }
                 >
                   {index === 0 ? row.term : row.term}

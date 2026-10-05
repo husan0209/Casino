@@ -7,7 +7,10 @@ import { errorMessage } from '@/common/utils/error-message'
 
 import { KycFacade } from '@modules/kyc/facade/kyc.facade'
 
-import { InvalidCurrencyError, PaymentProviderError } from '../../domain/errors'
+import { AppError } from '@casino/shared-utils'
+
+import { PaymentProviderError } from '../../domain/errors'
+import { assertReleaseCryptoCurrency } from '../../domain/payment-currency.policy'
 import {
   type INowPaymentsClient,
   type IPaymentRequestRepository,
@@ -39,14 +42,16 @@ export class CreateCryptoDepositUseCase {
     amount: string,
     currency: string,
   ): Promise<CreateCryptoDepositResult> {
-    const allowed = ['USDT_TRC20', 'BTC', 'TON', 'TRX', 'LTC']
-    if (!allowed.includes(currency)) {
-      throw new InvalidCurrencyError()
-    }
+    // TZ-02: допустимые валюты задаёт релизный набор (domain/payment-currency.policy,
+    // источник — @casino/shared-config), а не локальный список. Раньше здесь лежал
+    // свой whitelist с TON/TRX/LTC, и заявка в исключённой из релиза валюте
+    // доходила до провайдера с pay_currency='ton'|'trx'|'ltc'. Отклонение — до
+    // estimate и до createPayment: к NOWPayments не уходит ни один запрос.
+    const payCurrency = assertReleaseCryptoCurrency(currency)
     // estimate RUB for KYC
     const est = await this.np.getEstimatePrice({
       amount,
-      currencyFrom: currency,
+      currencyFrom: payCurrency,
       currencyTo: 'RUB',
     })
     const estimatedRub = est.estimatedAmount || '0'
@@ -57,7 +62,7 @@ export class CreateCryptoDepositUseCase {
       const npRes = await this.np.createPayment({
         priceAmount: amount,
         priceCurrency: 'USD',
-        payCurrency: currency,
+        payCurrency,
         orderId: 'tmp-' + randomUUID(),
         ipnCallbackUrl: this.ipnUrl(),
       })
@@ -86,6 +91,13 @@ export class CreateCryptoDepositUseCase {
         expires_at: npRes.expirationEstimateDate,
       }
     } catch (e) {
+      // AppError (в т.ч. back-stop-проверка релизной валюты в клиенте) наружу
+      // без изменений: INVALID_CURRENCY остаётся 422 со своим кодом, а не
+      // превращается в PAYMENT_PROVIDER_ERROR/502. Сбои провайдера и транспорта
+      // заворачиваются, как и раньше.
+      if (e instanceof AppError) {
+        throw e
+      }
       throw new PaymentProviderError('NOWPayments error', { cause: errorMessage(e) })
     }
   }

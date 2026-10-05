@@ -104,7 +104,7 @@ export function DepositReturnHandler(): React.JSX.Element | null {
     <>
       <div className="sheet-backdrop" onClick={() => setSuccess(null)} />
       <div className="sheet-panel">
-        <p className="text-lg font-semibold text-[#00C853]">
+        <p className="text-lg font-semibold text-money-dark">
           +{formatAmount(success.amount, success.currency)} зачислены
         </p>
         {success.gameSlug ? (

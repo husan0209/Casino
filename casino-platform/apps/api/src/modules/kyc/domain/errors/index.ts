@@ -29,3 +29,16 @@ export class KycFileError extends AppError {
     super(msg)
   }
 }
+/**
+ * Fail-closed для карточки модератора (GAP: `catch(() => '0')` в kyc-admin.service).
+ * Сумма депозитов — основание для выпуска средств и для решения по KYC, поэтому
+ * отказ чтения отдаётся вверх отдельным кодом: модератор видит 503 и не может
+ * одобрить анкету по «нулю депозитов», которого на самом деле нет.
+ */
+export class KycDepositTotalUnavailableError extends AppError {
+  readonly code = 'KYC_DEPOSIT_TOTAL_UNAVAILABLE'
+  readonly httpStatus = 503
+  constructor() {
+    super('Не удалось получить сумму депозитов игрока для проверки KYC')
+  }
+}
