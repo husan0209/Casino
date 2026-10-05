@@ -17,6 +17,8 @@ import { errCode, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import { type LoginSheetMode, useUIStore } from '@/stores/ui'
 
+import { LEGAL_DOCUMENT_VERSIONS } from '@casino/shared-types'
+
 /** §5.1: индикатор силы вместо отдельного «подтвердите пароль». */
 function getStrength(pass: string): { label: string; score: number; color: string } {
   if (!pass) {
@@ -119,11 +121,21 @@ function TermsConsent({
       />
       <span>
         Мне 18+ лет. Я принимаю{' '}
-        <Link href="/legal/terms" className="text-white underline">
+        <Link
+          href="/legal/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white underline"
+        >
           условия использования
         </Link>{' '}
         и{' '}
-        <Link href="/legal/privacy" className="text-white underline">
+        <Link
+          href="/legal/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-white underline"
+        >
           политику конфиденциальности
         </Link>
         .
@@ -177,7 +189,8 @@ function ModeSwitch({
  * не выкидывать на главную.
  */
 export function LoginSheet(): React.JSX.Element | null {
-  const { loginSheet, loginSheetMode, closeLogin, pendingGameSlug } = useUIStore()
+  const { loginSheet, loginSheetClosing, loginSheetMode, closeLogin, pendingGameSlug } =
+    useUIStore()
   const { login, register } = useAuth()
   const [mode, setMode] = useState<LoginSheetMode>('login')
   const [email, setEmail] = useState('')
@@ -195,7 +208,7 @@ export function LoginSheet(): React.JSX.Element | null {
     }
   }, [loginSheet, loginSheetMode])
 
-  if (!loginSheet) {
+  if (!loginSheet && !loginSheetClosing) {
     return null
   }
 
@@ -221,9 +234,12 @@ export function LoginSheet(): React.JSX.Element | null {
         await login(email, password, captchaRequired ? captchaToken : undefined)
       } else {
         // §5.1: сессия создаётся сразу, письмо подтверждения уходит фоном.
+        // Версия условий берётся из того же реестра, что и текст на /legal, —
+        // сервер сверит её и запишет акцепт (GAP-71, Terms §4).
         await register(email, password, {
           referral,
           affiliate: getAffiliateCode() ?? undefined,
+          termsVersion: LEGAL_DOCUMENT_VERSIONS.terms,
         })
         toast.success('Аккаунт создан')
       }
@@ -246,8 +262,11 @@ export function LoginSheet(): React.JSX.Element | null {
 
   return (
     <>
-      <div className="sheet-backdrop" onClick={closeLogin} />
-      <div className="sheet-panel">
+      <div
+        className={`sheet-backdrop${loginSheetClosing ? ' sheet-backdrop-out' : ''}`}
+        onClick={closeLogin}
+      />
+      <div className={`sheet-panel${loginSheetClosing ? ' sheet-panel-out' : ''}`}>
         <div className="sheet-handle" />
         <div className="flex items-center justify-between">
           <div>

@@ -228,8 +228,14 @@ function AmountField({
 }
 
 export function DepositSheet(): React.JSX.Element | null {
-  const { depositSheet, closeDeposit, depositCurrency, pendingGameSlug, openWalletSwitcher } =
-    useUIStore()
+  const {
+    depositSheet,
+    depositSheetClosing,
+    closeDeposit,
+    depositCurrency,
+    pendingGameSlug,
+    openWalletSwitcher,
+  } = useUIStore()
   const { config, load } = useGeoStore()
   const { activeCurrency, fetchWallets, getActiveWallet, setActiveCurrency } = useWalletStore()
   const { user } = useAuth()
@@ -280,7 +286,7 @@ export function DepositSheet(): React.JSX.Element | null {
     enabled: Boolean(depositSheet) && Boolean(user),
   })
 
-  if (!depositSheet) {
+  if (!depositSheet && !depositSheetClosing) {
     return null
   }
 
@@ -333,8 +339,11 @@ export function DepositSheet(): React.JSX.Element | null {
 
   return (
     <>
-      <div className="sheet-backdrop" onClick={closeDeposit} />
-      <div className="sheet-panel">
+      <div
+        className={`sheet-backdrop${depositSheetClosing ? ' sheet-backdrop-out' : ''}`}
+        onClick={closeDeposit}
+      />
+      <div className={`sheet-panel${depositSheetClosing ? ' sheet-panel-out' : ''}`}>
         <div className="sheet-handle" />
         <SheetTop
           currency={payCurrency}

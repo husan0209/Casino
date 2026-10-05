@@ -65,7 +65,7 @@ function WalletRow({
  * кошелёк». Суммы «итого ≈» нет (§2 пр.6, Don't-лист).
  */
 export function WalletSwitcher(): React.JSX.Element | null {
-  const { walletSwitcher, closeWalletSwitcher, openDeposit } = useUIStore()
+  const { walletSwitcher, walletSwitcherClosing, closeWalletSwitcher, openDeposit } = useUIStore()
   const { wallets, activeCurrency, fetchWallets, setActiveCurrency } = useWalletStore()
   const { config, load } = useGeoStore()
 
@@ -76,7 +76,7 @@ export function WalletSwitcher(): React.JSX.Element | null {
     }
   }, [walletSwitcher, load, fetchWallets])
 
-  if (!walletSwitcher) {
+  if (!walletSwitcher && !walletSwitcherClosing) {
     return null
   }
 
@@ -109,8 +109,11 @@ export function WalletSwitcher(): React.JSX.Element | null {
 
   return (
     <>
-      <div className="sheet-backdrop" onClick={closeWalletSwitcher} />
-      <div className="sheet-panel">
+      <div
+        className={`sheet-backdrop${walletSwitcherClosing ? ' sheet-backdrop-out' : ''}`}
+        onClick={closeWalletSwitcher}
+      />
+      <div className={`sheet-panel${walletSwitcherClosing ? ' sheet-panel-out' : ''}`}>
         <div className="sheet-handle" />
         <div className="flex items-center justify-between">
           <div>
