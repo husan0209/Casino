@@ -85,4 +85,29 @@ describe('Каталог: тулбар фильтров', () => {
       vi.useRealTimers()
     }
   })
+
+  it('лента провайдеров: мышь тянет скролл, клик после драга глушится', () => {
+    renderBar()
+    const row = screen.getByRole('group', { name: 'Провайдеры' })
+    Object.defineProperty(row, 'scrollLeft', { value: 0, writable: true })
+    // jsdom теряет clientX у PointerEvent — диспетчеризуем MouseEvent с координатами
+    const dragEvent = (type: string, clientX: number): void => {
+      row.dispatchEvent(new MouseEvent(type, { clientX, bubbles: true, cancelable: true }))
+    }
+
+    dragEvent('pointerdown', 200)
+    dragEvent('pointermove', 140)
+    expect(row.scrollLeft).toBe(60)
+
+    dragEvent('pointerup', 140)
+    // moved=true ещё живёт до клика — чип под курсором не должен выбраться
+    fireEvent.click(screen.getByRole('button', { name: 'RG provider' }))
+    expect(onChangeMock).not.toHaveBeenCalled()
+  })
+
+  it('лента провайдеров: обычный клик без драга выбирает чип', () => {
+    renderBar()
+    fireEvent.click(screen.getByRole('button', { name: 'RG provider' }))
+    expect(onChangeMock).toHaveBeenCalledWith({ provider: 'rg-1' })
+  })
 })

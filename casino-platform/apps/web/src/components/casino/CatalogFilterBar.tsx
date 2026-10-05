@@ -101,7 +101,9 @@ function SortDropdown({
   )
 }
 
-/** Провайдеры: горизонтальная лента чипов с аватарками-буквами (или логотипом). */
+/** Провайдеры: горизонтальная лента чипов с аватарками-буквами (или логотипом).
+ *  Тач скроллится нативно, мышь — drag-to-scroll (скроллбар скрыт, тянуть мышью
+ *  иначе невозможно); клик после драга глушится, чтобы чип не срабатывал. */
 function ProviderChipsRow({
   providers,
   active,
@@ -111,6 +113,50 @@ function ProviderChipsRow({
   active: string
   onSelect: (slug: string) => void
 }): React.JSX.Element {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const drag = useRef({ active: false, startX: 0, startLeft: 0, moved: false })
+
+  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
+    if (event.pointerType === 'touch') {
+      return // тач — нативный скролл контейнера
+    }
+    const el = scrollRef.current
+    if (!el) {
+      return
+    }
+    drag.current = { active: true, startX: event.clientX, startLeft: el.scrollLeft, moved: false }
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      /* jsdom/IAB без pointer capture — драг работает, пока курсор над лентой */
+    }
+  }
+
+  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>): void => {
+    const el = scrollRef.current
+    if (!drag.current.active || !el) {
+      return
+    }
+    const dx = event.clientX - drag.current.startX
+    if (Math.abs(dx) > 4) {
+      drag.current.moved = true
+    }
+    el.scrollLeft = drag.current.startLeft - dx
+  }
+
+  const endDrag = (): void => {
+    drag.current.active = false
+  }
+
+  // Драг не должен выбирать чип: глушим клик, если курсор реально двигался.
+  const onClickCapture = (event: React.MouseEvent<HTMLDivElement>): void => {
+    if (drag.current.moved) {
+      event.preventDefault()
+      event.stopPropagation()
+      drag.current.moved = false
+    }
+  }
+
   const chipClass = (selected: boolean): string =>
     `flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition ${
       selected
@@ -119,43 +165,57 @@ function ProviderChipsRow({
     }`
 
   return (
-    <div
-      role="group"
-      aria-label="Провайдеры"
-      className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      <button
-        type="button"
-        onClick={() => onSelect('')}
-        aria-pressed={active === ''}
-        className={chipClass(active === '')}
+    <div className="relative">
+      {providers.length > 6 && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 rounded-r-xl bg-gradient-to-l from-[#16213E] to-transparent"
+        />
+      )}
+      <div
+        ref={scrollRef}
+        role="group"
+        aria-label="Провайдеры"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onClickCapture={onClickCapture}
+        className="-mx-1 flex cursor-grab select-none items-center gap-1.5 overflow-x-auto overscroll-x-contain px-1 pb-1 active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        Все провайдеры
-      </button>
-      {providers.map((provider) => {
-        const color = pickProviderColor(provider.name)
-        return (
-          <button
-            key={provider.slug}
-            type="button"
-            onClick={() => onSelect(provider.slug)}
-            aria-pressed={active === provider.slug}
-            className={chipClass(active === provider.slug)}
-          >
-            {provider.logo_url ? (
-              <img src={provider.logo_url} alt="" className="h-4 w-4 rounded-full object-cover" />
-            ) : (
-              <span
-                aria-hidden
-                className={`grid h-4 w-4 place-items-center rounded-full text-[9px] font-black text-white ${color.icon}`}
-              >
-                {provider.name.charAt(0).toUpperCase()}
-              </span>
-            )}
-            {provider.name}
-          </button>
-        )
-      })}
+        <button
+          type="button"
+          onClick={() => onSelect('')}
+          aria-pressed={active === ''}
+          className={chipClass(active === '')}
+        >
+          Все провайдеры
+        </button>
+        {providers.map((provider) => {
+          const color = pickProviderColor(provider.name)
+          return (
+            <button
+              key={provider.slug}
+              type="button"
+              onClick={() => onSelect(provider.slug)}
+              aria-pressed={active === provider.slug}
+              className={chipClass(active === provider.slug)}
+            >
+              {provider.logo_url ? (
+                <img src={provider.logo_url} alt="" className="h-4 w-4 rounded-full object-cover" />
+              ) : (
+                <span
+                  aria-hidden
+                  className={`grid h-4 w-4 place-items-center rounded-full text-[9px] font-black text-white ${color.icon}`}
+                >
+                  {provider.name.charAt(0).toUpperCase()}
+                </span>
+              )}
+              {provider.name}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }
