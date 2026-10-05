@@ -1,16 +1,19 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common'
 
-import { prisma, type Prisma, type ReferralRewardStatus, type ReferralRewardType } from '@casino/database'
+import { AdminAuthGuard } from '@modules/admin/presentation/admin-auth.guard'
+import { Roles, RolesGuard } from '@modules/auth/presentation/guards/roles.guard'
 
-import { AuthGuard } from '../../auth/presentation/guards/auth.guard'
-import { Roles, RolesGuard } from '../../auth/presentation/guards/roles.guard'
+import { prisma, type Prisma, type ReferralRewardStatus, type ReferralRewardType } from '@casino/database'
 
 /**
  * Ручной триггер начислений POST admin/referrals/run-daily (GAP-32/21) переехал
  * в maintenance/presentation/maintenance-admin.controller.ts (решение В2):
  * путь, guards, тело запроса и форма ответа сохранены один-в-один.
  */
-@UseGuards(AuthGuard, RolesGuard)
+// AdminAuthGuard — токен админ-панели aud='admin': плеерский AuthGuard
+// (aud='user') отвечал 401, и панель разлогинивалась на «Рефералах».
+// Сетка ролей прежняя: роль RolesGuard берёт из админ-JWT.
+@UseGuards(AdminAuthGuard, RolesGuard)
 @Roles('admin', 'superadmin')
 @Controller('admin/referrals')
 export class ReferralsAdminController {
