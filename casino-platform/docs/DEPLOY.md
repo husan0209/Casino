@@ -15,6 +15,14 @@
 3. На VPS job выполняет: `git pull` → `docker compose build --pull` → `up -d` →
    `npx prisma migrate deploy` (миграции применяются автоматически на деплое — GAP-31).
 
+> ⚠️ Пересоздание upstream'а без nginx ломает проксирование. nginx резолвит имя
+> сервиса (`api`, `web`, `admin`) один раз при старте и держит IP в своём кэше, а
+> пересозданный `docker compose up -d --force-recreate api` контейнер получает ДРУГОЙ
+> IP. Итог: API `healthy`, сайт жив, а любой запрос через nginx отдаёт 502.
+> Если пересоздаёте не весь стек, а один сервис — перезапустите и nginx:
+> `docker compose -f docker-compose.prod.yml restart nginx`. Проверено на живом
+> стенде 2026-10-05 (прогоны крипто-депозитов падали 502 ровно по этой причине).
+
 `workflow_dispatch` доступен только с default-ветки (правило репо).
 
 ## 1st deploy – Hetzner CX41 Ubuntu 24.04
