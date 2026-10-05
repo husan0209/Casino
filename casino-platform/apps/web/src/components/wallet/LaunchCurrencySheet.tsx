@@ -4,11 +4,16 @@ import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
 export function LaunchCurrencySheet(): React.JSX.Element | null {
-  const { launchCurrencySheet, launchCurrencyOptions, closeLaunchCurrency, openDeposit } =
-    useUIStore()
+  const {
+    launchCurrencySheet,
+    launchCurrencySheetClosing,
+    launchCurrencyOptions,
+    closeLaunchCurrency,
+    openDeposit,
+  } = useUIStore()
   const { setActiveCurrency } = useWalletStore()
 
-  if (!launchCurrencySheet || !launchCurrencyOptions) {
+  if ((!launchCurrencySheet && !launchCurrencySheetClosing) || !launchCurrencyOptions) {
     return null
   }
 
@@ -28,8 +33,11 @@ export function LaunchCurrencySheet(): React.JSX.Element | null {
 
   return (
     <>
-      <div className="sheet-backdrop" onClick={closeLaunchCurrency} />
-      <div className="sheet-panel">
+      <div
+        className={`sheet-backdrop${launchCurrencySheetClosing ? ' sheet-backdrop-out' : ''}`}
+        onClick={closeLaunchCurrency}
+      />
+      <div className={`sheet-panel${launchCurrencySheetClosing ? ' sheet-panel-out' : ''}`}>
         <h2 className="text-lg font-semibold">
           В {currencyLabel(activeCurrency)} пусто
         </h2>

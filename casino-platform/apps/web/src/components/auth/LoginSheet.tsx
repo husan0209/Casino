@@ -179,7 +179,8 @@ function ModeSwitch({
  * не выкидывать на главную.
  */
 export function LoginSheet(): React.JSX.Element | null {
-  const { loginSheet, loginSheetMode, closeLogin, pendingGameSlug } = useUIStore()
+  const { loginSheet, loginSheetClosing, loginSheetMode, closeLogin, pendingGameSlug } =
+    useUIStore()
   const { login, register } = useAuth()
   const [mode, setMode] = useState<LoginSheetMode>('login')
   const [email, setEmail] = useState('')
@@ -197,7 +198,7 @@ export function LoginSheet(): React.JSX.Element | null {
     }
   }, [loginSheet, loginSheetMode])
 
-  if (!loginSheet) {
+  if (!loginSheet && !loginSheetClosing) {
     return null
   }
 
@@ -251,8 +252,8 @@ export function LoginSheet(): React.JSX.Element | null {
 
   return (
     <>
-      <div className="sheet-backdrop" onClick={closeLogin} />
-      <div className="sheet-panel">
+      <div className={`sheet-backdrop${loginSheetClosing ? ' sheet-backdrop-out' : ""}`} onClick={closeLogin} />
+      <div className={`sheet-panel${loginSheetClosing ? ' sheet-panel-out' : ""}`}>
         <div className="sheet-handle" />
         <div className="flex items-center justify-between">
           <div>

@@ -47,8 +47,15 @@ const FALLBACK_FIAT_METHODS: { id: WithdrawMethod; label: string }[] = [
 ]
 
 export function WithdrawSheet(): React.JSX.Element | null {
-  const { withdrawSheet, closeWithdraw, openWithdraw, withdrawCurrency, openDeposit, openWalletSwitcher } =
-    useUIStore()
+  const {
+    withdrawSheet,
+    withdrawSheetClosing,
+    closeWithdraw,
+    openWithdraw,
+    withdrawCurrency,
+    openDeposit,
+    openWalletSwitcher,
+  } = useUIStore()
   const { wallets, activeCurrency, fetchWallets, refreshActive } = useWalletStore()
   const { config, load } = useGeoStore()
   const { user } = useAuth()
@@ -118,13 +125,13 @@ export function WithdrawSheet(): React.JSX.Element | null {
     },
   })
 
-  if (!withdrawSheet) {
+  if (!withdrawSheet && !withdrawSheetClosing) {
     return null
   }
 
   if (precheck.kind !== 'form' && stage !== 'done') {
     return (
-      <SheetShell onClose={closeWithdraw}>
+      <SheetShell onClose={closeWithdraw} closing={withdrawSheetClosing}>
         <WithdrawPrecheckPanel
           precheck={precheck}
           currency={currency}
@@ -160,7 +167,7 @@ export function WithdrawSheet(): React.JSX.Element | null {
   }
 
   return (
-    <SheetShell onClose={closeWithdraw}>
+    <SheetShell onClose={closeWithdraw} closing={withdrawSheetClosing}>
         {stage === 'done' && (
           <DonePanel
             requestId={requestId}
@@ -426,15 +433,20 @@ function WithdrawPrecheckPanel({
 /** Оболочка листа: затемнение + нижняя панель + заголовок (одна на все стадии). */
 function SheetShell({
   onClose,
+  closing,
   children,
 }: {
   onClose: () => void
+  closing: boolean
   children: React.ReactNode
 }): React.JSX.Element {
   return (
     <>
-      <div className="sheet-backdrop" onClick={onClose} />
-      <div className="sheet-panel">
+      <div
+        className={`sheet-backdrop${closing ? ' sheet-backdrop-out' : ''}`}
+        onClick={onClose}
+      />
+      <div className={`sheet-panel${closing ? ' sheet-panel-out' : ''}`}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Вывод средств</h2>
           <button type="button" onClick={onClose} className="text-muted" aria-label="Закрыть">

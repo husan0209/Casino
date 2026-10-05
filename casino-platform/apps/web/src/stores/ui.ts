@@ -3,6 +3,14 @@ import { create } from 'zustand'
 
 import type { GameDto } from '@/types/casino'
 
+/**
+ * Листы уходят с анимацией: close ставит closing-флаг (компонент в это время
+ * рисует sheet-panel-out / sheet-backdrop-out), жёсткое скрытие — через
+ * SHEET_EXIT_MS, когда exit-анимация (200ms) доиграла. open* сбрасывает
+ * closing, чтобы reopen во время закрытия не мигал.
+ */
+const SHEET_EXIT_MS = 210
+
 export interface LaunchCurrencyOptions {
   slug: string
   activeCurrency: string
@@ -28,15 +36,21 @@ export type LoginSheetMode = 'login' | 'register'
 
 interface UIState {
   loginSheet: boolean
+  loginSheetClosing: boolean
   loginSheetMode: LoginSheetMode
   depositSheet: boolean
+  depositSheetClosing: boolean
   /** GAP-55 (з) §10.3/§16.1: касса вывода — глобальный sheet (открывается и поверх игры). */
   withdrawSheet: boolean
+  withdrawSheetClosing: boolean
   withdrawCurrency?: string | undefined
   walletSwitcher: boolean
+  walletSwitcherClosing: boolean
   launchCurrencySheet: boolean
+  launchCurrencySheetClosing: boolean
   launchCurrencyOptions: LaunchCurrencyOptions | null
   gamePreview: GamePreviewOptions | null
+  gamePreviewClosing: boolean
   pendingGameSlug: string | null
   depositCurrency?: string | undefined
   openLogin: (gameSlug?: string, mode?: LoginSheetMode) => void
@@ -53,27 +67,63 @@ interface UIState {
   closeGamePreview: () => void
 }
 
-export const useUIStore = create<UIState>((set) => ({
+type SheetKey =
+  | 'loginSheet'
+  | 'depositSheet'
+  | 'withdrawSheet'
+  | 'walletSwitcher'
+  | 'launchCurrencySheet'
+  | 'gamePreview'
+
+/** Closing-флаг сейчас, жёсткое скрытие — когда exit-анимация доиграла. */
+function deferredHide(
+  set: (partial: Partial<UIState>) => void,
+  get: () => UIState,
+  sheet: SheetKey,
+): void {
+  const closing = `${sheet}Closing` as keyof UIState
+  if (get()[closing] === true) {
+    return
+  }
+  set({ [closing]: true } as Partial<UIState>)
+  setTimeout(() => set({ [sheet]: false, [closing]: false } as Partial<UIState>), SHEET_EXIT_MS)
+}
+
+export const useUIStore = create<UIState>((set, get) => ({
   loginSheet: false,
+  loginSheetClosing: false,
   loginSheetMode: 'login',
   depositSheet: false,
+  depositSheetClosing: false,
   withdrawSheet: false,
+  withdrawSheetClosing: false,
   walletSwitcher: false,
+  walletSwitcherClosing: false,
   launchCurrencySheet: false,
+  launchCurrencySheetClosing: false,
   launchCurrencyOptions: null,
   gamePreview: null,
+  gamePreviewClosing: false,
   pendingGameSlug: null,
   openLogin: (gameSlug, mode) =>
-    set({ loginSheet: true, loginSheetMode: mode ?? 'login', pendingGameSlug: gameSlug ?? null }),
-  closeLogin: () => set({ loginSheet: false }),
-  openDeposit: (currency) => set({ depositSheet: true, depositCurrency: currency }),
-  closeDeposit: () => set({ depositSheet: false, depositCurrency: undefined }),
-  openWithdraw: (currency) => set({ withdrawSheet: true, withdrawCurrency: currency }),
-  closeWithdraw: () => set({ withdrawSheet: false, withdrawCurrency: undefined }),
-  openWalletSwitcher: () => set({ walletSwitcher: true }),
-  closeWalletSwitcher: () => set({ walletSwitcher: false }),
-  openLaunchCurrency: (opts) => set({ launchCurrencySheet: true, launchCurrencyOptions: opts }),
-  closeLaunchCurrency: () => set({ launchCurrencySheet: false, launchCurrencyOptions: null }),
-  openGamePreview: (opts) => set({ gamePreview: opts }),
-  closeGamePreview: () => set({ gamePreview: null }),
+    set({
+      loginSheet: true,
+      loginSheetClosing: false,
+      loginSheetMode: mode ?? 'login',
+      pendingGameSlug: gameSlug ?? null,
+    }),
+  closeLogin: () => deferredHide(set, get, 'loginSheet'),
+  openDeposit: (currency) =>
+    set({ depositSheet: true, depositSheetClosing: false, depositCurrency: currency }),
+  closeDeposit: () => deferredHide(set, get, 'depositSheet'),
+  openWithdraw: (currency) =>
+    set({ withdrawSheet: true, withdrawSheetClosing: false, withdrawCurrency: currency }),
+  closeWithdraw: () => deferredHide(set, get, 'withdrawSheet'),
+  openWalletSwitcher: () => set({ walletSwitcher: true, walletSwitcherClosing: false }),
+  closeWalletSwitcher: () => deferredHide(set, get, 'walletSwitcher'),
+  openLaunchCurrency: (opts) =>
+    set({ launchCurrencySheet: true, launchCurrencySheetClosing: false, launchCurrencyOptions: opts }),
+  closeLaunchCurrency: () => deferredHide(set, get, 'launchCurrencySheet'),
+  openGamePreview: (opts) => set({ gamePreview: opts, gamePreviewClosing: false }),
+  closeGamePreview: () => deferredHide(set, get, 'gamePreview'),
 }))
