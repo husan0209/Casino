@@ -61,7 +61,13 @@ export class CreateCryptoDepositUseCase {
       // create NP payment first to get pay_address
       const npRes = await this.np.createPayment({
         priceAmount: amount,
-        priceCurrency: 'USD',
+        // `amount` — это количество ЕДИНИЦ ВАЛЮТЫ ОПЛАТЫ: так же трактует его UI
+        // (подпись «Сумма, USDT/BTC» и placeholder 0.00) и так же считает RUB-оценку
+        // выше — estimate(payCurrency → RUB). Литерал 'USD' здесь означал, что
+        // NOWPayments берёт цену в долларах: депозит «0.0005 BTC» превращался в счёт
+        // на $0.0005 ≈ 1e-8 BTC, и BTC-депозит падал с AMOUNT_MINIMAL_ERROR на любой
+        // сумме. Для USDT баг маскировался курсом 1:1 и был не виден.
+        priceCurrency: payCurrency,
         payCurrency,
         orderId: 'tmp-' + randomUUID(),
         ipnCallbackUrl: this.ipnUrl(),

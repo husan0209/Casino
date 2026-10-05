@@ -34,6 +34,9 @@ type CreatedRow = Record<string, unknown>
 function makeDeps(over: { npError?: Error } = {}) {
   const created: CreatedRow[] = []
   const kycCalls: Array<{ userId: string; rub: string }> = []
+  // Аргументы createPayment раньше не захватывались: тест проверял только результат,
+  // поэтому priceCurrency='USD' при сумме в монетах проходил как зелёный.
+  const paymentCalls: Array<Record<string, unknown>> = []
 
   const repo = {
     create: async (data: CreatedRow) => {
@@ -44,7 +47,12 @@ function makeDeps(over: { npError?: Error } = {}) {
 
   const np: INowPaymentsClient = {
     getEstimatePrice: async () => ({ estimatedAmount: '12345.5' }),
-    createPayment: async () => {
+    createPayment: async (params: {
+      priceAmount: string
+      priceCurrency: string
+      payCurrency: string
+    }) => {
+      paymentCalls.push({ ...params })
       if (over.npError) {
         throw over.npError
       }
@@ -61,7 +69,7 @@ function makeDeps(over: { npError?: Error } = {}) {
   const config = { get: () => undefined } as never
 
   const uc = new CreateCryptoDepositUseCase(repo, np, kyc, config)
-  return { uc, created, kycCalls }
+  return { uc, created, kycCalls, paymentCalls }
 }
 
 describe('CreateCryptoDepositUseCase', () => {
@@ -88,6 +96,27 @@ describe('CreateCryptoDepositUseCase', () => {
       pay_amount: '99.9',
       pay_currency: 'USDT_TRC20',
       expires_at: '2026-10-03T00:00:00.000Z',
+    })
+    // Цена инвойса обязана быть в валюте оплаты: `amount` — это монеты, а не доллары.
+    expect(d.paymentCalls).toHaveLength(1)
+    expect(d.paymentCalls[0]).toMatchObject({
+      priceAmount: '99.9',
+      priceCurrency: 'USDT_TRC20',
+      payCurrency: 'USDT_TRC20',
+    })
+  })
+
+  // Регрессия: при priceCurrency='USD' NOWPayments считал цену в долларах и на
+  // «0.0005 BTC» выдавал AMOUNT_MINIMAL_ERROR (1e-8 BTC), то есть любой BTC-депозит
+  // был невозможен. USDT скрывал это курсом 1:1, поэтому случай нужен именно BTC.
+  it('BTC: сумма в монетах уходит ценой в монетах, а не в USD', async () => {
+    const d = makeDeps()
+    await d.uc.execute('u-1', '0.0005', 'BTC')
+
+    expect(d.paymentCalls[0]).toMatchObject({
+      priceAmount: '0.0005',
+      priceCurrency: 'BTC',
+      payCurrency: 'BTC',
     })
   })
 

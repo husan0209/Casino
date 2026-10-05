@@ -219,7 +219,9 @@ export class NOWPaymentsClient implements INowPaymentsClient {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
     if (!res.ok) {
-      throw new PaymentProviderError(`HTTP ${res.status}`)
+      // Тело ответа — единственное, что объясняет отказ (например AMOUNT_MINIMAL_ERROR
+      // с конкретной суммой). Без него диагностика сводится к «HTTP 400».
+      throw new PaymentProviderError(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
     }
     const d = asPspResponse<NOWPaymentsPaymentStatusResponse>(await res.json())
     return {
@@ -259,7 +261,8 @@ export class NOWPaymentsClient implements INowPaymentsClient {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       })
       if (!res.ok) {
-        throw new PaymentProviderError(`HTTP ${res.status}`)
+        // См. getPaymentStatus: без тела 429/400 неотличимы друг от друга.
+        throw new PaymentProviderError(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
       }
       const d = asPspResponse<NOWPaymentsEstimateResponse>(await res.json())
       // Курс остаётся строкой: `String(Number(x))` на границе терял формат
@@ -321,7 +324,8 @@ export class NOWPaymentsClient implements INowPaymentsClient {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
     if (!res.ok) {
-      throw new PaymentProviderError(`estimate HTTP ${res.status}`)
+      const detail = (await res.text()).slice(0, 200)
+      throw new PaymentProviderError(`estimate HTTP ${res.status}: ${detail}`)
     }
     const d = asPspResponse<NOWPaymentsEstimateResponse>(await res.json())
     return { estimatedAmount: String(d.estimated_amount ?? params.amount) }
