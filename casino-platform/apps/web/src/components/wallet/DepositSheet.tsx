@@ -403,7 +403,7 @@ export function DepositSheet(): React.JSX.Element | null {
 
             {kycNotApproved && limitRemaining !== undefined && !limitExhausted && (
               <p className="mt-2 text-center text-xs text-muted">
-                Без верификации можно выводить до{' '}
+                Без верификации осталось{' '}
                 {formatAmount(limitRemaining, kyc?.limit_currency ?? '', true)}
               </p>
             )}
