@@ -15,6 +15,18 @@ import {
 const HISTORY_TTL_MS = 7 * 86_400_000
 
 /**
+ * Пауза между /estimate по разным валютам. NOWPayments ограничивает частоту
+ * запросов, а задача перебирает display-валюты подряд: на живом стенде пачка
+ * из четырёх запросов укладывалась в 315 мс и провайдер отвечал 429, из-за чего
+ * курсы всегда брались из DISPLAY_RUB_RATES (source='static') и задача теряла
+ * смысл. 250 мс дают ~4 запроса/сек — с запасом под лимит и без заметного
+ * влияния на длительность тика (интервал 5 мин).
+ */
+const ESTIMATE_MIN_INTERVAL_MS = 250
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
  * Job `update-rates` (GAP-33, ТЗ ч.3 §13): каждые JOB_UPDATE_RATES_EVERY_MS
  * (default 5 мин) обновляет курсы RUB для display-валют:
  * - крипто (USDT_TRC20/BTC) — через RATES_PROVIDER (NOWPayments /estimate;
@@ -38,11 +50,16 @@ export class UpdateRatesJob {
     let skipped = 0
     let source = 'static'
     const cached: Record<string, string> = {}
+    let requests = 0
 
     for (const currency of Object.keys(DISPLAY_RUB_RATES)) {
       if (currency === 'RUB') {
         continue // 1:1, в таблицу не пишем
       }
+      if (requests > 0) {
+        await sleep(ESTIMATE_MIN_INTERVAL_MS)
+      }
+      requests++
       // Сбой провайдера по одной валюте не отменяет остальные: fallback на константу
       const live = await this.provider.estimateRub(currency).catch(() => null)
       const rate =
