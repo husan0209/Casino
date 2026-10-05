@@ -12,17 +12,15 @@ import {
   type CatalogCategory,
   type CatalogFilters,
 } from '@/lib/ui/catalog-filters'
-import { pickProviderColor } from '@/lib/ui/provider-colors'
 import type { ProviderDto } from '@/types/casino'
 
 /**
  * GAP-55 (ТЗ ч.5 §7): фильтры каталога. Чипы категорий (пустые не показываем),
- * поиск с иконкой и очисткой, сортировка — кастомный дропдаун, провайдеры —
- * горизонтальная лента чипов с аватарками (паттерн лобби 2024: нативные select
- * с десятками неотличимых опций не читаются). Активные фильтры — съёмные чипы
- * + «Сбросить фильтры» одной кнопкой (§7), счётчик найденного обязателен.
- * Состояние — в URL (родитель), здесь только управление; поиск с debounce.
- * На телефоне — bottom sheet «Фильтры» с теми же чипами (§7, не сайдбар).
+ * поиск с иконкой и очисткой, сортировка — кастомный дропдаун. Провайдерского
+ * фильтра в UI НЕТ (по фидбеку: игроки не думают провайдерами — ищут игру по
+ * названию); параметр ?provider= из старых ссылок honoured: если он в URL,
+ * показывается съёмный чип. Активные фильтры — съёмные чипы + «Сбросить всё».
+ * Состояние — в URL (родитель); поиск с debounce. На телефоне — bottom sheet.
  */
 const SEARCH_DEBOUNCE_MS = 300
 
@@ -101,125 +99,6 @@ function SortDropdown({
   )
 }
 
-/** Провайдеры: горизонтальная лента чипов с аватарками-буквами (или логотипом).
- *  Тач скроллится нативно, мышь — drag-to-scroll (скроллбар скрыт, тянуть мышью
- *  иначе невозможно); клик после драга глушится, чтобы чип не срабатывал. */
-function ProviderChipsRow({
-  providers,
-  active,
-  onSelect,
-}: {
-  providers: ProviderDto[]
-  active: string
-  onSelect: (slug: string) => void
-}): React.JSX.Element {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const drag = useRef({ active: false, startX: 0, startLeft: 0, moved: false })
-
-  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
-    if (event.pointerType === 'touch') {
-      return // тач — нативный скролл контейнера
-    }
-    const el = scrollRef.current
-    if (!el) {
-      return
-    }
-    drag.current = { active: true, startX: event.clientX, startLeft: el.scrollLeft, moved: false }
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId)
-    } catch {
-      /* jsdom/IAB без pointer capture — драг работает, пока курсор над лентой */
-    }
-  }
-
-  const onPointerMove = (event: React.PointerEvent<HTMLDivElement>): void => {
-    const el = scrollRef.current
-    if (!drag.current.active || !el) {
-      return
-    }
-    const dx = event.clientX - drag.current.startX
-    if (Math.abs(dx) > 4) {
-      drag.current.moved = true
-    }
-    el.scrollLeft = drag.current.startLeft - dx
-  }
-
-  const endDrag = (): void => {
-    drag.current.active = false
-  }
-
-  // Драг не должен выбирать чип: глушим клик, если курсор реально двигался.
-  const onClickCapture = (event: React.MouseEvent<HTMLDivElement>): void => {
-    if (drag.current.moved) {
-      event.preventDefault()
-      event.stopPropagation()
-      drag.current.moved = false
-    }
-  }
-
-  const chipClass = (selected: boolean): string =>
-    `flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition ${
-      selected
-        ? 'border-[#6C63FF] bg-[#6C63FF]/15 text-white'
-        : 'border-[#2A2A4A]/70 text-muted hover:border-[#6C63FF]/40 hover:text-white'
-    }`
-
-  return (
-    <div className="relative">
-      {providers.length > 6 && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 rounded-r-xl bg-gradient-to-l from-[#16213E] to-transparent"
-        />
-      )}
-      <div
-        ref={scrollRef}
-        role="group"
-        aria-label="Провайдеры"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onClickCapture={onClickCapture}
-        className="-mx-1 flex cursor-grab select-none items-center gap-1.5 overflow-x-auto overscroll-x-contain px-1 pb-1 active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        <button
-          type="button"
-          onClick={() => onSelect('')}
-          aria-pressed={active === ''}
-          className={chipClass(active === '')}
-        >
-          Все провайдеры
-        </button>
-        {providers.map((provider) => {
-          const color = pickProviderColor(provider.name)
-          return (
-            <button
-              key={provider.slug}
-              type="button"
-              onClick={() => onSelect(provider.slug)}
-              aria-pressed={active === provider.slug}
-              className={chipClass(active === provider.slug)}
-            >
-              {provider.logo_url ? (
-                <img src={provider.logo_url} alt="" className="h-4 w-4 rounded-full object-cover" />
-              ) : (
-                <span
-                  aria-hidden
-                  className={`grid h-4 w-4 place-items-center rounded-full text-[9px] font-black text-white ${color.icon}`}
-                >
-                  {provider.name.charAt(0).toUpperCase()}
-                </span>
-              )}
-              {provider.name}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 /** Активные фильтры — съёмные чипы (§7: сброс остаётся одной кнопкой). */
 function ActiveFilterChips({
   filters,
@@ -251,6 +130,7 @@ function ActiveFilterChips({
   if (filters.category && categoryName) {
     chips.push({ key: 'category', label: categoryName, clear: { category: '' } })
   }
+  // ?provider= из старых ссылок: UI его больше не ставит, но съёмный чип честно покажем
   if (filters.provider && providerName) {
     chips.push({ key: 'provider', label: providerName, clear: { provider: '' } })
   }
@@ -385,13 +265,6 @@ export function CatalogFilterBar({
         </div>
       </div>
 
-      {/* провайдеры — лента чипов (паттерн лобби 2024 вместо нативного select) */}
-      <ProviderChipsRow
-        providers={providers ?? []}
-        active={filters.provider}
-        onSelect={(provider) => onChange({ provider })}
-      />
-
       <ActiveFilterChips
         filters={filters}
         categories={categories ?? []}
@@ -434,28 +307,6 @@ export function CatalogFilterBar({
                     className={chipClass(filters.sort === option.value)}
                   >
                     {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <p className="caps-label">Провайдеры</p>
-              <div className="flex max-h-52 flex-wrap gap-1.5 overflow-y-auto">
-                <button
-                  type="button"
-                  onClick={() => onChange({ provider: '' })}
-                  className={chipClass(filters.provider === '')}
-                >
-                  Все
-                </button>
-                {(providers ?? []).map((provider) => (
-                  <button
-                    key={provider.slug}
-                    type="button"
-                    onClick={() => onChange({ provider: provider.slug })}
-                    className={chipClass(filters.provider === provider.slug)}
-                  >
-                    {provider.name}
                   </button>
                 ))}
               </div>

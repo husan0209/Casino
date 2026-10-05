@@ -2,10 +2,11 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * §7: тулбар фильтров каталога после редизайна — провайдеры чипами с
- * аватарками (нативные select с десятками неотличимых опций не читаются),
- * сортировка кастомным дропдауном, поиск с debounce и очисткой, активные
- * фильтры — съёмные чипы. URL-состояние не менялось (lib/catalog-filters).
+ * §7: тулбар фильтров каталога — провайдерского фильтра в UI НЕТ (игроки не
+ * думают провайдерами; ищут игру по названию), сортировка — кастомный
+ * дропдаун, поиск с debounce и очисткой, активные фильтры — съёмные чипы.
+ * ?provider= из старых ссылок honoured: показывается съёмный чип.
+ * URL-состояние не менялось (lib/catalog-filters).
  */
 
 const onChangeMock = vi.hoisted(() => vi.fn())
@@ -21,7 +22,6 @@ vi.mock('@/lib/api/casino.api', () => ({
   ],
   fetchProviders: () => [
     { slug: 'rg-1', name: 'RG provider', logo_url: null, game_count: 20 },
-    { slug: 'it-1', name: 'IT provider', logo_url: null, game_count: 11 },
   ],
 }))
 
@@ -44,11 +44,17 @@ function renderBar(
 }
 
 describe('Каталог: тулбар фильтров', () => {
-  it('пустая категория не показывается, провайдер выбирается чипом', () => {
+  it('пустая категория не показывается, категория выбирается чипом', () => {
     renderBar()
     expect(screen.queryByText('Пустая')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'RG provider' }))
-    expect(onChangeMock).toHaveBeenCalledWith({ provider: 'rg-1' })
+    fireEvent.click(screen.getByRole('button', { name: 'Слоты' }))
+    expect(onChangeMock).toHaveBeenCalledWith({ category: 'slots' })
+  })
+
+  it('провайдерского фильтра в тулбаре нет (ленты чипов и свайпов нет)', () => {
+    renderBar()
+    expect(screen.queryByRole('group', { name: 'Провайдеры' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'RG provider' })).toBeNull()
   })
 
   it('сортировка — кастомный дропдаун: открыть, выбрать, меню закрылось', () => {
@@ -59,10 +65,11 @@ describe('Каталог: тулбар фильтров', () => {
     expect(screen.queryByRole('listbox')).toBeNull()
   })
 
-  it('активные фильтры — съёмные чипы плюс сброс одной кнопкой', () => {
+  it('?provider= из старой ссылки — съёмный чип; сброс одной кнопкой', () => {
     renderBar({ ...EMPTY_FILTERS, provider: 'rg-1', q: 'sweet' }, 5)
-    fireEvent.click(screen.getByRole('button', { name: 'Убрать фильтр «sweet»' }))
-    expect(onChangeMock).toHaveBeenCalledWith({ q: '' })
+    const providerChip = screen.getByRole('button', { name: 'Убрать фильтр RG provider' })
+    fireEvent.click(providerChip)
+    expect(onChangeMock).toHaveBeenCalledWith({ provider: '' })
     fireEvent.click(screen.getByRole('button', { name: 'Сбросить всё' }))
     expect(onChangeMock).toHaveBeenCalledWith({ category: '', provider: '', sort: '', q: '' })
   })
@@ -84,30 +91,5 @@ describe('Каталог: тулбар фильтров', () => {
     } finally {
       vi.useRealTimers()
     }
-  })
-
-  it('лента провайдеров: мышь тянет скролл, клик после драга глушится', () => {
-    renderBar()
-    const row = screen.getByRole('group', { name: 'Провайдеры' })
-    Object.defineProperty(row, 'scrollLeft', { value: 0, writable: true })
-    // jsdom теряет clientX у PointerEvent — диспетчеризуем MouseEvent с координатами
-    const dragEvent = (type: string, clientX: number): void => {
-      row.dispatchEvent(new MouseEvent(type, { clientX, bubbles: true, cancelable: true }))
-    }
-
-    dragEvent('pointerdown', 200)
-    dragEvent('pointermove', 140)
-    expect(row.scrollLeft).toBe(60)
-
-    dragEvent('pointerup', 140)
-    // moved=true ещё живёт до клика — чип под курсором не должен выбраться
-    fireEvent.click(screen.getByRole('button', { name: 'RG provider' }))
-    expect(onChangeMock).not.toHaveBeenCalled()
-  })
-
-  it('лента провайдеров: обычный клик без драга выбирает чип', () => {
-    renderBar()
-    fireEvent.click(screen.getByRole('button', { name: 'RG provider' }))
-    expect(onChangeMock).toHaveBeenCalledWith({ provider: 'rg-1' })
   })
 })
