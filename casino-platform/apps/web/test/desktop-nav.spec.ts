@@ -101,7 +101,7 @@ describe('GAP-54: auth-страницы без казино-навигации (
     expect(isAuthPath('/verify-email')).toBe(true)
     expect(isAuthPath('/forgot-password')).toBe(true)
     expect(isAuthPath('/reset-password')).toBe(true)
-    expect(isAuthPath('/google/callback')).toBe(true)
+    expect(isAuthPath('/auth/google/callback')).toBe(true)
   })
 
   it('витрина и кабинет — с навигацией; чужие префиксы не ловятся', () => {
