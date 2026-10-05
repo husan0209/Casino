@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRef, useState } from 'react'
 
 import { UserAvatar } from '@/components/layout/UserAvatar'
+import { AvatarLightbox } from '@/components/profile/AvatarLightbox'
 import { SecurityTab, SessionsTab, SettingsTab } from '@/components/profile/ProfileTabs'
 import { toast } from '@/components/ui/toaster'
 import { apiGet, apiPost, errText } from '@/lib/api'
@@ -69,8 +70,9 @@ function DataTab({ me, onSaved }: { me: MeDto; onSaved: () => void }): React.JSX
   return (
     <div className="card space-y-3">
       <div className="font-semibold">Личные данные</div>
+      {/* Аватар в форме убран: он дублирует аватар в карточке профиля выше —
+          там же и просмотр крупно. Здесь только действие «Сменить аватар». */}
       <div className="flex items-center gap-3">
-        <UserAvatar email={me.user.email} avatarUrl={p?.avatarUrl ?? null} size={56} />
         <div>
           <button
             type="button"
@@ -126,6 +128,7 @@ function DataTab({ me, onSaved }: { me: MeDto; onSaved: () => void }): React.JSX
 export default function ProfilePage(): React.JSX.Element {
   const { user, logout } = useAuth()
   const [tab, setTab] = useState<Tab>('data')
+  const [avatarPreview, setAvatarPreview] = useState(false)
 
   const { data, refetch, isLoading } = useQuery({
     queryKey: ['me'],
@@ -145,11 +148,18 @@ export default function ProfilePage(): React.JSX.Element {
       ) : (
         <>
           <div className="card mb-5 flex flex-wrap items-center gap-4">
-            <UserAvatar
-              email={data.user.email}
-              avatarUrl={data.profile?.avatarUrl ?? null}
-              size={48}
-            />
+            {data.profile?.avatarUrl ? (
+              <button
+                type="button"
+                onClick={() => setAvatarPreview(true)}
+                aria-label="Посмотреть аватар крупно"
+                className="shrink-0 rounded-full transition hover:ring-2 hover:ring-brand/40"
+              >
+                <UserAvatar email={data.user.email} avatarUrl={data.profile.avatarUrl} size={64} />
+              </button>
+            ) : (
+              <UserAvatar email={data.user.email} avatarUrl={null} size={64} />
+            )}
             <div className="flex-1">
               <div className="font-medium">{data.user.email || 'Игрок'}</div>
               <div className="text-sm text-muted">
@@ -179,6 +189,10 @@ export default function ProfilePage(): React.JSX.Element {
           {tab === 'security' && <SecurityTab me={data} onLogout={logout} />}
           {tab === 'sessions' && <SessionsTab />}
           {tab === 'settings' && <SettingsTab me={data} />}
+
+          {avatarPreview && data.profile?.avatarUrl && (
+            <AvatarLightbox src={data.profile.avatarUrl} onClose={() => setAvatarPreview(false)} />
+          )}
 
           {/* Партнёрская программа (ТЗ ч.8) и поддержка (§15): на мобиле
               икон-панели нет, таб-бар фиксирован (§4.3) — входы дублируются

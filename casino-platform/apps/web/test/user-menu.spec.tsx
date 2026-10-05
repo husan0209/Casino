@@ -18,6 +18,11 @@ vi.mock('@/stores/auth', () => ({
   useAuth: () => ({ user: { id: 'u1', email: 'p@p.p', role: 'user' }, logout: logoutMock }),
 }))
 
+// useMe тянет react-query (нужен провайдер) — тесту меню профиль не нужен.
+vi.mock('@/hooks/useMe', () => ({
+  useMe: () => ({ me: null, isLoading: false }),
+}))
+
 vi.mock('@/components/layout/UserAvatar', () => ({
   UserAvatar: () => <span data-testid="avatar" />,
 }))

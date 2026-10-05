@@ -4,20 +4,17 @@ import { Gamepad2, Heart, Home, User } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-import { UserAvatar } from '@/components/layout/UserAvatar'
 import { useFavorites } from '@/hooks/useFavorites'
-import { useAuth } from '@/stores/auth'
 
 /**
  * GAP-52 (ТЗ ч.5 §4.3) + визуал ТЗ ч.5.1 §2 пр.7–8: таббар —
  * Главная · Казино · Избранное · Профиль. «Избранное» — полным словом
- * (Don't-лист §6 запрещает «Избр.»), иконки — lucide, у залогиненного
- * в «Профиле» — реальная аватарка. Кошелька в таб-баре нет: деньги
- * живут в шапке (§2 пр.6).
+ * (Don't-лист §6 запрещает «Избр.»), иконки — lucide; «Профиль» — силуэт
+ * (таб — символ назначения, фото аватара живёт в шапке и на профиле).
+ * Кошелька в таб-баре нет: деньги живут в шапке (§2 пр.6).
  */
 export function BottomNav(): React.JSX.Element | null {
   const pathname = usePathname()
-  const { user } = useAuth()
   const { favoriteSlugs } = useFavorites()
   const favCount = favoriteSlugs.size
 
@@ -59,11 +56,9 @@ export function BottomNav(): React.JSX.Element | null {
           )
         })}
         <Link href="/profile" className={linkClass(isActive('/profile'))}>
-          {user ? (
-            <UserAvatar email={user.email} size={22} />
-          ) : (
-            <User size={22} strokeWidth={1.8} aria-hidden />
-          )}
+          {/* Силуэт вместо фото/буквы: таб — символ назначения (Material 3),
+              монохромный ряд иконок читается целиком; фото живёт в шапке. */}
+          <User size={22} strokeWidth={1.8} aria-hidden />
           <span>Профиль</span>
         </Link>
       </div>

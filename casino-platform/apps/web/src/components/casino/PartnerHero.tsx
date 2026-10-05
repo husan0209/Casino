@@ -33,18 +33,12 @@ export function PartnerHero(): React.JSX.Element | null {
         className="pointer-events-none absolute -bottom-20 -left-10 h-52 w-52 rounded-full bg-[#6C63FF]/25 blur-[60px]"
       />
 
-      {/* Декоративные символы — процент и знак валюты вместо слот-семёрок */}
+      {/* Декоративный «%» — watermark RevShare */}
       <div
         aria-hidden
         className="pointer-events-none absolute right-6 top-6 text-[120px] font-black leading-none text-white/[0.03]"
       >
         %
-      </div>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute right-28 top-24 text-[80px] font-black leading-none text-[#FFB300]/[0.06]"
-      >
-        ₽
       </div>
 
       <div className="relative p-6 pb-5 md:p-8 md:pb-6">

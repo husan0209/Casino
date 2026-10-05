@@ -3,9 +3,9 @@
 import { Check, Plus, X } from 'lucide-react'
 import { useEffect } from 'react'
 
+import { CurrencyIcon } from '@/components/ui/CurrencyIcon'
 import {
   currencyFullName,
-  currencyLabel,
   formatBalance,
   isCryptoCurrency,
   networkLabel,
@@ -17,20 +17,6 @@ import { useWalletStore } from '@/stores/wallet'
 import type { WalletBalance } from '@/types/wallet'
 
 import { money } from '@casino/shared-utils'
-
-/** CSS-класс цветного кружка для валюты (как на скриншотах spinera). */
-function currencyIconClass(currency: string): string {
-  const map: Record<string, string> = {
-    RUB: 'currency-icon currency-icon-rub',
-    KZT: 'currency-icon currency-icon-kzt',
-    UAH: 'currency-icon currency-icon-uah',
-    BYN: 'currency-icon currency-icon-byn',
-    UZS: 'currency-icon currency-icon-uzs',
-    USDT_TRC20: 'currency-icon currency-icon-usdt',
-    BTC: 'currency-icon currency-icon-btc',
-  }
-  return map[currency] ?? 'currency-icon bg-white/[0.06] text-white'
-}
 
 /** Одна строка кошелька: цветная иконка, название, тег сети (крипта), баланс; нули — тусклые. */
 function WalletRow({
@@ -55,7 +41,7 @@ function WalletRow({
           : 'border-transparent hover:border-[#2A2A4A] hover:bg-white/[0.03]'
       } ${empty ? 'text-muted' : 'text-white'}`}
     >
-      <span className={currencyIconClass(wallet.currency)}>{currencyLabel(wallet.currency)}</span>
+      <CurrencyIcon currency={wallet.currency} size={40} />
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium">{currencyFullName(wallet.currency)}</span>
         {isCryptoCurrency(wallet.currency) && (

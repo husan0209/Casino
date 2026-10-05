@@ -1,3 +1,5 @@
+import { join } from 'node:path'
+
 import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
 import { type NestExpressApplication } from '@nestjs/platform-express'
@@ -95,6 +97,12 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   })
   app.use(cookieParser())
+
+  // Загруженные файлы (аватары, KYC-документы): use-cases пишут их в
+  // ./uploads относительно cwd и отдают клиенту ссылки вида /uploads/….
+  // В проде этот префикс закрывает nginx (volume ./uploads:/app/uploads),
+  // но в dev nginx нет — без раздачи с самого API ссылки дают 404.
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' })
 
   // pre-launch hardening A4 (2026-09-04): без enableShutdownHooks() SIGTERM
   // (деплой/рестарт/rollback) обрывал in-flight запросы и Prisma-транзакции

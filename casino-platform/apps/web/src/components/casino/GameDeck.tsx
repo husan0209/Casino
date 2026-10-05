@@ -257,7 +257,7 @@ const DeckCardFace = memo(function DeckCardFace({
       {/* «Сейчас играют» — тонкий живой бейдж на карте (§4.4) */}
       <span
         suppressHydrationWarning
-        className="deck-rise absolute bottom-[4.75rem] right-3 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white/85 backdrop-blur-md"
+        className="deck-rise absolute bottom-[7.5rem] right-3 z-10 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white/85 backdrop-blur-md"
       >
         <span className="deck-live-dot h-1.5 w-1.5 rounded-full bg-[#FF3D71]" />
         {playersCountLabel(onlineCount)} сейчас в игре
@@ -536,15 +536,17 @@ interface DeckNavProps {
 function DeckNav({ total, position, onPrev, onNext, onJump }: DeckNavProps): React.JSX.Element {
   const activeDot = Math.min(position, total - 1)
   return (
-    <div className="mt-3 flex items-center justify-between px-2">
+    /* Телефон: свайп + тапабельные точки — текстовые кнопки дублируют жест (§4.4).
+       Десктоп: стрелки-шевроны по краям (перетаскивание мышью не всем удобно). */
+    <div className="mt-3 flex items-center justify-center gap-2 px-2 lg:justify-between">
       <button
         type="button"
         onClick={onPrev}
         disabled={position === 0}
-        className="flex items-center gap-1 text-xs font-semibold text-muted transition hover:text-white disabled:opacity-40"
+        aria-label="Предыдущая карта"
+        className="hidden h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-white/5 hover:text-white disabled:opacity-40 lg:grid"
       >
-        <ChevronLeft size={16} />
-        <span>Назад</span>
+        <ChevronLeft size={18} />
       </button>
       <div className="flex gap-1">
         {Array.from({ length: total }, (_, cardIndex) => (
@@ -562,10 +564,10 @@ function DeckNav({ total, position, onPrev, onNext, onJump }: DeckNavProps): Rea
       <button
         type="button"
         onClick={onNext}
-        className="flex items-center gap-1 text-xs font-semibold text-muted transition hover:text-white"
+        aria-label="Следующая карта"
+        className="hidden h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-white/5 hover:text-white lg:grid"
       >
-        <span>Дальше</span>
-        <ChevronRight size={16} />
+        <ChevronRight size={18} />
       </button>
     </div>
   )
@@ -1429,7 +1431,9 @@ export function GameDeck({
     <section className="mb-8 isolate overflow-x-clip">
       <DeckHeader total={deck.length} position={position} onShuffle={handleShuffle} />
 
-      <div className="relative mx-auto max-w-md">
+      {/* Мобайл: карта ~320px по центру — во всю ширину свайп тяжёлый
+          (Tinder-стандарт 300–340px); от sm ширина возвращается к max-w-md. */}
+      <div className="relative mx-auto w-full max-w-[320px] sm:max-w-md">
         {/* Свечение за колодой (по моку) */}
         <div
           aria-hidden
@@ -1444,7 +1448,7 @@ export function GameDeck({
           onKeyDown={handleKeyDown}
           onMouseMove={handleStackMouseMove}
           onMouseLeave={handleStackMouseLeave}
-          className="deck-stack relative aspect-[16/10] w-full outline-none sm:aspect-[16/9]"
+          className="deck-stack relative aspect-[3/4] w-full outline-none sm:aspect-[4/5]"
         >
           {/* key по shuffleNonce — пересдача перемонтирует стек: фейды слоёв и вход фронта replay'ятся */}
           <div key={`deal-${shuffleNonce}`} className="absolute inset-0">

@@ -4,7 +4,6 @@ import {
   ArrowLeftRight,
   ArrowRight,
   Banknote,
-  Bitcoin,
   Check,
   ChevronDown,
   Coins,
@@ -16,6 +15,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { CurrencyIcon } from '@/components/ui/CurrencyIcon'
 import { toast } from '@/components/ui/toaster'
 import { CryptoDepositTicketPanel } from '@/components/wallet/CryptoDepositTicket'
 import { saveDepositContext } from '@/components/wallet/DepositReturnHandler'
@@ -32,7 +32,10 @@ import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
-/** Иконка метода по подписи (в гео-конфиге только id+label, без типа). */
+/** Иконка метода по подписи (в гео-конфиге только id+label, без типа).
+    Крипта — настоящие логотипы монет; карта/P2P — нейтральные глифы
+    (категории без одного бренда). Логотип СБП с wordmark в плитке 40px
+    читается плохо — вернулись к нейтральной молнии (fast payments). */
 function methodIcon(label: string): React.JSX.Element {
   const lower = label.toLowerCase()
   if (lower.includes('сбп')) {
@@ -42,10 +45,10 @@ function methodIcon(label: string): React.JSX.Element {
     return <ArrowLeftRight size={18} aria-hidden />
   }
   if (lower.includes('btc') || lower.includes('bitcoin')) {
-    return <Bitcoin size={18} aria-hidden />
+    return <CurrencyIcon currency="BTC" size={26} />
   }
   if (lower.includes('usdt')) {
-    return <Coins size={18} aria-hidden />
+    return <CurrencyIcon currency="USDT_TRC20" size={26} />
   }
   return <CreditCard size={18} aria-hidden />
 }

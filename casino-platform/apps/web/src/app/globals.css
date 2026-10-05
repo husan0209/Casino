@@ -137,31 +137,32 @@ body {
   }
 }
 
-/* ── Иконки валют (цветные кружки как на скриншотах spinera) ─────── */
+/* ── Иконки валют: крипта — настоящие логотипы (public/currency/*.svg),
+   фиат — «монета»: плотный градиент с белым символом, единый сет с криптой ── */
 
 .currency-icon {
-  @apply grid h-10 w-10 shrink-0 place-items-center rounded-xl text-xs font-bold;
+  @apply grid h-10 w-10 shrink-0 place-items-center rounded-xl text-xs font-bold text-white;
 }
 .currency-icon-rub {
-  @apply bg-[#6C63FF]/20 text-[#6C63FF];
+  @apply bg-gradient-to-br from-[#6C63FF] to-[#8B5CF6];
 }
 .currency-icon-kzt {
-  @apply bg-[#3A3A5C]/60 text-white/80;
+  @apply bg-gradient-to-br from-[#00A9E0] to-[#0069B4];
 }
 .currency-icon-uah {
-  @apply bg-money/15 text-money;
+  @apply bg-gradient-to-br from-[#005BBB] to-[#003D80];
 }
 .currency-icon-byn {
-  @apply bg-[#8888AA]/15 text-[#8888AA];
+  @apply bg-gradient-to-br from-[#CE1720] to-[#8F1017];
 }
 .currency-icon-uzs {
-  @apply bg-[#3A3A5C]/40 text-white/70;
+  @apply bg-gradient-to-br from-[#1EB8AA] to-[#0D8F85];
 }
 .currency-icon-usdt {
-  @apply bg-[#26A17B]/20 text-[#26A17B];
+  @apply bg-gradient-to-br from-[#26A17B] to-[#1B7A5D];
 }
 .currency-icon-btc {
-  @apply bg-[#F7931A]/15 text-[#F7931A];
+  @apply bg-gradient-to-br from-[#F7931A] to-[#C87A12];
 }
 
 /* ── Утилиты ───────────────────────────────────────────────────────── */
