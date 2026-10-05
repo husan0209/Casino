@@ -21,6 +21,8 @@ import { useWalletStore } from '@/stores/wallet'
  *   аватарка — деньги всегда в одном месте (§2 пр.6);
  * - поиск: десктоп — поле в хедере, телефон — лупа (Ctrl/⌘K — в MainShell).
  * Эмодзи-иконки заменены на lucide (Don't-лист §6).
+ * Адаптация: на экранах <400px кнопки компактнее, поиск уже, у лого без
+ * вордмарка — сумма ширин не должна вылезать за экран (жалоба на мал. смартфоны).
  */
 export function AppHeader(): React.JSX.Element {
   const { user } = useAuth()
@@ -53,9 +55,14 @@ export function AppHeader(): React.JSX.Element {
 
   return (
     <header className="sticky top-0 z-30 border-b border-[#2A2A4A] bg-[#0F0F1A]/95 backdrop-blur">
-      <div className="container-1 flex h-14 items-center gap-3">
+      <div className="container-1 flex h-14 items-center gap-2 min-[400px]:gap-3">
         <Link href="/" aria-label="На главную" className="shrink-0">
-          <Logo size={30} />
+          <span aria-hidden className="inline min-[400px]:hidden">
+            <Logo size={28} withWordmark={false} />
+          </span>
+          <span className="hidden min-[400px]:inline">
+            <Logo size={30} />
+          </span>
         </Link>
 
         <form onSubmit={submitSearch} className="relative hidden max-w-md flex-1 md:block">
@@ -73,11 +80,11 @@ export function AppHeader(): React.JSX.Element {
           />
         </form>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5 min-[400px]:gap-2">
           <Link
             href="/search"
             aria-label="Поиск"
-            className="rounded-lg p-2 text-muted hover:bg-white/5 hover:text-white md:hidden"
+            className="rounded-lg p-1.5 min-[400px]:p-2 text-muted hover:bg-white/5 hover:text-white md:hidden"
           >
             <Search size={20} strokeWidth={1.8} aria-hidden />
           </Link>
@@ -107,14 +114,14 @@ export function AppHeader(): React.JSX.Element {
             <>
               <button
                 type="button"
-                className="btn-ghost px-3 py-1.5 text-sm"
+                className="btn-ghost shrink-0 px-2.5 py-1.5 text-[13px] min-[400px]:px-3 min-[400px]:text-sm"
                 onClick={() => openLogin(undefined, 'login')}
               >
                 Войти
               </button>
               <button
                 type="button"
-                className="btn px-3 py-1.5 text-sm"
+                className="btn shrink-0 px-2.5 py-1.5 text-[13px] min-[400px]:px-3 min-[400px]:text-sm"
                 onClick={() => openLogin(undefined, 'register')}
               >
                 Регистрация
