@@ -1,0 +1,324 @@
+#!/bin/sh
+# guard-selftest — негативный тест гардов архитектуры (анти-вакуум).
+#
+# Зачем: прежний G7 умер молча — он проверял файл, в котором совпадений больше
+# нет, и из-за `if [ -f "$FILE" ]` красным не стал бы даже при удалении файла.
+# Такой гард нельзя отличить от отсутствующего, пока не погасишь инвариант.
+# Каждый гард обязан ДОКАЗАВАТЬ работоспособность: здесь на копиях дерева
+# кладётся файл-ловушка/портится примитива, и тот же самый детектор обязан
+# дать ненулевой exit-code. Рабочий код при этом НЕ меняется.
+#
+# Сценарии (каждый печатает вывод детектора и ожидаемый цвет):
+#   1–2  чистое дерево: G7 и foreign-writes → ЗЕЛЁНЫЕ (иначе самопроверка
+#        бессмысленна: «красный» гард ловит всё подряд);
+#   3–4  foreign-writes: ловушка «affiliate пишет в users» → КРАСНЫЙ;
+#        те же ЧТЕНИЯ чужой таблицы + своя запись → ЗЕЛЁНЫЙ (ADR GAP-51:
+#        путать классы нельзя, иначе гард невыполним);
+#   5    foreign-writes: модель в схеме без владельца в карте → КРАСНЫЙ
+#        (детектор не должен молча оглохнуть на новой таблице);
+#   6–10 G7: порча примитивы по одному инварианту → КРАСНЫЙ каждый раз:
+#        лок вырезан, изоляция возвращена к Serializable, лок берётся ПОСЛЕ
+#        чтения, файл леджера удалён, леджер открыл свою $transaction.
+#   11–13 service-specs (G26): сервис без спеки → КРАСНЫЙ; сервис со спекой,
+#        которая его инстанцирует (`new X(`) → ЗЕЛЁНЫЙ; сервис, упомянутый в спеке
+#        без инстанцирования → КРАСНЫЙ (упоминание в DI-wiring-спеке покрытием
+#        не считается — иначе гард превращается в ложное покрытие).
+#   14–16 presentation-db (G27): копия рабочего дерева = базлайну → ЗЕЛЁНЫЙ;
+#        `prisma.*` в presentation-файле → КРАСНЫЙ; тот же вызов в
+#        infrastructure-репозитории → ЗЕЛЁНЫЙ (правило про слой, а не про
+#        таблицу — иначе оно невыполнимо).
+#
+# Запуск:  sh scripts/bin/guard-selftest      (CI: шаг G25)
+# Выход:   0 — все гарды покраснели там, где должны;
+#          1 — хотя бы один гард не доказал свою работоспособность.
+
+set -u
+
+BIN_DIR=$(dirname "$0")
+PLATFORM_DIR=$(cd "$BIN_DIR/../.." && pwd)
+cd "$PLATFORM_DIR" || exit 2
+
+GUARD='scripts/check-wallet-money-invariant.sh'
+TECH_DEBT="$BIN_DIR/tech-debt"
+LEDGER_REL='apps/api/src/modules/wallet/infrastructure/ledger'
+FW_BASELINE='tech-debt/foreign-writes.txt'
+SS_BASELINE='tech-debt/service-specs.txt'
+PDB_BASELINE='tech-debt/presentation-db.txt'
+SCHEMA='packages/database/prisma/schema.prisma'
+
+TMP=$(mktemp -d 2>/dev/null) || TMP="$PLATFORM_DIR/.guard-selftest-tmp"
+rm -rf "$TMP" && mkdir -p "$TMP" || exit 2
+trap 'rm -rf "$TMP"' EXIT
+
+SCEN=0
+BAD=0
+
+# expect_green <заголовок> <команда...> — гард обязан выйти в 0.
+expect_green() {
+  LABEL=$1
+  shift
+  SCEN=$((SCEN + 1))
+  echo ""
+  echo "=== [$SCEN] $LABEL"
+  OUT=$("$@" 2>&1)
+  RC=$?
+  printf '%s\n' "$OUT" | sed 's/^/  | /'
+  if [ "$RC" = 0 ]; then
+    echo "  → exit=0: 🟢 ЗЕЛЁНЫЙ на чистом дереве, ложных срабатываний нет ✅"
+    return 0
+  fi
+  echo "  → exit=$RC: ❌ гард краснеет БЕЗ нарушения — самопроверка не проходит"
+  BAD=1
+}
+
+# expect_red <сигнатура-обязательна> <заголовок> <команда...> — гард обязан
+# выйти ненулевым И бросить в вывод свою фирменную строку отказа. Сигнатура
+# нужна, чтобы «красный» не оказался 127 «команда не найдена»: красный по
+# причине сломавшейся обвязки — это не работающий гард.
+expect_red() {
+  SIG=$1
+  LABEL=$2
+  shift 2
+  SCEN=$((SCEN + 1))
+  echo ""
+  echo "=== [$SCEN] $LABEL"
+  OUT=$("$@" 2>&1)
+  RC=$?
+  printf '%s\n' "$OUT" | sed 's/^/  | /'
+  case "$RC" in
+    126|127)
+      echo "  → exit=$RC: ❌ сам детектор не запустился (сломан selftest, не код)"
+      BAD=1
+      return 0
+      ;;
+  esac
+  if [ "$RC" = 0 ]; then
+    echo "  → exit=0: ❌ ВАКУУМ: нарушение в дереве есть, гард зелёный"
+    BAD=1
+    return 0
+  fi
+  if ! printf '%s' "$OUT" | grep -qF "$SIG"; then
+    echo "  → exit=$RC: ❌ краснеет, но не по своей причине (нет сигнатуры '$SIG')"
+    BAD=1
+    return 0
+  fi
+  echo "  → exit=$RC: 🔴 КРАСНЫЙ по сигнатуре '$SIG' — гард живой ✅"
+}
+
+# sed без -i (BSD/GNU порог разный): файл > .tmp > mv.
+mutate() {
+  sed "$2" "$1" > "$1.mut" && mv "$1.mut" "$1"
+}
+
+wallet_tree() {
+  T="$TMP/w-$1"
+  rm -rf "$T"
+  mkdir -p "$T/$LEDGER_REL"
+  cp $LEDGER_REL/*.ts "$T/$LEDGER_REL/"
+  printf '%s' "$T"
+}
+
+fw_tree() {
+  T="$TMP/fw-$1"
+  rm -rf "$T"
+  mkdir -p "$T/apps/api/src" "$T/tech-debt" "$T/packages/database/prisma"
+  cp -R apps/api/src/modules "$T/apps/api/src/"
+  cp "$SCHEMA" "$T/$SCHEMA"
+  cp "$FW_BASELINE" "$T/tech-debt/"
+  printf '%s' "$T"
+}
+
+# Дерево для service-specs: детектор читает и исходники (src/modules), и спеки
+# (apps/api/test), поэтому копируются ОБЕ ветки — иначе «покрытие» искали бы в
+# пустоте и гард краснел бы на любом дереве.
+svc_tree() {
+  T="$TMP/ss-$1"
+  rm -rf "$T"
+  mkdir -p "$T/apps/api/src" "$T/tech-debt"
+  cp -R apps/api/src/modules "$T/apps/api/src/"
+  cp -R apps/api/test "$T/apps/api/"
+  cp "$SS_BASELINE" "$T/tech-debt/"
+  printf '%s' "$T"
+}
+
+# Дерево для presentation-db: ловушка обязана лежать именно в presentation,
+# поэтому копируется весь apps/api/src/modules — детектор сам выбирает слой,
+# и проверка идёт тем же путём, что в CI.
+pdb_tree() {
+  T="$TMP/pdb-$1"
+  rm -rf "$T"
+  mkdir -p "$T/apps/api/src" "$T/tech-debt"
+  cp -R apps/api/src/modules "$T/apps/api/src/"
+  cp "$PDB_BASELINE" "$T/tech-debt/"
+  printf '%s' "$T"
+}
+
+echo "guard-selftest: доказываем, что G7 (деньги кошелька), G24 (чужие записи Prisma)"
+echo "                КРАСНЕЮТ на ловушках и ЗЕЛЁНЫЕ на чистом дереве."
+echo "                temp: $TMP"
+
+# ── 1–2. Чистое дерево ───────────────────────────────────────────────────
+expect_green "G7 на рабочем дереве (эталон зелёного)" sh "$GUARD"
+expect_green "foreign-writes на рабочем дереве = базлайну" sh "$TECH_DEBT" check foreign-writes
+
+# ── 3–4. foreign-writes: ловушка и легальные чтения ──────────────────────
+FW=$(fw_tree main)
+TRAP="$FW/apps/api/src/modules/affiliate/infrastructure/selftest-trap.prisma.repository.ts"
+cat > "$TRAP" <<'EOF'
+import { prisma } from '@casino/database'
+
+/** Ловушка selftest: affiliate мутирует чужую таблицу `users` (владелец — auth). */
+export class SelfTestForeignWriteTrap {
+  async activateUser(userId: string): Promise<unknown> {
+    return prisma.user.update({ where: { id: userId }, data: { status: 'active' } })
+  }
+}
+EOF
+expect_red "долг ВЫРОС" "foreign-writes: ловушка affiliate → prisma.user.update" \
+  env TECH_DEBT_ROOT="$FW" sh "$TECH_DEBT" check foreign-writes
+
+cat > "$TRAP" <<'EOF'
+import { prisma } from '@casino/database'
+
+/**
+ * Ловушка-контроль: ЧТЕНИЯ чужих таблиц + запись в СВОЮ. foreign-writes обязан
+ * такое пропускать — ADR GAP-51 легализует read-only межмодульный доступ.
+ */
+export class SelfTestReadOnlyTrap {
+  async readForeign(userId: string): Promise<unknown> {
+    return prisma.user.findMany({ where: { id: userId } })
+  }
+  async countKyc(userId: string): Promise<unknown> {
+    return prisma.kycProfile.count({ where: { userId } })
+  }
+  async writeOwn(affiliateId: string): Promise<unknown> {
+    return prisma.affiliate.update({ where: { id: affiliateId }, data: { status: 'active' } })
+  }
+}
+EOF
+expect_green "foreign-writes: только чтения чужого + запись своего (ложных нет)" \
+  env TECH_DEBT_ROOT="$FW" sh "$TECH_DEBT" check foreign-writes
+
+# ── 5. Модель без владельца в карте ──────────────────────────────────────
+printf '\nmodel PhantomTable {\n  id String @id\n}\n' >> "$FW/$SCHEMA"
+expect_red "MODEL_OWNERS" "foreign-writes: новая модель схемы отсутствует в карте MODEL_OWNERS" \
+  env TECH_DEBT_ROOT="$FW" sh "$TECH_DEBT" detect foreign-writes
+
+# ── 6. G7: примитива сломана по одному инварианту ────────────────────────
+T=$(wallet_tree nolock)
+mutate "$T/$LEDGER_REL/wallet-transaction-lock.ts" 's/pg_advisory_xact_lock/none_advisory_lock/g'
+expect_red "G7 FAIL" "G7: pg_advisory_xact_lock вырезан" sh "$GUARD" "$T"
+
+T=$(wallet_tree serializable)
+mutate "$T/$LEDGER_REL/wallet-transaction-lock.ts" "s/'ReadCommitted'/'Serializable'/"
+expect_red "G7 FAIL" "G7: изоляция возвращена к Serializable (откат GAP-57)" sh "$GUARD" "$T"
+
+T=$(wallet_tree lockafter)
+mutate "$T/$LEDGER_REL/wallet-transaction-lock.ts" \
+  's/await acquireWalletLock(tx, target)/await body(tx)/; s/return body(tx)/return await acquireWalletLock(tx, target)/'
+expect_red "G7 FAIL" "G7: лок берётся ПОСЛЕ чтения баланса" sh "$GUARD" "$T"
+
+T=$(wallet_tree nofile)
+rm "$T/$LEDGER_REL/wallet.ledger.prisma.ts"
+expect_red "G7 FAIL" "G7: файл леджера удалён/переименован (прежний гард тут молча OK)" sh "$GUARD" "$T"
+
+T=$(wallet_tree bypass)
+mutate "$T/$LEDGER_REL/wallet.ledger.prisma.ts" 's/runWalletTransaction(/prisma.$transaction(/g'
+expect_red "G7 FAIL" "G7: леджер открыл свою \$transaction в обход примитивы" sh "$GUARD" "$T"
+
+# ── 11–13. service-specs: ловушка, честное покрытие и «просто упомянут» ───
+SS=$(svc_tree main)
+SS_TRAP="$SS/apps/api/src/modules/admin/application/selftest.service.ts"
+SS_SPEC="$SS/apps/api/test/selftest-service.spec.ts"
+cat > "$SS_TRAP" <<'EOF'
+import { Injectable } from '@nestjs/common'
+
+/** Ловушка selftest: сервис без единого теста. */
+@Injectable()
+export class SelfTestService {
+  sum(a: number, b: number): number {
+    return a + b
+  }
+}
+EOF
+expect_red "долг ВЫРОС" "service-specs: новый сервис без спеки" \
+  env TECH_DEBT_ROOT="$SS" sh "$TECH_DEBT" check service-specs
+
+cat > "$SS_SPEC" <<'EOF'
+import { describe, expect, it } from 'vitest'
+
+import { SelfTestService } from '../src/modules/admin/application/selftest.service'
+
+describe('service-specs selftest: покрытие есть', () => {
+  it('складывает', () => {
+    expect(new SelfTestService().sum(2, 3)).toBe(5)
+  })
+})
+EOF
+expect_green "service-specs: сервис с реальной спекой (new …) не долг" \
+  env TECH_DEBT_ROOT="$SS" sh "$TECH_DEBT" check service-specs
+
+# Упоминание имени класса в спеке покрытием НЕ считается: DI-wiring-спеки
+# перечисляют все провайдеры модуля, и при мягком критерии сервис выглядел бы
+# протестированным, хотя ни один ассерт его логику не проверяет.
+rm "$SS_SPEC"
+cat > "$SS_SPEC" <<'EOF'
+import { describe, expect, it } from 'vitest'
+
+describe('service-specs selftest: только упоминание', () => {
+  it('SelfTestService упомянут в тексте, но не инстанцирован', () => {
+    expect(['SelfTestService']).toContain('SelfTestService')
+  })
+})
+EOF
+expect_red "долг ВЫРОС" "service-specs: упоминание в спеке не считается покрытием" \
+  env TECH_DEBT_ROOT="$SS" sh "$TECH_DEBT" check service-specs
+
+# ── 14–16. presentation-db: слой, а не таблица ───────────────────────────
+PDB=$(pdb_tree main)
+expect_green "presentation-db на копии рабочего дерева = базлайну" \
+  env TECH_DEBT_ROOT="$PDB" sh "$TECH_DEBT" check presentation-db
+
+PDB_TRAP="$PDB/apps/api/src/modules/health/presentation/selftest-trap.controller.ts"
+mkdir -p "$PDB/apps/api/src/modules/health/presentation"
+cat > "$PDB_TRAP" <<'EOF'
+import { prisma } from '@casino/database'
+
+/** Ловушка selftest: контроллер читает БД напрямую, минуя application-слой. */
+export class SelfTestPresentationDbTrap {
+  async latest(): Promise<unknown> {
+    return prisma.healthCheck.findFirst({ orderBy: { createdAt: 'desc' } })
+  }
+}
+EOF
+expect_red "долг ВЫРОС" "presentation-db: prisma.findFirst в контроллере" \
+  env TECH_DEBT_ROOT="$PDB" sh "$TECH_DEBT" check presentation-db
+
+# Тот же вызов в infrastructure-репозитории — НЕ долг: правило про слой, а не
+# про таблицу. Без этого контроля детектор нельзя отличить от «запретили prisma
+# вообще», что было бы невыполнимо.
+rm "$PDB_TRAP"
+mkdir -p "$PDB/apps/api/src/modules/health/infrastructure"
+cat > "$PDB/apps/api/src/modules/health/infrastructure/selftest-trap.repository.ts" <<'EOF'
+import { prisma } from '@casino/database'
+
+/** Ловушка-контроль: то же чтение, но в слое, которому оно и положено. */
+export class SelfTestPresentationDbRepository {
+  async latest(): Promise<unknown> {
+    return prisma.healthCheck.findFirst({ orderBy: { createdAt: 'desc' } })
+  }
+}
+EOF
+expect_green "presentation-db: чтение в infrastructure-репозитории не долг" \
+  env TECH_DEBT_ROOT="$PDB" sh "$TECH_DEBT" check presentation-db
+
+# ── Итог ────────────────────────────────────────────────────────────────
+echo ""
+echo "guard-selftest: сценариев $SCEN, провалов $BAD"
+if [ "$BAD" = 1 ]; then
+  echo "❌ самопроверка НЕ пройдена: гард не доказал, что ловит нарушение."
+  echo "   Вакуумный гард опаснее отсутствующего — он создаёт ложное покрытие."
+  exit 1
+fi
+echo "✅ самопроверка пройдена: каждый гард покраснел на своей ловушке и остался зелёным на чистом дереве."
+exit 0

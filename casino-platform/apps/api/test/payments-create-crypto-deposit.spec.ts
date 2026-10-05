@@ -1,10 +1,13 @@
 /**
  * Юнит-тесты CreateCryptoDepositUseCase (G21).
  *
- * Пайплайн: whitelist валют → RUB-оценка через NOWPayments → KYC-лимит →
- * NP createPayment → заявка в БД (pay_address в metadata). Ошибка NP
- * оборачивается в PaymentProviderError, заявка до БД не доезжает.
+ * Пайплайн: проверка релизной валюты (TZ-02, домен → @casino/shared-config) →
+ * RUB-оценка через NOWPayments → KYC-лимит → NP createPayment → заявка в БД
+ * (pay_address в metadata). Ошибка NP оборачивается в PaymentProviderError,
+ * заявка до БД не доезжает; AppError из клиента наружу идёт без изменений.
  */
+import { vi } from 'vitest'
+
 import { CreateCryptoDepositUseCase } from '../src/modules/payments/application/use-cases/create-crypto-deposit.use-case'
 import {
   InvalidCurrencyError,
@@ -43,8 +46,8 @@ function makeDeps(over: { npError?: Error } = {}) {
     getEstimatePrice: async () => ({ estimatedAmount: '12345.5' }),
     createPayment: async () => {
       if (over.npError) {
-throw over.npError
-}
+        throw over.npError
+      }
       return NP_PAYMENT
     },
   } as unknown as INowPaymentsClient
@@ -113,12 +116,7 @@ describe('CreateCryptoDepositUseCase', () => {
       },
     } as unknown as IPaymentRequestRepository
 
-    const uc = new CreateCryptoDepositUseCase(
-      repo,
-      np,
-      kyc,
-      { get: () => undefined } as never,
-    )
+    const uc = new CreateCryptoDepositUseCase(repo, np, kyc, { get: () => undefined } as never)
     await expect(uc.execute('u-1', '100', 'BTC')).rejects.toThrow(KycRequiredError)
   })
 
@@ -126,5 +124,139 @@ describe('CreateCryptoDepositUseCase', () => {
     const d = makeDeps({ npError: new Error('np down') })
     await expect(d.uc.execute('u-1', '99.9', 'USDT_TRC20')).rejects.toThrow(PaymentProviderError)
     expect(d.created).toHaveLength(0)
+  })
+})
+
+/**
+ * TZ-02: релизный набор валют задаёт domain/payment-currency.policy (источник —
+ * @casino/shared-config), а не локальный список use-case. Раньше whitelist здесь
+ * включал TON/TRX/LTC, исключённые из релиза, и заявка в такой валюте доходила
+ * до провайдера. Отклонение — до первого запроса к NOWPayments.
+ */
+describe('CreateCryptoDepositUseCase: релизный набор валют (TZ-02)', () => {
+  const RELEASE_CURRENCIES = ['USDT_TRC20', 'BTC']
+  const NOT_RELEASE_CURRENCIES = [
+    'TON',
+    'TRX',
+    'LTC',
+    'ETH',
+    'USD',
+    'RUB',
+    'usdt_trc20',
+    'btc',
+    ' BTC',
+    'BTC ',
+    '',
+  ]
+
+  /** Мок клиента считает каждый вызов: «0 обращений» — часть утверждений. */
+  function makeCountingDeps() {
+    const estimatePrice = vi.fn(
+      async (_params: { amount: string; currencyFrom: string; currencyTo: string }) => ({
+        estimatedAmount: '9250.00',
+      }),
+    )
+    const createPayment = vi.fn(
+      async (_params: {
+        priceAmount: string
+        priceCurrency: string
+        payCurrency: string
+        orderId: string
+        ipnCallbackUrl: string
+      }) => NP_PAYMENT,
+    )
+    const repoCreate = vi.fn(async (_data: Record<string, unknown>) => ({ id: 'pr-1' }))
+    const kycCalls: string[] = []
+
+    const np = {
+      getEstimatePrice: estimatePrice,
+      createPayment,
+    } as unknown as INowPaymentsClient
+    const repo = { create: repoCreate } as unknown as IPaymentRequestRepository
+    const kyc = {
+      assertCanDeposit: async (_userId: string, amountRub: string) => {
+        kycCalls.push(amountRub)
+      },
+    } as never
+
+    const useCase = new CreateCryptoDepositUseCase(repo, np, kyc, { get: () => undefined } as never)
+    return { useCase, estimatePrice, createPayment, repoCreate, kycCalls }
+  }
+
+  it.each(RELEASE_CURRENCIES)(
+    'релизная валюта %s: оценка → KYC → платёж → заявка',
+    async (currency) => {
+      const deps = makeCountingDeps()
+
+      const result = await deps.useCase.execute('u-1', '100', currency)
+
+      expect(deps.estimatePrice).toHaveBeenCalledTimes(1)
+      expect(deps.estimatePrice.mock.calls[0]?.[0]).toMatchObject({
+        currencyFrom: currency,
+        currencyTo: 'RUB',
+      })
+      expect(deps.createPayment).toHaveBeenCalledWith(
+        expect.objectContaining({ payCurrency: currency }),
+      )
+      expect(deps.kycCalls).toEqual(['9250.00'])
+      expect(deps.repoCreate).toHaveBeenCalledTimes(1)
+      expect(result.payment_request_id).toBe('pr-1')
+    },
+  )
+
+  it.each(NOT_RELEASE_CURRENCIES)(
+    'валюта вне релиза %j → INVALID_CURRENCY/422, ноль обращений к провайдеру и в БД',
+    async (currency) => {
+      const deps = makeCountingDeps()
+
+      const raised = await deps.useCase.execute('u-1', '100', currency).then(
+        () => undefined,
+        (error: unknown) => error as InvalidCurrencyError,
+      )
+
+      expect(raised).toBeInstanceOf(InvalidCurrencyError)
+      expect(raised?.code).toBe('INVALID_CURRENCY')
+      expect(raised?.httpStatus).toBe(422)
+      expect(deps.estimatePrice).toHaveBeenCalledTimes(0)
+      expect(deps.createPayment).toHaveBeenCalledTimes(0)
+      expect(deps.repoCreate).toHaveBeenCalledTimes(0)
+      expect(deps.kycCalls).toHaveLength(0)
+    },
+  )
+
+  it('AppError из клиента не превращается в 502: INVALID_CURRENCY остаётся 422', async () => {
+    const repoCreate = vi.fn()
+    const np = {
+      getEstimatePrice: async () => ({ estimatedAmount: '9250.00' }),
+      createPayment: async () => {
+        throw new InvalidCurrencyError('back-stop проверка клиента')
+      },
+    } as unknown as INowPaymentsClient
+    const useCase = new CreateCryptoDepositUseCase(
+      { create: repoCreate } as unknown as IPaymentRequestRepository,
+      np,
+      { assertCanDeposit: async () => undefined } as never,
+      { get: () => undefined } as never,
+    )
+
+    const raised = await useCase.execute('u-1', '100', 'BTC').then(
+      () => undefined,
+      (error: unknown) => error as InvalidCurrencyError,
+    )
+
+    expect(raised).toBeInstanceOf(InvalidCurrencyError)
+    expect(raised?.code).toBe('INVALID_CURRENCY')
+    expect(raised?.httpStatus).toBe(422)
+    expect(repoCreate).toHaveBeenCalledTimes(0)
+  })
+
+  it('идемпотентность не задета: ключ заявки генерируется до createPayment', async () => {
+    const deps = makeCountingDeps()
+
+    await deps.useCase.execute('u-1', '100', 'BTC')
+
+    const row = deps.repoCreate.mock.calls[0]?.[0] as { idempotencyKey: string; externalId: string }
+    expect(row.idempotencyKey).toMatch(/^dep_[0-9a-f-]{36}$/)
+    expect(row.externalId).toBe(NP_PAYMENT.paymentId)
   })
 })

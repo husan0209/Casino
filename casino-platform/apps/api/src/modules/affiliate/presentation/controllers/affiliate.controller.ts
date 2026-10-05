@@ -254,7 +254,10 @@ export class AffiliateController {
         total_deposit: item.totalDeposit,
         deposit_count: item.depositCount,
         first_deposit_at: item.firstDepositAt !== null ? item.firstDepositAt.toISOString() : null,
-        reject_reason: item.rejectReason,
+        // Для партнёра это «почему отказали». На квалифицированной строке
+        // колонка держит флаг для разбора администратором (F4), и показывать
+        // его партнёру нельзя — он читается как обвинение в перекупке трафика.
+        reject_reason: item.status === 'rejected' ? item.rejectReason : null,
         created_at: item.createdAt.toISOString(),
       })),
       meta: { total: page.total },

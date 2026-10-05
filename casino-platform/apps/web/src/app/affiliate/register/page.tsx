@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
+import { PasswordField } from '@/components/ui/password-field'
 import { toast } from '@/components/ui/toaster'
 import { affiliateErrText } from '@/lib/affiliate-api'
 import { type AffiliateAuthState, useAffiliateAuth } from '@/stores/affiliate'
@@ -82,13 +83,11 @@ export default function AffiliateRegisterPage(): React.JSX.Element {
           <label className="field-label" htmlFor="aff-pass">
             Пароль
           </label>
-          <input
+          <PasswordField
             id="aff-pass"
-            type="password"
             required
             minLength={8}
             autoComplete="new-password"
-            className="input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Минимум 8 символов"

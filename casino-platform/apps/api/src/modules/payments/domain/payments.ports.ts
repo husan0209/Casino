@@ -7,10 +7,31 @@
  * рантайм-зависимости domain от infrastructure).
  */
 
-import type { Prisma, PaymentCallback, PaymentRequest, PaymentStatus } from '@prisma/client'
+import type {
+  Prisma,
+  PaymentCallback,
+  PaymentProvider,
+  PaymentRequest,
+  PaymentStatus,
+  PaymentType,
+} from '@prisma/client'
 
 /** Строка платёжки (Prisma PaymentRequest) — переэкспорт для application-слоя. */
 export type { PaymentRequest }
+
+/**
+ * Строка админского списка заявок: сама заявка и email игрока. Тип ВЫВОДИТСЯ из
+ * include-конфигурации запроса, а не пишется руками: развёрнутые литералы уже
+ * расходились с колонками (см. комментарий в `admin-finance.controller.ts`).
+ */
+export type PaymentRequestAdminRow = Prisma.PaymentRequestGetPayload<{
+  include: { user: { select: { email: true } } }
+}>
+
+/** Карточка заявки для админки: те же поля + колбэки провайдеров + email игрока. */
+export type PaymentRequestDetailRow = Prisma.PaymentRequestGetPayload<{
+  include: { callbacks: true; user: { select: { email: true } } }
+}>
 
 /** Параметры создания платежа в Rukassa (TZ part 3 §5, UC-PAY-01). */
 export interface RukassaCreatePayment {
@@ -36,6 +57,13 @@ export interface IPaymentRequestRepository {
       errorMessage?: string | undefined
       externalId?: string | undefined
       paymentUrl?: string | undefined
+      /**
+       * RUB, который реально зачислен (GAP-72). Нужен крипто-депозиту: заявка
+       * хранит оценку на интенте, а провайдер платит `actually_paid`, — без
+       * этого `amount_rub` отстаёт от кошелька, и агрегат лимита без KYC
+       * недоучитывает пополнение.
+       */
+      amountRub?: string | undefined
     },
   ): Promise<PaymentRequest>
   listUser(args: {
@@ -44,6 +72,40 @@ export interface IPaymentRequestRepository {
     page: number
     perPage: number
   }): Promise<[PaymentRequest[], number]>
+  /**
+   * Админский список заявок (ТЗ ч.3 UC-PAY-17 и UC-PAY-10) с фильтрами и
+   * пагинацией.
+   *
+   * Запрос живёт здесь, а не в контроллере: `payment_requests` принадлежит
+   * payments, а presentation не имеет права ходить в БД (гард G27). До этого
+   * `admin-finance.controller.ts` собирал `where` сам и кастовал строки query
+   * к enum'ам без валидации.
+   *
+   * Возвращает пару `[rows, total]` — как `listUser`, чтобы счётчик для мета
+   * не требовал второго вызова на стороне потребителя.
+   */
+  listAdmin(args: {
+    userId?: string | undefined
+    type?: PaymentType | undefined
+    status?: PaymentStatus | undefined
+    provider?: PaymentProvider | undefined
+    currency?: string | undefined
+    page: number
+    perPage: number
+  }): Promise<[PaymentRequestAdminRow[], number]>
+  /** Карточка заявки с колбэками провайдера и email игрока (UC-PAY-18). */
+  findDetail(id: string): Promise<PaymentRequestDetailRow | null>
+  /**
+   * Условное истечение заявки: `pending → expired`, только если заявка ещё
+   * pending. Нужна cron-задаче истечения депозитов (maintenance), но SQL живёт
+   * здесь: `payment_requests` принадлежит payments (MODEL_OWNERS, гард G24).
+   *
+   * Условие — в `where`, а не проверкой читателя: между SELECT и UPDATE платёж
+   * может завершиться вебхуком, и тогда истечение затёрло бы completed-статус.
+   * Возвращает число обновлённых строк; «что делать с нулём» решает вызывающий,
+   * поэтому исключения здесь нет.
+   */
+  expireIfPending(id: string): Promise<number>
   saveCallback(data: {
     provider: string
     externalId?: string

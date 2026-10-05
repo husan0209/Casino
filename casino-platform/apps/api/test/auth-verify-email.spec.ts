@@ -92,6 +92,10 @@ function makeDeps(over: { rec?: VerificationTokenView | null; user?: User | null
     verifyAccess: () => ({ sub: 'u-1', role: 'user', session_id: 'sess-1' }),
     generateRefreshToken: () => ({ token: 'refresh-2', hash: 'hash-2' }),
     hashRefreshToken: (t) => `sha:${t}`,
+    refreshLifetime: () => ({
+      expiresAt: new Date(Date.now() + 30 * 24 * 3_600_000),
+      maxAgeMs: 30 * 24 * 3_600_000,
+    }),
   }
 
   const uc = new VerifyEmailUseCase(users, verif, sessions, jwt)

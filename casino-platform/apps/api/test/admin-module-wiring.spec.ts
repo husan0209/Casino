@@ -88,8 +88,12 @@ describe('AdminModule: порты настроек и рассылки подк�
   })
 
   it('реализация под ADMIN_BROADCAST_REPOSITORY удовлетворяет порту', () => {
+    // G24: порт рассылки сократился до чтения адресатов. Запись в
+    // `notifications` делает владелец таблицы через NotificationsFacade,
+    // поэтому createMany у admin-реализации больше нет (проверка — в
+    // notifications-broadcast-owner.spec.ts).
     // Arrange
-    const port: readonly (keyof IAdminBroadcastRepository)[] = ['getAllUserIds', 'createMany']
+    const port: readonly (keyof IAdminBroadcastRepository)[] = ['getAllUserIds']
     // Act
     const impl = new PrismaAdminBroadcastRepository()
     // Assert

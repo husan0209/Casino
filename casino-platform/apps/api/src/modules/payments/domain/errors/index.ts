@@ -31,8 +31,39 @@ export class AmountTooLargeError extends AppError {
 export class InvalidCurrencyError extends AppError {
   readonly code = 'INVALID_CURRENCY'
   readonly httpStatus = 422
-  constructor(m = 'INVALID_CURRENCY') {
-    super(m)
+  constructor(m = 'INVALID_CURRENCY', ctx?: Record<string, unknown>) {
+    super(m, ctx)
+  }
+}
+/**
+ * Реквизиты вывода не подходят сети/методу (`INVALID_DESTINATION`, 422).
+ *
+ * Отдельный код от `INVALID_CURRENCY`: валюта может быть релизной, а адрес —
+ * чужой сети (TRC20-адрес в заявке на BTC). Отправка в такой адрес — потеря
+ * средств без возврата, поэтому проверка fail-closed и до создания заявки.
+ * Контекст обрезается: сообщение уходит наружу, реквизиты — чувствительные
+ * данные (номер карты целиком не логируем и не возвращаем).
+ */
+export class InvalidDestinationError extends AppError {
+  readonly code = 'INVALID_DESTINATION'
+  readonly httpStatus = 422
+  constructor(m = 'INVALID_DESTINATION', ctx?: Record<string, unknown>) {
+    super(m, ctx)
+  }
+}
+/**
+ * Сумма заявки не разбирается как десятичное денежное значение
+ * (`INVALID_AMOUNT`, 422).
+ *
+ * До этого `new Decimal('мусор')` бросал сырую ошибку decimal.js и клиент
+ * получал 500. HTTP-слой отсекает мусор regex'ом DTO (400 VALIDATION_ERROR),
+ * поэтому класс обслуживает вызывающих, минующих presentation.
+ */
+export class InvalidAmountError extends AppError {
+  readonly code = 'INVALID_AMOUNT'
+  readonly httpStatus = 422
+  constructor(m = 'INVALID_AMOUNT', ctx?: Record<string, unknown>) {
+    super(m, ctx)
   }
 }
 /** 400 сохранён от прежнего BadRequestException('NOT_FOUND') — контракт web. */

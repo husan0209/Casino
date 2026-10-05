@@ -17,6 +17,7 @@
 import { randomUUID, createHmac } from 'crypto'
 
 import { prisma } from '@casino/database'
+import { LEGAL_DOCUMENT_VERSIONS } from '@casino/shared-types'
 
 const E2E = process.env['E2E_API'] === '1'
 const dE2E = E2E ? describe : describe.skip
@@ -186,7 +187,14 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
 
   it('1. регистрация игрока возвращает accessToken и referralCode', async () => {
     const res = await api('POST', '/auth/register', {
-      body: { email: PLAYER_EMAIL, password: PLAYER_PASSWORD },
+      body: {
+        email: PLAYER_EMAIL,
+        password: PLAYER_PASSWORD,
+        // GAP-71: без согласия регистрация больше не проходит — версия берётся
+        // из того же реестра, что отдаёт web.
+        accept_terms: true,
+        terms_version: LEGAL_DOCUMENT_VERSIONS.terms,
+      },
     })
     expect(res.status).toBe(201)
     expect(typeof res.json?.['accessToken']).toBe('string')

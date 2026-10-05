@@ -14,6 +14,11 @@ import { Throttle } from '@nestjs/throttler'
 import { type Request, type Response } from 'express'
 
 import {
+  OAUTH_STATE_COOKIE,
+  clearOAuthStateCookie,
+  setOAuthStateCookie,
+} from '@/common/cookies/oauth-state-cookie'
+import {
   clearRefreshTokenCookie,
   setRefreshTokenCookie,
 } from '@/common/cookies/refresh-token-cookie'
@@ -23,8 +28,13 @@ import { type UserActor } from '@/common/types/req-user'
 
 import { type UserRole } from '@casino/database'
 
+import { AcceptTermsUseCase } from '../../application/use-cases/accept-terms.use-case'
 import { ChangePasswordUseCase } from '../../application/use-cases/change-password.use-case'
 import { ForgotPasswordUseCase } from '../../application/use-cases/forgot-password.use-case'
+import {
+  ListTermsAcceptancesUseCase,
+  type TermsAcceptanceStatus,
+} from '../../application/use-cases/list-terms-acceptances.use-case'
 import { LoginUseCase } from '../../application/use-cases/login.use-case'
 import { LogoutUseCase } from '../../application/use-cases/logout.use-case'
 import { GoogleOAuthUseCase } from '../../application/use-cases/oauth/google-oauth.use-case'
@@ -41,6 +51,7 @@ import {
   ResetPasswordSchema,
 } from '../dto/password-reset.dto'
 import { type RegisterDto, RegisterSchema } from '../dto/register.dto'
+import { type AcceptTermsDto, AcceptTermsSchema } from '../dto/terms.dto'
 import { AuthGuard } from '../guards/auth.guard'
 
 /** Точечное сужение: req.cookies в @types/express — any (GAP-39 stage 10). */
@@ -72,6 +83,9 @@ export class AuthController {
     @Inject(ChangePasswordUseCase) private readonly changePasswordUc: ChangePasswordUseCase,
     @Inject(GoogleOAuthUseCase) private readonly googleUc: GoogleOAuthUseCase,
     @Inject(TelegramLoginUseCase) private readonly telegramUc: TelegramLoginUseCase,
+    @Inject(ListTermsAcceptancesUseCase)
+    private readonly termsAcceptancesUc: ListTermsAcceptancesUseCase,
+    @Inject(AcceptTermsUseCase) private readonly acceptTermsUc: AcceptTermsUseCase,
   ) {}
 
   @Post('register')
@@ -91,7 +105,14 @@ export class AuthController {
     // affiliates.tracking_code. Совпадёт максимум один.
     const affiliateCode = typeof req.query['ref'] === 'string' ? req.query['ref'] : undefined
     const result = await this.registerUc.execute(
-      { email: body.email, password: body.password, referralCode: body.referral_code },
+      {
+        email: body.email,
+        password: body.password,
+        referralCode: body.referral_code,
+        // GAP-71: версия условий, которую игрок видел на форме. Use-case сверяет
+        // её с реестром и отказывает устаревшему клиенту.
+        termsVersion: body.terms_version,
+      },
       {
         ip: req.ip,
         userAgent: req.headers['user-agent'],
@@ -100,6 +121,16 @@ export class AuthController {
     )
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user, referralCode: result.referralCode }
+  }
+
+  /**
+   * GAP-71 (Terms §23): игрок вправе получить копию того, что он принял, —
+   * полную историю акцептов и действующие версии документов.
+   */
+  @Get('terms-acceptances')
+  @UseGuards(AuthGuard)
+  async termsAcceptances(@CurrentUser() user: UserActor): Promise<TermsAcceptanceStatus> {
+    return this.termsAcceptancesUc.execute(user.id)
   }
 
   @Get('verify-email')
@@ -121,7 +152,15 @@ export class AuthController {
     @Body() body: LoginDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: UserRole } }> {
+  ): Promise<{
+    accessToken: string
+    user: { id: string; email: string | null; role: UserRole }
+    /**
+     * Гейт повторного акцепта (GAP-73, Terms §21): условия изменились с тех пор,
+     * как игрок подтверждал их в последний раз.
+     */
+    terms_reaccept_required: boolean
+  }> {
     const result = await this.loginUc.execute({
       email: body.email,
       password: body.password,
@@ -130,7 +169,34 @@ export class AuthController {
       ...(body.captcha_token !== undefined && { captchaToken: body.captcha_token }),
     })
     setRefreshTokenCookie(res, result.refreshToken)
-    return { accessToken: result.accessToken, user: result.user }
+    const status = await this.termsAcceptancesUc.execute(result.user.id)
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+      terms_reaccept_required: status.reacceptRequired,
+    }
+  }
+
+  /**
+   * Повторный акцепт после существенных изменений Условий (GAP-73, Terms §21).
+   * Отдельный эндпоинт, а не «молча обнови строку при входе»: согласие должно
+   * быть активным действием игрока (п. 4), иначе журнал перестаёт быть
+   * доказательством.
+   */
+  @Post('terms/accept')
+  @UseGuards(AuthGuard)
+  @UsePipes(new ZodValidationPipe(AcceptTermsSchema))
+  async acceptTerms(
+    @Body() body: AcceptTermsDto,
+    @CurrentUser() user: UserActor,
+    @Req() req: Request,
+  ): Promise<TermsAcceptanceStatus> {
+    return this.acceptTermsUc.execute({
+      userId: user.id,
+      termsVersion: body.terms_version,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
   }
 
   @Post('refresh')
@@ -204,25 +270,40 @@ export class AuthController {
   // ===== OAuth (TZ part 2) =====
 
   @Get('google/url')
-  googleUrl(@Query('redirect_uri') redirectUri?: string): { url: string; state: string } {
-    return this.googleUc.buildAuthUrl(redirectUri)
+  googleUrl(
+    @Query('redirect_uri') redirectUri: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ): { url: string; state: string } {
+    const result = this.googleUc.buildAuthUrl(redirectUri)
+    // `state` возвращается клиенту (он кладёт его в тело) и запоминается кукой:
+    // завершить вход может только тот браузер, который его начал. Подписанный
+    // state сам по себе воспроизводим — см. oauth-state-cookie.ts.
+    setOAuthStateCookie(res, result.state)
+    return result
   }
 
   @Post('google')
   @UsePipes(new ZodValidationPipe(GoogleLoginSchema))
   async google(
     @Body() body: { code: string; redirect_uri?: string; state?: string; referral_code?: string },
-    @Req() req: Request,
+    @Req() req: RequestWithCookies & Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: string } }> {
+    // `req.cookies` в @types/express объявлен как any (GAP-39, stage 10) — в
+    // пересечении `RequestWithCookies & Request` это any и побеждает. Значение
+    // берём через узкий интерфейс, иначе any уезжал бы в use-case мимо типов.
+    const { cookies } = req as RequestWithCookies
     const result = await this.googleUc.execute({
       code: body.code,
       redirectUri: body.redirect_uri,
       state: body.state,
+      stateCookie: cookies[OAUTH_STATE_COOKIE],
       referralCode: body.referral_code as string | undefined,
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     })
+    // state одноразовый: пара (code, state) больше не переиспользуется.
+    clearOAuthStateCookie(res)
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user }
   }

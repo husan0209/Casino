@@ -93,7 +93,7 @@ export class OAuthUserProvisioningService {
       refreshTokenHash: hash,
       ipAddress: input.ip || null,
       userAgent: input.userAgent || null,
-      expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
+      expiresAt: this.jwt.refreshLifetime().expiresAt,
       revokedAt: null,
     })
     const accessToken = this.jwt.signAccess(user.id, user.role, session.id)

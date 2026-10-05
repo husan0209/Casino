@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
+import { PasswordField } from '@/components/ui/password-field'
 import { affiliateErrText } from '@/lib/affiliate-api'
 import { type AffiliateAuthState, useAffiliateAuth } from '@/stores/affiliate'
 
@@ -64,12 +65,10 @@ export default function AffiliateLoginPage(): React.JSX.Element {
           <label className="field-label" htmlFor="login-pass">
             Пароль
           </label>
-          <input
+          <PasswordField
             id="login-pass"
-            type="password"
             required
             autoComplete="current-password"
-            className="input"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common'
 
-import { prisma, type Prisma } from '@casino/database'
-
+import { type AuditLog, prisma, type Prisma } from '@casino/database'
 
 import {
   type AdminFeedBigWin,
@@ -10,6 +9,7 @@ import {
   type AdminFeedSignup,
   type AdminFeedTicket,
   type AdminUserRow,
+  type AuditLogFilter,
   type AuditLogInput,
   type CreateAdminUserInput,
   type IAuditLogRepository,
@@ -66,17 +66,8 @@ export class PrismaAdminUserRepository implements IAdminUserRepository {
     await prisma.adminUser.update({ where: { id }, data: { lastLoginAt: new Date() } })
   }
 
-  /** Блокировка игрока: статус + отзыв активных сессий — одна доменная операция. */
-  async blockPlayer(userId: string): Promise<void> {
-    await prisma.$transaction([
-      prisma.user.update({ where: { id: userId }, data: { status: 'blocked' } }),
-      prisma.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } }),
-    ])
-  }
-
-  async unblockPlayer(userId: string): Promise<void> {
-    await prisma.user.update({ where: { id: userId }, data: { status: 'active' } })
-  }
+  // Блокировка/разблокировка игрока отсюда убраны (G24): `users` и `sessions`
+  // пишет их владелец — admin ходит в UsersFacade.blockPlayer/unblockPlayer.
 }
 
 @Injectable()
@@ -97,6 +88,30 @@ export class PrismaAuditLogRepository implements IAuditLogRepository {
         ...(input.userAgent !== undefined && { userAgent: input.userAgent }),
       },
     })
+  }
+
+  /**
+   * Список журнала (гард G27: запрос таблицы `audit_logs` живёт у её владельца,
+   * а не в presentation). Каждый фильтр добавляется только когда задан:
+   * `{ action: { contains: undefined } }` Prisma не упал бы, а отдал пустой
+   * список — ровно тот тихий дефект, который легко привезти из query-параметров.
+   */
+  list(filter: AuditLogFilter): Promise<[AuditLog[], number]> {
+    const where: Prisma.AuditLogWhereInput = {
+      ...(filter.actorType !== undefined && { actorType: filter.actorType }),
+      ...(filter.actorId !== undefined && { actorId: filter.actorId }),
+      ...(filter.action !== undefined && { action: { contains: filter.action } }),
+      ...(filter.targetType !== undefined && { targetType: filter.targetType }),
+    }
+    return Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        skip: (filter.page - 1) * filter.perPage,
+        take: filter.perPage,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.auditLog.count({ where }),
+    ])
   }
 }
 

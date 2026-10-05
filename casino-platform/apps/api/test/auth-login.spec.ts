@@ -132,6 +132,13 @@ function makeDeps(over: DepOverrides = {}) {
     verifyAccess: () => ({ sub: 'u-1', role: 'user', session_id: 'sess-1' }),
     generateRefreshToken: () => ({ token: 'refresh-raw', hash: 'sha:refresh' }),
     hashRefreshToken: (token) => `sha:${token}`,
+    // Намеренно НЕ 30 суток: тест должен ловить случай, когда use-case считает
+    // срок сам, а не спрашивает порт (прежний хардкод `30 * 24 * 3600 * 1000`
+    // в пяти местах делал `JWT_REFRESH_EXPIRES_IN` фиктивной переменной).
+    refreshLifetime: () => ({
+      expiresAt: new Date(Date.now() + 25 * 3_600_000),
+      maxAgeMs: 25 * 3_600_000,
+    }),
   }
 
   const captchaVerifications: Array<string | undefined> = []
@@ -196,13 +203,13 @@ describe('LoginUseCase', () => {
     expect(d.updated[0]!.props.lastLoginAt).toBeInstanceOf(Date)
   })
 
-  it('сессия живёт 30 дней (окно refresh-токена)', async () => {
+  it('сессия живёт столько, сколько отдал порт, а не 30 суток из головы', async () => {
     const d = makeDeps()
     const before = Date.now()
     await d.uc.execute(LOGIN_INPUT)
-    const days = (d.createdSessions[0]!.expiresAt.getTime() - before) / 86_400_000
-    expect(days).toBeGreaterThan(29.9)
-    expect(days).toBeLessThan(30.1)
+    const hours = (d.createdSessions[0]!.expiresAt.getTime() - before) / 3_600_000
+    expect(hours).toBeGreaterThan(24.9)
+    expect(hours).toBeLessThan(25.1)
   })
 
   it('аккаунта нет → InvalidCredentialsError, хешер не трогается', async () => {

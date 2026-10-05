@@ -46,7 +46,16 @@ const COMMISSION_ROW = {
   creditedAt: new Date('2026-10-01T03:00:00.000Z'),
 }
 
-const PLAYER_ROW = {
+/** Набор полей, который контроллер читает у атрибуции для `/players`. */
+const PLAYER_ROW: {
+  playerId: string
+  status: string
+  totalDeposit: string
+  depositCount: number
+  firstDepositAt: Date
+  rejectReason: string | null
+  createdAt: Date
+} = {
   playerId: 'p-1',
   status: 'qualified',
   totalDeposit: '25000.00',
@@ -62,6 +71,8 @@ interface Fakes {
   totals?: { totalCommission: string; totalNgr: string; totalGgr: string }
   commissionsTotal?: number
   playersTotal?: number
+  /** Строки `/players`; по умолчанию — одна квалифицированная без флага. */
+  playerRows?: Array<typeof PLAYER_ROW>
 }
 
 interface RepoArgs {
@@ -85,7 +96,7 @@ function makeController(fakes: Fakes = {}) {
       fakes.totals ?? { totalCommission: '18420.55', totalNgr: '61402.10', totalGgr: '78930.00' },
   )
   const listAttributions = vi.fn(async (args: RepoArgs) => ({
-    items: args.perPage === 1 ? [] : [PLAYER_ROW],
+    items: args.perPage === 1 ? [] : (fakes.playerRows ?? [PLAYER_ROW]),
     total: args.perPage === 1 ? (fakes.playersTotal ?? 47) : (fakes.playersTotal ?? 2),
   }))
   const clickStats = vi.fn(async () => fakes.clickStats ?? { total: 1284, converted: 47 })
@@ -261,6 +272,32 @@ describe('Контракт кабинета партнёра (presentation ↔ a
       first_deposit_at: '2026-09-12T10:04:00.000Z',
       reject_reason: null,
     })
+  })
+
+  /**
+   * F4: на квалифицированной строке `reject_reason` — флаг для разбора
+   * администратором, а не отказ. Партнёру он показался бы обвинением в
+   * перекупке трафика, хотя начисления у него идут.
+   */
+  it('players: флаг на разбор (F4) партнёру не показывается', async () => {
+    const { controller } = makeController({
+      playerRows: [{ ...PLAYER_ROW, rejectReason: 'near_threshold_deposit' }],
+    })
+
+    const res = await controller.players(ACTOR)
+
+    expect(res.data[0]?.status).toBe('qualified')
+    expect(res.data[0]?.reject_reason).toBeNull()
+  })
+
+  it('players: настоящая причина отказа остаётся — партнёр может оспорить (§13.3)', async () => {
+    const { controller } = makeController({
+      playerRows: [{ ...PLAYER_ROW, status: 'rejected', rejectReason: 'self_referral' }],
+    })
+
+    const res = await controller.players(ACTOR)
+
+    expect(res.data[0]?.reject_reason).toBe('self_referral')
   })
 
   it('links: базовая ссылка и deep-link — в том же формате, что и me()', async () => {

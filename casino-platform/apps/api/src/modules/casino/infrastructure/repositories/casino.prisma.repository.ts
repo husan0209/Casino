@@ -80,6 +80,10 @@ export class PrismaGameProviderRepository implements IGameProviderRepository {
     return prisma.gameProvider.findUnique({ where: { id } })
   }
 
+  findBySlug(slug: string): Promise<GameProvider | null> {
+    return prisma.gameProvider.findUnique({ where: { slug } })
+  }
+
   async setEnabled(id: string, isEnabled: boolean): Promise<void> {
     await prisma.gameProvider.update({ where: { id }, data: { isEnabled } })
   }

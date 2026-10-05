@@ -5,6 +5,13 @@ import { type ModuleRef } from '@nestjs/core'
 
 import { errorMessage } from '@/common/utils/error-message'
 
+import {
+  CONSENTED_ON_REGISTRATION,
+  LEGAL_DOCUMENT_VERSIONS,
+  type LegalDocumentType,
+} from '@casino/shared-types'
+
+
 // Импорт ТОЛЬКО класса-токена для ModuleRef.get. Это не зависимость Nest-модулей:
 // affiliate.module по-прежнему не импортируется из AuthModule, цикла нет.
 import { AffiliateFacade as AffiliateFacadeRef } from '../../../affiliate/facade/affiliate.facade'
@@ -16,16 +23,21 @@ import {
   PASSWORD_HASHER,
   JWT_TOKEN_SERVICE,
 } from '../../domain/auth.ports'
-import { type UserRole } from '../../domain/entities/user.entity'
+import { type User, type UserRole } from '../../domain/entities/user.entity'
 import {
   EmailAlreadyExistsError,
   ReferralCodeGenerationError,
+  TermsVersionOutdatedError,
   WeakPasswordError,
 } from '../../domain/errors'
 import {
   type ISessionRepository,
   SESSION_REPOSITORY,
 } from '../../domain/repositories/session.repository'
+import {
+  type ITermsAcceptanceRepository,
+  TERMS_ACCEPTANCE_REPOSITORY,
+} from '../../domain/repositories/terms-acceptance.repository'
 import { type IUserRepository, USER_REPOSITORY } from '../../domain/repositories/user.repository'
 import {
   EMAIL_VERIFICATION_REPOSITORY,
@@ -46,6 +58,10 @@ export class RegisterUseCase {
     @Inject(PASSWORD_HASHER) private hasher: IPasswordHasher,
     @Inject(EMAIL_QUEUE_SERVICE) private email: IEmailQueueService,
     @Inject(JWT_TOKEN_SERVICE) private jwt: IJwtTokenService,
+    // GAP-71: журнал акцепта. Обязательная зависимость, а не Optional:
+    // регистрация без записи согласия означает, что доказательств акцепта нет,
+    // и весь документ (Terms §4, §23) не работает.
+    @Inject(TERMS_ACCEPTANCE_REPOSITORY) private acceptances: ITermsAcceptanceRepository,
     // Атрибуция к партнёру (партнёрская программа, ТЗ ч.8 §7.3).
     //
     // ПОЧЕМУ ModuleRef, А НЕ AffiliateFacade ЧЕРЕЗ ИМПОРТ: affiliate уже
@@ -122,8 +138,64 @@ export class RegisterUseCase {
     throw new ReferralCodeGenerationError()
   }
 
+  /**
+   * Клиент присылает версию, которую реально отрендерил (она же — в реестре
+   * shared-types). Если сервер и web разошлись по версиям, регистрировать
+   * игрока под «нашей» версией нельзя: в журнале окажется документ, которого он
+   * не видел. Поэтому устаревшему клиенту — отказ с явной просьбой обновиться.
+   */
+  private assertTermsVersionIsCurrent(termsVersion: string): void {
+    if (termsVersion !== LEGAL_DOCUMENT_VERSIONS.terms) {
+      throw new TermsVersionOutdatedError(LEGAL_DOCUMENT_VERSIONS.terms)
+    }
+  }
+
+  /**
+   * Записывает согласие по каждому документу отдельной строкой (Terms §4).
+   * Версии берутся из серверного реестра, а не из тела запроса, — assert выше
+   * гарантирует, что присланная версия ему равна.
+   */
+  private async recordRegistrationConsent(input: {
+    userId: string
+    ip?: string | undefined
+    userAgent?: string | undefined
+  }): Promise<void> {
+    const entries = CONSENTED_ON_REGISTRATION.map((document: LegalDocumentType) => ({
+      userId: input.userId,
+      document,
+      version: LEGAL_DOCUMENT_VERSIONS[document],
+      ip: input.ip ?? null,
+      userAgent: input.userAgent ?? null,
+    }))
+    await this.acceptances.recordMany(entries)
+  }
+
+  /**
+   * Создаёт игрока: хеш пароля, уникальный реферальный код, связь с пригласившим.
+   * Вынесено из execute, чтобы тело регистрации осталось списком шагов.
+   */
+  private async createPlayer(input: {
+    email: string
+    password: string
+    referredBy: string | null
+  }): Promise<User> {
+    const passwordHash = await this.hasher.hash(input.password)
+    const referralCode = await this.generateReferralCode()
+    return this.users.create({
+      email: input.email,
+      passwordHash,
+      referralCode,
+      referredBy: input.referredBy,
+    })
+  }
+
   async execute(
-    input: { email: string; password: string; referralCode?: string | undefined },
+    input: {
+      email: string
+      password: string
+      referralCode?: string | undefined
+      termsVersion: string
+    },
     meta?: {
       ip?: string | undefined
       userAgent?: string | undefined
@@ -140,6 +212,7 @@ export class RegisterUseCase {
     if (input.password.length < 8) {
       throw new WeakPasswordError()
     }
+    this.assertTermsVersionIsCurrent(input.termsVersion)
     const emailNormalized = input.email.toLowerCase().trim()
 
     const existing = await this.users.findByEmail(emailNormalized)
@@ -148,13 +221,18 @@ export class RegisterUseCase {
     }
 
     const referredBy = await this.resolveReferrerId(input.referralCode)
-    const passwordHash = await this.hasher.hash(input.password)
-    const referralCode = await this.generateReferralCode()
-    const user = await this.users.create({
+    const user = await this.createPlayer({
       email: emailNormalized,
-      passwordHash,
-      referralCode,
+      password: input.password,
       referredBy,
+    })
+
+    // Журнал акцепта — сразу после создания игрока и до всего best-effort-ного:
+    // отказ последующих шагов не должен оставлять регистрацию без согласия.
+    await this.recordRegistrationConsent({
+      userId: user.id,
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
     })
 
     // Привязка к партнёру (партнёрская программа). Вызывается ПОСЛЕ создания
@@ -168,23 +246,43 @@ export class RegisterUseCase {
     })
 
     await this.sendVerification(user.id, emailNormalized)
-    const { token: refreshToken, hash } = this.jwt.generateRefreshToken()
-    const session = await this.sessions.create({
+    const tokens = await this.openSession({
       userId: user.id,
-      refreshTokenHash: hash,
-      ipAddress: meta?.ip || null,
-      userAgent: meta?.userAgent || null,
-      expiresAt: new Date(Date.now() + 30 * 24 * 3600 * 1000),
-      revokedAt: null,
+      role: user.role,
+      ip: meta?.ip,
+      userAgent: meta?.userAgent,
     })
-    const accessToken = this.jwt.signAccess(user.id, user.role, session.id)
 
     return {
-      accessToken,
-      refreshToken,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       user: { id: user.id, email: user.email, role: user.role },
-      referralCode,
+      referralCode: user.referralCode,
       message: 'Регистрация успешна',
     }
+  }
+
+  /**
+   * Сессия сразу после регистрации (§5.1: игрок входит, письмо подтверждает
+   * фоном). Вынесено из execute, чтобы тело регистрации читалось как список
+   * шагов. Окно refresh берётся из конфига (jwt.refreshLifetime), а не из
+   * литерала в коде: оно обязано совпадать с тем, что проверяет refresh-путь.
+   */
+  private async openSession(input: {
+    userId: string
+    role: UserRole
+    ip?: string | undefined
+    userAgent?: string | undefined
+  }): Promise<{ accessToken: string; refreshToken: string }> {
+    const { token: refreshToken, hash } = this.jwt.generateRefreshToken()
+    const session = await this.sessions.create({
+      userId: input.userId,
+      refreshTokenHash: hash,
+      ipAddress: input.ip || null,
+      userAgent: input.userAgent || null,
+      expiresAt: this.jwt.refreshLifetime().expiresAt,
+      revokedAt: null,
+    })
+    return { accessToken: this.jwt.signAccess(input.userId, input.role, session.id), refreshToken }
   }
 }

@@ -17,20 +17,13 @@ import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AdminActor } from '@/common/types/req-user'
 
 import {
-  type IPaymentRequestRepository,
-  PAYMENT_REQUEST_REPOSITORY,
-} from '@modules/payments/domain/payments.ports'
-import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
+  PaymentsFacade,
+  type PaymentRequestAdminRow,
+  type PaymentRequestDetailRow,
+} from '@modules/payments/facade/payments.facade'
+import { type LedgerEntryAdminRow, WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
-import {
-  type LedgerEntry,
-  type LedgerEntryType,
-  type PaymentProvider,
-  type PaymentStatus,
-  type PaymentType,
-  prisma,
-  type Prisma,
-} from '@casino/database'
+import { type LedgerEntry, PaymentType } from '@casino/database'
 import { type CreditResult, type Currency } from '@casino/shared-types'
 import { AppError } from '@casino/shared-utils'
 
@@ -42,34 +35,33 @@ import {
   type WithdrawalDecisionDependencies,
 } from '../../application/withdrawal-decision-deps'
 import { AdminForbiddenError } from '../../domain/errors'
+import {
+  type IWithdrawalRequestStore,
+  WITHDRAWAL_REQUEST_STORE,
+} from '../../domain/withdrawal.repository'
 import { AdminAuthGuard } from '../admin-auth.guard'
 import {
+  AdminPaymentRequestsQuerySchema,
+  AdminTransactionsQuerySchema,
+  AdminWithdrawalsQuerySchema,
   BatchApproveSchema,
   BatchRejectSchema,
   RejectWithdrawalSchema,
   WalletAdjustSchema,
+  type AdminPaymentRequestsQueryDto,
+  type AdminTransactionsQueryDto,
+  type AdminWithdrawalsQueryDto,
 } from '../dto/admin-finance.dto'
 
 /**
- * UC-PAY-18: карточка платёжной заявки для админки. Типы ВЫВОДЯТСЯ из схемы
- * Prisma по той же include/where-конфигурации, что и запросы: развёрнутые
- * литералы молча расходились с реальными колонками и раздували метод до 83 строк.
+ * UC-PAY-18: карточка платёжной заявки для админки. Строки приходят типами,
+ * ВЫВЕДЕННЫМИ из include-конфигурации запроса владельца таблицы (payments,
+ * wallet) — развёрнутые вручную литералы уже расходились с колонками.
  */
-type PaymentRequestWithUser = Prisma.PaymentRequestGetPayload<{
-  include: { callbacks: true; user: { select: { email: true } } }
-}>
-
 type PaymentRequestDetailView = {
-  payment_request: PaymentRequestWithUser | null
-  callbacks: PaymentRequestWithUser['callbacks'] | undefined
+  payment_request: PaymentRequestDetailRow | null
+  callbacks: PaymentRequestDetailRow['callbacks'] | undefined
   ledger_entries: LedgerEntry[]
-}
-
-/** Пагинация, общая для списков админки (q.page/q.per_page + дефолты/кап). */
-function parsePagination(q: Record<string, string | undefined>): { page: number; perPage: number } {
-  const page = parseInt(q.page ?? '') || 1
-  const perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
-  return { page, perPage }
 }
 
 @UseGuards(AdminAuthGuard)
@@ -77,182 +69,88 @@ function parsePagination(q: Record<string, string | undefined>): { page: number;
 export class AdminFinanceController {
   constructor(
     @Inject(WalletFacade) private wallet: WalletFacade,
-    @Inject(PAYMENT_REQUEST_REPOSITORY) private payments: IPaymentRequestRepository,
+    @Inject(WITHDRAWAL_REQUEST_STORE) private payments: IWithdrawalRequestStore,
     @Inject(AuditLogService) private audit: AuditLogService,
+    // Чтение заявок отдаёт payments (гард G27): `payment_requests` — его таблица.
+    // Имя поля с суффиксом Facade, а не `payments`: `payments` уже занято узким
+    // портом решений по заявке, а `paymentRequests` столкнулось бы с методом
+    // контроллера с тем же именем.
+    @Inject(PaymentsFacade) private paymentsFacade: PaymentsFacade,
   ) {}
 
   // UC-PAY-16 transactions
   @Get('transactions')
-  async transactions(@Query() q: Record<string, string | undefined>): Promise<{
-    items: ({ user: { email: string | null } | null; walletAccount: { currency: string } } & {
-      id: string
-      createdAt: Date
-      transactionId: string
-      walletAccountId: string
-      type: LedgerEntryType
-      amount: Prisma.Decimal
-      balanceBefore: Prisma.Decimal
-      balanceAfter: Prisma.Decimal
-      idempotencyKey: string | null
-      description: string | null
-      metadata: Prisma.JsonValue
-      userId: string | null
-    })[]
+  @UsePipes(new ZodValidationPipe(AdminTransactionsQuerySchema))
+  async transactions(@Query() q: AdminTransactionsQueryDto): Promise<{
+    items: LedgerEntryAdminRow[]
     meta: { page: number; perPage: number; total: number }
   }> {
-    const { page, perPage } = parsePagination(q)
-    const where: Prisma.LedgerEntryWhereInput = {}
-    if (q.user_id) {
-      where.userId = q.user_id
-    }
-    if (q.type) {
-      where.type = q.type as LedgerEntryType
-    }
-    if (q.currency) {
-      where.walletAccount = { currency: q.currency }
-    }
-    const [items, total] = await Promise.all([
-      prisma.ledgerEntry.findMany({
-        where,
-        skip: (page - 1) * perPage,
-        take: perPage,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          walletAccount: { select: { currency: true } },
-          user: { select: { email: true } },
-        },
-      }),
-      prisma.ledgerEntry.count({ where }),
-    ])
-    return { items, meta: { page, perPage, total } }
+    const { items, total } = await this.wallet.listLedgerEntries({
+      userId: q.user_id,
+      type: q.type,
+      currency: q.currency,
+      page: q.page,
+      perPage: q.per_page,
+    })
+    return { items, meta: { page: q.page, perPage: q.per_page, total } }
   }
 
   // UC-PAY-17 payment_requests
   @Get('payment-requests')
-  async paymentRequests(@Query() q: Record<string, string | undefined>): Promise<{
-    items: ({ user: { email: string | null } } & {
-      id: string
-      createdAt: Date
-      updatedAt: Date
-      type: PaymentType
-      amount: Prisma.Decimal
-      idempotencyKey: string
-      metadata: Prisma.JsonValue
-      userId: string
-      currency: string
-      status: PaymentStatus
-      provider: PaymentProvider
-      method: string | null
-      amountRub: Prisma.Decimal | null
-      fee: Prisma.Decimal
-      externalId: string | null
-      externalStatus: string | null
-      paymentUrl: string | null
-      destination: Prisma.JsonValue
-      errorMessage: string | null
-      expiresAt: Date | null
-      completedAt: Date | null
-    })[]
+  @UsePipes(new ZodValidationPipe(AdminPaymentRequestsQuerySchema))
+  async paymentRequests(@Query() q: AdminPaymentRequestsQueryDto): Promise<{
+    items: PaymentRequestAdminRow[]
     meta: { page: number; perPage: number; total: number }
   }> {
-    const { page, perPage } = parsePagination(q)
-    const where: Prisma.PaymentRequestWhereInput = {}
-    if (q.user_id) {
-      where.userId = q.user_id
-    }
-    if (q.type) {
-      where.type = q.type as PaymentType
-    }
-    if (q.status) {
-      where.status = q.status as PaymentStatus
-    }
-    if (q.provider) {
-      where.provider = q.provider as PaymentProvider
-    }
-    const [items, total] = await Promise.all([
-      prisma.paymentRequest.findMany({
-        where,
-        skip: (page - 1) * perPage,
-        take: perPage,
-        orderBy: { createdAt: 'desc' },
-        include: { user: { select: { email: true } } },
-      }),
-      prisma.paymentRequest.count({ where }),
-    ])
-    return { items, meta: { page, perPage, total } }
+    const { items, total } = await this.paymentsFacade.listPaymentRequests({
+      userId: q.user_id,
+      type: q.type,
+      status: q.status,
+      provider: q.provider,
+      page: q.page,
+      perPage: q.per_page,
+    })
+    return { items, meta: { page: q.page, perPage: q.per_page, total } }
   }
 
   // UC-PAY-18 details
   @Get('payment-requests/:id')
   async paymentDetail(@Param('id') id: string): Promise<PaymentRequestDetailView> {
-    const pr = await prisma.paymentRequest.findUnique({
-      where: { id },
-      include: { callbacks: true, user: { select: { email: true } } },
-    })
-    const ledger = await prisma.ledgerEntry
-      .findMany({ where: { metadata: { path: ['payment_request_id'], equals: id } } })
-      .catch(() => [])
+    const pr = await this.paymentsFacade.getPaymentRequestDetail(id)
+    // Проводки — справочный блок карточки: не дождавшись их, страница заявки
+    // всё равно показывает главное, поэтому сбой этого чтения не должен
+    // превращать карточку в 500.
+    const ledger = await this.wallet.listEntriesForPaymentRequest(id).catch(() => [])
     return { payment_request: pr, callbacks: pr?.callbacks, ledger_entries: ledger }
   }
 
   // UC-PAY-10 withdrawals list
   @Get('withdrawals')
-  async withdrawals(@Query() q: Record<string, string | undefined>): Promise<{
-    items: ({ user: { email: string | null } } & {
-      id: string
-      createdAt: Date
-      updatedAt: Date
-      type: PaymentType
-      amount: Prisma.Decimal
-      idempotencyKey: string
-      metadata: Prisma.JsonValue
-      userId: string
-      currency: string
-      status: PaymentStatus
-      provider: PaymentProvider
-      method: string | null
-      amountRub: Prisma.Decimal | null
-      fee: Prisma.Decimal
-      externalId: string | null
-      externalStatus: string | null
-      paymentUrl: string | null
-      destination: Prisma.JsonValue
-      errorMessage: string | null
-      expiresAt: Date | null
-      completedAt: Date | null
-    })[]
+  @UsePipes(new ZodValidationPipe(AdminWithdrawalsQuerySchema))
+  async withdrawals(@Query() q: AdminWithdrawalsQueryDto): Promise<{
+    items: PaymentRequestAdminRow[]
     meta: { page: number; perPage: number; total: number }
   }> {
-    const { page, perPage } = parsePagination(q)
-    const where: Prisma.PaymentRequestWhereInput = { type: 'withdrawal' }
-    if (q.status) {
-      where.status = q.status as PaymentStatus
-    }
-    if (q.user_id) {
-      where.userId = q.user_id
-    }
-    if (q.currency) {
-      where.currency = q.currency
-    }
-    const [items, total] = await Promise.all([
-      prisma.paymentRequest.findMany({
-        where,
-        skip: (page - 1) * perPage,
-        take: perPage,
-        orderBy: { createdAt: 'desc' },
-        include: { user: { select: { email: true } } },
-      }),
-      prisma.paymentRequest.count({ where }),
-    ])
-    return { items, meta: { page, perPage, total } }
+    // Тип фиксируется здесь, а не берётся из query: /withdrawals — это
+    // payment_requests с фильтром type=withdrawal, и подменить его запросом нельзя.
+    const { items, total } = await this.paymentsFacade.listPaymentRequests({
+      type: PaymentType.withdrawal,
+      userId: q.user_id,
+      status: q.status,
+      currency: q.currency,
+      page: q.page,
+      perPage: q.per_page,
+    })
+    return { items, meta: { page: q.page, perPage: q.per_page, total } }
   }
 
   /**
    * Порты для сценариев решения по заявке (В3).
    *
    * Контроллер не выполняет ни одной записи в БД: `payments.updateStatus`
-   * вызывает application use case, а сюда за зависимостями приходит тот же
-   * `PAYMENT_REQUEST_REPOSITORY`, что инжектится модулем.
+   * вызывает application use case, а сюда за зависимостями приходит узкий порт
+   * `WITHDRAWAL_REQUEST_STORE` (реализация — адаптер над `PaymentsFacade`), а не
+   * репозиторий чужого модуля.
    */
   private withdrawalDependencies(): WithdrawalDecisionDependencies {
     return { payments: this.payments, wallet: this.wallet, audit: this.audit }

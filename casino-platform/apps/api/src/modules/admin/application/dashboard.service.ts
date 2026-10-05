@@ -46,9 +46,7 @@ export class DashboardService {
   constructor(@Inject(DASHBOARD_REPOSITORY) private readonly repo: IDashboardRepository) {}
 
   // UC-ADMIN-DASH-01
-  async metrics(
-    period: DashPeriod = 'today',
-  ): Promise<{
+  async metrics(period: DashPeriod = 'today'): Promise<{
     period: DashPeriod
     users: { total: number; new_in_period: number; active_today: number }
     finance: {
@@ -78,7 +76,10 @@ export class DashboardService {
       openTickets,
     ] = await Promise.all([
       this.repo.countUsers(),
-      this.repo.countUsersCreatedSince(todayStart),
+      // `new_in_period` — за ПЕРИОД. Прежний `todayStart` давал «новые за сегодня»
+      // на всех четырёх периодах: на 7d/30d/90d карточка занижалась до суток, что
+      // на экране выглядит правдоподобно и глазами не ловится.
+      this.repo.countUsersCreatedSince(since),
       this.repo.findActiveUserIds(todayStart),
       this.repo.sumCompletedPaymentsRub('deposit', since),
       this.repo.sumCompletedPaymentsRub('withdrawal', since),

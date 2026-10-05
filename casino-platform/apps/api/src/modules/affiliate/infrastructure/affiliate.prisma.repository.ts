@@ -416,6 +416,9 @@ export class PrismaAffiliateAttributionRepository implements AffiliateAttributio
         firstDepositAt: input.firstDepositAt,
         totalDeposit: new Decimal(input.totalDeposit),
         depositCount: input.depositCount,
+        // Флаг на разбор админу (F4). Статус при этом qualified, начисления
+        // идут: суточный расчёт фильтрует по status, а не по причине.
+        ...(input.reviewReason !== undefined && { rejectReason: input.reviewReason }),
       },
     })
     return toAttribution(row)
@@ -464,6 +467,74 @@ export class PrismaAffiliateAttributionRepository implements AffiliateAttributio
       qualified: attribution.status === 'qualified',
       attributionId: attribution.id,
       isFirstDeposit,
+    }
+  }
+
+  /**
+   * Депозиты игрока из `payment_requests` — первоисточник для квалификации.
+   *
+   * Только чтение (ADR GAP-51). Сумма — по `amount_rub`: это RUB-эквивалент, в
+   * котором задан порог `affiliate_min_deposit`, и для крипто он совпадает с
+   * фактически зачисленным после GAP-72.
+   *
+   * Заявки с NULL в `amount_rub` в сумму не попадают — складывать рубли с
+   * единицами монеты нельзя (`amount` у крипто-заявки именно в монетах). На
+   * исход это влияет так: сумма может оказаться меньше фактической, и
+   * квалификация тогда задержится, а не пройдёт по чужим деньгам; `count` при
+   * этом считается по всем completed-заявкам, поэтому сам факт депозита не
+   * теряется.
+   */
+  async sumPlayerDeposits(playerId: string): Promise<{
+    totalRub: string
+    count: number
+    firstDepositId: string | null
+    firstDepositAt: Date | null
+    firstAmountRub: string | null
+  }> {
+    const where: Prisma.PaymentRequestWhereInput = {
+      userId: playerId,
+      type: 'deposit',
+      status: 'completed',
+    }
+    const agg = await prisma.paymentRequest.aggregate({
+      where,
+      _sum: { amountRub: true },
+      _count: { _all: true },
+    })
+    const count = agg._count._all
+    if (count === 0) {
+      return {
+        totalRub: '0',
+        count: 0,
+        firstDepositId: null,
+        firstDepositAt: null,
+        firstAmountRub: null,
+      }
+    }
+    // Второй запрос только когда депозиты есть: джоба квалификации идёт по
+    // всем pending-атрибуциям каждый час, а у значительной их части пополнений
+    // ещё нет — второй round-trip на них был бы платным впустую.
+    const first = await prisma.paymentRequest.findFirst({
+      where,
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, completedAt: true, createdAt: true, amountRub: true },
+    })
+    // amount_rub nullable: NULL (заявка без пересчёта в рубли) и исчезнувшая
+    // строка означают одно — сравнивать с порогом нечего. В '0' это превирать
+    // нельзя: F4 вешал бы флаг на отсутствие данных.
+    const firstAmount = first?.amountRub ?? null
+    return {
+      totalRub: toMoneyString(agg._sum.amountRub),
+      count,
+      firstDepositId: first?.id ?? null,
+      // completedAt обязана быть у completed-заявки, но колонка nullable:
+      // берём createdAt как гарантированно не-пустой момент, иначе квалификация
+      // встала бы навсегда на строке без него
+      firstDepositAt: first?.completedAt ?? first?.createdAt ?? null,
+      // amount_rub у крипто-заявки пересчитан вебхуком по actually_paid
+      // (GAP-72), поэтому «впритык к порогу» считается по фактической оплате,
+      // а не по оценке курса на интенте
+      firstAmountRub: firstAmount === null ? null : toMoneyString(firstAmount),
     }
   }
 
@@ -528,12 +599,14 @@ export class PrismaAffiliateAttributionRepository implements AffiliateAttributio
   async list(args: {
     affiliateId?: string
     status?: AffiliateAttributionStatus
+    rejectReason?: AffiliateRejectReason
     page: number
     perPage: number
   }): Promise<{ items: AffiliateAttributionEntity[]; total: number }> {
     const where: Prisma.AffiliateAttributionWhereInput = {
       ...(args.affiliateId !== undefined ? { affiliateId: args.affiliateId } : {}),
       ...(args.status !== undefined ? { status: args.status } : {}),
+      ...(args.rejectReason !== undefined ? { rejectReason: args.rejectReason } : {}),
     }
     const [rows, total] = await Promise.all([
       prisma.affiliateAttribution.findMany({

@@ -7,6 +7,7 @@ import type { DisplayCurrency } from '@casino/shared-config'
 import { money } from '@casino/shared-utils'
 
 import { type IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
+import { kycDepositLimitRub } from '../deposit-limit'
 
 @Injectable()
 export class GetKycStatusUseCase {
@@ -30,7 +31,10 @@ export class GetKycStatusUseCase {
     documents?: string[]
   }> {
     const status = await this.repo.getStatus(userId)
-    const limitRub = this.config.get<string>('KYC_DEPOSIT_LIMIT_RUB') || '5000'
+    // Порог — общий с KycCheckService (application/deposit-limit.ts): цифра на
+    // этой странице и правило, которое сервер применяет к депозиту, обязаны
+    // читаться из одного места.
+    const limitRub = kycDepositLimitRub(this.config)
     const totalRub = (await this.repo.getTotalDepositedRub(userId)) || '0'
     const remainingRub = money.isGreaterThan(totalRub, limitRub)
       ? '0'

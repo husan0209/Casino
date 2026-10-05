@@ -55,10 +55,19 @@ export const GAME_CATALOG_REPOSITORY = Symbol('GAME_CATALOG_REPOSITORY')
 /**
  * Провайдеры игр: мутации админ-контура (В3) + чтение, которое нужно
  * application-слою (в application prisma banned — guard G1).
- * Read-only списки для витрины остаются в presentation по ADR GAP-51.
+ * Read-only списки витрины пока остаются в presentation — это посчитанный долг
+ * храповика G27 (`presentation-db`), а не разрешение: ADR GAP-51 легализует
+ * межмодульные ЧТЕНИЯ, но не чтение из слоя контроллера. Путь коллбэков
+ * (провайдер по slug) через порт уже идёт.
  */
 export interface IGameProviderRepository {
   findById(id: string): Promise<GameProvider | null>
+  /**
+   * Провайдер по slug — путь коллбэка (`POST /provider-callback/:providerSlug`):
+   * провайдер приходит по своему коду, а `dispatch` уже работает по id. До
+   * храповика G27 контроллер читал `game_providers` сам.
+   */
+  findBySlug(slug: string): Promise<GameProvider | null>
   /** Включить/выключить провайдера (endpoints enable/disable). */
   setEnabled(id: string, isEnabled: boolean): Promise<void>
   /** Актуальный счётчик игр каталога (пересчитывается после синхронизации). */

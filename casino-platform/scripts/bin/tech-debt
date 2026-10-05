@@ -14,7 +14,15 @@
 #   tech-debt gen   <name>...  — перезаписать базлайн текущим состоянием
 #                                (только осознанно: после разбора части долга
 #                                или при добавлении нового правила).
+#   tech-debt detect <name>    — ТОЛЬКО печать факта (без базлайна и без
+#                                записи). Нужен негативному тесту
+#                                scripts/bin/guard-selftest, который гоняет
+#                                ЭТОТ ЖЕ детектор по copy-дереву с ловушкой.
 #   tech-debt list             — имена всех правил.
+#
+# ENV TECH_DEBT_ROOT=<каталог> — перенести сканирование (и DIR) в чужое дерево.
+# Разрешено у `detect` и `check` (check только читает базлайн), запрещено у
+# `gen`: подменённый корень не должен оставить ловушку в вечном базлайне.
 #
 # Exit codes: 0 — OK (или STALE при --allow-stale); 1 — долг вырос;
 # 2 — ошибка использования / нет базлайна / неизвестное правило;
@@ -28,14 +36,58 @@
 
 set -u
 
-cd "$(git rev-parse --show-toplevel 2>/dev/null)/casino-platform" 2>/dev/null ||
-  cd "$(dirname "$0")/../.."
+if [ -n "${TECH_DEBT_ROOT:-}" ]; then
+  cd "$TECH_DEBT_ROOT" 2>/dev/null || {
+    echo "tech-debt: TECH_DEBT_ROOT='$TECH_DEBT_ROOT' — нет такого каталога" >&2
+    exit 2
+  }
+else
+  cd "$(git rev-parse --show-toplevel 2>/dev/null)/casino-platform" 2>/dev/null ||
+    cd "$(dirname "$0")/../.."
+fi
 DIR=tech-debt
+
+# ── Карта владения моделями Prisma ───────────────────────────────────────
+# ЭТО И ЕСТЬ ИСТОЧНИК ИСТИНЫ правила `foreign-writes`: формат
+# `<МодельИзSchema>:<модуль-владелец>`, модуль — каталог apps/api/src/modules.
+# Карту пополняет ТОТ, кто добавляет модель в packages/database/prisma/schema.prisma:
+# детектор отказывается работать, если модели нет здесь (см. FOREIGN_WRITES_SCHEMA
+# ниже) — иначе новая таблица стала бы для гарда невидимкой, ровно тем вакуумом,
+# на котором умер прежний G7.
+#
+# Как выбирается владелец (сверено с docs/MODULE_BOUNDARIES.md §«Ключевые таблицы»):
+#   • владелец — модуль, чей репозиторий СТРОКУ СОЗДАЁТ (INSERT), а не тот, кто
+#     её читает: read-only доступ между модулями легален по ADR GAP-51;
+#   • `users` → auth: `user.create` живит только auth (`user.repository.prisma.ts`,
+#     регистрация email/Google/Telegram); MODULE_BOUNDARIES §3.2 перечисляет
+#     таблицу и у users, но users создаёт только профиль/настройки;
+#   • `sessions` → auth (§3.2 NB: «выпуск refresh-токенов — в auth»), поэтому
+#     отзывы сессий админом, users-модулем и клинером maintenance — чужие записи;
+#   • `exchange_rates` → maintenance (§18.6: запись курсов — её джоба, geo лишь читает);
+#   • `audit_logs`/`system_settings`/`admin_users` → admin (§12.3, §13, §9a.2).
+# Владельцы взяты из docs/MODULE_BOUNDARIES, а не из названий модулей:
+#   User    — §3.2 (users: «users (основная, базовая)») + §2.1 (auth: регистрация)
+#   Session — §2.1 (auth: session management) + §3.1 (users: terminate/просмотр)
+# Где граница разделена по ответственностям, у модели два владельца — гард тогда
+# ловит запись ТРЕТЬИХ модулей (кейс GAP-62: affiliate писал в users), а не
+# превращает в долг законную работу обоих владельцев.
+MODEL_OWNERS='
+User:auth User:users AuthProvider:auth Session:auth Session:users EmailVerification:auth PasswordReset:auth TermsAcceptance:auth
+UserProfile:users UserSettings:users KycProfile:kyc KycDocument:kyc
+AdminUser:admin AuditLog:admin SystemSetting:admin
+WalletAccount:wallet LedgerEntry:wallet
+PaymentRequest:payments PaymentCallback:payments ExchangeRate:maintenance
+GameProvider:casino Game:casino GameSession:casino GameRound:casino
+GameTransaction:casino GameFavorite:casino
+SupportTicket:support SupportMessage:support ReferralReward:referrals
+Affiliate:affiliate AffiliateClick:affiliate AffiliateAttribution:affiliate
+AffiliateCommission:affiliate Notification:notifications
+'
+PRISMA_SCHEMA='packages/database/prisma/schema.prisma'
 
 # ── Детекторы: на stdout — текущее состояние долга в формате базлайна ──
 detect() {
-  case "$1" in
-    # Сырой new Error() вместо AppError-подклассов (AI_DEVELOPMENT_RULES §5)
+  case "$1" in    # Сырой new Error() вместо AppError-подклассов (AI_DEVELOPMENT_RULES §5)
     raw-error)
       grep -rnE 'new Error\(' apps/api/src --include='*.ts' 2>/dev/null |
         grep -vE '\.spec\.ts:|\.test\.ts:' |
@@ -91,6 +143,33 @@ detect() {
           printf '%s\n' "$uc"
         done
       ;;
+    # Сервис без теста. Скоуп — любой *.service.ts внутри apps/api/src/modules:
+    # и application-слой (DashboardService, NotificationService), и
+    # infrastructure-сервисы (подпись админских токенов, argon2-хешер, очередь
+    # писем). Критерий покрытия ЗАМЕТНО строже, чем у use-case-specs, и вот почему:
+    # DI-wiring-спеки (admin-module-wiring.spec.ts, admin-contract.spec.ts)
+    # перечисляют ИМЕНА всех провайдеров модуля — при мягком критерии «упомянут»
+    # сервис считался бы покрытым, хотя ни один ассерт его поведение не проверяет.
+    # Это ровно тот вакуумный гард, из-за которого G7 когда-то протух.
+    # Покрытием считается только:
+    #   (а) соседний файл <имя>.service.spec.ts, ИЛИ
+    #   (б) в любом *.spec.ts (в test/ и рядом с кодом в src/) есть вызов
+    #       конструктора `new <Class>(` — то есть спека реально собирает сервис.
+    # Имя класса читается из файла, а не выводится из пути: admin-jwt.service.ts
+    # содержит класс AdminAuthService, mechanical camelCase дал бы бы AdminJwtService
+    # и гард искал бы в спеках несуществующее имя.
+    service-specs)
+      find apps/api/src/modules -name '*.service.ts' ! -name '*.spec.ts' 2>/dev/null |
+        sed 's|\\|/|g' | sort |
+        while IFS= read -r svc; do
+          [ -f "${svc%.ts}.spec.ts" ] && continue
+          CLS=$(grep -oE 'export class [A-Za-z0-9_]+' "$svc" 2>/dev/null | head -1 | awk '{print $3}')
+          [ -n "$CLS" ] || continue
+          grep -rlE "new ${CLS}[[:space:]]*\(" apps/api/test apps/api/src --include='*.spec.ts' 2>/dev/null |
+            grep -q . && continue
+          printf '%s\n' "$svc"
+        done
+      ;;
     # Кросс-модульные deep-импорты мимо Facade (MODULE_BOUNDARIES.md).
     # Разрешено (публичный API модуля): импорт *.facade и guard'ов (*.guard) —
     # MODULE_BOUNDARIES §2.5 объявляет JwtAuthGuard/RolesGuard экспортом auth,
@@ -118,6 +197,120 @@ detect() {
             if (B != "" && B != A) print file
           }' | sort | uniq -c | awk '{print $2 "\t" $1}' | sort
       ;;
+    # ЧУЖИЕ ЗАПИСИ Prisma (foreign-writes): вызовы записи по модели, владельцем
+    # которой модуль НЕ является. Карта владения — MODEL_OWNERS выше.
+    #   • считаются ТОЛЬКО запись: create/createMany/update/updateMany/delete/
+    #     deleteMany/upsert. ЧТЕНИЯ (find*, count, aggregate, groupBy) не
+    #     считаются: ADR GAP-51 легализует read-only межмодульный доступ, и
+    #     смешение этих классов сделало бы гард невыполнимым;
+    #    ловится и `prisma.x.update()`, и клиент транзакции `tx.x.update()`
+    #     (внутри $transaction чужая таблица мутируется точно так же);
+    #   • строчки-комментарии не считаются — комментарий не пишет в БД.
+    # Анти-вакуум: карта обязана покрывать ВСЕ модели схемы в обе стороны —
+    # модель без владельца и владелец у убранной модели дают exit 2.
+    foreign-writes)
+      SCHEMA_MODELS=$(grep -E '^[[:space:]]*model[[:space:]]+[A-Za-z0-9_]+' "$PRISMA_SCHEMA" 2>/dev/null |
+        awk '{print $2}' || true)
+      # Карта многострочная (читаемость) — для сверок приводим к одной строке.
+      OWNS=$(printf '%s' "$MODEL_OWNERS" | tr '\n' ' ')
+      if [ -z "$SCHEMA_MODELS" ]; then
+        echo "tech-debt [foreign-writes]: нет модели в $PRISMA_SCHEMA — детектору нечего сверять, карта владения повисла" >&2
+        return 2
+      fi
+      for m in $SCHEMA_MODELS; do
+        case " $OWNS " in
+          *" $m:"*) ;;
+          *)
+            echo "tech-debt [foreign-writes]: модель $m есть в $PRISMA_SCHEMA, но нет в MODEL_OWNERS (scripts/bin/tech-debt) — добавь '$m:<модуль-владелец>', иначе чужие записи в неё невидимы для гарда" >&2
+            return 2
+            ;;
+        esac
+      done
+      for pair in $MODEL_OWNERS; do
+        m=${pair%%:*}
+        FOUND=0
+        for s in $SCHEMA_MODELS; do
+          [ "$s" = "$m" ] && FOUND=1
+        done
+        if [ "$FOUND" = 0 ]; then
+          echo "tech-debt [foreign-writes]: MODEL_OWNERS ссылается на модель $m, которой нет в $PRISMA_SCHEMA — убери строку из карты" >&2
+          return 2
+        fi
+      done
+      if [ ! -d apps/api/src/modules ]; then
+        echo "tech-debt [foreign-writes]: нет apps/api/src/modules — гарду нечего сканировать (анти-вакуум: пустое дерево это FAIL, не OK)" >&2
+        return 2
+      fi
+      # Файлы подаются в awk ЧЕРЕЗ -exec: `find | awk` без аргументов читал бы
+      # список файлов как данные и молча выдавал пустой результат.
+      find apps/api/src/modules -name '*.ts' ! -name '*.spec.ts' ! -name '*.test.ts' \
+        ! -name '*.mock.ts' ! -path '*__tests__*' \
+        -exec awk -v owners="$(printf '%s' "$MODEL_OWNERS" | tr '\n' ' ')" '
+          BEGIN {
+            WRITE = "(createMany|updateMany|deleteMany|create|update|delete|upsert)"
+            n = split(owners, pairs, " ")
+            for (i = 1; i <= n; i++) {
+              if (pairs[i] == "") continue
+              split(pairs[i], kv, ":")
+              acc = tolower(substr(kv[1], 1, 1)) substr(kv[1], 2)
+              # Модель может иметь несколько владельцев, если граница в
+              # MODULE_BOUNDARIES разделена по ответственностям (users: таблица
+              # §3.2, регистрация и сессии §2.1). Дубли ключа в карте =
+              # несколько владельцев; гард тогда ловит именно третьих.
+              OWNER[acc] = (acc in OWNER) ? OWNER[acc] " " kv[2] : kv[2]
+            }
+          }
+          /^[[:space:]]*(\/\/|\/\*|\*)/ { next }
+          {
+            file = FILENAME; gsub(/\\/, "/", file)
+            if (!match(file, /modules\/[^\/]+\//)) next
+            mod = substr(file, RSTART + 8, RLENGTH - 9)
+            line = $0
+            while (match(line, "\\.[A-Za-z0-9_]+\\." WRITE "\\(")) {
+              seg = substr(line, RSTART + 1, RLENGTH - 2)
+              d = index(seg, ".")
+              acc = substr(seg, 1, d - 1)
+              if (acc in OWNER) {
+                isOwner = 0
+                ownerCount = split(OWNER[acc], ownerList, " ")
+                for (oi = 1; oi <= ownerCount; oi++) {
+                  if (ownerList[oi] == mod) isOwner = 1
+                }
+                if (!isOwner) hits[file]++
+              }
+              line = substr(line, RSTART + RLENGTH)
+            }
+          }
+          END { for (f in hits) printf "%s\t%d\n", f, hits[f] }
+        ' {} + | sort
+      ;;
+    # presentation-слой ходит в БД в обход application-слоя и фасадов
+    # (AI_DEVELOPMENT_RULES §3.3 — пример «❌ логика в controller» там же и
+    # показан: `prisma.user.findUnique` внутри контроллера). Считаются ЛЮБЫЕ
+    # обращения к моделям Prisma — и чтения, и записи, и по чужому клиенту
+    # транзакции `tx`:
+    #   • чужие ЗАПИСИ ловит foreign-writes, но запись в СВОЮ таблицу из
+    #     контроллера не ловил никто — её закрыло именно это правило;
+    #   • чтения из presentation обходят фасад ровно так же, как обходили бы
+    #     границу модуля, поэтому класс тоже здесь, а не в cross-module-imports.
+    # Правило заведено ПО ФАКТУ, а не с нуля: базлайн — 9 файлов / 37 вхождений
+    # на 2026-10-05. С этого момента он может только уменьшаться: рост → FAIL,
+    # погасил и не ужмят базлайн → STALE.
+    # Анти-вакуум: если каталогов presentation вообще нет, детектор exit 2 —
+    # пустое дерево это не «ноль нарушений», а оглохший гард.
+    presentation-db)
+      DIRS=$(ls -d apps/api/src/modules/*/presentation 2>/dev/null || true)
+      if [ -z "$DIRS" ]; then
+        echo "tech-debt [presentation-db]: нет apps/api/src/modules/*/presentation — гарду нечего сканировать (анти-вакуум: пустое дерево это FAIL, не OK)" >&2
+        return 2
+      fi
+      # $DIRS без кавычек намеренно: список каталогов из ls разбивается на слова.
+      grep -rnoE '\b(prisma|tx)\.[a-zA-Z][A-Za-z0-9]*\.(findFirst|findMany|findFirstOrThrow|findUnique|findUniqueOrThrow|count|aggregate|groupBy|create|createMany|update|updateMany|delete|deleteMany|upsert)\(' \
+        $DIRS --include='*.ts' 2>/dev/null |
+        grep -vE '\.spec\.ts:|\.test\.ts:' |
+        cut -d: -f1 | sed 's|\\|/|g' | sort | uniq -c |
+        awk '{print $2 "\t" $1}' | sort
+      ;;
     *)
       echo "tech-debt: неизвестное правило '$1' (см. tech-debt list)" >&2
       return 2
@@ -125,7 +318,7 @@ detect() {
   esac
 }
 
-NAMES='raw-error nest-exceptions eslint-disable money-number use-case-specs cross-module-imports'
+NAMES='raw-error nest-exceptions eslint-disable money-number use-case-specs service-specs cross-module-imports foreign-writes presentation-db'
 
 # Имя правила проверяется ДО любого редиректа в tech-debt/: `gen <опечатка>`
 # ранее создавал пустой tech-debt/<опечатка>.txt, который потом попадал в git
@@ -175,11 +368,32 @@ diff_state() {
 
 TAB=$(printf '\t')
 
+# Подменённый корень сканирования: `detect` — всегда, `check` — тоже (он только
+# читает базлайн). `gen` запрещён: иначе ловушка из temp-дерева записалась бы в
+# вечный базлайн. Нужен scripts/bin/guard-selftest — негативному тесту гардов.
+root_override_allowed() {
+  [ -z "${TECH_DEBT_ROOT:-}" ] && return 0
+  [ "$1" = gen ] || return 0
+  echo "tech-debt gen: TECH_DEBT_ROOT не принимается (базлайн пишется только из рабочего дерева)" >&2
+  exit 2
+}
+
 case "${1:-}" in
   list)
     echo "$NAMES"
     ;;
+  detect)
+    shift
+    [ $# -eq 1 ] || { echo "usage: tech-debt detect <name>" >&2; exit 2; }
+    is_known_name "$1" || {
+      echo "tech-debt detect: неизвестное правило '$1' (см. tech-debt list)" >&2
+      exit 2
+    }
+    detect "$1"
+    exit $?
+    ;;
   gen)
+    root_override_allowed gen
     shift
     [ "${1:-}" = "all" ] && set -- $NAMES
     [ $# -gt 0 ] || { echo "usage: tech-debt gen <name>...|all" >&2; exit 2; }
@@ -269,7 +483,7 @@ case "${1:-}" in
     exit $RC
     ;;
   *)
-    echo "usage: tech-debt gen|check [--allow-stale] <name>...|all; tech-debt list" >&2
+    echo "usage: tech-debt gen|check [--allow-stale] <name>...|all; tech-debt detect <name>; tech-debt list" >&2
     exit 2
     ;;
 esac

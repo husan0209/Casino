@@ -1,9 +1,23 @@
 import { AppError } from '@casino/shared-utils'
 
 export class KycRequiredError extends AppError {
-  readonly code = 'KYC_REQUIRED'
+  // Тип — string (не литерал), чтобы наследник мог отдать другой стабильный код;
+  // значение для KYC_REQUIRED не меняется.
+  readonly code: string = 'KYC_REQUIRED'
   readonly httpStatus = 422
   constructor(msg = 'KYC verification required') {
+    super(msg)
+  }
+}
+/**
+ * Превышен лимит суммарных депозитов без KYC (KYC_DEPOSIT_LIMIT_RUB).
+ * docs/API_CONVENTIONS.md §5.3 резервирует под этот случай код
+ * DEPOSIT_LIMIT_EXCEEDED; наследование от KycRequiredError сохранено, чтобы
+ * `instanceof KycRequiredError` (и общая ветка «нужен KYC») не сломались.
+ */
+export class DepositLimitExceededError extends KycRequiredError {
+  override readonly code = 'DEPOSIT_LIMIT_EXCEEDED'
+  constructor(msg: string) {
     super(msg)
   }
 }
@@ -27,5 +41,18 @@ export class KycFileError extends AppError {
   readonly httpStatus = 400
   constructor(msg: string) {
     super(msg)
+  }
+}
+/**
+ * Fail-closed для карточки модератора (GAP: `catch(() => '0')` в kyc-admin.service).
+ * Сумма депозитов — основание для выпуска средств и для решения по KYC, поэтому
+ * отказ чтения отдаётся вверх отдельным кодом: модератор видит 503 и не может
+ * одобрить анкету по «нулю депозитов», которого на самом деле нет.
+ */
+export class KycDepositTotalUnavailableError extends AppError {
+  readonly code = 'KYC_DEPOSIT_TOTAL_UNAVAILABLE'
+  readonly httpStatus = 503
+  constructor() {
+    super('Не удалось получить сумму депозитов игрока для проверки KYC')
   }
 }

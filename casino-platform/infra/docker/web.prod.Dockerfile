@@ -3,6 +3,17 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 ARG NEXT_PUBLIC_API_URL=https://casino.example.com/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# NEXT_PUBLIC_* инлайнятся в бандл во время `next build` и в standalone-рантайме
+# уже не читаются — значит каждый публичный ключ обязан дойти сюда build-аргом.
+# Без GOOGLE_CLIENT_ID кнопка входа в Google не рисуется (LoginSheet рендерит её
+# только при непустом значении), без TURNSTILE_SITE_KEY молча отключается капча,
+# без IMAGE_HOSTS next/image отбраковывает аватары с чужих хостов.
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID=
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=$NEXT_PUBLIC_TURNSTILE_SITE_KEY
+ARG NEXT_PUBLIC_IMAGE_HOSTS=
+ENV NEXT_PUBLIC_IMAGE_HOSTS=$NEXT_PUBLIC_IMAGE_HOSTS
 # GAP-60: без этих двух файлов сборка этого образа падала ВСЕГДА (её просто не
 # гонял ни один CI до 2026-10-01 — docker-build собирал только api.prod).
 #   .npmrc — node-linker=hoisted. Без него pnpm изолирует транзитивные зависимости

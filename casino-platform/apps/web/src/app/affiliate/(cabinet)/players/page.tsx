@@ -40,7 +40,7 @@ export default function AffiliatePlayersPage(): React.JSX.Element {
         </div>
         <div className="card">
           <div className="text-muted text-xs leading-tight break-words">Квалифицировано</div>
-          <div className="text-2xl font-black mt-1 text-[#00C853]">{qualified}</div>
+          <div className="text-2xl font-black mt-1 text-money-dark">{qualified}</div>
         </div>
         <div className="card">
           <div className="text-muted text-xs leading-tight break-words">Отклонено</div>

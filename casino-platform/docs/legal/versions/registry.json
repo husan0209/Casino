@@ -1,0 +1,24 @@
+{
+  "1.0": {
+    "terms": {
+      "file": "1.0/terms.md",
+      "sha256": "527a406ce4f0a3f417ad7e85028d2fa291e09ab404a49cbe7a6aed120f3309d0",
+      "publishedAt": "2026-10-03"
+    },
+    "privacy": {
+      "file": "1.0/privacy.md",
+      "sha256": "704ae8db5b1a4dd56da90a246fba9af73bc4995099df4b384f4d1aae1212baa9",
+      "publishedAt": "2026-10-03"
+    },
+    "cookies": {
+      "file": "1.0/cookies.md",
+      "sha256": "4fb279036619765404791101184027c1b56258a7d560eebb1309164ffa8964e3",
+      "publishedAt": "2026-10-03"
+    },
+    "responsible_gaming": {
+      "file": "1.0/responsible-gaming.md",
+      "sha256": "4e0db47364ec96ee6025a88b7059da01abb60c76a213f3d4bbf87f1704879023",
+      "publishedAt": "2026-10-03"
+    }
+  }
+}

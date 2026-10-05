@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common'
 
-import { PAYMENT_REQUEST_REPOSITORY } from '../payments/domain/payments.ports'
-import { PaymentRequestRepository } from '../payments/infrastructure/repositories/payment-request.repository'
+import { AdminAuthModule } from './admin-auth.module'
+import { NotificationsModule } from '../notifications/notifications.module'
+import { PaymentsModule } from '../payments/payments.module'
+import { UsersModule } from '../users/users.module'
 import { WalletModule } from '../wallet/wallet.module'
 import { AdminBroadcastService } from './application/admin-broadcast.service'
 import { AdminSettingsService } from './application/admin-settings.service'
@@ -14,8 +16,8 @@ import {
   DASHBOARD_REPOSITORY,
 } from './domain/admin.repository'
 import { ADMIN_BROADCAST_REPOSITORY, SYSTEM_SETTING_REPOSITORY } from './domain/system.repository'
+import { WITHDRAWAL_REQUEST_STORE } from './domain/withdrawal.repository'
 import { AdminFacade } from './facade/admin.facade'
-import { AdminAuthService } from './infrastructure/admin-jwt.service'
 import {
   PrismaAdminBroadcastRepository,
   PrismaSystemSettingRepository,
@@ -25,7 +27,7 @@ import {
   PrismaAuditLogRepository,
   PrismaDashboardRepository,
 } from './infrastructure/repositories/admin.prisma.repository'
-import { AdminAuthGuard } from './presentation/admin-auth.guard'
+import { PaymentsFacadeWithdrawalGateway } from './infrastructure/withdrawal-payments.gateway'
 import { AdminAdminsController } from './presentation/controllers/admin-admins.controller'
 import { AdminAuditController } from './presentation/controllers/admin-audit.controller'
 import { AdminAuthController } from './presentation/controllers/admin-auth.controller'
@@ -36,7 +38,15 @@ import { AdminSettingsController } from './presentation/controllers/admin-settin
 import { AdminUsersController } from './presentation/controllers/admin-users.controller'
 
 @Module({
-  imports: [WalletModule],
+  // PaymentsModule нужен ради PaymentsFacade: решение по заявке на вывод
+  // (approve/reject) admin делает через публичный API владельца таблицы, а не
+  // через её порт и Prisma-класс (гвард G16). Цикла нет, потому что вход в
+  // админку живёт в AdminAuthModule, и kyc больше не тянет AdminModule.
+  // NotificationsModule — ради NotificationsFacade: рассылку пишет владелец таблицы
+  // notifications, а не admin (гард G24).
+  // UsersModule — ради UsersFacade: блокировку игрока (статус + отзыв сессий)
+  // делает владелец этих таблиц, admin только заказчик (гвард G24).
+  imports: [WalletModule, PaymentsModule, UsersModule, NotificationsModule, AdminAuthModule],
   controllers: [
     AdminAuthController,
     AdminUsersController,
@@ -48,12 +58,18 @@ import { AdminUsersController } from './presentation/controllers/admin-users.con
     AdminNotificationsController,
   ],
   providers: [
-    AdminAuthService,
-    AdminAuthGuard,
+    // AdminAuthService/AdminAuthGuard больше не здесь: они в AdminAuthModule,
+    // иначе два экземпляра на один AppModule. Ниже они же и экспортируются —
+    // через импорт AdminAuthModule, чтобы внешние потребители (affiliate-admin)
+    // не менялись.
     { provide: ADMIN_USER_REPOSITORY, useClass: PrismaAdminUserRepository },
     { provide: AUDIT_LOG_REPOSITORY, useClass: PrismaAuditLogRepository },
-    // Порт payments-домена: admin-finance инжектит IPaymentRequestRepository (В3)
-    { provide: PAYMENT_REQUEST_REPOSITORY, useClass: PaymentRequestRepository },
+    // Порт заявок на вывод — СВОЙ токен admin (domain/withdrawal.repository),
+    // реализация ходит в PaymentsFacade. Раньше здесь стоял
+    // { provide: PAYMENT_REQUEST_REPOSITORY, useClass: PaymentRequestRepository },
+    // то есть admin импортировал токен и Prisma-класс чужого модуля (гвард G16)
+    // и давал контроллеру всю поверхность репозитория вместо двух методов.
+    { provide: WITHDRAWAL_REQUEST_STORE, useClass: PaymentsFacadeWithdrawalGateway },
     { provide: DASHBOARD_REPOSITORY, useClass: PrismaDashboardRepository },
     // Настройки/шаблоны и массовая рассылка (В3). До этого коммита сервисы и
     // порты были объявлены, но не подключены: Nest не резолвил
@@ -69,18 +85,17 @@ import { AdminUsersController } from './presentation/controllers/admin-users.con
     DashboardService,
     AdminSettingsService,
     AdminBroadcastService,
-    PaymentRequestRepository,
   ],
-  // AdminAuthService экспортируем вместе с AdminAuthGuard: guard инжектит его,
-  // и без экспорта импортирующие модули (KycModule) падали на DI (E2E, PR #15)
-  // наружу отдаём фасад: прямой доступ к AuditLogService из других модулей
-  // считается межмодульным долгом (гвард G16, AGENTS.md правило 4).
-  // Наружу отдаём и фасад, и сам AuditLogService: фасад — sanctioned-путь для
-  // новых модулей (правило 4, гвард G16), а maintenance пока остаётся
-  // legacy-потребителем и импортирует сервис напрямую (его долг учтён в
-  // tech-debt/cross-module-imports.txt). Убрать сервис из exports нельзя —
-  // Nest перестанет резолвить MaintenanceAdminController, и это видно только
-  // на E2E-прогоне с реальной БД.
-  exports: [AdminFacade, AuditLogService, AdminAuthGuard, AdminAuthService],
+  // Наружу отдаём фасад, AuditLogService и AdminAuthModule целиком.
+  // Guard и сервис напрямую не экспортируются: их провайдер — AdminAuthModule,
+  // а Nest умеет переэкспортировать только целый импорт, но не провайдер чужого
+  // модуля (иначе «Nest cannot export a provider … not a part of the module»
+  // на старте контейнера — это падение видно только в DI-графе, не в tsc).
+  // AdminAuthService нужен наружу вместе с guard'ом: guard инжектит его, и без
+  // переэкспорта падали импортирующие модули (E2E, PR #15).
+  // AuditLogService оставляем прямым экспортом осознанно: maintenance пока
+  // legacy-потребитель и импортирует сервис напрямую (долг учтён в
+  // tech-debt/cross-module-imports.txt), removal сломал бы DI только на E2E.
+  exports: [AdminFacade, AuditLogService, AdminAuthModule],
 })
 export class AdminModule {}
