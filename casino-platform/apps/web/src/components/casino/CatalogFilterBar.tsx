@@ -68,7 +68,7 @@ function SortDropdown({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="input flex items-center gap-2 py-1.5 text-xs"
+        className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#2A2A4A]/80 bg-[#0F0F1A]/70 px-3 text-xs text-white/90 transition hover:border-[#6C63FF]/40"
       >
         <ArrowUpDown size={14} className="text-muted" aria-hidden />
         {current.label}
@@ -293,9 +293,9 @@ export function CatalogFilterBar({
         ))}
       </div>
 
-      {/* поиск — с иконкой и очисткой; сортировка — кастомный дропдаун */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-0 flex-1 sm:w-64 sm:flex-none">
+      {/* поиск — отдельная строка на всю ширину (мобайл), поля темнее карточки */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative w-full sm:w-64 sm:shrink-0">
           <Search
             size={14}
             aria-hidden
@@ -306,7 +306,7 @@ export function CatalogFilterBar({
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Поиск по названию…"
             aria-label="Поиск по каталогу"
-            className="input pl-8 pr-8"
+            className="h-10 w-full rounded-xl border border-[#2A2A4A]/80 bg-[#0F0F1A]/70 pl-8 pr-8 text-sm text-white placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/25"
           />
           {draft !== '' && (
             <button
