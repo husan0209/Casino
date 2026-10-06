@@ -5,8 +5,14 @@ import {
   isSupportedCurrency,
   liveFiatCurrencies,
 } from '@casino/shared-config'
+import { money } from '@casino/shared-utils'
 
-import { InvalidCurrencyError, InvalidDestinationError } from './errors'
+import {
+  AmountTooLargeError,
+  AmountTooSmallError,
+  InvalidCurrencyError,
+  InvalidDestinationError,
+} from './errors'
 
 /**
  * Релизный набор криптовалют платежа (TZ-02).
@@ -49,6 +55,24 @@ export const RELEASE_CRYPTO_CURRENCIES = Object.keys(CRYPTO_PAY_CURRENCY_TICKERS
 
 export function isReleaseCryptoCurrency(currency: string): currency is CryptoCurrency {
   return Object.prototype.hasOwnProperty.call(CRYPTO_PAY_CURRENCY_TICKERS, currency)
+}
+
+/**
+ * Лимиты крипто-депозита из той же `CURRENCY_LIMITS`, что и у фиата.
+ *
+ * Минимумы сняты с живого провайдера (2026-10-06, стенд): 15 USDT и 0.0001 BTC
+ * он отклонял `AMOUNT_MINIMAL_ERROR`, 20 USDT и 0.0003 BTC принимал. Прежние
+ * `depositMin` ('10' и '0.0001') были ниже фактических, то есть UI легально
+ * разрешал сумму, на которой заявка всегда падала.
+ */
+export function assertCryptoDepositAmount(currency: CryptoCurrency, amount: string): void {
+  const limits = CURRENCY_LIMITS[currency]
+  if (!money.isGreaterOrEqual(amount, limits.depositMin)) {
+    throw new AmountTooSmallError(limits.depositMin)
+  }
+  if (money.isGreaterThan(amount, limits.depositMax)) {
+    throw new AmountTooLargeError(limits.depositMax)
+  }
 }
 
 /**
