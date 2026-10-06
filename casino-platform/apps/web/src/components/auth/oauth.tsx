@@ -105,6 +105,10 @@ export async function exchangeGoogleCode(): Promise<{ accessToken: string; user:
   const res = await apiPost<{ accessToken: string; user: WebUser }>('/auth/google', {
     code,
     redirect_uri: `${window.location.origin}/auth/google/callback`,
+    // Google возвращает `state` в query callback-а, и он обязан уехать в тело:
+    // API сверяет его с кукой `oauth_state`, выданной на /auth/google/url
+    // (защита от login CSRF). Без него обмен отбивается на 400 ещё до Google.
+    state: params.get('state') ?? undefined,
     referral_code: referralCode,
   })
   sessionStorage.removeItem('oauth_referral_code')
