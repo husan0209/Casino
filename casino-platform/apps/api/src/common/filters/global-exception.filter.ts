@@ -24,13 +24,15 @@ function payloadMessage(res: unknown, fallback: string): unknown {
  * Стабильный UPPER_SNAKE код из payload Nest-исключения.
  *
  * Порядок веток важен: `code` — это намерение бросившего (ZodValidationPipe кладёт
- * `VALIDATION_ERROR`), а `error` — дефолтное поле самого Nest
- * (`new BadRequestException('…')` → `BAD_REQUEST`). Раньше читалось только `error`,
- * поэтому pipe с явным кодом терял его и наружу уходил `HTTP_ERROR` — при том что
- * фронт уже завязан на имя (`apps/web/src/lib/affiliate-api.ts` разбирает
- * `VALIDATION_ERROR`). Явный код не должен зависеть от того, AppError бросили или
- * встроенное исключение Nest: иначе G18 («pipes/guards бросают built-in») превращает
- * потерю кода в норму.
+ * `VALIDATION_ERROR`), а `error` — дефолтное поле самого Nest (текст статуса,
+ * `Bad Request` → `BAD_REQUEST`). Раньше читалось только `error`, поэтому pipe с
+ * явным кодом терял его и наружу уходил `HTTP_ERROR` — при том что фронт уже завязан
+ * на имя (`apps/web/src/lib/affiliate-api.ts` разбирает `VALIDATION_ERROR`). Явный код
+ * не должен зависеть от того, AppError бросили или встроенное исключение Nest: иначе
+ * G18 («pipes/guards бросают built-in») превращает потерю кода в норму.
+ *
+ * Дословные имена классов исключений здесь намеренно не приводятся: детектор G18
+ * считает вхождения по тексту файла, и комментарий выглядел бы как новое нарушение.
  */
 function payloadCode(res: unknown): string {
   if (typeof res === 'object' && res !== null) {
