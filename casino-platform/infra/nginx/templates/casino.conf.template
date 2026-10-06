@@ -47,7 +47,7 @@ server {
 
   # /api -> api:3001
   location /api/ {
-    limit_req zone=api_general burst=20 nodelay;
+    limit_req zone=api_general burst=40 nodelay;
     limit_req_status 429;
     proxy_pass http://api:3001;
     proxy_set_header Host $host;

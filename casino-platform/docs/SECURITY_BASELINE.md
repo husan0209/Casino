@@ -13,19 +13,19 @@ last_updated: 2026-06-19
 
 ## 1. Целевые угрозы
 
-| Угроза | Где |
-|--------|-----|
-| **Credential stuffing** | Login endpoint |
-| **Brute-force пароля** | Login |
-| **Mass registration** | Register |
-| **Privilege escalation** | Admin endpoints |
-| **Financial fraud** | Wallet, payments |
-| **Webhook spoofing** | Provider callbacks |
-| **Token replay** | JWT, refresh tokens |
-| **Race conditions** | Wallet credits |
-| **IDOR** | User-specific endpoints |
-| **XSS** | User profile fields |
-| **CSRF** | Cookie auth flows |
+| Угроза                   | Где                     |
+| ------------------------ | ----------------------- |
+| **Credential stuffing**  | Login endpoint          |
+| **Brute-force пароля**   | Login                   |
+| **Mass registration**    | Register                |
+| **Privilege escalation** | Admin endpoints         |
+| **Financial fraud**      | Wallet, payments        |
+| **Webhook spoofing**     | Provider callbacks      |
+| **Token replay**         | JWT, refresh tokens     |
+| **Race conditions**      | Wallet credits          |
+| **IDOR**                 | User-specific endpoints |
+| **XSS**                  | User profile fields     |
+| **CSRF**                 | Cookie auth flows       |
 
 ---
 
@@ -38,7 +38,7 @@ import { argon2id } from 'hash-wasm'
 
 const HASH_OPTIONS = {
   algorithm: 'argon2id' as const,
-  memory: 65536,    // 64 MB
+  memory: 65536, // 64 MB
   iterations: 3,
   parallelism: 4,
   hashLength: 32,
@@ -58,9 +58,7 @@ async function hashPassword(plain: string): Promise<string> {
 Минимум 8 символов, минимум 1 цифра.
 
 ```typescript
-const passwordSchema = z.string()
-  .min(8, 'Минимум 8 символов')
-  .regex(/\d/, 'Минимум 1 цифра')
+const passwordSchema = z.string().min(8, 'Минимум 8 символов').regex(/\d/, 'Минимум 1 цифра')
 ```
 
 Frontend — показывать strength indicator (weak / medium / strong).
@@ -79,8 +77,7 @@ Frontend — показывать strength indicator (weak / medium / strong).
 
 ```typescript
 auth.generateRefreshToken = () => crypto.randomBytes(64).toString('hex')
-auth.hashRefreshToken = (token: string) => 
-  crypto.createHash('sha256').update(token).digest('hex')
+auth.hashRefreshToken = (token: string) => crypto.createHash('sha256').update(token).digest('hex')
 ```
 
 ---
@@ -102,14 +99,14 @@ auth.hashRefreshToken = (token: string) =>
 
 ```typescript
 interface JwtPayload {
-  sub: string         // userId
+  sub: string // userId
   email: string
   role: 'user' | 'admin' | 'superadmin'
-  aud: 'user' | 'admin'  // разные audiences для пользователей и админов
+  aud: 'user' | 'admin' // разные audiences для пользователей и админов
   iss: 'casino-platform'
   iat: number
-  exp: number         // short-lived (15 минут для access)
-  jti: string         // unique token id
+  exp: number // short-lived (15 минут для access)
+  jti: string // unique token id
 }
 ```
 
@@ -118,16 +115,16 @@ interface JwtPayload {
 ```typescript
 async refresh(input: RefreshInput) {
   const oldTokenHash = hashRefreshToken(input.refreshToken)
-  
+
   // 1. Найти session
   const session = await this.sessionRepo.findByTokenHash(oldTokenHash)
   if (!session) throw new InvalidTokenError()
   if (session.expiresAt < new Date()) throw new TokenExpiredError()
-  
+
   // 2. ATOMIC: удалить старую и создать новую
   return this.prisma.$transaction(async (tx) => {
     await tx.session.delete({ where: { id: session.id } })
-    
+
     const newSession = await tx.session.create({
       data: {
         userId: session.userId,
@@ -135,15 +132,15 @@ async refresh(input: RefreshInput) {
         expiresAt: addDays(new Date(), 30),
       },
     })
-    
+
     const newRefreshToken = generateRefreshToken()
     const newRefreshTokenHash = hashRefreshToken(newRefreshToken)
-    
+
     await tx.session.update({
       where: { id: newSession.id },
       data: { tokenHash: newRefreshTokenHash },
     })
-    
+
     return {
       accessToken: generateAccessToken(...),
       refreshToken: newRefreshToken,
@@ -159,7 +156,7 @@ async refresh(input: RefreshInput) {
 ### 4.1. Nginx уровень
 
 ```nginx
-limit_req_zone $binary_remote_addr zone=api_general:10m rate=60r/m;
+limit_req_zone $binary_remote_addr zone=api_general:10m rate=600r/m;
 limit_req_zone $binary_remote_addr zone=auth:10m rate=10r/m;
 limit_req_status 429;
 # NB: «10 неудачных login за 15 мин» (§2.3) — per-account lockout на app-уровне,
@@ -177,7 +174,7 @@ location /api/v1/payments/webhooks/ {
 }
 
 # General API
-limit_req zone=api_general burst=20 nodelay;
+limit_req zone=api_general burst=40 nodelay;
 ```
 
 ### 4.2. App-level (ThrottlerModule)
@@ -223,7 +220,7 @@ async login() { ... }
 app.enableCors({
   origin: [process.env.APP_URL, process.env.ADMIN_URL],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  credentials: false,  // важно для token-based flow
+  credentials: false, // важно для token-based flow
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'Idempotency-Key'],
 })
 ```
@@ -272,11 +269,13 @@ add_header Content-Security-Policy "
 ### 6.3. Helmet (NestJS)
 
 ```typescript
-app.use(helmet({
-  contentSecurityPolicy: false,  // CSP уже в Nginx
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-}))
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // CSP уже в Nginx
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+)
 ```
 
 ---
@@ -291,7 +290,7 @@ import crypto from 'crypto'
 import path from 'path'
 
 const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-const MAX_SIZE = 10 * 1024 * 1024  // 10 MB
+const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -330,15 +329,9 @@ const upload = multer({
 
 ```typescript
 function verifyRukassaSignature(payload: string, signature: string): boolean {
-  const expected = crypto
-    .createHmac('sha256', env.RUKASSA_SECRET_KEY)
-    .update(payload)
-    .digest('hex')
-  
-  return crypto.timingSafeEqual(
-    Buffer.from(expected, 'hex'),
-    Buffer.from(signature, 'hex'),
-  )
+  const expected = crypto.createHmac('sha256', env.RUKASSA_SECRET_KEY).update(payload).digest('hex')
+
+  return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'))
 }
 ```
 
@@ -357,14 +350,9 @@ function verifyRukassaSignature(payload: string, signature: string): boolean {
 
 ```typescript
 function verifyNowPaymentsSignature(body: string, signature: string): boolean {
-  const hmac = crypto.createHmac('sha512', env.NOWPAYMENTS_IPN_SECRET)
-    .update(body)
-    .digest('hex')
-  
-  return crypto.timingSafeEqual(
-    Buffer.from(hmac, 'hex'),
-    Buffer.from(signature, 'hex'),
-  )
+  const hmac = crypto.createHmac('sha512', env.NOWPAYMENTS_IPN_SECRET).update(body).digest('hex')
+
+  return crypto.timingSafeEqual(Buffer.from(hmac, 'hex'), Buffer.from(signature, 'hex'))
 }
 ```
 
@@ -383,14 +371,16 @@ function verifyNowPaymentsSignature(body: string, signature: string): boolean {
 ### 9.1. Whitelisting через ValidationPipe
 
 ```typescript
-app.useGlobalPipes(new ValidationPipe({
-  whitelist: true,         // удаляет поля вне DTO
-  forbidNonWhitelisted: true,  // 400 если есть лишние поля
-  transform: true,
-  transformOptions: {
-    enableImplicitConversion: false,
-  },
-}))
+app.useGlobalPipes(
+  new ValidationPipe({
+    whitelist: true, // удаляет поля вне DTO
+    forbidNonWhitelisted: true, // 400 если есть лишние поля
+    transform: true,
+    transformOptions: {
+      enableImplicitConversion: false,
+    },
+  }),
+)
 ```
 
 ### 9.2. Zod schemas для сложной валидации
@@ -398,9 +388,11 @@ app.useGlobalPipes(new ValidationPipe({
 ```typescript
 const depositSchema = z.object({
   currency: z.enum(['RUB']),
-  amount: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Invalid amount format')
-    .refine(v => new Decimal(v).gt(100), 'Минимум 100 RUB')
-    .refine(v => new Decimal(v).lte(500000), 'Максимум 500 000 RUB'),
+  amount: z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/, 'Invalid amount format')
+    .refine((v) => new Decimal(v).gt(100), 'Минимум 100 RUB')
+    .refine((v) => new Decimal(v).lte(500000), 'Максимум 500 000 RUB'),
   method: z.enum(['card', 'sbp', 'p2p']),
   idempotencyKey: z.string().min(10).max(128),
 })
@@ -424,11 +416,11 @@ const depositSchema = z.object({
 
 ### 10.1. Где хранить secrets
 
-| Где | Что |
-|-----|-----|
-| **GitHub Secrets** | CI/CD (VPS_SSH_KEY, DEPLOY_TOKEN) |
+| Где                              | Что                                       |
+| -------------------------------- | ----------------------------------------- |
+| **GitHub Secrets**               | CI/CD (VPS_SSH_KEY, DEPLOY_TOKEN)         |
 | **/home/deploy/.env.production** | App secrets, rotated через `openssl rand` |
-| **Никогда** в git | .env, .env.local, .env.production |
+| **Никогда** в git                | .env, .env.local, .env.production         |
 
 ### 10.2. .gitignore (обязательно)
 
@@ -461,12 +453,12 @@ openssl rand -hex 32
 
 ### 10.4. Ротация
 
-| Secret | Период ротации |
-|--------|---------------|
-| JWT secrets | При компрометации (force logout all) |
-| DB password | Раз в 90 дней |
-| API keys (providers) | По требованию провайдера |
-| Admin passwords | Раз в 90 дней |
+| Secret               | Период ротации                       |
+| -------------------- | ------------------------------------ |
+| JWT secrets          | При компрометации (force logout all) |
+| DB password          | Раз в 90 дней                        |
+| API keys (providers) | По требованию провайдера             |
+| Admin passwords      | Раз в 90 дней                        |
 
 ---
 
@@ -511,14 +503,14 @@ GRANT ALL PRIVILEGES ON DATABASE casino_prod TO casino_migration_user;
 
 ### 12.1. Что НЕЛЬЗЯ логировать
 
-| Поле | Почему |
-|------|--------|
-| Пароли (даже хеши) | Атакующий получит материал для offline cracking |
-| Refresh tokens | Полная компрометация сессии |
-| API keys / secrets | Прямая эксплуатация |
-| Полные номера карт | PCI DSS violation |
-| KYC документы в любом виде | GDPR + privacy |
-| Bodies запросов с credentials | Mass credential leak |
+| Поле                          | Почему                                          |
+| ----------------------------- | ----------------------------------------------- |
+| Пароли (даже хеши)            | Атакующий получит материал для offline cracking |
+| Refresh tokens                | Полная компрометация сессии                     |
+| API keys / secrets            | Прямая эксплуатация                             |
+| Полные номера карт            | PCI DSS violation                               |
+| KYC документы в любом виде    | GDPR + privacy                                  |
+| Bodies запросов с credentials | Mass credential leak                            |
 
 ### 12.2. Что маскировать при логировании
 
@@ -599,11 +591,11 @@ const logger = pino({
 server {
   listen 443 ssl http2;
   server_name admin.casino.example.com;
-  
+
   allow 1.2.3.4;     # office IP
   allow 5.6.7.8;     # VPN IP
   deny all;
-  
+
   location / {
     proxy_pass http://admin_frontend;
   }
@@ -639,16 +631,16 @@ await this.auditLog.log({
 async processGameCallback(payload: GameCallbackPayload) {
   // 1. Verify HMAC signature (provider-specific)
   this.verifySignature(payload, signature)
-  
+
   // 2. Check timestamp window (5 minutes)
   if (Math.abs(Date.now() - payload.timestamp) > 5 * 60 * 1000) {
     throw new InvalidTimestampError()
   }
-  
+
   // 3. Check session exists and active
   const session = await this.gameSessionRepo.findById(payload.sessionId)
   if (!session || session.closedAt) throw new InvalidSessionError()
-  
+
   // 4. Check transaction_id uniqueness (provider tx_id)
   const existing = await this.gameTransactionRepo.findByProviderTxId(
     payload.provider, payload.transactionId
@@ -657,7 +649,7 @@ async processGameCallback(payload: GameCallbackPayload) {
     // Idempotent replay — return current balance
     return { balance: await this.walletFacade.getBalance(...) }
   }
-  
+
   // 5. Process
   return this.processBet({ ... })
 }
@@ -717,11 +709,11 @@ Email + password достаточно для MVP. Если потребуетс�
 
 ### 18.1. Регулярные проверки
 
-| Инструмент | Когда |
-|------------|-------|
-| `npm audit` | Каждый PR |
-| SNYK / SonarQube | Optional |
-| OWASP ZAP | Перед релизом |
+| Инструмент            | Когда         |
+| --------------------- | ------------- |
+| `npm audit`           | Каждый PR     |
+| SNYK / SonarQube      | Optional      |
+| OWASP ZAP             | Перед релизом |
 | Security headers test | Перед релизом |
 
 ### 18.2. CI pipeline
@@ -729,7 +721,7 @@ Email + password достаточно для MVP. Если потребуетс�
 ```yaml
 - name: Security audit
   run: pnpm audit --audit-level high
-  
+
 - name: Check for secrets
   run: |
     if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
@@ -754,20 +746,20 @@ Email + password достаточно для MVP. Если потребуетс�
 
 ### 19.2. Сценарии
 
-| Инцидент | Действия |
-|----------|----------|
-| Утечка JWT secret | Rotate, force logout all, проверить audit logs |
-| DB breach | Reset passwords, force re-auth, notify users |
-| Provider account compromise | Rotate API keys, проверить recent transactions |
-| Admin credentials leak | Disable admin account, сменить пароль, проверить audit |
+| Инцидент                    | Действия                                               |
+| --------------------------- | ------------------------------------------------------ |
+| Утечка JWT secret           | Rotate, force logout all, проверить audit logs         |
+| DB breach                   | Reset passwords, force re-auth, notify users           |
+| Provider account compromise | Rotate API keys, проверить recent transactions         |
+| Admin credentials leak      | Disable admin account, сменить пароль, проверить audit |
 
 ### 19.3. Контакты
 
-| Тип | Кого уведомить |
-|-----|---------------|
-| DB breach | DPO, юристы, пользователи (email) |
-| Webhook spoofing detected | Paуза provider integration, contact provider |
-| Admin account compromise | Заблокировать все admin sessions, сменить JWT secret |
+| Тип                       | Кого уведомить                                       |
+| ------------------------- | ---------------------------------------------------- |
+| DB breach                 | DPO, юристы, пользователи (email)                    |
+| Webhook spoofing detected | Paуза provider integration, contact provider         |
+| Admin account compromise  | Заблокировать все admin sessions, сменить JWT secret |
 
 ---
 
