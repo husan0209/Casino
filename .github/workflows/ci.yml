@@ -338,8 +338,30 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            cd /opt/casino-platform
+            # Фактический путь прод-дерева: клон лежит в /opt/casino, рабочая
+            # копия — его подкаталог casino-platform. Прежний /opt/casino-platform
+            # на инстансе не существует: job никогда не исполнялся (нет секретов
+            # VPS_*), поэтому ошибка была видна только бы на первом же деплое.
+            cd /opt/casino/casino-platform
+            # Левое дерево здесь дороже, чем в разработке: `git pull` поверх
+            # ручной правки на проде даёт merge-конфликт посреди выкатки, когда
+            # откатываться уже дорого. Падаем сразу и печатаем, что именно грязно.
+            if [ -n "$(git status --porcelain)" ]; then
+              echo "::error::на сервере есть незакоммиченные правки — выкатка остановлена"
+              git status --porcelain
+              exit 1
+            fi
             git pull origin main
+            # Сборка на t3.small (20 ГБ корень) кончается внезапно и без внятного
+            # лога: `pnpm install` внутри билда выходит с `exit 1`, когда место
+            # заканчивается в процессе. BuildKit-кэш на этом инстансе наворачивал
+            # до 18 ГБ — чистим заранее, если свободно меньше ~6 ГБ (цена одного
+            # api/web-слоя). Кэш только скорость, данные не трогает.
+            FREE_KB=$(df --output=avail -k . | tail -1)
+            if [ "$FREE_KB" -lt 6291456 ]; then
+              echo "свободно $((FREE_KB / 1024)) МБ — чищу build-кэш"
+              docker builder prune -f
+            fi
             docker compose -f docker-compose.prod.yml pull || true
             docker compose -f docker-compose.prod.yml build --pull
             # `up -d` с service_healthy-условиями (см. docker-compose.prod.yml) НЕ
@@ -354,5 +376,19 @@ jobs:
             # pnpm в runtime-стадии нет (corepack только в builder), поэтому явный путь.
             docker compose -f docker-compose.prod.yml exec -T api npx prisma migrate deploy \
               --schema=packages/database/prisma/schema.prisma
+            # Перезапуск nginx после пересоздания остальных сервисов ОБЯЗАТЕЛЕН:
+            # nginx резолвит имена сервисов один раз при старте и держит IP в кэше,
+            # а `up -d` выдаёт контейнеру новый адрес. Без этого шага прод выглядит
+            # здоровым (все healthy, витрина отдаёт HTML), а любой запрос к API —
+            # 502. Поймано на этом стенде дважды; зафиксировано в docs/DEPLOY.md.
+            # Заметьте: `restart nginx`, а не `up -d --force-recreate nginx` —
+            # конфигурация vhost'ов меняется только вместе с самим конфигом.
+            docker compose -f docker-compose.prod.yml restart nginx
+            # Зелёный деплой должен означать «прод отвечает», а не «команды
+            # отработали». Домен берём из боевого .env.production, а не хардкодом,
+            # иначе проверка разъедется при первом же переезде на другое имя.
+            DOMAIN_NAME=$(grep -E '^DOMAIN=' .env.production | cut -d= -f2-)
+            curl --fail --silent --show-error --max-time 45 \
+              "https://${DOMAIN_NAME}/api/v1/health" > /dev/null
+            echo "Deploy OK $(date): ${DOMAIN_NAME} отвечает на /api/v1/health"
             docker compose -f docker-compose.prod.yml ps
-            echo "Deploy OK $(date)"
