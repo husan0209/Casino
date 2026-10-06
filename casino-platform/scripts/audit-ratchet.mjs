@@ -41,9 +41,12 @@ const BASELINE = 'tech-debt/pnpm-audit.txt'
 const MANIFEST = 'package.json'
 // Реестр может посчитать одну advisory дважды (GHSA на две версии пакета),
 // поэтому metadata обычно на 1 больше, чем advisories (наблюдено: 29 vs 28 и
-// 52 vs 51). Допуск = METADATA_SLACK: больше — это уже не двойной счёт, а
-// потерянные записи.
-const METADATA_SLACK = 2
+// 52 vs 51). Допуска на двойной счёт недостаточно при мульти-версионных
+// транзитивах: один GHSA в ignoreGhsas бьёт по НЕСКОЛЬКИМ версиям пакета
+// (minimatch ×3 GHSA, esbuild/vite-цепочка), и каждая версия — отдельная
+// запись metadata. Поэтому допуск пропорционален mute-листу (~20%),
+// минимум прежние 2.
+const METADATA_SLACK_RATIO = 0.2
 
 const args = process.argv.slice(2)
 const mode = args[0]
@@ -98,7 +101,7 @@ const visibleTotal = total(cur)
 if (!metaTotal) {
   console.warn('⚠️  в отчёте нет metadata.vulnerabilities — сверку полноты отчёта не сделать')
 }
-if (metaTotal - visibleTotal > ignore.length + mutedInReport + METADATA_SLACK) {
+if (metaTotal - visibleTotal > ignore.length + mutedInReport + Math.max(2, Math.ceil(ignore.length * METADATA_SLACK_RATIO))) {
   console.error(
     `❌ отчёт неполон: metadata=${metaTotal}, осталось после mute=${visibleTotal} ` +
       `(в отчёте advisories=${Object.values(advisories).length}, снято мной=${mutedInReport}, ` +
