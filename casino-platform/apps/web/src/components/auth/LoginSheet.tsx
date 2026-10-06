@@ -304,21 +304,20 @@ export function LoginSheet(): React.JSX.Element | null {
             />
           </div>
           <div>
-            <label
-              className="mb-1 flex items-center justify-between text-xs text-muted"
-              htmlFor="auth-password"
-            >
-              <span>Пароль</span>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-xs text-muted" htmlFor="auth-password">
+                Пароль
+              </label>
               {mode === 'login' && (
                 <Link
                   href="/forgot-password"
-                  className="text-brand hover:underline"
+                  className="text-xs text-brand hover:underline"
                   onClick={closeLogin}
                 >
                   Забыли пароль?
                 </Link>
               )}
-            </label>
+            </div>
             <div className="relative">
               <input
                 id="auth-password"
