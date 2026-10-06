@@ -71,7 +71,7 @@ function OAuthSection({ referral }: { referral: string | undefined }): React.JSX
           Продолжить с Google
         </button>
       ) : (
-        <Link href="/google/callback" className={OAUTH_BUTTON_CLASS}>
+        <Link href="/auth/google/callback" className={OAUTH_BUTTON_CLASS}>
           <span className="grid h-6 w-6 place-items-center rounded-full bg-white">
             <GoogleMark size={14} />
           </span>

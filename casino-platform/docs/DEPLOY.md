@@ -15,6 +15,14 @@
 3. На VPS job выполняет: `git pull` → `docker compose build --pull` → `up -d` →
    `npx prisma migrate deploy` (миграции применяются автоматически на деплое — GAP-31).
 
+> ⚠️ Пересоздание upstream'а без nginx ломает проксирование. nginx резолвит имя
+> сервиса (`api`, `web`, `admin`) один раз при старте и держит IP в своём кэше, а
+> пересозданный `docker compose up -d --force-recreate api` контейнер получает ДРУГОЙ
+> IP. Итог: API `healthy`, сайт жив, а любой запрос через nginx отдаёт 502.
+> Если пересоздаёте не весь стек, а один сервис — перезапустите и nginx:
+> `docker compose -f docker-compose.prod.yml restart nginx`. Проверено на живом
+> стенде 2026-10-05 (прогоны крипто-депозитов падали 502 ровно по этой причине).
+
 `workflow_dispatch` доступен только с default-ветки (правило репо).
 
 ## 1st deploy – Hetzner CX41 Ubuntu 24.04
@@ -69,10 +77,13 @@ curl -sS -o /dev/null -w '%{http_code}\n' "https://$DOMAIN/"
 curl -sS -o /dev/null -w '%{http_code}\n' "https://$ADMIN_DOMAIN/"
 # 3. маршрут возврата Google существует (несовпадение с redirect_uri в oauth.tsx
 #    даёт 404 уже ПОСЛЕ успешного входа в аккаунт Google — выглядит как «не работает»)
-curl -sS -o /dev/null -w '%{http_code}\n' "https://$DOMAIN/google/callback"
-# 4. публичные ключи попали в бандл: без build-arg'ов кнопка Google/капча молча
-#    отсутствуют, и по HTTP-коду это не видно — смотреть наличие data-client-id в HTML
-curl -sS "https://$DOMAIN/" | grep -c 'accounts.google.com\|google'
+curl -sS -o /dev/null -w '%{http_code}\n' "https://$DOMAIN/auth/google/callback"
+# 4. публичные ключи попали в бандл: NEXT_PUBLIC_* инлайнятся в JS-чанк во время
+#    `next build` и в HTML не встречаются, поэтому искать их надо в чанке layout, а не
+#    в разметке. Отличительный случай: сборка, стартовавшая ДО появления ключа в .env,
+#    проходит успешно и просто не печатает кнопку (проверено 2026-10-05 на стенде).
+CHUNK=$(curl -sS "https://$DOMAIN/" | grep -o '/_next/static/chunks/app/layout-[a-f0-9]*\.js' | head -1)
+curl -sS "https://$DOMAIN$CHUNK" | grep -c "$NEXT_PUBLIC_GOOGLE_CLIENT_ID"
 ```
 
 ## Первичная инициализация админа (обязательно)

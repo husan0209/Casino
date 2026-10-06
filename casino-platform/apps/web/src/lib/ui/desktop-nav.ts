@@ -60,7 +60,7 @@ export const AUTH_PATHS: readonly string[] = [
   '/verify-email',
   '/forgot-password',
   '/reset-password',
-  '/google/callback',
+  '/auth/google/callback',
 ]
 
 export function isAuthPath(pathname: string): boolean {

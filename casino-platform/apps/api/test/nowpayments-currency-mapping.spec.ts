@@ -227,6 +227,26 @@ describe('NOWPaymentsClient.createPayment: отклонение до обращ�
     expect(result.payCurrency).toBe(ticker)
   })
 
+  // use-case передаёт цену в той же монете, что и оплата (сумма в UI — это монеты),
+  // поэтому our-имя USDT_TRC20 попадает и в price_currency. Провайдер принимает только
+  // буквенно-цифровые тикеры: toLowerCase() подчёркивание не убирает, и платёж падал с
+  // INVALID_REQUEST_PARAMS «price_currency must only contain alpha-numeric characters».
+  it('цена в монете: USDT_TRC20 уходит провайдеру как usdttrc20, без подчёркивания', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(createdPaymentResponse('usdttrc20'))
+    vi.stubGlobal('fetch', fetchMock)
+    const client = makeClient(PRODUCTION_CONFIG)
+
+    await client.createPayment({
+      ...createPaymentArgs('USDT_TRC20'),
+      priceCurrency: 'USDT_TRC20',
+    })
+
+    const [, init] = fetchMock.mock.calls[0] as [string, { body?: string }]
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>
+    expect(body.price_currency).toBe('usdttrc20')
+    expect(body.pay_currency).toBe('usdttrc20')
+  })
+
   it('dev без ключа: релизная валюта отдаёт детерминированный stub без fetch', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)

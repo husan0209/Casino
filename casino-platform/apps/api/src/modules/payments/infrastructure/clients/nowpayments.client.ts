@@ -177,7 +177,11 @@ export class NOWPaymentsClient implements INowPaymentsClient {
           // строкой (params.priceAmount: string), провайдеру уходит число по его
           // спецификации (docs/PAYMENT_OVERVIEW.md, решение В11).
           price_amount: Number(params.priceAmount),
-          price_currency: params.priceCurrency.toLowerCase(),
+          // Тот же маппер, что у pay_currency: NOWPayments принимает только
+          // буквенно-цифровые тикеры, а наше имя USDT_TRC20 содержит подчёркивание.
+          // toLowerCase() его не убирает → INVALID_REQUEST_PARAMS
+          // «price_currency must only contain alpha-numeric characters».
+          price_currency: this.mapCurrency(params.priceCurrency),
           pay_currency: this.mapCurrency(payCurrency),
           order_id: params.orderId,
           ipn_callback_url: params.ipnCallbackUrl,
