@@ -268,6 +268,25 @@ constructor(@Inject(LoginUseCase) private readonly login: LoginUseCase) {}
 constructor(@Inject(WALLET_REPOSITORY) private readonly repo: IWalletRepository) {}
 ```
 
+**Тот же класс ошибки — параметр хендлера без param-декоратора.** Nest собирает аргументы
+метода только из `ROUTE_ARGS_METADATA`, поэтому в `async me(actor: AffiliateActor)` приезжает
+`undefined`: `tsc`, ESLint и старт приложения — зелёные, а каждый эндпоинт класса даёт 500 на
+`actor.affiliateId`. Unit- и contract-спеки поймать это не могут: они вызывают метод напрямую и
+аргумент передают сами. Так кабинет партнёра жил пустым до #197 (10 параметров).
+
+```typescript
+// ❌ приезжает undefined → 500 на всех маршрутах контроллера
+@Get('me')
+async me(actor: AffiliateActor) {}
+
+// ✅
+@Get('me')
+async me(@CurrentUser() actor: AffiliateActor) {}
+```
+
+**Машинная проверка.** Guard **G28** (`node scripts/check-controller-params.mjs`, реестр —
+`docs/QUALITY_GATES.md` §3.2).
+
 ---
 
 ## 6. Общение между модулями

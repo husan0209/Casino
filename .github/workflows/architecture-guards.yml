@@ -458,6 +458,24 @@ jobs:
         id: g22
         run: node scripts/check-explicit-di.mjs
 
+      # ──────────────────────────────────────────────────────────────
+      # Q2. Привязка параметров HTTP-хендлеров (сосед G22 по классу бага:
+      #     и там, и тут Nest молча отдаёт undefined, код компилируется и живёт
+      #     до первого обращения к полю)
+      # Catches: #197 — кабинет партнёра: у десяти параметров хендлеров
+      #          AffiliateController не было param-декоратора, поэтому
+      #          /affiliate/me|dashboard|links|commissions|players давали 500
+      #          при любом токене, а UI без ветки isError показывал «Загрузка…».
+      #          Contract-спека не ловит: она вызывает методы напрямую и
+      #          передаёт актора аргументом — HTTP-связывание ей недоступно.
+      # Rule: docs/ARCHITECTURE.md §5.3, docs/API_CONVENTIONS.md §2
+      # NOTE: детектор — scripts/check-controller-params.mjs; краснеет и когда
+      #          не просканировал ни одного хендлера (урок вакуумного G7).
+      # ──────────────────────────────────────────────────────────────
+      - name: G28 — controller handler params are bound explicitly
+        id: g28
+        run: node scripts/check-controller-params.mjs
+
       # R. NEXT_PUBLIC_* инлайнятся в бандл на сборке (Next.js), поэтому env_file
       #    на build не влияет — ARG обязан приехать через build.args.
       # Catches: GAP-59 — build-arg NEXT_PUBLIC_API_URL был у web, но не у admin;
@@ -525,6 +543,7 @@ jobs:
           echo "- G20 money-number ratchet: ${{ steps.g20.outcome }}"
           echo "- G21 use-case specs rat.:  ${{ steps.g21.outcome }}"
           echo "- G22 explicit Nest DI:     ${{ steps.g22.outcome }}"
+          echo "- G28 controller params:    ${{ steps.g28.outcome }}"
           echo "- G23 NEXT_PUBLIC_ args:    ${{ steps.g23.outcome }}"
           echo "- G24 foreign writes ratch.: ${{ steps.g24.outcome }}"
           echo "- G26 service specs ratchet: ${{ steps.g26.outcome }}"
