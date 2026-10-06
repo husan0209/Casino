@@ -27,6 +27,10 @@
 #        `prisma.*` в presentation-файле → КРАСНЫЙ; тот же вызов в
 #        infrastructure-репозитории → ЗЕЛЁНЫЙ (правило про слой, а не про
 #        таблицу — иначе оно невыполнимо).
+#   17–18 controller-params (G28): рабочее дерево → ЗЕЛЁНЫЙ; у хендлера снят
+#        param-декоратор → КРАСНЫЙ. Дополнительно детектор сам краснеет, если
+#        не просканировал ни одного хендлера (см. «анти-вакуум» ниже) — поэтому
+#        зелёный тут означает «проверка действительно что-то видела».
 #
 # Запуск:  sh scripts/bin/guard-selftest      (CI: шаг G25)
 # Выход:   0 — все гарды покраснели там, где должны;
@@ -150,6 +154,16 @@ pdb_tree() {
   mkdir -p "$T/apps/api/src" "$T/tech-debt"
   cp -R apps/api/src/modules "$T/apps/api/src/"
   cp "$PDB_BASELINE" "$T/tech-debt/"
+  printf '%s' "$T"
+}
+
+# Дерево для controller-params: копируется весь apps/api/src — ловушка обязана
+# лежать именно в @Controller, и детектор идёт тем же путём, что в CI.
+ctl_tree() {
+  T="$TMP/ctl-$1"
+  rm -rf "$T"
+  mkdir -p "$T/apps/api"
+  cp -R apps/api/src "$T/apps/api/src"
   printf '%s' "$T"
 }
 
@@ -311,6 +325,18 @@ export class SelfTestPresentationDbRepository {
 EOF
 expect_green "presentation-db: чтение в infrastructure-репозитории не долг" \
   env TECH_DEBT_ROOT="$PDB" sh "$TECH_DEBT" check presentation-db
+
+# ── 17–18. controller-params: декоратор у параметра хендлера ─────────────
+CTL=$(ctl_tree main)
+expect_green "controller-params на копии рабочего дерева" \
+  node scripts/check-controller-params.mjs "$CTL/apps/api/src"
+
+# Снимаем param-декоратор у одного хендлера: Nest передаст в метод undefined,
+# ровно так кабинет партнёра отдавал 500 на всех шести эндпоинтах до #197.
+CTL_TRAP="$CTL/apps/api/src/modules/affiliate/presentation/controllers/affiliate.controller.ts"
+mutate "$CTL_TRAP" 's/@CurrentUser() actor/actor/'
+expect_red "G28 FAIL" "controller-params: у хендлера снят @CurrentUser() (актор = undefined)" \
+  node scripts/check-controller-params.mjs "$CTL/apps/api/src"
 
 # ── Итог ────────────────────────────────────────────────────────────────
 echo ""

@@ -261,6 +261,11 @@ module/
 Неявный DI ловит машиной — guard **G22** (`scripts/check-explicit-di.mjs`) роняет CI до рантайма.
 Владелец правила: `docs/ARCHITECTURE.md` §5.3.
 
+Так же связываются и параметры хендлеров: у каждого обязан быть param-декоратор
+(`@Body`/`@Query`/`@Param`/`@Req`/`@CurrentUser`), иначе Nest приезжает в метод с `undefined`
+и весь контроллер отвечает 500, оставаясь зелёным для `tsc`, ESLint и unit-спек. Ловит guard
+**G28** (`scripts/check-controller-params.mjs`).
+
 ### 3.3. Бизнес-логика — ТОЛЬКО в application
 
 ❌ Запрещено писать business logic в `controller` или `repository`.
