@@ -9,6 +9,7 @@ import {
 import { type IAffiliateJwtService } from '../../domain/affiliate.ports'
 import {
   AffiliateAlreadyExistsError,
+  AffiliateProgramDisabledError,
   PlayerReferralCodeGenerationError,
 } from '../../domain/errors/affiliate.errors'
 import {
@@ -193,6 +194,25 @@ describe('RegisterAffiliateUseCase', () => {
         deps.users,
       ).execute(VALID_INPUT),
     ).rejects.toBeInstanceOf(AffiliateAlreadyExistsError)
+    expect(deps.provisionAffiliatePlayer).not.toHaveBeenCalled()
+    expect(deps.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses registration while the program is disabled (kill-switch)', async () => {
+    const deps = makeDeps({ settings: { isEnabled: false } })
+
+    await expect(
+      new RegisterAffiliateUseCase(
+        deps.affiliates,
+        deps.players,
+        deps.settings,
+        deps.jwt,
+        deps.users,
+      ).execute(VALID_INPUT),
+    ).rejects.toBeInstanceOf(AffiliateProgramDisabledError)
+    // Отказ до любых сайд-эффектов: проверка дубля и служебная user-запись
+    // не должны появиться, если программа закрыта.
+    expect(deps.findByEmail).not.toHaveBeenCalled()
     expect(deps.provisionAffiliatePlayer).not.toHaveBeenCalled()
     expect(deps.create).not.toHaveBeenCalled()
   })
