@@ -6,14 +6,18 @@ import { useEffect, useState } from 'react'
 import { getAffiliateCode } from '@/components/affiliate/AffiliateCodeCapture'
 import { CaptchaField } from '@/components/auth/CaptchaField'
 import {
+  exchangeTelegramAuth,
   GOOGLE_CLIENT_ID,
   GoogleMark,
   OAUTH_BUTTON_CLASS,
+  TELEGRAM_BOT_NAME,
+  TelegramLoginWidget,
   TelegramMark,
   startGoogleOAuth,
+  type TelegramAuthPayload,
 } from '@/components/auth/oauth'
 import { toast } from '@/components/ui/toaster'
-import { errCode, errText } from '@/lib/api'
+import { errCode, errText, setAccessToken } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import { type LoginSheetMode, useUIStore } from '@/stores/ui'
 
@@ -56,7 +60,15 @@ function getQuietReferral(): string | undefined {
 }
 
 /** §4.8: OAuth сверху — Google и Telegram; Google включается при наличии ключа. */
-function OAuthSection({ referral }: { referral: string | undefined }): React.JSX.Element {
+function OAuthSection({
+  referral,
+  onTelegramAuth,
+  telegramLoading,
+}: {
+  referral: string | undefined
+  onTelegramAuth: (payload: TelegramAuthPayload) => void
+  telegramLoading: boolean
+}): React.JSX.Element {
   return (
     <div className="mt-4 space-y-2.5">
       {GOOGLE_CLIENT_ID !== undefined ? (
@@ -78,11 +90,20 @@ function OAuthSection({ referral }: { referral: string | undefined }): React.JSX
           Продолжить с Google
         </Link>
       )}
-      {/* Виджет Telegram (UC-AUTH-09) — после настройки бота и домена, тот же контур, что GAP-46. */}
-      <button type="button" className={OAUTH_BUTTON_CLASS}>
-        <TelegramMark size={24} />
-        Войти через Telegram
-      </button>
+      {TELEGRAM_BOT_NAME !== undefined ? (
+        // Нативная кнопка виджета кликается через iframe — на время обмена
+        // входом блокируем повторные клики, но не прячем статус Telegram.
+        <div className={telegramLoading ? 'pointer-events-none opacity-60' : undefined}>
+          <TelegramLoginWidget onAuth={onTelegramAuth} />
+        </div>
+      ) : (
+        // Бот не прописан в NEXT_PUBLIC_TELEGRAM_BOT_NAME — мёртвая кнопка хуже
+        // отсутствующей: прячем настоящий виджет, показываем выключенную плашку.
+        <button type="button" className={OAUTH_BUTTON_CLASS} disabled>
+          <TelegramMark size={24} />
+          Войти через Telegram
+        </button>
+      )}
     </div>
   )
 }
@@ -181,7 +202,7 @@ function ModeSwitch({
 export function LoginSheet(): React.JSX.Element | null {
   const { loginSheet, loginSheetClosing, loginSheetMode, closeLogin, pendingGameSlug } =
     useUIStore()
-  const { login, register } = useAuth()
+  const { login, register, setSession } = useAuth()
   const [mode, setMode] = useState<LoginSheetMode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -214,6 +235,22 @@ export function LoginSheet(): React.JSX.Element | null {
     closeLogin()
     if (pendingGameSlug) {
       window.location.href = `/casino/${pendingGameSlug}?launch=1`
+    }
+  }
+
+  /** UC-AUTH-09: данные виджета Telegram меняем на сессию тем же afterAuth-путём. */
+  const onTelegramAuth = async (payload: TelegramAuthPayload): Promise<void> => {
+    setLoading(true)
+    try {
+      const res = await exchangeTelegramAuth(payload, referral)
+      setAccessToken(res.accessToken)
+      setSession(res.accessToken, res.user)
+      toast.success('Вход через Telegram выполнен')
+      afterAuth()
+    } catch (e) {
+      toast.error(errText(e))
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -272,7 +309,11 @@ export function LoginSheet(): React.JSX.Element | null {
           </button>
         </div>
 
-        <OAuthSection referral={referral} />
+        <OAuthSection
+          referral={referral}
+          onTelegramAuth={(payload) => void onTelegramAuth(payload)}
+          telegramLoading={loading}
+        />
 
         {/* Разделитель */}
         <div className="my-4 flex items-center gap-3">

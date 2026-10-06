@@ -101,6 +101,9 @@ services:
         - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
         - NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
         - NEXT_PUBLIC_IMAGE_HOSTS=${NEXT_PUBLIC_IMAGE_HOSTS:-}
+        # UC-AUTH-09: username бота для Telegram Login Widget (G23 — ARG из
+        # web.prod.Dockerfile обязан доехать через build.args).
+        - NEXT_PUBLIC_TELEGRAM_BOT_NAME=${NEXT_PUBLIC_TELEGRAM_BOT_NAME:-}
     env_file: [.env.production]
     # Next standalone-сервер берёт порт из process.env.PORT (дефолт 3000) и хост из
     # process.env.HOSTNAME. Docker сам проставляет HOSTNAME = ID контейнера, и тогда
