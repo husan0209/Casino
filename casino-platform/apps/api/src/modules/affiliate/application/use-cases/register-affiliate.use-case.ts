@@ -23,7 +23,10 @@ import { errorMessage } from '@/common/utils/error-message'
 import { UsersFacade } from '@modules/users/facade/users.facade'
 
 import { AFFILIATE_JWT_SERVICE, type IAffiliateJwtService } from '../../domain/affiliate.ports'
-import { AffiliateAlreadyExistsError } from '../../domain/errors/affiliate.errors'
+import {
+  AffiliateAlreadyExistsError,
+  AffiliateProgramDisabledError,
+} from '../../domain/errors/affiliate.errors'
 import {
   AFFILIATE_PLAYER_PROVISIONING_REPOSITORY,
   AFFILIATE_REPOSITORY,
@@ -71,6 +74,16 @@ export class RegisterAffiliateUseCase {
   async execute(input: RegisterAffiliateInput): Promise<RegisterAffiliateResult> {
     const email = input.email.toLowerCase().trim()
     const settings = await this.settings.get()
+
+    // Kill-switch программы. Click и атрибуция его уже слушают
+    // (track-click.use-case.ts:84, attribute-player.use-case.ts:73), поэтому без
+    // этой проверки регистрация принимала бы партнёров в выключенную программу:
+    // код партнёра выдавался бы, а конверсии по нему не возникало бы никогда.
+    // До проверки — без сайд-эффектов: provisioning-запись в users не должна
+    // появиться у отказа.
+    if (!settings.isEnabled) {
+      throw new AffiliateProgramDisabledError()
+    }
 
     const existing = await this.affiliates.findByEmail(email)
     if (existing !== null) {

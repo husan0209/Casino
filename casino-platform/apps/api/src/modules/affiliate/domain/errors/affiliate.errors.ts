@@ -50,6 +50,24 @@ export class AffiliateAlreadyExistsError extends AppError {
   }
 }
 
+/**
+ * Программа закрыта настройкой `affiliate_enabled` (kill-switch из админки).
+ *
+ * 503, а не 403: пауза — состояние программы, а не право клиента. Оператор
+ * включает её обратно, и та же попытка становится успешной. Логин при этом НЕ
+ * блокируется: партнёр обязан видеть начисленное и иметь возможность выйти из
+ * программы (POST /leave) — иначе выключение программы превращается в залог
+ * его баланса.
+ */
+export class AffiliateProgramDisabledError extends AppError {
+  readonly code = 'AFFILIATE_PROGRAM_DISABLED'
+  readonly httpStatus = 503
+
+  constructor() {
+    super('Affiliate program is not accepting new registrations right now')
+  }
+}
+
 /** Неверный email/пароль партнёра. Сообщение намеренно общее — не раскрывает, существует ли email. */
 export class AffiliateCredentialsInvalidError extends AppError {
   readonly code = 'AFFILIATE_CREDENTIALS_INVALID'
