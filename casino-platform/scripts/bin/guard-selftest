@@ -28,9 +28,13 @@
 #        infrastructure-репозитории → ЗЕЛЁНЫЙ (правило про слой, а не про
 #        таблицу — иначе оно невыполнимо).
 #   17–18 controller-params (G28): рабочее дерево → ЗЕЛЁНЫЙ; у хендлера снят
-#        param-декоратор → КРАСНЫЙ. Дополнительно детектор сам краснеет, если
-#        не просканировал ни одного хендлера (см. «анти-вакуум» ниже) — поэтому
+#        param-декоратор → КРАСНЫЙ. Отдельно детектор краснеет, если не
+#        просканировал ни одного хендлера (см. «анти-вакуум» ниже) — поэтому
 #        зелёный тут означает «проверка действительно что-то видела».
+#   19–21 dto-key-naming (G29): копия рабочего дерева = базлайну → ЗЕЛЁНЫЙ;
+#        новый camelCase-ключ в presentation/dto → КРАСНЫЙ. Отдельно важно, что
+#        camelCase в *.spec.ts не считается: спеки описывают контракты, а не
+#        тела запросов, и иначе гард краснел бы на легальных файлах.
 #
 # Запуск:  sh scripts/bin/guard-selftest      (CI: шаг G25)
 # Выход:   0 — все гарды покраснели там, где должны;
@@ -48,6 +52,7 @@ LEDGER_REL='apps/api/src/modules/wallet/infrastructure/ledger'
 FW_BASELINE='tech-debt/foreign-writes.txt'
 SS_BASELINE='tech-debt/service-specs.txt'
 PDB_BASELINE='tech-debt/presentation-db.txt'
+DTN_BASELINE='tech-debt/dto-key-naming.txt'
 SCHEMA='packages/database/prisma/schema.prisma'
 
 TMP=$(mktemp -d 2>/dev/null) || TMP="$PLATFORM_DIR/.guard-selftest-tmp"
@@ -164,6 +169,17 @@ ctl_tree() {
   rm -rf "$T"
   mkdir -p "$T/apps/api"
   cp -R apps/api/src "$T/apps/api/src"
+  printf '%s' "$T"
+}
+
+# Дерево для dto-key-naming: детектор идёт по apps/api/src/modules/*/presentation/dto,
+# поэтому копируется весь modules — ловушка должна быть найдена тем же путём, что в CI.
+dtn_tree() {
+  T="$TMP/dtn-$1"
+  rm -rf "$T"
+  mkdir -p "$T/apps/api/src" "$T/tech-debt"
+  cp -R apps/api/src/modules "$T/apps/api/src/"
+  cp "$DTN_BASELINE" "$T/tech-debt/"
   printf '%s' "$T"
 }
 
@@ -337,6 +353,45 @@ CTL_TRAP="$CTL/apps/api/src/modules/affiliate/presentation/controllers/affiliate
 mutate "$CTL_TRAP" 's/@CurrentUser() actor/actor/'
 expect_red "G28 FAIL" "controller-params: у хендлера снят @CurrentUser() (актор = undefined)" \
   node scripts/check-controller-params.mjs "$CTL/apps/api/src"
+
+# ── 19–20. dto-key-naming: имена ключей входных схем ─────────────────────
+DTN=$(dtn_tree main)
+expect_green "dto-key-naming на копии рабочего дерева = базлайну" \
+  env TECH_DEBT_ROOT="$DTN" sh "$TECH_DEBT" check dto-key-naming
+
+DTN_TRAP="$DTN/apps/api/src/modules/health/presentation/dto/selftest-trap.dto.ts"
+mkdir -p "$DTN/apps/api/src/modules/health/presentation/dto"
+cat > "$DTN_TRAP" <<'EOF'
+import { z } from 'zod'
+
+/** Ловушка selftest: camelCase-ключ в схеме тела вместо snake_case (§2.2). */
+export const SelfTestDtoKeyTrap = z.object({
+  payoutMethod: z.string().min(1),
+  amount_rub: z.string(),
+})
+EOF
+expect_red "долг ВЫРОС" "dto-key-naming: новый camelCase-ключ в presentation/dto" \
+  env TECH_DEBT_ROOT="$DTN" sh "$TECH_DEBT" check dto-key-naming
+
+# CamelCase внутри спеки — НЕ нарушение: спеки описывают контракты, а не тела
+# запросов. Без этого контроля детектор краснел бы на легальных файлах.
+rm "$DTN_TRAP"
+cat > "$DTN/apps/api/src/modules/health/presentation/dto/selftest-trap.dto.spec.ts" <<'EOF'
+import { describe, expect, it } from 'vitest'
+import { z } from 'zod'
+
+const SpecOnlyCamel = z.object({ notARequestBodyKey: z.string() })
+
+describe('dto-key-naming selftest: спека не считается', () => {
+  it('пропускает camelCase-ключ в тестовом файле', () => {
+    expect(SpecOnlyCamel.parse({ notARequestBodyKey: 'x' })).toEqual({
+      notARequestBodyKey: 'x',
+    })
+  })
+})
+EOF
+expect_green "dto-key-naming: camelCase в *.spec.ts не долг" \
+  env TECH_DEBT_ROOT="$DTN" sh "$TECH_DEBT" check dto-key-naming
 
 # ── Итог ────────────────────────────────────────────────────────────────
 echo ""
