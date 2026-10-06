@@ -59,15 +59,24 @@ function SpecTable({
  * GameCard/GameDeck не подключён — это отдельный шаг (см. PR #133).
  */
 export function GamePreviewSheet(): React.JSX.Element | null {
-  const { gamePreview } = useUIStore()
+  const { gamePreview, gamePreviewClosing } = useUIStore()
 
+  if (!gamePreview && !gamePreviewClosing) {
+    return null
+  }
   if (!gamePreview) {
     return null
   }
-  return <GamePreviewBody options={gamePreview} />
+  return <GamePreviewBody options={gamePreview} closing={gamePreviewClosing} />
 }
 
-function GamePreviewBody({ options }: { options: GamePreviewOptions }): React.JSX.Element {
+function GamePreviewBody({
+  options,
+  closing,
+}: {
+  options: GamePreviewOptions
+  closing: boolean
+}): React.JSX.Element {
   const { game, isFavorite, onToggleFavorite } = options
   const { user } = useAuth()
   const { closeGamePreview, openLogin } = useUIStore()
@@ -106,8 +115,15 @@ function GamePreviewBody({ options }: { options: GamePreviewOptions }): React.JS
     <>
       {/* Фон за шторкой размыт: донор оставляет витрину читаемой как подложку,
           без blur каталог за листом перетягивает взгляд на себя. */}
-      <div className="sheet-backdrop backdrop-blur-sm" onClick={closeGamePreview} />
-      <div className="sheet-panel p-0" role="dialog" aria-label={displayName}>
+      <div
+        className={`sheet-backdrop backdrop-blur-sm${closing ? ' sheet-backdrop-out' : ''}`}
+        onClick={closeGamePreview}
+      />
+      <div
+        className={`sheet-panel p-0${closing ? ' sheet-panel-out' : ''}`}
+        role="dialog"
+        aria-label={displayName}
+      >
         <div className="relative aspect-[5/3] w-full overflow-hidden">
           <GameThumb
             src={details?.bannerUrl ?? game.thumbnailUrl}

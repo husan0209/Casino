@@ -140,6 +140,34 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
+describe('Валидация суммы кассы (фидбек вместо молчаливого return)', () => {
+  it('пустая сумма: подсказка у поля, API не вызывается', () => {
+    kycMock.mockResolvedValue({ status: 'approved' })
+    renderSheet()
+    fireEvent.click(screen.getByRole('button', { name: /Перейти к оплате/ }))
+    expect(screen.getByText('Выберите или введите сумму пополнения')).toBeTruthy()
+    expect(depositMock).not.toHaveBeenCalled()
+  })
+
+  it('сумма ниже минимума: подсказка с минимумом из гео-конфига', () => {
+    kycMock.mockResolvedValue({ status: 'approved' })
+    renderSheet()
+    fireEvent.change(screen.getByPlaceholderText('2000'), { target: { value: '100' } })
+    fireEvent.click(screen.getByRole('button', { name: /Перейти к оплате/ }))
+    expect(screen.getByText('Минимальная сумма — 1 000 ₽')).toBeTruthy()
+    expect(depositMock).not.toHaveBeenCalled()
+  })
+
+  it('ошибка сбрасывается при вводе суммы', () => {
+    kycMock.mockResolvedValue({ status: 'approved' })
+    renderSheet()
+    fireEvent.click(screen.getByRole('button', { name: /Перейти к оплате/ }))
+    expect(screen.getByText('Выберите или введите сумму пополнения')).toBeTruthy()
+    fireEvent.change(screen.getByPlaceholderText('2000'), { target: { value: '2000' } })
+    expect(screen.queryByText('Выберите или введите сумму пополнения')).toBeNull()
+  })
+})
+
 describe('GAP-36/44: DepositSheet — KYC-лимит из API', () => {
   it('показывает остаток лимита из API в валюте шита (без пересчёта)', async () => {
     kycMock.mockResolvedValue({
@@ -151,9 +179,9 @@ describe('GAP-36/44: DepositSheet — KYC-лимит из API', () => {
     renderSheet()
     // значение — как отдал API, без клиентской арифметики; пресет-кнопки «5 000 ₽»
     // не считаем — берём именно параграф остатка целиком (текст в двух узлах:
-    // «Без верификации осталось » + «5 000 ₽»), матчим самый глубокий узел с маркером
+    // «Без верификации можно выводить до » + «5 000 ₽»), матчим самый глубокий узел с маркером
     const deepest = (_: unknown, el: Element | null): boolean => {
-      const marker = 'Без верификации осталось'
+      const marker = 'Без верификации можно выводить до'
       if (!el?.textContent.includes(marker) || !el.textContent.includes('5 000')) {
         return false
       }
