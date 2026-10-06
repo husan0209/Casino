@@ -42,7 +42,13 @@ function setEnv() {
   process.env['APP_URL'] = process.env['APP_URL'] || 'http://localhost:3000'
   process.env['ADMIN_URL'] = process.env['ADMIN_URL'] || 'http://localhost:3002'
   process.env['DOMAIN'] = process.env['DOMAIN'] || 'localhost'
-  delete process.env['REDIS_URL']
+  // REDIS_URL прежний `delete` делал скрипт неисполнимым: валидатор окружения
+  // требует его безусловно (packages/shared-config/src/env.validation.ts:86), и
+  // падение происходило ещё до AppModule — «❌ Invalid env: { REDIS_URL:
+  // [Required] }». Отсутствие Redis и так обработано ниже по стеку: queues.module
+  // без REDIS_URL берёт DevLogEmailQueue, поэтому дефолт тут — только адрес
+  // dev-стека, а не смена поведения.
+  process.env['REDIS_URL'] = process.env['REDIS_URL'] || 'redis://localhost:6379'
 }
 
 /**
@@ -88,6 +94,14 @@ async function cleanup(prisma) {
   const playerWallets = await prisma.walletAccount.deleteMany({
     where: { user: { email: { startsWith: playerPrefix } } },
   })
+  // Депозит квалификации — по idempotencyKey (у payment_requests нет email, а
+  // чужие платежи игроков трогать нельзя). KYC-профиль снимается по игроку.
+  const deposits = await prisma.paymentRequest.deleteMany({
+    where: { idempotencyKey: { startsWith: prefix } },
+  })
+  const kycProfiles = await prisma.kycProfile.deleteMany({
+    where: { user: { email: { startsWith: playerPrefix } } },
+  })
   const players = await prisma.user.deleteMany({ where: { email: { startsWith: playerPrefix } } })
   const partners = await prisma.affiliate.deleteMany({ where: { email: { startsWith: prefix } } })
   const partnerUsers = await prisma.user.deleteMany({ where: { id: { in: partnerUserIds } } })
@@ -97,6 +111,7 @@ async function cleanup(prisma) {
       `начислений=${commissions.count} атрибуций=${attributions.count} кликов=${clicks.count} ` +
       `транзакций=${transactions.count} раундов=${rounds.count} сессий=${sessions.count} ` +
       `ledger=${ledgers.count} кошельков=${partnerWallets.count + playerWallets.count} ` +
+      `депозитов=${deposits.count} kyc=${kycProfiles.count} ` +
       `user-партнёров=${partnerUsers.count}`,
   )
 }
@@ -132,6 +147,12 @@ async function main() {
   const {
     RegisterAffiliateUseCase,
   } = require('../dist/modules/affiliate/application/use-cases/register-affiliate.use-case')
+  const {
+    QualifyAttributionsUseCase,
+  } = require('../dist/modules/affiliate/application/use-cases/qualify-attributions.use-case')
+  const {
+    AffiliateSettingsService,
+  } = require('../dist/modules/affiliate/application/affiliate-settings.service')
 
   // ВАЖНО: preview:true НЕ подходит — в этом режиме Nest не вызывает
   // конструкторы провайдеров, и app.get() отдаёт «пустые» экземпляры
@@ -146,6 +167,8 @@ async function main() {
   const trackClick = app.get(TrackClickUseCase, { strict: false })
   const clawback = app.get(ClawbackPlayerCommissionsUseCase, { strict: false })
   const registerAffiliate = app.get(RegisterAffiliateUseCase, { strict: false })
+  const qualifyAttributions = app.get(QualifyAttributionsUseCase, { strict: false })
+  const settings = app.get(AffiliateSettingsService, { strict: false })
 
   const steps = []
   const log = (name, detail) => {
@@ -313,21 +336,74 @@ async function main() {
   })
   await prisma.walletAccount.create({ data: { userId: player.id, currency: 'RUB', balance: '0' } })
 
-  const attrRow = await prisma.affiliateAttribution.findUnique({ where: { playerId: player.id } })
-  await prisma.affiliateAttribution.update({
-    where: { id: attrRow.id },
+  const attrRowBefore = await prisma.affiliateAttribution.findUnique({
+    where: { playerId: player.id },
+  })
+  assert(attrRowBefore.status === 'pending', `атрибуция pending, статус ${attrRowBefore.status}`)
+
+  // ── 5. Квалификация РЕАЛЬНЫМ путём, а не подделкой строки ─────────────────
+  // Здесь был prisma.affiliateAttribution.update({ status: 'qualified', … }) —
+  // то есть проверка подменяла именно тот шаг, который обязана подтверждать:
+  // критерий квалификации (агрегат payment_requests по завершённым депозитам)
+  // не исполнялся, и полностью сломанный qualify-attributions.use-case прошёл бы
+  // зелёным. Теперь депозит проводится как завершённый платёж, затем джоба
+  // квалификации, а результат читается из БД.
+  const program = await settings.get()
+  // Депозит не меньше порога: при minDepositRub из настроек квалификация
+  // иначе задержится, и ассерт «квалифицирована» перестанет быть детерминированным.
+  const depositRub = Math.max(500, Number(program.minDepositRub) || 0)
+  await prisma.paymentRequest.create({
     data: {
-      status: 'qualified',
-      qualifiedAt: new Date(),
-      firstDepositId: '00000000-0000-0000-0000-000000000000',
-      firstDepositAt: new Date(),
-      totalDeposit: '500',
-      depositCount: 1,
+      userId: player.id,
+      type: 'deposit',
+      status: 'completed',
+      provider: 'manual',
+      method: 'itest-deposit',
+      currency: 'RUB',
+      amount: String(depositRub),
+      amountRub: String(depositRub),
+      idempotencyKey: `${RUN_TAG}-deposit-1`,
+      completedAt: new Date(),
     },
   })
-  log('подготовлены данные периода', 'bet=1000 win=400 → GGR=600, атрибуция qualified')
+  // Порог квалификации на практике — KYC игрока, а не сумма (minDepositRub может
+  // быть 0). Профиль заводится только когда настройка требует: иначе в dev-БД
+  // рос бы мусор, которого сценарий не создавал раньше.
+  if (program.requireKyc) {
+    await prisma.kycProfile.create({
+      data: { userId: player.id, status: 'approved', approvedAt: new Date() },
+    })
+  }
 
-  // ── 5. Расчёт NGR и комиссии ────────────────────────────────────────────
+  const qualification = await qualifyAttributions.execute()
+  assert(
+    qualification.errors.length === 0,
+    `тик квалификации без ошибок: ${qualification.errors.join('; ')}`,
+  )
+  const attrRow = await prisma.affiliateAttribution.findUnique({ where: { playerId: player.id } })
+  assert(
+    attrRow.status === 'qualified',
+    `атрибуция квалифицирована джобой, получено ${attrRow.status} ` +
+      `(checked=${qualification.checked} qualified=${qualification.qualified})`,
+  )
+  // Витрина кабинета («Игроки») читает эти колонки: если квалификация их не
+  // записала, партнёр видит нули у реально квалифицированного игрока.
+  assert(attrRow.depositCount === 1, `deposit_count=1, получено ${attrRow.depositCount}`)
+  assert(
+    Number(attrRow.totalDeposit) === depositRub,
+    `total_deposit=${depositRub} из агрегата платежей, получено ${attrRow.totalDeposit}`,
+  )
+  assert(attrRow.firstDepositAt !== null, 'first_deposit_at заполнен')
+  assert(
+    attrRow.firstDepositId !== null,
+    `first_deposit_id ссылается на платёж, получено ${attrRow.firstDepositId}`,
+  )
+  log(
+    'квалификация джобой',
+    `депозит ${depositRub} ₽ → qualified, total_deposit=${attrRow.totalDeposit} count=${attrRow.depositCount}`,
+  )
+
+  // ── 6. Расчёт NGR и комиссии ────────────────────────────────────────────
   const outcome = await createCommission.executeForCurrency(
     { affiliateId, playerId: player.id, attributionId: attrRow.id, periodStart, periodEnd },
     'RUB',
@@ -345,7 +421,7 @@ async function main() {
     `GGR=${outcome.ngr.ggr} NGR=${outcome.ngr.ngr} комиссия=${outcome.commissionAmount}`,
   )
 
-  // ── 6. Идемпотентность: повторный расчёт не создаёт дубль ───────────────
+  // ── 7. Идемпотентность: повторный расчёт не создаёт дубль ───────────────
   const secondRun = await createCommission.executeForCurrency(
     { affiliateId, playerId: player.id, attributionId: attrRow.id, periodStart, periodEnd },
     'RUB',
@@ -357,7 +433,7 @@ async function main() {
   assert(commissionCount === 1, `начислений ровно 1, получено ${commissionCount}`)
   log('идемпотентность расчёта', 'повторный запуск не создал дубль')
 
-  // ── 7. Начисление на кошелёк партнёра ───────────────────────────────────
+  // ── 8. Начисление на кошелёк партнёра ───────────────────────────────────
   const credited = await creditCommission.execute({ commissionId: outcome.commissionId })
   assert(credited.status === 'credited', `кредит выполнен, status=${credited.status}`)
   const partnerWallet = await prisma.walletAccount.findFirst({
@@ -393,7 +469,7 @@ async function main() {
   )
   log('идемпотентность кредита', 'повторное начисление отклонено на уровне ledger')
 
-  // ── 8. Clawback при самоисключении ───────────────────────────────────────
+  // ── 9. Clawback при самоисключении ───────────────────────────────────────
   const clawbackResult = await clawback.execute({ playerId: player.id })
   assert(
     clawbackResult.cancelled === 1,
@@ -425,7 +501,7 @@ async function main() {
   )
   log('clawback', `баланс партнёра ${afterClawback.balance.toFixed(8)}, причина=self_exclusion`)
 
-  // ── 9. Facade-контракт доступен снаружи модуля ───────────────────────────
+  // ── 10. Facade-контракт доступен снаружи модуля ───────────────────────────
   assert(typeof facade.runDaily === 'function', 'facade.runDaily доступен')
   const runResult = await facade.runDaily(periodStart.toISOString().slice(0, 10))
   assert(
