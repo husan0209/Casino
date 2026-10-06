@@ -289,8 +289,14 @@ export function LoginSheet(): React.JSX.Element | null {
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs text-muted">Email</label>
+            <label className="mb-1 block text-xs text-muted" htmlFor="auth-email">
+              Email
+            </label>
             <input
+              id="auth-email"
+              name="email"
+              type="email"
+              autoComplete={mode === 'login' ? 'username' : 'email'}
               className="input"
               placeholder="you@example.com"
               value={email}
@@ -298,7 +304,10 @@ export function LoginSheet(): React.JSX.Element | null {
             />
           </div>
           <div>
-            <label className="mb-1 flex items-center justify-between text-xs text-muted">
+            <label
+              className="mb-1 flex items-center justify-between text-xs text-muted"
+              htmlFor="auth-password"
+            >
               <span>Пароль</span>
               {mode === 'login' && (
                 <Link
@@ -312,6 +321,9 @@ export function LoginSheet(): React.JSX.Element | null {
             </label>
             <div className="relative">
               <input
+                id="auth-password"
+                name="password"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 className="input pr-10"
                 type={showPassword ? 'text' : 'password'}
                 placeholder={mode === 'login' ? 'Введите пароль' : 'Мин. 8 символов'}
