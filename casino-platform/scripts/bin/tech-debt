@@ -311,6 +311,35 @@ detect() {
         cut -d: -f1 | sed 's|\\|/|g' | sort | uniq -c |
         awk '{print $2 "\t" $1}' | sort
       ;;
+    # Ключи входных Zod-схем в camelCase вместо snake_case (API_CONVENTIONS §2.2).
+    # Почему это долг, а не вкусовщина: имя ключа — часть контракта, и расхождение
+    # с тем, что реально шлёт клиент, не видно НИКИМ, кроме самого клиента. В
+    # партнёрке так жили три дефекта: схема ждала `acceptTerms`, оба клиента шлют
+    # `accept_terms` → регистрация отбивалась с «примите условия» при поставленной
+    # галочке (#195); `displayName`/`revshareRate`/`suspendedReason` в админских
+    # схемах → PATCH отвечал 200 и ничего не менял (#198). tsc, ESLint и юнит-спеки
+    # не ловят: они не знают, что шлёт браузер.
+    # Считаются ключи вида `someKey: z.…` с начала строки в presentation/dto/*.ts —
+    # то есть ровно те, что приходят из тела или query запроса.
+    # Базлайн заведён ПО ФАКТУ (2026-10-07): 3 ключа в 3 файлах. Два из них —
+    # живые контракты админки (`userIds` рассылки, `htmlBody` письма), третий —
+    # намеренный двойной приём `isPopular` рядом со `is_popular` (комментарий в
+    # admin-game.dto.ts). Ужимать базлайн можно только вместе с клиентом.
+    # Анти-вакуум: нет каталога dto → exit 2, иначе «ноль нарушений» означает
+    # «гард оглох», как в прежнем G7.
+    dto-key-naming)
+      FILES=$(ls apps/api/src/modules/*/presentation/dto/*.ts 2>/dev/null || true)
+      if [ -z "$FILES" ]; then
+        echo "tech-debt [dto-key-naming]: нет apps/api/src/modules/*/presentation/dto/*.ts — гарду нечего сканировать (анти-вакуум: пустое дерево это FAIL, не OK)" >&2
+        return 2
+      fi
+      # $FILES без кавычек намеренно: список файлов из ls разбивается на слова.
+      grep -rnoE '^[[:space:]]+[a-z]+[A-Za-z0-9_]*[A-Z][A-Za-z0-9]*:[[:space:]]*z\.' \
+        $FILES 2>/dev/null |
+        grep -vE '\.spec\.ts:' |
+        cut -d: -f1 | sed 's|\\|/|g' | sort | uniq -c |
+        awk '{print $2 "\t" $1}' | sort
+      ;;
     *)
       echo "tech-debt: неизвестное правило '$1' (см. tech-debt list)" >&2
       return 2
@@ -318,7 +347,7 @@ detect() {
   esac
 }
 
-NAMES='raw-error nest-exceptions eslint-disable money-number use-case-specs service-specs cross-module-imports foreign-writes presentation-db'
+NAMES='raw-error nest-exceptions eslint-disable money-number use-case-specs service-specs cross-module-imports foreign-writes presentation-db dto-key-naming'
 
 # Имя правила проверяется ДО любого редиректа в tech-debt/: `gen <опечатка>`
 # ранее создавал пустой tech-debt/<опечатка>.txt, который потом попадал в git

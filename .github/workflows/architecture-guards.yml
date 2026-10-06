@@ -445,6 +445,21 @@ jobs:
         run: sh scripts/bin/tech-debt check presentation-db
 
       # ──────────────────────────────────────────────────────────────
+      # V. Имена ключей входных схем (ratchet): camelCase в теле/query вместо
+      #    snake_case — расхождение с клиентом не ловит ни компилятор, ни тесты.
+      # Catches: #195 (схема ждала acceptTerms, оба клиента шлют accept_terms →
+      #          отказ «примите условия» при поставленной галочке), #198
+      #          (displayName/revshareRate/suspendedReason → PATCH 200 и no-op).
+      # Rule: docs/API_CONVENTIONS.md §2.2
+      # Базлайн: tech-debt/dto-key-naming.txt — 3 ключа в 3 файлах, заведён ПО ФАКТУ
+      #          2026-10-07 (userIds рассылки, htmlBody письма, намеренный двойной
+      #          приём isPopular в admin-game.dto.ts).
+      # ──────────────────────────────────────────────────────────────
+      - name: G29 — request schema keys are snake_case (ratchet)
+        id: g29
+        run: sh scripts/bin/tech-debt check dto-key-naming
+
+      # ──────────────────────────────────────────────────────────────
       # Q. Явный Nest-DI (гард найден при переезде на TS 6 / tsgo)
       # Catches: emitDecoratorMetadata:false → конструктор без @Inject собирается,
       #          проходит tsc и ESLint, и падает в рантайме первым же вызовом
@@ -548,4 +563,5 @@ jobs:
           echo "- G24 foreign writes ratch.: ${{ steps.g24.outcome }}"
           echo "- G26 service specs ratchet: ${{ steps.g26.outcome }}"
           echo "- G27 presentation-db ratchet: ${{ steps.g27.outcome }}"
+          echo "- G29 dto key naming ratchet: ${{ steps.g29.outcome }}"
           echo "- G25 anti-vacuum selftest: ${{ steps.g25.outcome }}"
