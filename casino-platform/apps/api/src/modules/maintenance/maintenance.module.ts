@@ -4,6 +4,7 @@ import { AdminModule } from '../admin/admin.module'
 import { AffiliateModule } from '../affiliate/affiliate.module'
 import { AuthModule } from '../auth/auth.module'
 import { ReferralsModule } from '../referrals/referrals.module'
+import { UsersModule } from '../users/users.module'
 import { AffiliateClicksCleanupJob } from './application/affiliate-clicks-cleanup.job'
 import { AffiliateDailyJob } from './application/affiliate-daily.job'
 import { AffiliateQualificationJob } from './application/affiliate-qualification.job'
@@ -63,6 +64,7 @@ import { PaymentsModule } from '../payments/payments.module'
     PaymentsModule,
     ReferralsModule,
     AffiliateModule,
+    UsersModule,
     QueuesModule,
   ],
   controllers: [MaintenanceAdminController],

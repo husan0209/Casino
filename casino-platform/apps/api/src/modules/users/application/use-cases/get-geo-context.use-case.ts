@@ -1,10 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common'
 
-import { type UserGeoContext } from '@modules/geo/domain/geo-config.policy'
-
 import {
   type IUserProfileRepository,
   USER_PROFILE_REPOSITORY,
+  type UserGeoContext,
 } from '../../domain/repositories/user-profile.repository'
 
 @Injectable()

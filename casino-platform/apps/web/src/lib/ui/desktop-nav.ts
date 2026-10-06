@@ -60,21 +60,38 @@ export const AUTH_PATHS: readonly string[] = [
   '/verify-email',
   '/forgot-password',
   '/reset-password',
-  '/google/callback',
+  '/auth/google/callback',
 ]
 
 export function isAuthPath(pathname: string): boolean {
   return AUTH_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
 }
 
+/**
+ * GAP-49: правовые документы рендерятся в нейтральной обвязке (`LegalChrome`) —
+ * без бренда, тэглайна, платёжных бейджей и казино-навигации. Юридический текст
+ * не должен быть оформлен как рекламная страница и не должен содержать данных
+ * об операторе, пока реквизиты не утверждены (docs/LEGAL_COMPLIANCE.md §2).
+ */
+export const LEGAL_PATHS: readonly string[] = ['/legal']
+
+export function isLegalPath(pathname: string): boolean {
+  return LEGAL_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+}
+
 /** §4.4: Ctrl/⌘ K открывает поиск. Игнорируем, пока фокус в поле ввода. */
 export function isSearchShortcut(event: {
-  key: string
+  // `key` опционален не для красоты: синтетические keydown от расширений приходят
+  // с metaKey/ctrlKey, но без него, и `event.key.toLowerCase()` рвал обработчик.
+  key?: string
   metaKey: boolean
   ctrlKey: boolean
   target?: EventTarget | null
 }): boolean {
-  if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey)) {
+  // key отсутствует у синтетических keydown, которые шлют расширения браузера:
+  // без проверки typeof падаем на undefined.toLowerCase() и рвём обработчик.
+  const pressedKey = typeof event.key === 'string' ? event.key.toLowerCase() : ''
+  if (pressedKey !== 'k' || !(event.metaKey || event.ctrlKey)) {
     return false
   }
   const element = event.target as HTMLElement | null

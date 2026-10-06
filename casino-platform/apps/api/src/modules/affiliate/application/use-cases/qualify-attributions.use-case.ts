@@ -18,12 +18,14 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { Decimal } from 'decimal.js'
 
+import { type AffiliateRejectReason } from '../../domain/entities/affiliate.entity'
 import {
   AFFILIATE_ATTRIBUTION_REPOSITORY,
   AFFILIATE_PLAYER_PROVISIONING_REPOSITORY,
   type AffiliateAttributionRepository,
   type AffiliatePlayerProvisioningRepository,
 } from '../../domain/repositories/affiliate.repository'
+import { isNearThresholdDeposit } from '../../domain/value-objects/deposit-threshold-band.value-object'
 import { AffiliateSettingsService } from '../affiliate-settings.service'
 
 /** Сколько атрибуций обрабатываем за один проход постранично. */
@@ -52,9 +54,17 @@ export class QualifyAttributionsUseCase {
   /**
    * Один проход по всем `pending`-атрибуциям.
    *
-   * Депозиты копятся в `total_deposit` на самой атрибуции (их инкрементит
-   * payments-модуль через `applyDeposit`), поэтому здесь достаточно сравнить
-   * накопленную сумму с порогом и статус KYC.
+   * Депозиты берутся из `payment_requests` (первоисточник), а не из колонки
+   * `total_deposit` атрибуции. Колонку заполняет только `applyDeposit`, а
+   * вызывающего у него нет: событие «депозит завершён» живёт в payments, который
+   * не может импортировать affiliate (цикл `payments → affiliate → admin →
+   * payments`). Оставаться на накопленном значении означало бы, что при
+   * любом ненулевом пороге и даже без него (`first_deposit_at` пустой всегда)
+   * не квалифицируется никто — молча, без ошибки.
+   *
+   * Квалифицируя по первоисточнику, сюда же записываем накопленное:
+   * `total_deposit`, `deposit_count`, `first_deposit_*` становятся реальными, и
+   * админ видит их без пересчёта.
    */
   async execute(): Promise<QualificationResult> {
     const result: QualificationResult = {
@@ -127,23 +137,51 @@ export class QualifyAttributionsUseCase {
     if (attribution?.status !== 'pending') {
       return false
     }
-    if (new Decimal(attribution.totalDeposit).lt(minDeposit)) {
+    const deposits = await this.attributions.sumPlayerDeposits(attribution.playerId)
+    // Порог и факт депозита — отдельные условия: `min_deposit = 0` значит «без
+    // порога», но не «квалифицируем игрока, который ничего не внёс».
+    if (deposits.count === 0 || deposits.firstDepositAt === null) {
       return false
     }
-    if (attribution.firstDepositAt === null) {
+    if (new Decimal(deposits.totalRub).lt(minDeposit)) {
       return false
     }
     if (requireKyc && !(await this.players.isKycApproved(attribution.playerId))) {
       return false
     }
 
+    // Накопленное записываем из первоисточника: админ видит total_deposit /
+    // deposit_count / first_deposit_* без пересчёта, и суточный расчёт
+    // (listQualifiedForCalc фильтрует по first_deposit_at) подхватывает их.
     await this.attributions.qualify({
       id: attributionId,
-      firstDepositId: attribution.firstDepositId,
-      firstDepositAt: attribution.firstDepositAt,
-      totalDeposit: attribution.totalDeposit,
-      depositCount: attribution.depositCount,
+      firstDepositId: deposits.firstDepositId,
+      firstDepositAt: deposits.firstDepositAt,
+      totalDeposit: deposits.totalRub,
+      depositCount: deposits.count,
+      // F4 (ТЗ ч.8 §13.2): «депозит ровно на порог» — не отказ, а флаг на
+      // разбор. Ставка на то, что перекупщик выкупает трафик минимально
+      // допустимым платежом; честный первый платёж под ту же вилку попасть
+      // может, поэтому начисления правило не трогает.
+      reviewReason: this.reviewReasonFor(deposits.firstAmountRub, minDeposit),
     })
     return true
+  }
+
+  /**
+   * Причина для разбора или `null`. Отдельным методом, а не инлайном, чтобы
+   * сравнение с порогом жил в домене (`isNearThresholdDeposit`), а здесь только
+   * решение «помечать или нет».
+   */
+  private reviewReasonFor(
+    firstAmountRub: string | null,
+    minDeposit: Decimal,
+  ): AffiliateRejectReason | null {
+    if (firstAmountRub === null) {
+      return null
+    }
+    return isNearThresholdDeposit(firstAmountRub, minDeposit.toString())
+      ? 'near_threshold_deposit'
+      : null
   }
 }

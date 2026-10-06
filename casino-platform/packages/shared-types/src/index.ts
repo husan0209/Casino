@@ -1,6 +1,7 @@
 export * from './money'
 export * from './api'
 export * from './enums'
+export * from './legal-documents'
 export * from './admin'
 export * from './affiliate'
 export * from './casino'

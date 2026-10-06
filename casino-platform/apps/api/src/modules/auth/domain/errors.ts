@@ -34,6 +34,17 @@ export class AccountLockedError extends AppError {
   }
 }
 
+export class TermsVersionOutdatedError extends AppError {
+  readonly code = 'TERMS_VERSION_OUTDATED'
+  readonly httpStatus = 422
+  constructor(public readonly currentVersion: string) {
+    super(
+      `Условия использования изменены (действует версия ${currentVersion}). Обновите страницу и подтвердите согласие заново`,
+      { currentVersion },
+    )
+  }
+}
+
 export class EmailAlreadyExistsError extends AppError {
   readonly code = 'EMAIL_ALREADY_EXISTS'
   readonly httpStatus = 409

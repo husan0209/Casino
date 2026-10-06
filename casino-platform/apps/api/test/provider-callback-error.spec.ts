@@ -1,16 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Моки ДО импорта SUT (hoisted). GAP-57: при неизвестной ошибке (например,
-// Prisma P2034) провайдер получает нейтральный INTERNAL_ERROR, а не текст
-// внутренней ошибки с путями машины.
-vi.mock('@casino/database', () => ({
-  prisma: {
-    gameProvider: {
-      findUnique: vi.fn().mockResolvedValue({ id: 'provider-1', slug: 'gitslotpark' }),
-    },
-  },
-}))
-
 import { ProviderCallbackController } from '../src/modules/casino/presentation/controllers/provider-callback.controller'
 
 import type { GameCallbackService } from '../src/modules/casino/application/services/game-callback.service'
@@ -52,6 +41,7 @@ describe('GAP-57: provider-callback не отдаёт текст внутрен�
   let controller: ProviderCallbackController
   let adapter: ReturnType<typeof makeAdapter>
   let cbBet: ReturnType<typeof vi.fn>
+  let providerRepo: { findBySlug: ReturnType<typeof vi.fn> }
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -61,7 +51,8 @@ describe('GAP-57: provider-callback не отдаёт текст внутрен�
       getAdapter: vi.fn().mockReturnValue(adapter),
     } as unknown as ProviderAdapterFactory
     const cb = { bet: cbBet } as unknown as GameCallbackService
-    controller = new ProviderCallbackController(adapters, cb)
+    providerRepo = { findBySlug: vi.fn(async () => ({ id: 'provider-1', slug: 'gitslotpark' })) }
+    controller = new ProviderCallbackController(adapters, cb, providerRepo as never)
   })
 
   it('неизвестная ошибка (P2034) → нейтральный INTERNAL_ERROR без текста Prisma', async () => {
@@ -110,5 +101,31 @@ describe('GAP-57: provider-callback не отдаёт текст внутрен�
 
     expect(adapter.formatSuccessResponse).toHaveBeenCalledWith('90.00', 'tx-1')
     expect(res.json).toHaveBeenCalledWith({ status: 0, balance: '90.00' })
+  })
+
+  /**
+   * Провайдера по slug ищет владелец таблицы (гард G27): контроллер больше не
+   * дёргает Prisma, а зовёт `IGameProviderRepository.findBySlug`.
+   */
+  it('slug провайдера резолвится через репозиторий, а не через prisma', async () => {
+    cbBet.mockResolvedValue({ balance: '90.00' })
+    const res = makeRes()
+
+    await controller.handle('gitslotpark', { 'x-gsp-op': 'withdraw' }, VALID_BODY, res)
+
+    expect(providerRepo.findBySlug).toHaveBeenCalledWith('gitslotpark')
+  })
+
+  it('неизвестный slug — PROVIDER_NOT_FOUND в теле и HTTP 200, ставка не идёт', async () => {
+    providerRepo.findBySlug.mockResolvedValue(null)
+    const res = makeRes()
+
+    await controller.handle('unknown', { 'x-gsp-op': 'withdraw' }, VALID_BODY, res)
+
+    expect(adapter.formatErrorResponse).toHaveBeenCalledWith(
+      'PROVIDER_NOT_FOUND',
+      'Unknown provider',
+    )
+    expect(cbBet).not.toHaveBeenCalled()
   })
 })

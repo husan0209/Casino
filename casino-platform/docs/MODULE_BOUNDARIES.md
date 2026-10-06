@@ -2,7 +2,7 @@
 title: Module Boundaries
 description: Границы между модулями backend casino-platform
 status: living document
-last_updated: 2026-10-03
+last_updated: 2026-10-04
 ---
 
 # Module Boundaries
@@ -124,10 +124,16 @@ sessions             (refresh tokens hashed)
 
 - `geo` (UsersFacade.getGeoContext)
 - `payments` (UsersFacade — контекст пользователя, onDepositCompleted)
+- `admin` (UsersFacade.blockPlayer/unblockPlayer — блокировка игрока; G24: статус
+  `users` и отзыв `sessions` пишет владелец таблиц, а не заказчик)
 
 ### 3.5. Экспортирует
 
-- `UsersFacade` (getGeoContext, updateCurrencyPreference, onDepositCompleted) — `users/facade/users.facade.ts`
+- `UsersFacade` (getGeoContext, updateCurrencyPreference, onDepositCompleted, provisionAffiliatePlayer,
+  deprovisionAffiliatePlayer, blockPlayer, unblockPlayer) — `users/facade/users.facade.ts`
+- Блокировка игрока — порт `USER_STATUS_REPOSITORY` (`domain/repositories/user-status.repository.ts`),
+  реализация `PrismaUserStatusRepository`: `blocked` + отзыв живых сессий одной `$transaction`. Метод не
+  параметризуется флагом «отзывать сессию или нет»: отзыв — часть блокировки
 - `SelfExclusionUseCase` (самоисключение игрока)
 - NB: таблица `sessions` общая с auth — чтение/отзыв сессий здесь через `USER_SESSION_REPOSITORY`, выпуск refresh-токенов — в auth (`SESSION_REPOSITORY`)
 
@@ -220,7 +226,11 @@ ledger_entries       (append-only — каждая операция)
 
 ### 5.3. Использует
 
-- Ничего из модулей (импортирует только `AuthModule` ради guard) — foundational module
+- Импортов других модулей нет (только `AuthModule` ради guard) — foundational module
+- Read-only по ADR GAP-51: `payment_requests` ради `payment_status` в строке
+  истории (`GET /wallet/transactions`, GAP-55 §11). Запрос живёт в
+  `PrismaWalletRepository.findPaymentStatuses`, фильтр `userId` — внутри запроса
+  (граница IDOR, а не проверка вызывающего)
 
 ### 5.4. Используется в
 
@@ -238,6 +248,15 @@ ledger_entries       (append-only — каждая операция)
 - `unlock({userId, currency, amount})`
 - `confirmWithdrawal({userId, currency, amount, withdrawalRequestId})`
 - `getBalance(userId, currency)`
+- `listLedgerEntries({userId, type, currency, page, perPage})` — админский список
+  журнала (UC-PAY-16); фильтр по валюте идёт через кошелёк, потому что у проводки
+  своей колонки валюты нет
+- `listEntriesForPaymentRequest(paymentRequestId)` — проводки одной заявки для
+  карточки (UC-PAY-18)
+- `listOwnerTransactions({userId, type, currency, from, to, page, perPage})` —
+  история проводок игрока (`GET /wallet/transactions`); include без `users`,
+  в отличие от админского списка
+- `findPaymentStatuses(userId, ids)` — статусы заявок по id для той же истории
 - `getBalances(userId)`
 - `runInTransaction(fn)` — групповые проводки (casino bet/win)
 
@@ -308,11 +327,14 @@ payment_callbacks    (raw callbacks от провайдеров)
 
 ### 6.6. Экспортирует
 
-- Ничего (в `payments.module.ts` нет `exports`) — потребители работают через
-  собственные контроллеры/use-cases модуля
+- `PaymentsFacade` (`estimateRub`, `getPaymentRequest`, `getPaymentRequestDetail`,
+  `updatePaymentStatus`, `listPaymentRequests`) —
+  потребители: `maintenance` (курсы) и `admin` (решение по заявке на вывод,
+  списки UC-PAY-17/10 и карточка UC-PAY-18)
 - NB: `PaymentProvider` — это Prisma-enum из `@casino/database`, а не interface
-  модуля; admin читает `payment_requests` напрямую (`PaymentRequestRepository`
-  провайдится в `admin.module.ts`)
+  модуля. Admin больше не провайдит `PaymentRequestRepository` у себя: доступ к
+  заявкам идёт через фасад (G16), а `PAYMENT_REQUEST_REPOSITORY` остаётся
+  внутренним портом payments
 
 ---
 
@@ -341,9 +363,14 @@ payment_callbacks    (raw callbacks от провайдеров)
 ### 7.3. Использует
 
 - `wallet` (WalletFacade — активный кошелёк при launch; debit/credit в callbacks)
-- `auth` (AuthGuard/RolesGuard, в т.ч. на admin-endpoints каталога)
-- NB: `casino.module.ts` импортирует также `AdminModule`, но его экспорты
-  (AuditLogService/AdminAuth*) внутри модуля не инжектятся
+- `auth` (AuthGuard/RolesGuard — на плеерских эндпоинтах каталога)
+- `admin` (AdminAuthGuard — на admin-endpoints каталога: /admin/games,
+  /admin/providers, /admin/game-sessions*, /admin/game-transactions; §13.2.1.
+  2026-10-04: переведены с плеерского AuthGuard — тот проверяет aud='user' и
+  отвечал 401 на админский токен, панель разлогинивалась на «Играх»/«Провайдерах»)
+- NB: `casino.module.ts` импортирует `AdminModule` (guard приходит через его
+  переэкспорт `AdminAuthModule`); остальные его экспорты внутри модуля
+  не инжектятся
 
 ### 7.4. Используется в
 
@@ -431,9 +458,12 @@ referral_rewards                (period, ggr, reward_amount, status)
 ### 9.3. Использует
 
 - `wallet` (WalletFacade.credit для reward)
-- `auth` (только AuthGuard; событие USER_REGISTERED не используется — referral
-  code и привязка `referred_by` выполняются в самом `register.use-case` /
-  `oauth-user-provisioning.service`)
+- `auth` (только AuthGuard на плеерских эндпоинтах; событие USER_REGISTERED не
+  используется — referral code и привязка `referred_by` выполняются в самом
+  `register.use-case` / `oauth-user-provisioning.service`)
+- `admin` (AdminAuthGuard на ReferralsAdminController через переэкспорт
+  `AdminAuthModule` в `AdminModule`; §13.2.1 — 2026-10-04; AuditLogService в
+  referrals-admin)
 - read-only groupBy по `game_transactions` для расчёта GGR — ADR GAP-51:
   принят прямой доступ через общий Prisma-клиент (`prisma.gameTransaction.groupBy`);
   порт/событие — при выносе casino в отдельный сервис
@@ -455,8 +485,9 @@ referral_rewards                (period, ggr, reward_amount, status)
 
 - Регистрация/вход партнёров (affiliate) — внешних вебмастеров
 - Трекинг кликов по ссылке `/go/{tracking_code}` + cookie-атрибуция
-- Привязка игрока к партнёру при регистрации + антифрод F1–F3
-- Квалификация атрибуции (депозит ≥ порога + KYC)
+- Привязка игрока к партнёру при регистрации + антифрод F1–F3 (в момент атрибуции)
+- Квалификация атрибуции (депозит ≥ порога + KYC; сумму читает из `payment_requests` — GAP-74) и флаг F4: первый
+  депозит в коридоре ±1% от порога помечается причиной `near_threshold_deposit`, статус и начисления не меняются
 - Расчёт NGR и RevShare, начисление комиссии на кошелёк партнёра
 - Clawback начислений при самоисключении игрока (ответственная игра)
 - Admin-API: партнёры, индивидуальные ставки, начисления, настройки программы
@@ -531,8 +562,10 @@ support_messages    (ticket, sender_type, message, attachments, is_internal)
 
 ### 10.3. Использует
 
-- Только `auth` (AuthGuard/RolesGuard). NB: `notifications` и `audit`
-  support-модуль НЕ импортирует (email при reply в коде не отправляется)
+- `auth` (AuthGuard/RolesGuard — на плеерских эндпоинтах)
+- `admin` (AdminAuthModule на SupportAdminController, §13.2.1 — 2026-10-04).
+  NB: `notifications` и `audit` support-модуль НЕ импортирует (email при reply
+  в коде не отправляется)
 
 ### 10.4. Используется в
 
@@ -568,15 +601,23 @@ Email-джобов отдельной таблицы НЕТ: очередь `ema
 
 ### 11.4. Используется в
 
-- Никем: `NotificationsModule` импортируется только в `app.module.ts` (in-app
-  API `/notifications` — контроллер самого модуля)
+- `admin` (`NotificationsFacade.broadcastInternal`) — массовая рассылка. До
+  2026-10-04 её писал сам admin: `prisma.notification.createMany` из своего
+  репозитория (гард G24). Формат уведомления — `channel`, default `data`,
+  правило `isRead` — теперь задаёт один модуль, а не два
 - Письма о событиях (verification, reset, withdrawal-reminder) шлют `auth` и
   `maintenance` напрямую через EMAIL_QUEUE_PORT, минуя notifications-модуль
+- Больше `NotificationsModule` нигде не импортируется; in-app API
+  `/notifications` — контроллер самого модуля
 
 ### 11.5. Экспортирует
 
-- `NotificationService` (send/list/markRead/unreadCount) — но внешних
-  потребителей у экспорта сейчас нет
+- `NotificationsFacade` (`notifications/facade/notifications.facade.ts`) —
+  `broadcastInternal(rows): Promise<number>`, единственная точка входа для
+  чужих модулей (правило 4). Возвращает число вставленных строк: вызывающий
+  отдаёт оператору факт из БД, а не длину своего списка адресатов
+- `NotificationService` (send/list/markRead/unreadCount) — экспорт оставлен как
+  был, внешних потребителей у него нет
 
 ---
 
@@ -596,7 +637,7 @@ Email-джобов отдельной таблицы НЕТ: очередь `ema
 ### 12.2. Где лежит
 
 ```
-apps/api/src/modules/admin/application/audit-log.service.ts          (AuditLogService.log(input))
+apps/api/src/modules/admin/application/audit-log.service.ts          (AuditLogService.log / .list)
 apps/api/src/modules/admin/domain/admin.repository.ts                (порт AUDIT_LOG_REPOSITORY)
 apps/api/src/modules/admin/infrastructure/repositories/admin.prisma.repository.ts (PrismaAuditLogRepository)
 apps/api/src/modules/admin/presentation/controllers/admin-audit.controller.ts
@@ -633,16 +674,26 @@ audit_logs          (actor_type, actor_id, action, target_type, target_id, paylo
   - Admin management (`AdminAdminsController`)
   - Audit-logs read-only (`AdminAuditController`, см. §12)
   - Dashboard metrics (`AdminDashboardController`)
-  - Settings: контроллер в коде есть (`AdminSettingsController`), но в
-    `admin.module.ts` пока не зарегистрирован
+  - Settings (`AdminSettingsController`) и рассылка (`AdminNotificationsController`) —
+    оба зарегистрированы в `admin.module.ts` (#135 закрыл 404 на `/admin/settings` и
+    `/admin/notifications/send`, держит `admin-module-wiring`)
 - NB: KYC review и referral run-daily админ-API живут в соответствующих
   модулях (`KycAdminController` в kyc, `ReferralsAdminController` в referrals)
 
 ### 13.2. Использует
 
 - `wallet` (WalletFacade — manual credit/debit)
-- Собственные репозитории к admin_users, audit_logs, dashboard, payment_requests
-  (`PaymentRequestRepository` провайдится локально — прямой доступ к таблице payments)
+- `users` (`UsersFacade.blockPlayer/unblockPlayer`) — блокировка игрока. Админ заказывает
+  действие, а `user.status` и `session.revokedAt` пишет владелец таблиц: раньше эти три записи
+  делал `admin.prisma.repository` (G24)
+- `notifications` (`NotificationsFacade.broadcastInternal`) — массовая рассылка
+- `payments` (`PaymentsFacade` — approve/reject заявки на вывод; узкий токен
+  `WITHDRAWAL_REQUEST_STORE` закрывается адаптером в `admin/infrastructure`,
+  порты и Prisma-класс payments наружу не импортируются — G16)
+- Собственные репозитории к admin_users, audit_logs, dashboard.
+  Список заявок (`payment_requests`) контроллер пока читает через `prisma`
+  напрямую — это долг В3 (presentation → БД), а не G16: таблица в этом
+  обращении не пишется
 
 ### 13.2.1. Публичный API (наружу из `AdminModule`, exports)
 
@@ -650,13 +701,33 @@ audit_logs          (actor_type, actor_id, action, target_type, target_id, paylo
   записи аудита из других модулей: `logAction(input)` оборачивает
   `AuditLogService.log` и не роняет операцию при сбое журнала. Потребители:
   `affiliate` (affiliate-admin), `maintenance` (ручной триггер run-daily).
+- `AdminFacade.logActionStrict(input)` — тот же контракт, но сбой летит наружу.
+  Нужен вызывающим, для которых строка `audit_logs` является состоянием, а не
+  только наблюдакостью: `maintenance.withdrawal_reminder` служит ключом дедупа,
+  и молчаливый пропуск записи означал бы второе письмо админу через час
+  (потребитель — `maintenance`, G24).
+- `AdminAuthModule` (`admin/admin-auth.module.ts`) — провайдер и экспортер
+  `AdminAuthGuard` + `AdminAuthService`. Вынесен из `AdminModule` не для красоты:
+  `KycModule` импортировал весь `AdminModule` ради одного guard'а, и любая
+  попытка убрать deep-импорты admin собирала цикл
+  `admin → payments → kyc → admin` (payments нужен kyc для порога депозитов),
+  который eslint ловит статически по `import/no-cycle`. Теперь kyc импортирует
+  только вход в админку.
 - `AdminAuthGuard` (`admin/presentation/admin-auth.guard`) — публичный API по
   решению **В6.1** (guards аутентификации = exports модуля, §16.2). Импортируют
-  напрямую: `kyc` (`KycAdminController`), `affiliate` (`AffiliateAdminController`).
-  Отдельного фасада под guard нет: guard — это middleware-контракт, а не
-  бизнес-операция.
-- `AdminAuthService` — экспорт нужен, потому что `AdminAuthGuard` инжектит его:
-  без экспорта DI в `KycModule` не резолвится (E2E, PR #15).
+  напрямую: `kyc` (`KycAdminController`), `affiliate` (`AffiliateAdminController`),
+  `casino` (`CasinoAdminController` — через переэкспорт в `AdminModule`),
+  `referrals` (`ReferralsAdminController` — так же), `support`
+  (`SupportAdminController` — через `AdminAuthModule`) — три последних переведены
+  2026-10-04 с плеерского AuthGuard, который проверял aud='user' и отвечал 401
+  на админский токен: панель разлогинивалась при открытии «Игр», «Провайдеров»,
+  «Поддержки» и «Рефералов». Отдельного фасада под guard нет: guard — это
+  middleware-контракт, а не бизнес-операция. Наружу он идёт через
+  `AdminModule → exports: [AdminAuthModule]` (переэкспорт модуля): Nest не
+  позволяет экспортировать провайдер чужого модуля напрямую, и падает на старте
+  контейнера, а не на typecheck.
+- `AdminAuthService` — рядом с guard'ом потому, что `AdminAuthGuard` инжектит
+  его: без переэкспорта DI в потребителях не резолвится (E2E, PR #15).
 - `AuditLogService` — **legacy-экспорт**: исторически его импортировал
   `MaintenanceAdminController` напрямую (долг был заморожен в
   `tech-debt/cross-module-imports.txt`). После В1/В6 maintenance перешёл на
@@ -703,21 +774,26 @@ kyc           → geo                 (GeoFacade.convertRubToDisplay)
               exports KycCheckService
 
 wallet        → auth                (AuthGuard)
-              ↛ NOTHING ELSE        (foundational module)
+              (ЧТЕНИЕ payment_requests: статус заявки для строки истории
+               проводок — read-only по ADR GAP-51, чужих записей wallet не
+               делает. Через PaymentsFacade сюда нельзя: `payments → wallet`
+               уже импорт модуля, обратный дал бы цикл модулей)
               exports WalletFacade
 
 payments      → wallet              (WalletFacade.credit/debit/lock)
               → kyc                 (KycCheckService.assertCanDeposit/assertCanWithdraw)
               → users               (UsersFacade)
               → geo                 (GeoFacade)
-              exports НИЧЕГО (п.6.6)
+              exports PaymentsFacade (estimate, чтение заявки, смена статуса)
 
 casino        → wallet              (WalletFacade: launch + bet/win/rollback)
-              → auth                (guards)
+              → auth                (guards — плеерские эндпоинты)
+              → admin               (AdminAuthGuard — admin-endpoints каталога, §7.3)
               (+ game-sessions — часть этого же модуля, §8)
 
 referrals     → wallet              (WalletFacade.credit для reward)
-              → admin               (AuditLogService в referrals-admin)
+              → admin               (AuditLogService в referrals-admin +
+                                     AdminAuthGuard — ReferralsAdminController)
               (read-only prisma.gameTransaction.groupBy для GGR — ADR GAP-51)
 
 affiliate     → wallet              (WalletFacade.credit/debit — комиссия и clawback)
@@ -732,15 +808,22 @@ affiliate     → wallet              (WalletFacade.credit/debit — комис�
 auth          ↛ affiliate           (цикл разорван: привязка через ModuleRef,
                                      см. §9a.5. ПРЯМОЙ ИМПОРТ ЗАПРЕЩЁН)
 
-support       → auth                (guards) — больше ничего
+support       → auth                (guards — плеерские эндпоинты)
+              → admin               (AdminAuthModule — SupportAdminController)
 
 notifications → queues              (EMAIL_QUEUE_PORT)
               → auth                (guards)
               (никем не импортируется; письма auth/maintenance шлют напрямую)
 
-admin         → wallet              (WalletFacade — manual credit/debit)
+admin         → wallet              (WalletFacade — manual credit/debit +
+                                      listLedgerEntries для /admin/transactions)
+              → payments            (PaymentsFacade — списки и карточка заявок;
+                                      узкий токен WITHDRAWAL_REQUEST_STORE для
+                                      approve/reject — адаптер над тем же фасадом)
               (+ audit-log — часть admin, §12; собственные репозитории к
-               admin_users, audit_logs, dashboard, payment_requests)
+               admin_users, audit_logs, dashboard. Чужих таблиц admin не читает:
+               с 2026-10-05 чтение payment_requests и ledger_entries отдаёт
+               владелец через фасад — гард G27)
 
 health        → (standalone: readiness проверяет db/redis)
 
@@ -748,9 +831,11 @@ maintenance   → referrals           (ReferralsFacade.runDaily — job referral
               → admin               (AdminFacade.logAction — аудит ручного run-daily)
               → affiliate           (AffiliateFacade.runDaily + 3 affiliate-джоба)
               → queues              (BullMQ-очередь `maintenance`: scheduler + worker; EMAIL_QUEUE_PORT)
-              → payments            (NOWPaymentsClient — импорт клиента курсов)
-              (пишет напрямую: payment_requests, exchange_rates, sessions,
-               audit_logs, admin_users — §18)
+              → payments            (PaymentsFacade — estimateRub для курсов и
+                                    expirePendingPayment для `expire-deposits`)
+              → users               (UsersFacade.purgeDeadSessions — `cleanup-sessions`)
+              (пишет напрямую только exchange_rates — это ЕГО таблица по MODEL_OWNERS;
+               чужие записи ушли фасадам владельцев, G24 и §18.3)
 ```
 
 ---
@@ -877,8 +962,19 @@ apps/api/src/modules/maintenance/maintenance.module.ts
   `RATES_PROVIDER`, `MAINTENANCE_EMAIL_PORT`), каждая джоба тестируема in-memory
 - `MaintenanceWorker` (infrastructure) — BullMQ Worker очереди `maintenance`,
   диспетчеризация по map `MAINTENANCE_HANDLERS` (job.name → хендлер)
-- Дедуп/трейл напоминаний пишутся напрямую в `audit_logs` через
-  `PrismaReminderAuditRepo` (AdminModule/AuditLogService не используется)
+- Дедуп/трейл напоминаний пишет admin: `PrismaReminderAuditRepo` заказывает строку
+  через `AdminFacade.logActionStrict` (G24, 2026-10-04). Раньше запись шла напрямую в
+  `audit_logs`. Строгий вариант фасада, а не best-effort `logAction`, выбран потому, что
+  эта строка — ключ дедупа: молчаливый пропуск записи означал бы второе письмо админу
+  через час, а падение видно в логе джобы
+- Истечение заявок (`pending → expired`) заказывается через
+  `PaymentsFacade.expirePendingPayment`, уборка сессий — через
+  `UsersFacade.purgeDeadSessions`. Условие «только pending» и OR-фильтр мёртвых строк
+  уехали вместе с записями к владельцам таблиц, иначе гарантию гонки нельзя было бы
+  сохранить на чужой стороне границы
+- Чтения чужих таблиц (`payment_requests`, `audit_logs`, `admin_users`) остались
+  прямыми через prisma: межмодульное чтение разрешено ADR GAP-51, детектор записей
+  (`tech-debt/foreign-writes.txt`) их не считает
 
 ### 18.4. Использует
 

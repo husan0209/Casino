@@ -10,6 +10,8 @@ import { vi } from 'vitest'
 
 import { CreateCryptoDepositUseCase } from '../src/modules/payments/application/use-cases/create-crypto-deposit.use-case'
 import {
+  AmountTooLargeError,
+  AmountTooSmallError,
   InvalidCurrencyError,
   KycRequiredError,
   PaymentProviderError,
@@ -34,6 +36,9 @@ type CreatedRow = Record<string, unknown>
 function makeDeps(over: { npError?: Error } = {}) {
   const created: CreatedRow[] = []
   const kycCalls: Array<{ userId: string; rub: string }> = []
+  // Аргументы createPayment раньше не захватывались: тест проверял только результат,
+  // поэтому priceCurrency='USD' при сумме в монетах проходил как зелёный.
+  const paymentCalls: Array<Record<string, unknown>> = []
 
   const repo = {
     create: async (data: CreatedRow) => {
@@ -44,7 +49,12 @@ function makeDeps(over: { npError?: Error } = {}) {
 
   const np: INowPaymentsClient = {
     getEstimatePrice: async () => ({ estimatedAmount: '12345.5' }),
-    createPayment: async () => {
+    createPayment: async (params: {
+      priceAmount: string
+      priceCurrency: string
+      payCurrency: string
+    }) => {
+      paymentCalls.push({ ...params })
       if (over.npError) {
         throw over.npError
       }
@@ -61,7 +71,7 @@ function makeDeps(over: { npError?: Error } = {}) {
   const config = { get: () => undefined } as never
 
   const uc = new CreateCryptoDepositUseCase(repo, np, kyc, config)
-  return { uc, created, kycCalls }
+  return { uc, created, kycCalls, paymentCalls }
 }
 
 describe('CreateCryptoDepositUseCase', () => {
@@ -89,6 +99,44 @@ describe('CreateCryptoDepositUseCase', () => {
       pay_currency: 'USDT_TRC20',
       expires_at: '2026-10-03T00:00:00.000Z',
     })
+    // Цена инвойса обязана быть в валюте оплаты: `amount` — это монеты, а не доллары.
+    expect(d.paymentCalls).toHaveLength(1)
+    expect(d.paymentCalls[0]).toMatchObject({
+      priceAmount: '99.9',
+      priceCurrency: 'USDT_TRC20',
+      payCurrency: 'USDT_TRC20',
+    })
+  })
+
+  // Регрессия: при priceCurrency='USD' NOWPayments считал цену в долларах и на
+  // «0.0005 BTC» выдавал AMOUNT_MINIMAL_ERROR (1e-8 BTC), то есть любой BTC-депозит
+  // был невозможен. USDT скрывал это курсом 1:1, поэтому случай нужен именно BTC.
+  it('BTC: сумма в монетах уходит ценой в монетах, а не в USD', async () => {
+    const d = makeDeps()
+    await d.uc.execute('u-1', '0.0005', 'BTC')
+
+    expect(d.paymentCalls[0]).toMatchObject({
+      priceAmount: '0.0005',
+      priceCurrency: 'BTC',
+      payCurrency: 'BTC',
+    })
+  })
+
+  // Минимум раньше не проверял никто: ни домен, ни UI (фиатная ветка проверяет,
+  // крипто — нет). 10 USDT улетали в NOWPayments и возвращались 502 с сырым JSON
+  // провайдера в сообщении.
+  it('сумма ниже депозитного минимума → AmountTooSmallError, NP не дёргается', async () => {
+    const d = makeDeps()
+    await expect(d.uc.execute('u-1', '10', 'USDT_TRC20')).rejects.toThrow(AmountTooSmallError)
+    expect(d.paymentCalls).toHaveLength(0)
+    expect(d.kycCalls).toHaveLength(0)
+    expect(d.created).toHaveLength(0)
+  })
+
+  it('сумма выше депозитного максимума → AmountTooLargeError, NP не дёргается', async () => {
+    const d = makeDeps()
+    await expect(d.uc.execute('u-1', '3', 'BTC')).rejects.toThrow(AmountTooLargeError)
+    expect(d.paymentCalls).toHaveLength(0)
   })
 
   it('валюта вне whitelist → InvalidCurrencyError, NP не дёргается', async () => {
@@ -117,7 +165,7 @@ describe('CreateCryptoDepositUseCase', () => {
     } as unknown as IPaymentRequestRepository
 
     const uc = new CreateCryptoDepositUseCase(repo, np, kyc, { get: () => undefined } as never)
-    await expect(uc.execute('u-1', '100', 'BTC')).rejects.toThrow(KycRequiredError)
+    await expect(uc.execute('u-1', '0.001', 'BTC')).rejects.toThrow(KycRequiredError)
   })
 
   it('NOWPayments упал на createPayment → PaymentProviderError, заявка не создана', async () => {
@@ -135,6 +183,8 @@ describe('CreateCryptoDepositUseCase', () => {
  */
 describe('CreateCryptoDepositUseCase: релизный набор валют (TZ-02)', () => {
   const RELEASE_CURRENCIES = ['USDT_TRC20', 'BTC']
+  /** Суммы внутри CURRENCY_LIMITS: проверка лимитов не должна мешать тесту валют. */
+  const VALID_AMOUNT: Record<string, string> = { USDT_TRC20: '100', BTC: '0.001' }
   const NOT_RELEASE_CURRENCIES = [
     'TON',
     'TRX',
@@ -188,7 +238,7 @@ describe('CreateCryptoDepositUseCase: релизный набор валют (TZ
     async (currency) => {
       const deps = makeCountingDeps()
 
-      const result = await deps.useCase.execute('u-1', '100', currency)
+      const result = await deps.useCase.execute('u-1', VALID_AMOUNT[currency] ?? '100', currency)
 
       expect(deps.estimatePrice).toHaveBeenCalledTimes(1)
       expect(deps.estimatePrice.mock.calls[0]?.[0]).toMatchObject({
@@ -239,7 +289,7 @@ describe('CreateCryptoDepositUseCase: релизный набор валют (TZ
       { get: () => undefined } as never,
     )
 
-    const raised = await useCase.execute('u-1', '100', 'BTC').then(
+    const raised = await useCase.execute('u-1', '0.001', 'BTC').then(
       () => undefined,
       (error: unknown) => error as InvalidCurrencyError,
     )
@@ -253,7 +303,7 @@ describe('CreateCryptoDepositUseCase: релизный набор валют (TZ
   it('идемпотентность не задета: ключ заявки генерируется до createPayment', async () => {
     const deps = makeCountingDeps()
 
-    await deps.useCase.execute('u-1', '100', 'BTC')
+    await deps.useCase.execute('u-1', '0.001', 'BTC')
 
     const row = deps.repoCreate.mock.calls[0]?.[0] as { idempotencyKey: string; externalId: string }
     expect(row.idempotencyKey).toMatch(/^dep_[0-9a-f-]{36}$/)

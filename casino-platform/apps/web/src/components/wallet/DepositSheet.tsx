@@ -190,24 +190,32 @@ function AmountField({
   onAmount,
   presets,
   min,
+  error,
 }: {
   currency: string
   amount: string
   onAmount: (value: string) => void
   presets: string[]
   min: string | undefined
+  error: string | undefined
 }): React.JSX.Element {
   return (
     <div className="mt-4">
       <label className="text-sm text-muted">Сумма, {currencyLabel(currency)}</label>
       <input
-        className="input mt-1"
+        className={`input mt-1 ${error ? 'outline outline-2 outline-[#FF3D71]/60' : ''}`}
+        aria-invalid={error ? true : undefined}
         value={amount}
         onChange={(e) => onAmount(e.target.value)}
         /* Фиатная подсказка «2000» в поле USDT — тот же обман масштаба, из-за
            которого пресеты в крипто-кассе убраны. */
         placeholder={isCryptoCurrency(currency) ? '0.00' : '2000'}
       />
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-[#FF6B81]">
+          {error}
+        </p>
+      )}
       <div className="mt-2 flex flex-wrap gap-2">
         {presets.map((p) => (
           <button
@@ -241,6 +249,7 @@ export function DepositSheet(): React.JSX.Element | null {
   const { user } = useAuth()
   const router = useRouter()
   const [amount, setAmount] = useState('')
+  const [amountError, setAmountError] = useState('')
   const [method, setMethod] = useState('')
   const [loading, setLoading] = useState(false)
   const [showCrypto, setShowCrypto] = useState(false)
@@ -266,6 +275,7 @@ export function DepositSheet(): React.JSX.Element | null {
     setMode(crypto ? 'crypto' : 'fiat')
     setShowCrypto(crypto)
     setTicket(null)
+    setAmountError('')
     const first = crypto ? config?.cryptoMethods[0] : config?.paymentMethods[0]
     if (first) {
       setMethod(first.id)
@@ -296,9 +306,26 @@ export function DepositSheet(): React.JSX.Element | null {
     kycNotApproved && limitRemaining !== undefined && Number(limitRemaining) <= 0
 
   const pay = async (): Promise<void> => {
-    if (!amount || !method) {
+    // Валидация суммы ДО API: пусто/нечисло → подсказка у поля (фидбек был
+    // молчаливым return — пользователь не понимал, почему ничего не происходит).
+    const amountNum = Number(amount.replace(',', '.').trim())
+    if (amount.trim() === '' || Number.isNaN(amountNum) || amountNum <= 0) {
+      setAmountError('Выберите или введите сумму пополнения')
       return
     }
+    if (mode === 'fiat' && config?.depositMin && amountNum < Number(config.depositMin)) {
+      setAmountError(`Минимальная сумма — ${formatAmount(config.depositMin, currency, true)}`)
+      return
+    }
+    if (mode === 'fiat' && config?.depositMax && amountNum > Number(config.depositMax)) {
+      setAmountError(`Максимальная сумма — ${formatAmount(config.depositMax, currency, true)}`)
+      return
+    }
+    if (!method) {
+      setAmountError('Выберите способ оплаты')
+      return
+    }
+    setAmountError('')
     setLoading(true)
     try {
       if (mode === 'crypto') {
@@ -374,7 +401,11 @@ export function DepositSheet(): React.JSX.Element | null {
             <AmountField
               currency={payCurrency}
               amount={amount}
-              onAmount={setAmount}
+              error={amountError}
+              onAmount={(value) => {
+                setAmount(value)
+                setAmountError('')
+              }}
               /* Пресеты и минимум отдаёт только для активного фиата
                  (geo-config.policy.ts:51 — CURRENCY_LIMITS[activeCurrency], где
                  activeCurrency всегда фиат). Крипто-шкала на бэке есть, но наружу

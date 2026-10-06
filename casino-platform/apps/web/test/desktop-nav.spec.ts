@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   isAuthPath,
+  isLegalPath,
   isNavActive,
   NAV_ITEMS,
   isSearchShortcut,
@@ -100,7 +101,7 @@ describe('GAP-54: auth-страницы без казино-навигации (
     expect(isAuthPath('/verify-email')).toBe(true)
     expect(isAuthPath('/forgot-password')).toBe(true)
     expect(isAuthPath('/reset-password')).toBe(true)
-    expect(isAuthPath('/google/callback')).toBe(true)
+    expect(isAuthPath('/auth/google/callback')).toBe(true)
   })
 
   it('витрина и кабинет — с навигацией; чужие префиксы не ловятся', () => {
@@ -108,6 +109,27 @@ describe('GAP-54: auth-страницы без казино-навигации (
     expect(isAuthPath('/casino')).toBe(false)
     expect(isAuthPath('/profile')).toBe(false)
     expect(isAuthPath('/login-back')).toBe(false)
+  })
+})
+
+describe('GAP-49: правовые документы в нейтральной обвязке', () => {
+  it('все четыре документа — legal', () => {
+    expect(isLegalPath('/legal/terms')).toBe(true)
+    expect(isLegalPath('/legal/privacy')).toBe(true)
+    expect(isLegalPath('/legal/cookies')).toBe(true)
+    expect(isLegalPath('/legal/responsible-gaming')).toBe(true)
+  })
+
+  it('префикс /legal без слэша и витрина — не legal', () => {
+    expect(isLegalPath('/legally-a-casino')).toBe(false)
+    expect(isLegalPath('/')).toBe(false)
+    expect(isLegalPath('/casino')).toBe(false)
+    expect(isLegalPath('/profile')).toBe(false)
+    expect(isLegalPath('/support')).toBe(false)
+  })
+
+  it('префикс целиком тоже legal — страница-индекс появится, обвязка подхватит сама', () => {
+    expect(isLegalPath('/legal')).toBe(true)
   })
 })
 
@@ -132,5 +154,12 @@ describe('GAP-54: Ctrl/⌘K (§4.4)', () => {
     expect(isSearchShortcut(event({ ctrlKey: true, target: input }))).toBe(false)
     expect(isSearchShortcut(event({ ctrlKey: true, target: textarea }))).toBe(false)
     expect(isSearchShortcut(event({ ctrlKey: true, target: editable }))).toBe(false)
+  })
+
+  it('не падает на синтетическом keydown без key (расширения браузера)', () => {
+    // keydown от расширения приходит с metaKey/ctrlKey, но без key — раньше
+    // обработчик падал на undefined.toLowerCase() и переставал работать.
+    expect(isSearchShortcut(event({ ctrlKey: true, key: undefined }))).toBe(false)
+    expect(isSearchShortcut(event({ metaKey: true, key: undefined }))).toBe(false)
   })
 })

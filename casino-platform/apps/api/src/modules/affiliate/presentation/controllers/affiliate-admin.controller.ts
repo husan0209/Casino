@@ -55,12 +55,14 @@ import {
 import { revShareRateToPercent } from '../../domain/value-objects/revshare-rate.value-object'
 import {
   AffiliateListQuerySchema,
+  AttributionListQuerySchema,
   CommissionListQuerySchema,
   CreateAffiliateAdminSchema,
   RunDailySchema,
   UpdateAffiliateAdminSchema,
   UpdateAffiliateSettingSchema,
   type AffiliateListQueryDto,
+  type AttributionListQueryDto,
   type CommissionListQueryDto,
   type CreateAffiliateAdminDto,
   type UpdateAffiliateAdminDto,
@@ -380,17 +382,11 @@ export class AffiliateAdminController {
     }
   }
 
-  /** Атрибуции с фильтрами — ручной разбор спорных случаев. */
+  /** Атрибуции с фильтрами — ручной разбор спорных случаев (ТЗ ч.8 §13.3). */
   @Get('attributions')
   @Roles('admin', 'superadmin')
-  async listAttributions(
-    @Query()
-    query: {
-      status?: 'pending' | 'qualified' | 'rejected'
-      page?: string
-      per_page?: string
-    },
-  ): Promise<{
+  @UsePipes(new ZodValidationPipe(AttributionListQuerySchema))
+  async listAttributions(@Query() query: AttributionListQueryDto): Promise<{
     data: Array<{
       id: string
       affiliate_id: string
@@ -403,12 +399,11 @@ export class AffiliateAdminController {
     }>
     meta: { page: number; perPage: number; total: number }
   }> {
-    const page = Number(query.page ?? '1') || 1
-    const perPage = Number(query.per_page ?? '20') || 20
     const result = await this.attributions.list({
       status: query.status,
-      page,
-      perPage,
+      rejectReason: query.reject_reason,
+      page: query.page,
+      perPage: query.per_page,
     })
     return {
       data: result.items.map((item) => ({
@@ -417,11 +412,13 @@ export class AffiliateAdminController {
         player_id: item.playerId,
         status: item.status,
         total_deposit: item.totalDeposit,
+        // Админу причину показываем целиком: квалифицированная строка с
+        // причиной — это флаг на разбор (F4), а не отказ
         reject_reason: item.rejectReason,
         is_self_referral: item.isSelfReferral,
         created_at: item.createdAt.toISOString(),
       })),
-      meta: { page, perPage, total: result.total },
+      meta: { page: query.page, perPage: query.per_page, total: result.total },
     }
   }
 

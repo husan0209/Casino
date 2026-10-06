@@ -84,9 +84,12 @@ jobs:
 
   # README обещает pnpm audit среди обязательных чеков — теперь он тут.
   # Без name: (чек = job id), как у остальных required-джоб (см. D6).
-  # Режим — храповик (docs/TECH_DEBT.md): текущие 3 critical / 22 high в
-  # prod-дереве заморожены в tech-debt/pnpm-audit.txt; job краснеет только
-  # если какой-то severity ВЫРОС (новый CVE или неудачный апгрейд).
+  # Режим — храповик (docs/TECH_DEBT.md): job краснеет только если какой-то
+  # severity ВЫРОС против базлайна.
+  # ВАЖНО о нуле: `pnpm audit --prod` отдаёт advisories уже фильтрованным —
+  # pnpm.auditConfig.ignoreGhsas (27 записей) снимает ~28 advisory-записей
+  # metadata, поэтому tech-debt/pnpm-audit.txt = 0/0/0/0 означает «не выросло
+  # против принятой заглушки», а не «в prod-дереве нет уязвимостей».
   audit:
     runs-on: ubuntu-latest
     steps:
@@ -105,6 +108,35 @@ jobs:
         run: |
           pnpm audit --prod --json > /tmp/audit.json || true
           node scripts/audit-ratchet.mjs --check /tmp/audit.json
+
+  # Dev-контур не попадал ни в одну проверку: `--prod` его не видит, а этот код
+  # исполняется на прогоне CI и на машине разработчика. Фактически: 1 critical
+  # (vitest <3.2.6), 8 high, 7 moderate, 3 low — заморожено в
+  # tech-debt/pnpm-audit-dev.txt, критичное снимается только vitest 2→3.
+  #
+  # Job намеренно НЕ добавлен в required (шапка файла, docs/BRANCH_PROTECTION):
+  # допуск канарейки полноты для этого отчёта выбран ровно по границе
+  # (metadata=48 − видимых=19 ≤ mute-лист=27 + slack=2), поэтому на другой
+  # версии pnpm шаг способен покраснеть БЕЗ роста долга. Сначала наблюдение —
+  # в required после того, как vitest поднимется (или риск примет владелец).
+  audit-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: casino-platform/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: pnpm audit (полное дерево) — ratchet
+        run: |
+          pnpm audit --json > /tmp/audit-dev.json || true
+          node scripts/audit-ratchet.mjs --check /tmp/audit-dev.json tech-debt/pnpm-audit-dev.txt
 
   lint-typecheck-test:
     runs-on: ubuntu-latest

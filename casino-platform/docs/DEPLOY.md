@@ -15,6 +15,14 @@
 3. На VPS job выполняет: `git pull` → `docker compose build --pull` → `up -d` →
    `npx prisma migrate deploy` (миграции применяются автоматически на деплое — GAP-31).
 
+> ⚠️ Пересоздание upstream'а без nginx ломает проксирование. nginx резолвит имя
+> сервиса (`api`, `web`, `admin`) один раз при старте и держит IP в своём кэше, а
+> пересозданный `docker compose up -d --force-recreate api` контейнер получает ДРУГОЙ
+> IP. Итог: API `healthy`, сайт жив, а любой запрос через nginx отдаёт 502.
+> Если пересоздаёте не весь стек, а один сервис — перезапустите и nginx:
+> `docker compose -f docker-compose.prod.yml restart nginx`. Проверено на живом
+> стенде 2026-10-05 (прогоны крипто-депозитов падали 502 ровно по этой причине).
+
 `workflow_dispatch` доступен только с default-ветки (правило репо).
 
 ## 1st deploy – Hetzner CX41 Ubuntu 24.04
@@ -55,10 +63,36 @@ docker compose -f docker-compose.prod.yml exec api npx prisma migrate deploy
 curl "https://$DOMAIN/api/v1/health/ready"   # $DOMAIN — из .env.production (dotenv уже в шелле: set -a; . ./.env)
 ```
 
+### Smoke-тест: `healthy` ≠ «сайт работает»
+
+Первый реальный запуск прод-образов (2026-10-04) показал, что зелёный `docker compose ps`
+ничего не гарантирует: контейнер может быть `running`, но не отдавать наружу ровным счётом
+ничего. Проверять вот так, по порядку:
+
+```bash
+# 1. nginx реально собрал vhost'ы из шаблона (иначе снаружи connection refused)
+docker compose -f docker-compose.prod.yml exec nginx sh -c 'ls /etc/nginx/conf.d'
+# 2. маршрут отдаёт 200, а не 404/502
+curl -sS -o /dev/null -w '%{http_code}\n' "https://$DOMAIN/"
+curl -sS -o /dev/null -w '%{http_code}\n' "https://$ADMIN_DOMAIN/"
+# 3. маршрут возврата Google существует (несовпадение с redirect_uri в oauth.tsx
+#    даёт 404 уже ПОСЛЕ успешного входа в аккаунт Google — выглядит как «не работает»)
+curl -sS -o /dev/null -w '%{http_code}\n' "https://$DOMAIN/auth/google/callback"
+# 4. публичные ключи попали в бандл: NEXT_PUBLIC_* инлайнятся в JS-чанк во время
+#    `next build` и в HTML не встречаются, поэтому искать их надо в чанке layout, а не
+#    в разметке. Отличительный случай: сборка, стартовавшая ДО появления ключа в .env,
+#    проходит успешно и просто не печатает кнопку (проверено 2026-10-05 на стенде).
+CHUNK=$(curl -sS "https://$DOMAIN/" | grep -o '/_next/static/chunks/app/layout-[a-f0-9]*\.js' | head -1)
+curl -sS "https://$DOMAIN$CHUNK" | grep -c "$NEXT_PUBLIC_GOOGLE_CLIENT_ID"
+```
+
 ## Первичная инициализация админа (обязательно)
 
 Первый superadmin создаётся сидом `packages/database/src/seed.ts` (`pnpm db:seed` локально /
-`docker compose -f docker-compose.prod.yml exec api npx prisma db seed` на VPS). Перед запуском
+`docker compose -f docker-compose.prod.yml exec api ./node_modules/.bin/tsx packages/database/src/seed.ts`
+на VPS). Команда `npx prisma db seed` на VPS **не работает**: поле `prisma.seed` в
+`packages/database/package.json` не объявлено, а сам сид — это TS-скрипт, в прод-образ он
+не компилируется (`tsx` доступен только как бинарник в `node_modules/.bin`). Перед запуском
 задай **обязательные** переменные в `.env.production`:
 
 ```bash

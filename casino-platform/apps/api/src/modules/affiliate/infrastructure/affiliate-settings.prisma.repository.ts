@@ -1,11 +1,17 @@
 /**
- * Prisma-реализация порта настроек партнёрской программы.
+ * Реализация порта настроек партнёрской программы.
  *
- * Пишет/читает существующую таблицу system_settings по ключам с префиксом
- * `affiliate_`. Кэш в памяти живёт в AffiliateSettingsService (application),
- * здесь только доступ к данным.
+ * Чтение — `system_settings` напрямую: межмодульное чтение разрешено и
+ * зафиксировано ADR (GAP-51), детектор записей его не считает.
+ *
+ * Запись — через `AdminFacade`: таблица принадлежит admin (карта
+ * `MODEL_OWNERS`, гард G24), и affiliate не имеет права делать в ней upsert
+ * сам (GAP-62). Категория `affiliate` при этом задаёт именно этот модуль —
+ * он знает, какие ключи его, а admin лишь пишет то, что ему передали.
  */
-import { Injectable } from '@nestjs/common'
+import { Inject, Injectable } from '@nestjs/common'
+
+import { AdminFacade } from '@modules/admin/facade/admin.facade'
 
 import { prisma } from '@casino/database'
 
@@ -21,6 +27,8 @@ const AFFILIATE_CATEGORY = 'affiliate'
 
 @Injectable()
 export class PrismaAffiliateSettingsRepository implements AffiliateSettingsRepository {
+  constructor(@Inject(AdminFacade) private readonly adminSettings: AdminFacade) {}
+
   async listRaw(): Promise<RawSetting[]> {
     const rows = await prisma.systemSetting.findMany({
       where: { key: { startsWith: 'affiliate_' } },
@@ -43,21 +51,12 @@ export class PrismaAffiliateSettingsRepository implements AffiliateSettingsRepos
     type: AffiliateSettingType
     updatedBy: string
   }): Promise<void> {
-    await prisma.systemSetting.upsert({
-      where: { key: args.key },
-      update: {
-        value: args.value,
-        type: args.type,
-        category: AFFILIATE_CATEGORY,
-        updatedBy: args.updatedBy,
-      },
-      create: {
-        key: args.key,
-        value: args.value,
-        type: args.type,
-        category: AFFILIATE_CATEGORY,
-        updatedBy: args.updatedBy,
-      },
+    await this.adminSettings.setSystemSetting({
+      key: args.key,
+      value: args.value,
+      type: args.type,
+      updatedBy: args.updatedBy,
+      category: AFFILIATE_CATEGORY,
     })
   }
 }

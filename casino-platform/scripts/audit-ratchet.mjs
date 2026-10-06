@@ -6,8 +6,14 @@
 // это осознанно, триаж обязателен (upgrade / pnpm.auditOverrides / mute),
 // после чего базлайн ужмётся через --gen.
 //
-//   node scripts/audit-ratchet.mjs --check <audit.json>   — сверить с базлайном (CI)
-//   node scripts/audit-ratchet.mjs --gen <audit.json>     — перезаписать базлайн
+//   node scripts/audit-ratchet.mjs --check <audit.json> [baseline]  — сверить (CI)
+//   node scripts/audit-ratchet.mjs --gen   <audit.json> [baseline]  — перезаписать
+//
+// [baseline] по умолчанию tech-debt/pnpm-audit.txt. Второй базлайн нужен для
+// полного (`pnpm audit --json`) отчёта: `--prod` не видит dev-дерево, а в нём
+// живут vitest/vite/esbuild — код, который исполняется на прогоне CI и на
+// машине разработчика. Без отдельного базлайна этот контур не проверялся
+// вовсе: критическая advisory в vitest была зелёной.
 //
 // <audit.json> — вывод `pnpm audit --prod --json` (exit code audit не важен,
 // отчёт валиден и при найденных уязвимостях).
@@ -35,15 +41,19 @@ const BASELINE = 'tech-debt/pnpm-audit.txt'
 const MANIFEST = 'package.json'
 // Реестр может посчитать одну advisory дважды (GHSA на две версии пакета),
 // поэтому metadata обычно на 1 больше, чем advisories (наблюдено: 29 vs 28 и
-// 52 vs 51). Допуск = METADATA_SLACK: больше — это уже не двойной счёт, а
-// потерянные записи.
-const METADATA_SLACK = 2
+// 52 vs 51). Допуска на двойной счёт недостаточно при мульти-версионных
+// транзитивах: один GHSA в ignoreGhsas бьёт по НЕСКОЛЬКИМ версиям пакета
+// (minimatch ×3 GHSA, esbuild/vite-цепочка), и каждая версия — отдельная
+// запись metadata. Поэтому допуск пропорционален mute-листу (~20%),
+// минимум прежние 2.
+const METADATA_SLACK_RATIO = 0.2
 
 const args = process.argv.slice(2)
 const mode = args[0]
 const reportPath = args[1]
+const baselinePath = args[2] ?? BASELINE
 if ((mode !== '--check' && mode !== '--gen') || !reportPath) {
-  console.error('usage: audit-ratchet.mjs --check|--gen <audit.json>')
+  console.error('usage: audit-ratchet.mjs --check|--gen <audit.json> [baseline]')
   process.exit(2)
 }
 
@@ -91,7 +101,7 @@ const visibleTotal = total(cur)
 if (!metaTotal) {
   console.warn('⚠️  в отчёте нет metadata.vulnerabilities — сверку полноты отчёта не сделать')
 }
-if (metaTotal - visibleTotal > ignore.length + mutedInReport + METADATA_SLACK) {
+if (metaTotal - visibleTotal > ignore.length + mutedInReport + Math.max(2, Math.ceil(ignore.length * METADATA_SLACK_RATIO))) {
   console.error(
     `❌ отчёт неполон: metadata=${metaTotal}, осталось после mute=${visibleTotal} ` +
       `(в отчёте advisories=${Object.values(advisories).length}, снято мной=${mutedInReport}, ` +
@@ -108,20 +118,20 @@ const detail = `видимый долг ${JSON.stringify(cur)} (advisories в о
 
 if (mode === '--gen') {
   const lines = SEV.map((s) => `${s}\t${cur[s] ?? 0}`).join('\n') + '\n'
-  writeFileSync(BASELINE, lines)
-  process.stdout.write(`baseline updated: ${BASELINE} (${detail})\n`)
+  writeFileSync(baselinePath, lines)
+  process.stdout.write(`baseline updated: ${baselinePath} (${detail})\n`)
   process.exit(0)
 }
 
 const base = {}
-for (const line of readFileSync(BASELINE, 'utf8').split('\n')) {
+for (const line of readFileSync(baselinePath, 'utf8').split('\n')) {
   const m = line.match(/^(critical|high|moderate|low|info)\t(\d+)\s*$/)
   if (m) {
     base[m[1]] = Number(m[2])
   }
 }
 if (SEV.every((s) => base[s] === undefined)) {
-  console.error(`❌ базлайн ${BASELINE} пуст или не читается`)
+  console.error(`❌ базлайн ${baselinePath} пуст или не читается`)
   process.exit(2)
 }
 

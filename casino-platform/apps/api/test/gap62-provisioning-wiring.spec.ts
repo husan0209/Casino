@@ -29,9 +29,11 @@ vi.mock('@casino/database', async (importOriginal) => {
   return { ...actual, prisma: {} }
 })
 
+import { AdminModule } from '../src/modules/admin/admin.module'
 import { AffiliateModule } from '../src/modules/affiliate/affiliate.module'
 import { CreateAffiliateByAdminUseCase } from '../src/modules/affiliate/application/use-cases/create-affiliate-by-admin.use-case'
 import { RegisterAffiliateUseCase } from '../src/modules/affiliate/application/use-cases/register-affiliate.use-case'
+import { PrismaAffiliateSettingsRepository } from '../src/modules/affiliate/infrastructure/affiliate-settings.prisma.repository'
 import { PrismaPlayerProvisioningRepository } from '../src/modules/affiliate/infrastructure/player-provisioning.prisma.repository'
 import { DeprovisionAffiliatePlayerUseCase } from '../src/modules/users/application/use-cases/deprovision-affiliate-player.use-case'
 import { ProvisionAffiliatePlayerUseCase } from '../src/modules/users/application/use-cases/provision-affiliate-player.use-case'
@@ -39,6 +41,8 @@ import { USER_PROFILE_REPOSITORY } from '../src/modules/users/domain/repositorie
 import { UsersFacade } from '../src/modules/users/facade/users.facade'
 import { PrismaUserProfileRepository } from '../src/modules/users/infrastructure/repositories/user-profile.prisma'
 import { UsersModule } from '../src/modules/users/users.module'
+
+import type { AdminFacade } from '../src/modules/admin/facade/admin.facade'
 
 // Свойства обязательны и могут быть undefined: при exactOptionalPropertyTypes
 // присвоить `unknown[] | undefined` опциональному `providers?: unknown[]` нельзя.
@@ -118,5 +122,49 @@ describe('GAP-62: DI-сборка провижининга партнёрско�
     expect(RegisterAffiliateUseCase.length).toBe(5)
     expect(CreateAffiliateByAdminUseCase.length).toBe(4)
     expect(UsersFacade).toBeDefined()
+  })
+
+  // ── остаток GAP-62: последняя чужая запись affiliate — таблица system_settings ──
+
+  it('настройки партнёрки пишет не prisma, а владелец таблицы — AdminFacade', async () => {
+    const calls: Array<Record<string, unknown>> = []
+    const facade = {
+      setSystemSetting: async (input: Record<string, unknown>) => {
+        calls.push(input)
+        return {} as never
+      },
+    } as unknown as AdminFacade
+
+    const repo = new PrismaAffiliateSettingsRepository(facade)
+    await repo.set({
+      key: 'affiliate_default_revshare_rate',
+      value: '7.5',
+      type: 'number',
+      updatedBy: 'a1',
+    })
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toEqual({
+      key: 'affiliate_default_revshare_rate',
+      value: '7.5',
+      type: 'number',
+      updatedBy: 'a1',
+      category: 'affiliate',
+    })
+  })
+
+  it('у репозитория настроек не осталось write-пути в prisma, чтение — как было', () => {
+    // Одна зависимость в конструкторе = в классе больше нет прямого upsert'а.
+    expect(PrismaAffiliateSettingsRepository.length).toBe(1)
+    const prototype = PrismaAffiliateSettingsRepository.prototype as unknown as Record<
+      string,
+      unknown
+    >
+    // Чтение легально по ADR GAP-51 и осталось на prisma.
+    expect(typeof prototype['listRaw']).toBe('function')
+  })
+
+  it('affiliate импортирует AdminModule — иначе AdminFacade в настройках нерезолвим', () => {
+    expect(affiliateMetadata.imports ?? []).toContain(AdminModule)
   })
 })

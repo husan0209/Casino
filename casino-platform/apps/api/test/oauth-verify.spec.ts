@@ -255,6 +255,7 @@ describe('GAP-42 GoogleOAuthUseCase', () => {
         code: 'any-code',
         redirectUri: 'https://example.com/cb',
         state,
+        stateCookie: state,
       })
     } catch (e) {
       caught = e
@@ -278,6 +279,8 @@ describe('GAP-42 GoogleOAuthUseCase', () => {
         code: 'x',
         redirectUri: 'https://example.com/cb',
         state: tampered,
+        // Кука совпадает: проверка должна упасть именно на подписи, а не на привязке.
+        stateCookie: tampered,
       }),
     ).rejects.toBeInstanceOf(OAuthStateError)
   })
@@ -299,6 +302,7 @@ describe('GAP-42 GoogleOAuthUseCase', () => {
         code: 'x',
         redirectUri: 'https://example.com/cb',
         state: expiredState,
+        stateCookie: expiredState,
       }),
     ).rejects.toBeInstanceOf(OAuthStateError)
   })

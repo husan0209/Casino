@@ -19,6 +19,14 @@
 #   6–10 G7: порча примитивы по одному инварианту → КРАСНЫЙ каждый раз:
 #        лок вырезан, изоляция возвращена к Serializable, лок берётся ПОСЛЕ
 #        чтения, файл леджера удалён, леджер открыл свою $transaction.
+#   11–13 service-specs (G26): сервис без спеки → КРАСНЫЙ; сервис со спекой,
+#        которая его инстанцирует (`new X(`) → ЗЕЛЁНЫЙ; сервис, упомянутый в спеке
+#        без инстанцирования → КРАСНЫЙ (упоминание в DI-wiring-спеке покрытием
+#        не считается — иначе гард превращается в ложное покрытие).
+#   14–16 presentation-db (G27): копия рабочего дерева = базлайну → ЗЕЛЁНЫЙ;
+#        `prisma.*` в presentation-файле → КРАСНЫЙ; тот же вызов в
+#        infrastructure-репозитории → ЗЕЛЁНЫЙ (правило про слой, а не про
+#        таблицу — иначе оно невыполнимо).
 #
 # Запуск:  sh scripts/bin/guard-selftest      (CI: шаг G25)
 # Выход:   0 — все гарды покраснели там, где должны;
@@ -34,6 +42,8 @@ GUARD='scripts/check-wallet-money-invariant.sh'
 TECH_DEBT="$BIN_DIR/tech-debt"
 LEDGER_REL='apps/api/src/modules/wallet/infrastructure/ledger'
 FW_BASELINE='tech-debt/foreign-writes.txt'
+SS_BASELINE='tech-debt/service-specs.txt'
+PDB_BASELINE='tech-debt/presentation-db.txt'
 SCHEMA='packages/database/prisma/schema.prisma'
 
 TMP=$(mktemp -d 2>/dev/null) || TMP="$PLATFORM_DIR/.guard-selftest-tmp"
@@ -118,7 +128,32 @@ fw_tree() {
   printf '%s' "$T"
 }
 
-echo "guard-selftest: доказываем, что G7 (деньги кошелька) и G24 (чужие записи Prisma)"
+# Дерево для service-specs: детектор читает и исходники (src/modules), и спеки
+# (apps/api/test), поэтому копируются ОБЕ ветки — иначе «покрытие» искали бы в
+# пустоте и гард краснел бы на любом дереве.
+svc_tree() {
+  T="$TMP/ss-$1"
+  rm -rf "$T"
+  mkdir -p "$T/apps/api/src" "$T/tech-debt"
+  cp -R apps/api/src/modules "$T/apps/api/src/"
+  cp -R apps/api/test "$T/apps/api/"
+  cp "$SS_BASELINE" "$T/tech-debt/"
+  printf '%s' "$T"
+}
+
+# Дерево для presentation-db: ловушка обязана лежать именно в presentation,
+# поэтому копируется весь apps/api/src/modules — детектор сам выбирает слой,
+# и проверка идёт тем же путём, что в CI.
+pdb_tree() {
+  T="$TMP/pdb-$1"
+  rm -rf "$T"
+  mkdir -p "$T/apps/api/src" "$T/tech-debt"
+  cp -R apps/api/src/modules "$T/apps/api/src/"
+  cp "$PDB_BASELINE" "$T/tech-debt/"
+  printf '%s' "$T"
+}
+
+echo "guard-selftest: доказываем, что G7 (деньги кошелька), G24 (чужие записи Prisma)"
 echo "                КРАСНЕЮТ на ловушках и ЗЕЛЁНЫЕ на чистом дереве."
 echo "                temp: $TMP"
 
@@ -190,6 +225,92 @@ expect_red "G7 FAIL" "G7: файл леджера удалён/переимен�
 T=$(wallet_tree bypass)
 mutate "$T/$LEDGER_REL/wallet.ledger.prisma.ts" 's/runWalletTransaction(/prisma.$transaction(/g'
 expect_red "G7 FAIL" "G7: леджер открыл свою \$transaction в обход примитивы" sh "$GUARD" "$T"
+
+# ── 11–13. service-specs: ловушка, честное покрытие и «просто упомянут» ───
+SS=$(svc_tree main)
+SS_TRAP="$SS/apps/api/src/modules/admin/application/selftest.service.ts"
+SS_SPEC="$SS/apps/api/test/selftest-service.spec.ts"
+cat > "$SS_TRAP" <<'EOF'
+import { Injectable } from '@nestjs/common'
+
+/** Ловушка selftest: сервис без единого теста. */
+@Injectable()
+export class SelfTestService {
+  sum(a: number, b: number): number {
+    return a + b
+  }
+}
+EOF
+expect_red "долг ВЫРОС" "service-specs: новый сервис без спеки" \
+  env TECH_DEBT_ROOT="$SS" sh "$TECH_DEBT" check service-specs
+
+cat > "$SS_SPEC" <<'EOF'
+import { describe, expect, it } from 'vitest'
+
+import { SelfTestService } from '../src/modules/admin/application/selftest.service'
+
+describe('service-specs selftest: покрытие есть', () => {
+  it('складывает', () => {
+    expect(new SelfTestService().sum(2, 3)).toBe(5)
+  })
+})
+EOF
+expect_green "service-specs: сервис с реальной спекой (new …) не долг" \
+  env TECH_DEBT_ROOT="$SS" sh "$TECH_DEBT" check service-specs
+
+# Упоминание имени класса в спеке покрытием НЕ считается: DI-wiring-спеки
+# перечисляют все провайдеры модуля, и при мягком критерии сервис выглядел бы
+# протестированным, хотя ни один ассерт его логику не проверяет.
+rm "$SS_SPEC"
+cat > "$SS_SPEC" <<'EOF'
+import { describe, expect, it } from 'vitest'
+
+describe('service-specs selftest: только упоминание', () => {
+  it('SelfTestService упомянут в тексте, но не инстанцирован', () => {
+    expect(['SelfTestService']).toContain('SelfTestService')
+  })
+})
+EOF
+expect_red "долг ВЫРОС" "service-specs: упоминание в спеке не считается покрытием" \
+  env TECH_DEBT_ROOT="$SS" sh "$TECH_DEBT" check service-specs
+
+# ── 14–16. presentation-db: слой, а не таблица ───────────────────────────
+PDB=$(pdb_tree main)
+expect_green "presentation-db на копии рабочего дерева = базлайну" \
+  env TECH_DEBT_ROOT="$PDB" sh "$TECH_DEBT" check presentation-db
+
+PDB_TRAP="$PDB/apps/api/src/modules/health/presentation/selftest-trap.controller.ts"
+mkdir -p "$PDB/apps/api/src/modules/health/presentation"
+cat > "$PDB_TRAP" <<'EOF'
+import { prisma } from '@casino/database'
+
+/** Ловушка selftest: контроллер читает БД напрямую, минуя application-слой. */
+export class SelfTestPresentationDbTrap {
+  async latest(): Promise<unknown> {
+    return prisma.healthCheck.findFirst({ orderBy: { createdAt: 'desc' } })
+  }
+}
+EOF
+expect_red "долг ВЫРОС" "presentation-db: prisma.findFirst в контроллере" \
+  env TECH_DEBT_ROOT="$PDB" sh "$TECH_DEBT" check presentation-db
+
+# Тот же вызов в infrastructure-репозитории — НЕ долг: правило про слой, а не
+# про таблицу. Без этого контроля детектор нельзя отличить от «запретили prisma
+# вообще», что было бы невыполнимо.
+rm "$PDB_TRAP"
+mkdir -p "$PDB/apps/api/src/modules/health/infrastructure"
+cat > "$PDB/apps/api/src/modules/health/infrastructure/selftest-trap.repository.ts" <<'EOF'
+import { prisma } from '@casino/database'
+
+/** Ловушка-контроль: то же чтение, но в слое, которому оно и положено. */
+export class SelfTestPresentationDbRepository {
+  async latest(): Promise<unknown> {
+    return prisma.healthCheck.findFirst({ orderBy: { createdAt: 'desc' } })
+  }
+}
+EOF
+expect_green "presentation-db: чтение в infrastructure-репозитории не долг" \
+  env TECH_DEBT_ROOT="$PDB" sh "$TECH_DEBT" check presentation-db
 
 # ── Итог ────────────────────────────────────────────────────────────────
 echo ""

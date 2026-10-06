@@ -13,9 +13,11 @@ import { AdminSettingsService } from '../src/modules/admin/application/admin-set
 import {
   type IAdminBroadcastRepository,
   type ISystemSettingRepository,
-  type NotificationBroadcastInput,
   type SystemSettingRow,
 } from '../src/modules/admin/domain/system.repository'
+
+import type { BroadcastNotificationInput } from '../src/modules/notifications/domain/notification.repository'
+import type { NotificationsFacade } from '../src/modules/notifications/facade/notifications.facade'
 
 const ROW: SystemSettingRow = {
   id: 's1',
@@ -36,19 +38,29 @@ const settingRepo = {
 
 const broadcastRepo = {
   getAllUserIds: vi.fn(),
-  createMany: vi.fn(),
+}
+
+// G24: рассылку пишет владелец таблицы notifications, admin только заказывает.
+// Фейк возвращает число вставленных строк — сервис отдаёт его как sentCount.
+const notifications = {
+  broadcastInternal: vi.fn(),
 }
 
 const settings = new AdminSettingsService(settingRepo as unknown as ISystemSettingRepository)
 
-const broadcast = new AdminBroadcastService(broadcastRepo as unknown as IAdminBroadcastRepository)
+const broadcast = new AdminBroadcastService(
+  broadcastRepo as unknown as IAdminBroadcastRepository,
+  notifications as unknown as NotificationsFacade,
+)
 
 beforeEach(() => {
   settingRepo.findMany.mockReset().mockResolvedValue([ROW])
   settingRepo.findEmailTemplates.mockReset().mockResolvedValue([{ ...ROW, type: 'json' }])
   settingRepo.upsert.mockReset().mockResolvedValue(ROW)
   broadcastRepo.getAllUserIds.mockReset().mockResolvedValue([])
-  broadcastRepo.createMany.mockReset().mockResolvedValue(undefined)
+  notifications.broadcastInternal
+    .mockReset()
+    .mockImplementation((rows: unknown[]) => Promise.resolve(rows.length))
 })
 
 describe('AdminSettingsService — тонкий делегат к порту', () => {
@@ -93,7 +105,7 @@ describe('AdminBroadcastService.send — адресаты', () => {
     const res = await broadcast.send(userIds, { title: 'T', message: 'M', type: 'system' })
     // Assert
     expect(broadcastRepo.getAllUserIds).not.toHaveBeenCalled()
-    expect(broadcastRepo.createMany).toHaveBeenCalledTimes(1)
+    expect(notifications.broadcastInternal).toHaveBeenCalledTimes(1)
     expect(res).toEqual({ success: true, sentCount: 2 })
   })
 
@@ -104,7 +116,7 @@ describe('AdminBroadcastService.send — адресаты', () => {
     const res = await broadcast.send([], { title: 'T', message: 'M', type: 'system' })
     // Assert
     expect(broadcastRepo.getAllUserIds).toHaveBeenCalledTimes(1)
-    const sent = broadcastRepo.createMany.mock.calls[0]?.[0] as NotificationBroadcastInput[]
+    const sent = notifications.broadcastInternal.mock.calls[0]?.[0] as BroadcastNotificationInput[]
     expect(sent.map((n) => n.userId)).toEqual(['u1', 'u2', 'u3'])
     expect(res.sentCount).toBe(3)
   })
@@ -114,8 +126,19 @@ describe('AdminBroadcastService.send — адресаты', () => {
     broadcastRepo.getAllUserIds.mockResolvedValue([])
     // Act
     const res = await broadcast.send([], { title: 'T', message: 'M', type: 'system' })
-    // Assert — createMany с пустым массивом Prisma принимает
+    // Assert — пустой список уходит в фасад как пустой массив, это валидно
     expect(res).toEqual({ success: true, sentCount: 0 })
+  })
+
+  it('sentCount приходит из фасада, а не вычисляется из длины списка', async () => {
+    // Arrange — решение «сколько отправлено» принимает владелец записи, а не
+    // заказчик: если notifications начнёт пропускать дубли или отфильтровывать
+    // адресатов, админ увидит реальное число, а не свой список
+    notifications.broadcastInternal.mockResolvedValue(1)
+    // Act
+    const res = await broadcast.send(['u1', 'u2'], { title: 'T', message: 'M', type: 'system' })
+    // Assert
+    expect(res).toEqual({ success: true, sentCount: 1 })
   })
 })
 
@@ -125,32 +148,19 @@ describe('AdminBroadcastService.send — форма уведомления', () 
     // Act
     await broadcast.send(['u1'], { title: 'T', message: 'M', type: '' })
     // Assert
-    const sent = broadcastRepo.createMany.mock.calls[0]?.[0] as NotificationBroadcastInput[]
+    const sent = notifications.broadcastInternal.mock.calls[0]?.[0] as BroadcastNotificationInput[]
     expect(sent[0]?.type).toBe('system')
   })
 
-  it('каждое уведомление: channel internal, isRead false, title/message из payload', async () => {
-    // Arrange
+  it('каждое уведомление несёт адресата, type и текст из payload', async () => {
+    // Arrange — канал и isRead задаёт модуль уведомлений, не админ (G24):
+    // admin передаёт только содержание
     // Act
     await broadcast.send(['u1', 'u2'], { title: 'Акция', message: 'Тело', type: 'promo' })
     // Assert
-    expect(broadcastRepo.createMany).toHaveBeenCalledWith([
-      {
-        userId: 'u1',
-        title: 'Акция',
-        message: 'Тело',
-        type: 'promo',
-        channel: 'internal',
-        isRead: false,
-      },
-      {
-        userId: 'u2',
-        title: 'Акция',
-        message: 'Тело',
-        type: 'promo',
-        channel: 'internal',
-        isRead: false,
-      },
+    expect(notifications.broadcastInternal).toHaveBeenCalledWith([
+      { userId: 'u1', type: 'promo', title: 'Акция', message: 'Тело' },
+      { userId: 'u2', type: 'promo', title: 'Акция', message: 'Тело' },
     ])
   })
 })

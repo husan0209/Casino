@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto'
 
 import { Injectable } from '@nestjs/common'
 
-import { type LedgerEntryType, prisma, type Prisma } from '@casino/database'
+import { type LedgerEntry, type LedgerEntryType, prisma, type Prisma } from '@casino/database'
 import { type Currency, type MoneyAmount, ZERO } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
@@ -18,6 +18,9 @@ import {
   type CreditResult,
   type IWalletLedger,
   type IWalletRepository,
+  type LedgerEntryAdminRow,
+  type LedgerEntryOwnerRow,
+  type PaymentStatusById,
   type WalletAccount,
   type WalletLockTarget,
   type WithdrawalOpArgs,
@@ -49,6 +52,36 @@ function withdrawalMetadata(args: WithdrawalOpArgs): Prisma.InputJsonObject {
   return metadata as Prisma.InputJsonObject
 }
 
+/**
+ * Фильтр списка проводок — ОДИН на оба чтения (админский список и историю
+ * игрока). Правило «валюта берётся через кошелёк, у проводки своей колонки
+ * валюты нет» иначе лежало бы в двух местах и расходилось бы молча: второй
+ * вариант фильтра Prisma не считает ошибкой, он просто отдаёт пустой список.
+ */
+function entriesWhere(args: {
+  userId?: string | undefined
+  type?: LedgerEntryType | undefined
+  currency?: Currency | undefined
+  from?: Date | undefined
+  to?: Date | undefined
+}): Prisma.LedgerEntryWhereInput {
+  const period =
+    args.from !== undefined || args.to !== undefined
+      ? {
+          createdAt: {
+            ...(args.from !== undefined && { gte: args.from }),
+            ...(args.to !== undefined && { lte: args.to }),
+          },
+        }
+      : {}
+  return {
+    ...(args.userId !== undefined && { userId: args.userId }),
+    ...(args.type !== undefined && { type: args.type }),
+    ...(args.currency !== undefined && { walletAccount: { currency: args.currency } }),
+    ...period,
+  }
+}
+
 @Injectable()
 export class PrismaWalletRepository implements IWalletRepository {
   async getBalance(userId: string, currency: Currency): Promise<WalletAccount | null> {
@@ -69,13 +102,80 @@ export class PrismaWalletRepository implements IWalletRepository {
   async listBalances(userId: string): Promise<WalletAccount[]> {
     const rows = await prisma.walletAccount.findMany({ where: { userId } })
     return rows.map((w) => ({
-        userId: w.userId,
-        currency: w.currency as Currency,
-        balance: toMoney(w.balance),
-        locked: toMoney(w.locked),
-        version: w.version,
-      })
-    )
+      userId: w.userId,
+      currency: w.currency as Currency,
+      balance: toMoney(w.balance),
+      locked: toMoney(w.locked),
+      version: w.version,
+    }))
+  }
+  /**
+   * Админский список проводок (UC-PAY-16). Фильтр по валюте — через кошелёк,
+   * потому что у самой проводки валюты нет: она принадлежит `wallet_account`.
+   */
+  listEntries(args: {
+    userId?: string | undefined
+    type?: LedgerEntryType | undefined
+    currency?: Currency | undefined
+    page: number
+    perPage: number
+  }): Promise<[LedgerEntryAdminRow[], number]> {
+    const where = entriesWhere(args)
+    return Promise.all([
+      prisma.ledgerEntry.findMany({
+        where,
+        skip: (args.page - 1) * args.perPage,
+        take: args.perPage,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          walletAccount: { select: { currency: true } },
+          user: { select: { email: true } },
+        },
+      }),
+      prisma.ledgerEntry.count({ where }),
+    ])
+  }
+
+  /**
+   * История проводок игрока (GAP-55 §11, `GET /wallet/transactions`).
+   *
+   * От админского списка отличается составом `include`: здесь не нужен email
+   * игрока — он и есть тот, кто запросил, и джойнить `users` на каждую страницу
+   * истории незачем.
+   */
+  listOwnerEntries(args: {
+    userId: string
+    type?: LedgerEntryType | undefined
+    currency?: Currency | undefined
+    from?: Date | undefined
+    to?: Date | undefined
+    page: number
+    perPage: number
+  }): Promise<[LedgerEntryOwnerRow[], number]> {
+    const where = entriesWhere(args)
+    return Promise.all([
+      prisma.ledgerEntry.findMany({
+        where,
+        skip: (args.page - 1) * args.perPage,
+        take: args.perPage,
+        orderBy: { createdAt: 'desc' },
+        include: { walletAccount: { select: { currency: true } } },
+      }),
+      prisma.ledgerEntry.count({ where }),
+    ])
+  }
+
+  findEntriesForPayment(paymentRequestId: string): Promise<LedgerEntry[]> {
+    return prisma.ledgerEntry.findMany({
+      where: { metadata: { path: ['payment_request_id'], equals: paymentRequestId } },
+    })
+  }
+
+  findPaymentStatuses(userId: string, ids: string[]): Promise<PaymentStatusById[]> {
+    return prisma.paymentRequest.findMany({
+      where: { userId, id: { in: ids } },
+      select: { id: true, status: true },
+    })
   }
 }
 
@@ -104,9 +204,8 @@ export class PrismaWalletLedger implements IWalletLedger {
     }
     // GAP-57: solo-путь (депозит/реферальная выплата/admin) идёт через ту же
     // примитиву, что и bet/win — advisory-лок + ReadCommitted + повтор.
-    return runWalletTransaction(
-      { userId: input.userId, currency: input.currency },
-      (tx) => this.applyCreditDebit(tx, input, sign),
+    return runWalletTransaction({ userId: input.userId, currency: input.currency }, (tx) =>
+      this.applyCreditDebit(tx, input, sign),
     )
   }
 
@@ -115,7 +214,16 @@ export class PrismaWalletLedger implements IWalletLedger {
     tx: Prisma.TransactionClient,
     userId: string,
     currency: Currency,
-  ): Promise<{ id: string; createdAt: Date; updatedAt: Date; userId: string; currency: string; balance: Prisma.Decimal; locked: Prisma.Decimal; version: bigint; }> {
+  ): Promise<{
+    id: string
+    createdAt: Date
+    updatedAt: Date
+    userId: string
+    currency: string
+    balance: Prisma.Decimal
+    locked: Prisma.Decimal
+    version: bigint
+  }> {
     const wallet = await tx.walletAccount.findUnique({
       where: { userId_currency: { userId, currency } },
     })
@@ -210,7 +318,16 @@ export class PrismaWalletLedger implements IWalletLedger {
     tx: Prisma.TransactionClient,
     userId: string,
     currency: Currency,
-  ): Promise<{ id: string; createdAt: Date; updatedAt: Date; userId: string; currency: string; balance: Prisma.Decimal; locked: Prisma.Decimal; version: bigint; }> {
+  ): Promise<{
+    id: string
+    createdAt: Date
+    updatedAt: Date
+    userId: string
+    currency: string
+    balance: Prisma.Decimal
+    locked: Prisma.Decimal
+    version: bigint
+  }> {
     const wallet = await tx.walletAccount.findUnique({
       where: { userId_currency: { userId, currency } },
     })
@@ -233,7 +350,20 @@ export class PrismaWalletLedger implements IWalletLedger {
       description: string
       metadata?: Prisma.InputJsonValue
     },
-  ): Promise<{ id: string; createdAt: Date; transactionId: string; walletAccountId: string; type: LedgerEntryType; amount: Prisma.Decimal; balanceBefore: Prisma.Decimal; balanceAfter: Prisma.Decimal; idempotencyKey: string | null; description: string | null; metadata: Prisma.JsonValue; userId: string | null; }> {
+  ): Promise<{
+    id: string
+    createdAt: Date
+    transactionId: string
+    walletAccountId: string
+    type: LedgerEntryType
+    amount: Prisma.Decimal
+    balanceBefore: Prisma.Decimal
+    balanceAfter: Prisma.Decimal
+    idempotencyKey: string | null
+    description: string | null
+    metadata: Prisma.JsonValue
+    userId: string | null
+  }> {
     return tx.ledgerEntry.create({
       data: { transactionId: randomUUID(), ...data, metadata: data.metadata ?? {} },
     })
@@ -271,7 +401,12 @@ export class PrismaWalletLedger implements IWalletLedger {
         description: 'Withdrawal lock',
         metadata: { locked_amount: amount, ...withdrawalMetadata(args) },
       })
-      return { balanceBefore: balance, balanceAfter: balance, ledgerEntryId: ledger.id, duplicate: false }
+      return {
+        balanceBefore: balance,
+        balanceAfter: balance,
+        ledgerEntryId: ledger.id,
+        duplicate: false,
+      }
     })
   }
 
@@ -308,7 +443,12 @@ export class PrismaWalletLedger implements IWalletLedger {
         description: 'Withdrawal unlock',
         metadata: { unlocked_amount: amount, ...withdrawalMetadata(args) },
       })
-      return { balanceBefore: balance, balanceAfter: balance, ledgerEntryId: ledger.id, duplicate: false }
+      return {
+        balanceBefore: balance,
+        balanceAfter: balance,
+        ledgerEntryId: ledger.id,
+        duplicate: false,
+      }
     })
   }
 
@@ -332,7 +472,11 @@ export class PrismaWalletLedger implements IWalletLedger {
       const balanceAfter = money.subtract(balanceBefore, amount)
       const updated = await tx.walletAccount.updateMany({
         where: { id: wallet.id, version: wallet.version },
-        data: { balance: balanceAfter, locked: money.subtract(currentLocked, amount), version: { increment: 1 } },
+        data: {
+          balance: balanceAfter,
+          locked: money.subtract(currentLocked, amount),
+          version: { increment: 1 },
+        },
       })
       if (updated.count === 0) {
         throw new OptimisticLockError()

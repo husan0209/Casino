@@ -3,6 +3,13 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 ARG NEXT_PUBLIC_API_URL=https://casino.example.com/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Причина та же, что у web.prod.Dockerfile: NEXT_PUBLIC_* запекаются на `next build`.
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID=
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=$NEXT_PUBLIC_TURNSTILE_SITE_KEY
+ARG NEXT_PUBLIC_IMAGE_HOSTS=
+ENV NEXT_PUBLIC_IMAGE_HOSTS=$NEXT_PUBLIC_IMAGE_HOSTS
 # GAP-60: причина та же, что у web.prod.Dockerfile — образ не собирался ни разу
 # (CI до 2026-10-01 собирал только api.prod). .npmrc — hoisted-линковка, иначе
 # pnpm изолирует транзитивные зависимости; .eslintrc.js — корневой конфиг ESLint,

@@ -1,3 +1,5 @@
 # Храповик техдолга сравнивает базлайны построчно — CRLF на чекауте (Windows
 # autocrlf) ломает comm-сравнение с детектором. Держим LF.
 tech-debt/*.txt text eol=lf
+
+# Хуки nginx-entrypoint: свежий entrypoint ИГНОРИРУЕТ файл без бита исполнения

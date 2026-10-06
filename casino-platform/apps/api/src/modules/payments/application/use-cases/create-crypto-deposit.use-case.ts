@@ -10,7 +10,10 @@ import { KycFacade } from '@modules/kyc/facade/kyc.facade'
 import { AppError } from '@casino/shared-utils'
 
 import { PaymentProviderError } from '../../domain/errors'
-import { assertReleaseCryptoCurrency } from '../../domain/payment-currency.policy'
+import {
+  assertCryptoDepositAmount,
+  assertReleaseCryptoCurrency,
+} from '../../domain/payment-currency.policy'
 import {
   type INowPaymentsClient,
   type IPaymentRequestRepository,
@@ -48,6 +51,10 @@ export class CreateCryptoDepositUseCase {
     // доходила до провайдера с pay_currency='ton'|'trx'|'ltc'. Отклонение — до
     // estimate и до createPayment: к NOWPayments не уходит ни один запрос.
     const payCurrency = assertReleaseCryptoCurrency(currency)
+    // Лимиты проверяются ДО обращения к провайдеру: отказ `AMOUNT_MINIMAL_ERROR`
+    // наружу приходил как PAYMENT_PROVIDER_ERROR/502 с сырым JSON NOWPayments в
+    // сообщении, и игрок видел «HTTP 400: {...}» вместо внятной подсказки.
+    assertCryptoDepositAmount(payCurrency, amount)
     // estimate RUB for KYC
     const est = await this.np.getEstimatePrice({
       amount,
@@ -61,7 +68,13 @@ export class CreateCryptoDepositUseCase {
       // create NP payment first to get pay_address
       const npRes = await this.np.createPayment({
         priceAmount: amount,
-        priceCurrency: 'USD',
+        // `amount` — это количество ЕДИНИЦ ВАЛЮТЫ ОПЛАТЫ: так же трактует его UI
+        // (подпись «Сумма, USDT/BTC» и placeholder 0.00) и так же считает RUB-оценку
+        // выше — estimate(payCurrency → RUB). Литерал 'USD' здесь означал, что
+        // NOWPayments берёт цену в долларах: депозит «0.0005 BTC» превращался в счёт
+        // на $0.0005 ≈ 1e-8 BTC, и BTC-депозит падал с AMOUNT_MINIMAL_ERROR на любой
+        // сумме. Для USDT баг маскировался курсом 1:1 и был не виден.
+        priceCurrency: payCurrency,
         payCurrency,
         orderId: 'tmp-' + randomUUID(),
         ipnCallbackUrl: this.ipnUrl(),

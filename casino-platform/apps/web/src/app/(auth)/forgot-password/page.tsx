@@ -21,7 +21,13 @@ export default function ForgotPage(): React.JSX.Element {
           <p className="text-muted text-sm">Проверьте почту.</p>
         ) : (
           <form onSubmit={submit} className="space-y-3">
+            <label className="field-label" htmlFor="forgot-email">
+              Email
+            </label>
             <input
+              id="forgot-email"
+              name="email"
+              autoComplete="email"
               className="input"
               type="email"
               placeholder="Email"

@@ -21,10 +21,24 @@ import {
   WALLET_TRANSACTION_RUNNER,
   type CreditInput,
   type CreditResult,
+  type LedgerEntryAdminRow,
+  type LedgerEntryOwnerRow,
+  type PaymentStatusById,
   type WalletLockTarget,
 } from '../domain/repositories/wallet.repository'
 
-import type { Prisma } from '@prisma/client'
+import type { LedgerEntry, LedgerEntryType, Prisma } from '@prisma/client'
+
+/**
+ * Read-модели списков проводок отдаются через фасад (правило 4, G16):
+ * потребителю незачем импортировать domain-слой wallet, чтобы назвать тип
+ * собственного ответа.
+ */
+export type {
+  LedgerEntryAdminRow,
+  LedgerEntryOwnerRow,
+  PaymentStatusById,
+} from '../domain/repositories/wallet.repository'
 
 /**
  * Единственная точка входа в wallet для других модулей (4-слойка, GAP-22):
@@ -100,5 +114,45 @@ export class WalletFacade {
       locked: w.locked,
       available: money.subtract(w.balance, w.locked),
     }
+  }
+
+  /**
+   * Список журнала для админки (ТЗ ч.3 UC-PAY-16) и проводки одной заявки
+   * (UC-PAY-18). Чтение `ledger_entries` отдаёт его владелец — wallet; до
+   * храповика G27 запрос собирал `admin-finance.controller.ts` напрямую.
+   */
+  listLedgerEntries(args: {
+    userId?: string | undefined
+    type?: LedgerEntryType | undefined
+    currency?: Currency | undefined
+    page: number
+    perPage: number
+  }): Promise<{ items: LedgerEntryAdminRow[]; total: number }> {
+    return this.repo.listEntries(args).then(([items, total]) => ({ items, total }))
+  }
+
+  listEntriesForPaymentRequest(paymentRequestId: string): Promise<LedgerEntry[]> {
+    return this.repo.findEntriesForPayment(paymentRequestId)
+  }
+
+  /**
+   * История проводок игрока (`GET /wallet/transactions`, GAP-55 §11). До
+   * храповика G27 контроллер сам собирал `where` по `ledger_entries`.
+   */
+  listOwnerTransactions(args: {
+    userId: string
+    type?: LedgerEntryType | undefined
+    currency?: Currency | undefined
+    from?: Date | undefined
+    to?: Date | undefined
+    page: number
+    perPage: number
+  }): Promise<{ items: LedgerEntryOwnerRow[]; total: number }> {
+    return this.repo.listOwnerEntries(args).then(([items, total]) => ({ items, total }))
+  }
+
+  /** Статусы заявок игрока по id — для `payment_status` в строке истории. */
+  findPaymentStatuses(userId: string, ids: string[]): Promise<PaymentStatusById[]> {
+    return this.repo.findPaymentStatuses(userId, ids)
   }
 }

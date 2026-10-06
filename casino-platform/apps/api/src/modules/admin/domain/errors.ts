@@ -8,7 +8,18 @@ export class AdminJwtTokenError extends AppError {
   // INVALID_TOKEN — отказы verify, у которых нет своей причины из JWT: битый
   // base64, невалидный JSON payload, отсутствующий JWT_ACCESS_SECRET. Вешать на
   // них BAD_SIGNATURE означало бы искать сломанную подпись там, где её нет.
-  constructor(code: 'BAD_SIGNATURE' | 'TOKEN_EXPIRED' | 'INVALID_TOKEN') {
+  // MALFORMED_TOKEN — токен структурно не токен (не три части) или payload не
+  // JSON; BAD_AUDIENCE / BAD_ISSUER — подпись настоящая, но токен выпущен не для
+  // админ-контура (игровые и админские токены подписаны одним секретом).
+  constructor(
+    code:
+      | 'BAD_SIGNATURE'
+      | 'TOKEN_EXPIRED'
+      | 'INVALID_TOKEN'
+      | 'MALFORMED_TOKEN'
+      | 'BAD_AUDIENCE'
+      | 'BAD_ISSUER',
+  ) {
     super(code)
     this.code = code
   }

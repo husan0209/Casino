@@ -1,38 +1,39 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common'
+import { Controller, Get, Inject, Query, UseGuards, UsePipes } from '@nestjs/common'
 
-import { prisma, type ActorType, type Prisma } from '@casino/database'
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
+import { type AuditLog } from '@casino/database'
+
+import { AuditLogService } from '../../application/audit-log.service'
 import { AdminAuthGuard } from '../admin-auth.guard'
+import { AuditListQuerySchema, type AuditListQueryDto } from '../dto/admin-audit.dto'
 
+/**
+ * Журнал действий (`GET /admin/audit-logs`) — только сериализация.
+ *
+ * Запрос таблицы `audit_logs` отдаёт владелец таблицы (гард G27): контроллер
+ * больше не собирает `where` и не кастует query-параметры к enum'ам схемы —
+ * форму проверяет Zod-схема.
+ */
 @UseGuards(AdminAuthGuard)
 @Controller('admin/audit-logs')
 export class AdminAuditController {
+  constructor(@Inject(AuditLogService) private readonly audit: AuditLogService) {}
+
   @Get()
-  async list(@Query() q: Record<string, string | undefined>): Promise<{ items: { id: string; createdAt: Date; actorType: ActorType; actorId: string; action: string; targetType: string | null; targetId: string | null; payload: Prisma.JsonValue; ipAddress: string | null; userAgent: string | null; }[]; meta: { page: number; perPage: number; total: number; }; }> {
-    const page = parseInt(q.page ?? '') || 1,
-      perPage = Math.min(parseInt(q.per_page ?? '') || 50, 200)
-    const where: Prisma.AuditLogWhereInput = {}
-    if (q.actor_type) {
-      where.actorType = q.actor_type as ActorType
-    }
-    if (q.actor_id) {
-      where.actorId = q.actor_id
-    }
-    if (q.action) {
-      where.action = { contains: q.action }
-    }
-    if (q.target_type) {
-      where.targetType = q.target_type
-    }
-    const [items, total] = await Promise.all([
-      prisma.auditLog.findMany({
-        where,
-        skip: (page - 1) * perPage,
-        take: perPage,
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.auditLog.count({ where }),
-    ])
-    return { items, meta: { page, perPage, total } }
+  @UsePipes(new ZodValidationPipe(AuditListQuerySchema))
+  async list(@Query() q: AuditListQueryDto): Promise<{
+    items: AuditLog[]
+    meta: { page: number; perPage: number; total: number }
+  }> {
+    const { items, total } = await this.audit.list({
+      actorType: q.actor_type,
+      actorId: q.actor_id,
+      action: q.action,
+      targetType: q.target_type,
+      page: q.page,
+      perPage: q.per_page,
+    })
+    return { items, meta: { page: q.page, perPage: q.per_page, total } }
   }
 }

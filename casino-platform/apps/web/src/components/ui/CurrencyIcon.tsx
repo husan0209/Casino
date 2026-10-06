@@ -32,7 +32,9 @@ export function CurrencyIcon({
   size?: number
   className?: string
 }): React.JSX.Element {
-  const slug = CRYPTO_SLUGS[currency] ?? (isCryptoCurrency(currency) ? currency.toLowerCase().split('_')[0] : null)
+  const slug =
+    CRYPTO_SLUGS[currency] ??
+    (isCryptoCurrency(currency) ? currency.toLowerCase().split('_')[0] : null)
 
   if (slug) {
     return (

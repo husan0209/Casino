@@ -1,6 +1,6 @@
 # QA Checklist – Casino Platform
 
-> **Сводка покрытия (GAP-45 от 2026-09-03; обновлено 2026-09-16 после GAP-52…55, числа — после #88):** 35 пункта. **10 закрыто автотестами полностью** (`[x]` + `[auto: файл::тест]`); **9 закрыто частично** (`[x*]` — код-путь покрыт тестом, хвост боевой интеграции/UI помечен `[manual: …]` и ведёт в GAP-46); **16 — только ручные.** Автобаза (пересчёт 2026-10-01, GAP-59): **api — 403 unit/integration** в прогоне без БД + **12 файлов** интеграций/E2E, которые идут в CI на Postgres/Redis; **web — 177**; **admin — 11**.
+> **Сводка покрытия (GAP-45 от 2026-09-03; структура пунктов не менялась: 35 пункта — 10 закрыто автотестами полностью (`[x]` + `[auto: файл::тест]`), 9 закрыто частично (`[x*]` — код-путь покрыт тестом, хвост боевой интеграции/UI помечен `[manual: …]` и ведёт в GAP-46), 16 — только ручные):** автобаза переснята прогоном 2026-10-04 на `origin/main` = `0943477` (`pnpm --filter <пакет> exec vitest run`): **api — 1011 кейсов** (989 passed + 22 skipped; 22 — это файлы, требующие БД/Redis, в обычном прогоне они скипаются), **web — 210**, **admin — 25**. Прежде здесь жили числа 403/177/11 (пересчёт 2026-10-01) — они разошлись с составом спек после #134…#138 и более не воспроизводились. Пять спек-файлов требуют БД (`LEDGER_INTEGRATION=1` / `E2E_API=1`) и выполняются только в CI.
 >
 > Обозначения: `[x]` — закрыто автотестом целиком (`[auto: <файл>::<имя теста>]`, файлы в `apps/api/test/`); `[x*]` — частично: покрытая часть помечена `[auto:...]`, хвост боевой интеграции/UI — `[manual:...]` (сводится к GAP-46); `[ ]` — `[manual: что и где проверять]`.
 
@@ -24,7 +24,7 @@
 - [x*] Rukassa deposit → callback → credit → duplicate callback ignored — HMAC/зачисление/fail-closed/дедуп: `[auto: e2e/player-lifecycle.e2e.spec.ts::«5. вебхук Rukassa с валидным HMAC зачисляет 1000 RUB»/«5b. неверная подпись НЕ меняет баланс»]` + `[auto: deposit-idempotency.spec.ts::«Rukassa: ключ от order_id»]`; хвост: `[manual: GAP-46 — боевой callback от Rukassa на публичный домен после создания платежа в кабинете провайдера]`
 - [x*] NOWPayments deposit → actually_paid credited — HMAC-канонизация (python-json.dumps-совместимая): `[auto: nowpayments-ipn.spec.ts (5 тестов)]`; ключ проводки от payment_id: `[auto: deposit-idempotency.spec.ts::«NOWPayments: ключ проводки от payment_id»]`; хвост: `[manual: GAP-46 — createPayment/estimate на реальном ключе, боевой IPN, зачисление actually_paid ≠ norm]`
 - [x*] Withdrawal → funds locked → admin approve → balance debited / reject → unlock — approve-путь целиком: `[auto: e2e/player-lifecycle.e2e.spec.ts::«7. вывод 500 RUB: средства блокируются (locked)»/«8. одобрение суперадмином: баланс 650, locked 0»]`; хвост: `[manual: reject-ветка в админке → locked возвращается на баланс]`
-- [x*] KYC 5000 RUB limit enforced on deposit — арифметика лимита и курсы: `[auto: kyc-limit-rates.integration.spec.ts::«rate=4000 меняет limit_remaining: 5000 RUB → 1.25 USDT»]` + `[auto: exchange-rates.spec.ts (3 describe, GAP-34)]`; хвост: `[manual: живой депозит без KYC сверх лимита → 403 KYC_REQUIRED]`
+- [x*] KYC 5000 RUB limit enforced on deposit — арифметика лимита и курсы: `[auto: kyc-limit-rates.integration.spec.ts::«rate=4000 меняет limit_remaining: 5000 RUB → 1.25 USDT»]` + `[auto: exchange-rates.spec.ts (3 describe, GAP-34)]`; порог читается из `KYC_DEPOSIT_LIMIT_RUB` и тот же, что видит игрок: `[auto: kyc-check.service.spec.ts (15)]`; зачисление по вебхуку сверх порога эскалируется, а не отказывается: `[auto: payments-webhook-kyc-escalation.spec.ts (13)]`; хвост: `[manual: живой депозит без KYC сверх лимита → DEPOSIT_LIMIT_EXCEEDED 422]`
 - [ ] Withdrawal always requires KYC — `[manual: запрос вывода у не-KYC-игрока → 403 KYC_REQUIRED (API + UI web); E2E покрывает лишь пройденный KYC-gate — «7. KYC-gate пройден»]`
 
 ## Casino
@@ -58,14 +58,14 @@
 
 ### Считалка (для сверки)
 
-| Раздел | всего | `[x]` auto | `[x*]` частично | `[ ]` manual |
-|---|---|---|---|---|
-| Auth | 9 | 0 | 3 | 6 |
-| Wallet / Payments | 8 | 3 | 4 | 1 |
-| Casino | 7 | 4 | 1 | 2 |
-| Support / Referrals | 5 | 2 | 0 | 3 |
-| Admin | 6 | 1 | 1 | 4 |
-| **Итого** | **35** | **10** | **9** | **16** |
+| Раздел              | всего  | `[x]` auto | `[x*]` частично | `[ ]` manual |
+| ------------------- | ------ | ---------- | --------------- | ------------ |
+| Auth                | 9      | 0          | 3               | 6            |
+| Wallet / Payments   | 8      | 3          | 4               | 1            |
+| Casino              | 7      | 4          | 1               | 2            |
+| Support / Referrals | 5      | 2          | 0               | 3            |
+| Admin               | 6      | 1          | 1               | 4            |
+| **Итого**           | **35** | **10**     | **9**           | **16**       |
 
 **Автопокрытие в сумме: 19 из 35** (10 полных + 9 частичных; GAP-56 2026-09-27 — считалка сведена с фактом: ранее Auth считался 7 пунктами при фактических 9, итог занижался до 33/17). Пропорция отвечает фактическому состоянию: весь money-путь и роль-гейт закрыты спеками, внешний контур (SMTP/PSP/OAuth/домен) — осознанный ручной остаток GAP-46.
 **Куда идти за деталями:** автопокрытие — `apps/api/test/` (25 файлов в корне + 1 в `e2e/` = 26 спецификаций: account-lockout, captcha, change-password, deposit-idempotency, env-validation, exchange-rates, game-round.integration, gitslotpark-adapter, health-ready, history-filters, kyc-file-sniffer, kyc-limit-rates.integration, ledger.integration, logger-redact, maintenance-jobs, money-flow, nowpayments-ipn, oauth-verify, provider-stubs, referral-payout.integration, roles-guard, seed-guard, sentry-options, smtp-mailer, withdrawal-link + e2e/player-lifecycle); ручной остаток — GAP-46 в [IMPLEMENTATION_GAPS.md](IMPLEMENTATION_GAPS.md) (пп. 1–9), session-expire при нагрузке — GAP-47.

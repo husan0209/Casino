@@ -6,6 +6,8 @@
  */
 import { z } from 'zod'
 
+import { AFFILIATE_REJECT_REASONS } from '../../domain/entities/affiliate.entity'
+
 /** Код трекинга: 8 символов из алфавита без 0/O/1/I. */
 export const TrackingCodeSchema = z
   .string()
@@ -29,14 +31,27 @@ export const AffiliatePasswordSchema = z
   .min(8, 'Пароль должен быть не короче 8 символов')
   .max(128)
 
+/**
+ * Тело запроса — snake_case (§2.2 API_CONVENTIONS), и оба клиента шлют именно так:
+ * apps/web/src/stores/affiliate.ts и e2e-сценарий. Прежние camelCase-ключи здесь
+ * не совпадали ни с одним из них: `accept_terms` из запроса схема не видела и
+ * отбивала регистрацию «примите условия» при снятой галочке и при поставленной,
+ * а `display_name` молча терялся (поле опциональное).
+ *
+ * Сообщение задано `errorMap`, а не `message`: в zod 3.25 `message` у
+ * `z.literal` подставляется только когда ключ отсутствует, а при неверном
+ * значении (`false`) наружу идёт дефолт «Invalid literal value, expected true».
+ */
 export const RegisterAffiliateSchema = z.object({
   email: AffiliateEmailSchema,
   password: AffiliatePasswordSchema,
-  displayName: z.string().trim().max(128).optional(),
+  display_name: z.string().trim().max(128).optional(),
   telegram: z.string().trim().max(64).optional(),
   website: z.string().trim().url('Некорректный URL сайта').max(500).optional(),
   /** Принятие соглашения — обязательное для compliance (ТЗ ч.8 §14.1). */
-  acceptTerms: z.literal(true, { message: 'Необходимо принять условия партнёрской программы' }),
+  accept_terms: z.literal(true, {
+    errorMap: () => ({ message: 'Необходимо принять условия партнёрской программы' }),
+  }),
 })
 
 export const LoginAffiliateSchema = z.object({
@@ -126,6 +141,16 @@ export const CommissionListQuerySchema = PaginationQuerySchema.extend({
     .optional(),
 })
 
+/**
+ * Список атрибуций для ручного разбора (ТЗ ч.8 §13.3) — фильтр по статусу и по
+ * причине. Без второго флаг F4 (`near_threshold_deposit`) пришлось бы искать
+ * глазами по страницам, и правило стало бы декоративным.
+ */
+export const AttributionListQuerySchema = PaginationQuerySchema.extend({
+  status: z.enum(['pending', 'qualified', 'rejected']).optional(),
+  reject_reason: z.enum(AFFILIATE_REJECT_REASONS).optional(),
+})
+
 export const ClickQuerySchema = z.object({
   days: z.coerce.number().int().positive().max(365).default(30),
 })
@@ -137,4 +162,5 @@ export type CreateAffiliateAdminDto = z.infer<typeof CreateAffiliateAdminSchema>
 export type UpdateAffiliateAdminDto = z.infer<typeof UpdateAffiliateAdminSchema>
 export type AffiliateListQueryDto = z.infer<typeof AffiliateListQuerySchema>
 export type CommissionListQueryDto = z.infer<typeof CommissionListQuerySchema>
+export type AttributionListQueryDto = z.infer<typeof AttributionListQuerySchema>
 export type ClickQueryDto = z.infer<typeof ClickQuerySchema>

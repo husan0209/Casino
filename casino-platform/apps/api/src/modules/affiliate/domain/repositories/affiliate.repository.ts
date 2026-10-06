@@ -97,6 +97,15 @@ export interface QualifyAttributionInput {
   firstDepositAt: Date | null
   totalDeposit: string
   depositCount: number
+  /**
+   * Флаг на разбор администратору (правило F4, ТЗ ч.8 §13.2).
+   *
+   * На квалифицированной строке `reject_reason` означает НЕ отказ: статус
+   * остаётся `qualified`, начисления идут (суточный расчёт фильтрует по
+   * `status`, а не по причине). Это единственное, чем квалификация может
+   * пометить «депозит ровно на порог», не наказав партнёра деньгами.
+   */
+  reviewReason?: AffiliateRejectReason | null
 }
 
 /** Данные для расчёта периода. */
@@ -209,6 +218,15 @@ export interface AffiliateAttributionRepository {
    * Начисление депозита квалифицированной атрибуции.
    * Возвращает false, если атрибуция ещё не qualified (депозит учтён, но
    * квалификация не пройдена) — тогда first_deposit_* остаётся пустым.
+   *
+   * ВЫЗЫВАЮЩЕГО СЕЙЧАС НЕТ, и это не опечатка: событие «депозит завершён» живёт
+   * в payments, а payments не может импортировать affiliate — сборался бы цикл
+   * `payments → affiliate → admin → payments` (affiliate нужен AdminFacade для
+   * аудита, admin с #171 импортирует PaymentsModule). ТЗ ч.8 §7.4 хочет именно
+   * синхронную квалификацию по событию; до её подключения квалификация читает
+   * депозиты из первоисточника — см. `sumPlayerDeposits`. Метод оставлен как
+   * сейм того самого события: удалять его — значит потерять форму, под которую
+   * оно придёт.
    */
   applyDeposit(args: {
     playerId: string
@@ -216,6 +234,33 @@ export interface AffiliateAttributionRepository {
     amount: string
     at: Date
   }): Promise<{ qualified: boolean; attributionId: string | null; isFirstDeposit: boolean }>
+  /**
+   * Депозиты игрока по данным платежей: сумма в RUB-эквиваленте, число заявок
+   * и первая из них.
+   *
+   * Источник — `payment_requests` (type=deposit, status=completed) по колонке
+   * `amount_rub`: ровно та единица, в которой задан порог `affiliate_min_deposit`
+   * (ТЗ ч.8 §7.4), и ровно та же строка, которую пересчитывает вебхук NOWPayments
+   * после фактической оплаты (GAP-72). Чтение чужой таблицы легально по ADR
+   * GAP-51; записей отсюда не делается.
+   *
+   * Нужен потому, что колонка `total_deposit` атрибуции заполнялась только из
+   * `applyDeposit`, а вызывающего у него нет (см. выше) — квалификация по
+   * накопленному не проходила никогда.
+   */
+  sumPlayerDeposits(playerId: string): Promise<{
+    totalRub: string
+    count: number
+    firstDepositId: string | null
+    firstDepositAt: Date | null
+    /**
+     * RUB-эквивалент самого раннего завершённого депозита — то, с чем правило
+     * F4 сравнивает порог (`near_threshold_deposit`). Порог определяется одним
+     * платежом, а не накопленной суммой: «закинул минималку» и «накопил
+     * минималку тремя депозитами» — разные сигналы.
+     */
+    firstAmountRub: string | null
+  }>
   /** Все квалифицированные атрибуции с депозитом — вход суточного расчёта. */
   listQualifiedForCalc(args: { until: Date; page: number; perPage: number }): Promise<{
     items: AttributionForCalc[]
@@ -241,6 +286,12 @@ export interface AffiliateAttributionRepository {
   list(args: {
     affiliateId?: string | undefined
     status?: AffiliateAttributionStatus | undefined
+    /**
+     * Разбор по причине (ТЗ ч.8 §13.3). Нужен не только для отказов: на
+     * квалифицированной строке колонка держит флаг F4, и без фильтра его
+     * пришлось бы искать по всем страницам.
+     */
+    rejectReason?: AffiliateRejectReason | undefined
     page: number
     perPage: number
   }): Promise<{ items: AffiliateAttributionEntity[]; total: number }>

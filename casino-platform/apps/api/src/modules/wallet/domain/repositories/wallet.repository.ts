@@ -1,6 +1,26 @@
 import type { CreditResult, Currency, MoneyAmount } from '@casino/shared-types'
 
-import type { LedgerEntryType, Prisma } from '@prisma/client'
+import type { LedgerEntry, LedgerEntryType, PaymentStatus, Prisma } from '@prisma/client'
+
+/** id + статус заявки — минимальный набор для строки истории проводок. */
+export type PaymentStatusById = { id: string; status: PaymentStatus }
+
+/**
+ * Строка журнала для админского списка: проводка + валюта кошелька + email
+ * игрока. Тип выводится из include-конфигурации запроса, а не переписывается
+ * руками — иначе список админки расходится с колонками молча.
+ */
+export type LedgerEntryAdminRow = Prisma.LedgerEntryGetPayload<{
+  include: { walletAccount: { select: { currency: true } }; user: { select: { email: true } } }
+}>
+
+/**
+ * То же без `user`: история проводок игрока принадлежит самому игроку, и
+ * джойнить таблицу пользователей на каждую страницу незачем.
+ */
+export type LedgerEntryOwnerRow = Prisma.LedgerEntryGetPayload<{
+  include: { walletAccount: { select: { currency: true } } }
+}>
 
 export interface WalletAccount {
   userId: string
@@ -33,6 +53,55 @@ export type { CreditResult }
 export interface IWalletRepository {
   getBalance(userId: string, currency: Currency): Promise<WalletAccount | null>
   listBalances(userId: string): Promise<WalletAccount[]>
+  /**
+   * Админский список проводок (ТЗ ч.3 UC-PAY-16) с фильтрами и пагинацией.
+   *
+   * `ledger_entries` принадлежит wallet, поэтому запрос здесь: presentation не
+   * имеет права ходить в БД (гард G27), а consumer видит только фасад.
+   */
+  listEntries(args: {
+    userId?: string | undefined
+    type?: LedgerEntryType | undefined
+    currency?: Currency | undefined
+    page: number
+    perPage: number
+  }): Promise<[LedgerEntryAdminRow[], number]>
+  /**
+   * История проводок игрока (`GET /wallet/transactions`, GAP-55 §11).
+   *
+   * `userId` обязателен типом: эндпоинт отдаёт данные конкретного игрока, и
+   * «забыть фильтр» здесь означало бы отдать чужой журнал. Границы периода
+   * (`from`/`to`) собраны вызывающим — здесь только `gte`/`lte`.
+   */
+  listOwnerEntries(args: {
+    userId: string
+    type?: LedgerEntryType | undefined
+    currency?: Currency | undefined
+    from?: Date | undefined
+    to?: Date | undefined
+    page: number
+    perPage: number
+  }): Promise<[LedgerEntryOwnerRow[], number]>
+  /**
+   * Проводки, выпущенные по конкретной платёжной заявке, — для карточки заявки.
+   *
+   * Связь лежит в `metadata.payment_request_id` (jsonb), поэтому без пагинации:
+   * у одной заявки их несколько десятков строк не бывает, а резать список
+   * произвольным лимитом значило бы молча врать админу.
+   */
+  findEntriesForPayment(paymentRequestId: string): Promise<LedgerEntry[]>
+  /**
+   * Статусы заявок игрока по id — `payment_status` в строке истории (GAP-55 §11).
+   *
+   * `payment_requests` принадлежит payments, но это ЧТЕНИЕ по ADR GAP-51 (так
+   * же читает их affiliate в `sumPlayerDeposits`). Через `PaymentsFacade`
+   * нельзя: `payments → wallet` уже импорт модуля, а обратный дал бы цикл
+   * модулей — `forwardRef` в этом репозитории не используется ни разу.
+   *
+   * `userId` в фильтре — граница, а не оптимизация: без него по списку чужих
+   * id вернулись бы чужие статусы (IDOR).
+   */
+  findPaymentStatuses(userId: string, ids: string[]): Promise<PaymentStatusById[]>
 }
 /**
  * GAP-57: кошелёк, который сериализует денежная транзакция. Ключ advisory-лока

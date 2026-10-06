@@ -96,6 +96,11 @@ services:
         # исторический плейсхолдер. Build-arg запекается в бандл: сменив домен,
         # не забудь `docker compose build web`.
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://casino.example.com/api/v1}
+        # Публичные ключи тоже инлайнятся на `next build` — без них в собранном
+        # бандле нет ни кнопки Google, ни капчи, ни разрешённых хостов картинок.
+        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+        - NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
+        - NEXT_PUBLIC_IMAGE_HOSTS=${NEXT_PUBLIC_IMAGE_HOSTS:-}
     env_file: [.env.production]
     # Next standalone-сервер берёт порт из process.env.PORT (дефолт 3000) и хост из
     # process.env.HOSTNAME. Docker сам проставляет HOSTNAME = ID контейнера, и тогда
@@ -136,6 +141,10 @@ services:
         # админка (axios 'use client', vhost admin без location /api/) уходила
         # на чужой хост. env_file на сборку не влияет — только build.args.
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://casino.example.com/api/v1}
+        # Тот же контур, что у web: публичные ключи пекутся на сборке.
+        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+        - NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
+        - NEXT_PUBLIC_IMAGE_HOSTS=${NEXT_PUBLIC_IMAGE_HOSTS:-}
     env_file: [.env.production]
     # PORT обязан быть 3002: nginx-шаблон проксирует ADMIN_DOMAIN на http://admin:3002,
     # но Next standalone без process.env.PORT слушает 3000 (в образе EXPOSE 3000 — он
@@ -197,13 +206,19 @@ services:
       # GAP-56: snippets раньше не монтировался — include /etc/nginx/snippets/ssl.conf
       # ронял nginx на первом старте (nginx: [emerg] open() ... failed)
       - ./infra/nginx/snippets:/etc/nginx/snippets:ro
+      # GAP-56 (перенос): welcome-страницу образа убирает этот хук, а не command —
+      # см. комментарий ниже.
+      - ./infra/nginx/docker-entrypoint.d/05-drop-default-conf.sh:/docker-entrypoint.d/05-drop-default-conf.sh:ro
       - certbot_certs:/etc/letsencrypt:ro
       - certbot_www:/var/www/certbot:ro
       - ./uploads:/var/www/uploads:ro
     # GAP-56: дефолтный default.conf образа слушает :80 и отдаёт welcome-страницу
-    # по прямому IP; убираем до старта nginx (envsubst-скрипты entrypoint к этому
-    # моменту уже сгенерировали conf.d/casino.conf из шаблона).
-    command: ['sh', '-c', "rm -f /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]
+    # по прямому IP. Раньше его убирали через command: ['sh','-c', ...] — но официальный
+    # entrypoint nginx прогоняет /docker-entrypoint.d/* (в том числе envsubst шаблонов в
+    # conf.d) только при $1 = nginx|nginx-debug. Прошлый command обходил этот guard:
+    # casino.conf не генерировался, nginx поднимался без единого vhost'а, снаружи —
+    # connection refused, внутри compose считалось healthy. Удаление вынесено в хук 05-.
+    command: ['nginx', '-g', 'daemon off;']
     restart: unless-stopped
     networks: [casino]
     logging:

@@ -177,7 +177,11 @@ export class NOWPaymentsClient implements INowPaymentsClient {
           // строкой (params.priceAmount: string), провайдеру уходит число по его
           // спецификации (docs/PAYMENT_OVERVIEW.md, решение В11).
           price_amount: Number(params.priceAmount),
-          price_currency: params.priceCurrency.toLowerCase(),
+          // Тот же маппер, что у pay_currency: NOWPayments принимает только
+          // буквенно-цифровые тикеры, а наше имя USDT_TRC20 содержит подчёркивание.
+          // toLowerCase() его не убирает → INVALID_REQUEST_PARAMS
+          // «price_currency must only contain alpha-numeric characters».
+          price_currency: this.mapCurrency(params.priceCurrency),
           pay_currency: this.mapCurrency(payCurrency),
           order_id: params.orderId,
           ipn_callback_url: params.ipnCallbackUrl,
@@ -219,7 +223,9 @@ export class NOWPaymentsClient implements INowPaymentsClient {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
     if (!res.ok) {
-      throw new PaymentProviderError(`HTTP ${res.status}`)
+      // Тело ответа — единственное, что объясняет отказ (например AMOUNT_MINIMAL_ERROR
+      // с конкретной суммой). Без него диагностика сводится к «HTTP 400».
+      throw new PaymentProviderError(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
     }
     const d = asPspResponse<NOWPaymentsPaymentStatusResponse>(await res.json())
     return {
@@ -259,7 +265,8 @@ export class NOWPaymentsClient implements INowPaymentsClient {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       })
       if (!res.ok) {
-        throw new PaymentProviderError(`HTTP ${res.status}`)
+        // См. getPaymentStatus: без тела 429/400 неотличимы друг от друга.
+        throw new PaymentProviderError(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
       }
       const d = asPspResponse<NOWPaymentsEstimateResponse>(await res.json())
       // Курс остаётся строкой: `String(Number(x))` на границе терял формат
@@ -321,7 +328,8 @@ export class NOWPaymentsClient implements INowPaymentsClient {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     })
     if (!res.ok) {
-      throw new PaymentProviderError(`estimate HTTP ${res.status}`)
+      const detail = (await res.text()).slice(0, 200)
+      throw new PaymentProviderError(`estimate HTTP ${res.status}: ${detail}`)
     }
     const d = asPspResponse<NOWPaymentsEstimateResponse>(await res.json())
     return { estimatedAmount: String(d.estimated_amount ?? params.amount) }

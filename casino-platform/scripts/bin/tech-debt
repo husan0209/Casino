@@ -72,7 +72,7 @@ DIR=tech-debt
 # ловит запись ТРЕТЬИХ модулей (кейс GAP-62: affiliate писал в users), а не
 # превращает в долг законную работу обоих владельцев.
 MODEL_OWNERS='
-User:auth User:users AuthProvider:auth Session:auth Session:users EmailVerification:auth PasswordReset:auth
+User:auth User:users AuthProvider:auth Session:auth Session:users EmailVerification:auth PasswordReset:auth TermsAcceptance:auth
 UserProfile:users UserSettings:users KycProfile:kyc KycDocument:kyc
 AdminUser:admin AuditLog:admin SystemSetting:admin
 WalletAccount:wallet LedgerEntry:wallet
@@ -141,6 +141,33 @@ detect() {
           [ -n "$CLS" ] || CLS="$DERIVED"
           grep -rqw "$CLS" apps/api/test --include='*.spec.ts' 2>/dev/null && continue
           printf '%s\n' "$uc"
+        done
+      ;;
+    # Сервис без теста. Скоуп — любой *.service.ts внутри apps/api/src/modules:
+    # и application-слой (DashboardService, NotificationService), и
+    # infrastructure-сервисы (подпись админских токенов, argon2-хешер, очередь
+    # писем). Критерий покрытия ЗАМЕТНО строже, чем у use-case-specs, и вот почему:
+    # DI-wiring-спеки (admin-module-wiring.spec.ts, admin-contract.spec.ts)
+    # перечисляют ИМЕНА всех провайдеров модуля — при мягком критерии «упомянут»
+    # сервис считался бы покрытым, хотя ни один ассерт его поведение не проверяет.
+    # Это ровно тот вакуумный гард, из-за которого G7 когда-то протух.
+    # Покрытием считается только:
+    #   (а) соседний файл <имя>.service.spec.ts, ИЛИ
+    #   (б) в любом *.spec.ts (в test/ и рядом с кодом в src/) есть вызов
+    #       конструктора `new <Class>(` — то есть спека реально собирает сервис.
+    # Имя класса читается из файла, а не выводится из пути: admin-jwt.service.ts
+    # содержит класс AdminAuthService, mechanical camelCase дал бы бы AdminJwtService
+    # и гард искал бы в спеках несуществующее имя.
+    service-specs)
+      find apps/api/src/modules -name '*.service.ts' ! -name '*.spec.ts' 2>/dev/null |
+        sed 's|\\|/|g' | sort |
+        while IFS= read -r svc; do
+          [ -f "${svc%.ts}.spec.ts" ] && continue
+          CLS=$(grep -oE 'export class [A-Za-z0-9_]+' "$svc" 2>/dev/null | head -1 | awk '{print $3}')
+          [ -n "$CLS" ] || continue
+          grep -rlE "new ${CLS}[[:space:]]*\(" apps/api/test apps/api/src --include='*.spec.ts' 2>/dev/null |
+            grep -q . && continue
+          printf '%s\n' "$svc"
         done
       ;;
     # Кросс-модульные deep-импорты мимо Facade (MODULE_BOUNDARIES.md).
@@ -257,6 +284,33 @@ detect() {
           END { for (f in hits) printf "%s\t%d\n", f, hits[f] }
         ' {} + | sort
       ;;
+    # presentation-слой ходит в БД в обход application-слоя и фасадов
+    # (AI_DEVELOPMENT_RULES §3.3 — пример «❌ логика в controller» там же и
+    # показан: `prisma.user.findUnique` внутри контроллера). Считаются ЛЮБЫЕ
+    # обращения к моделям Prisma — и чтения, и записи, и по чужому клиенту
+    # транзакции `tx`:
+    #   • чужие ЗАПИСИ ловит foreign-writes, но запись в СВОЮ таблицу из
+    #     контроллера не ловил никто — её закрыло именно это правило;
+    #   • чтения из presentation обходят фасад ровно так же, как обходили бы
+    #     границу модуля, поэтому класс тоже здесь, а не в cross-module-imports.
+    # Правило заведено ПО ФАКТУ, а не с нуля: базлайн — 9 файлов / 37 вхождений
+    # на 2026-10-05. С этого момента он может только уменьшаться: рост → FAIL,
+    # погасил и не ужмят базлайн → STALE.
+    # Анти-вакуум: если каталогов presentation вообще нет, детектор exit 2 —
+    # пустое дерево это не «ноль нарушений», а оглохший гард.
+    presentation-db)
+      DIRS=$(ls -d apps/api/src/modules/*/presentation 2>/dev/null || true)
+      if [ -z "$DIRS" ]; then
+        echo "tech-debt [presentation-db]: нет apps/api/src/modules/*/presentation — гарду нечего сканировать (анти-вакуум: пустое дерево это FAIL, не OK)" >&2
+        return 2
+      fi
+      # $DIRS без кавычек намеренно: список каталогов из ls разбивается на слова.
+      grep -rnoE '\b(prisma|tx)\.[a-zA-Z][A-Za-z0-9]*\.(findFirst|findMany|findFirstOrThrow|findUnique|findUniqueOrThrow|count|aggregate|groupBy|create|createMany|update|updateMany|delete|deleteMany|upsert)\(' \
+        $DIRS --include='*.ts' 2>/dev/null |
+        grep -vE '\.spec\.ts:|\.test\.ts:' |
+        cut -d: -f1 | sed 's|\\|/|g' | sort | uniq -c |
+        awk '{print $2 "\t" $1}' | sort
+      ;;
     *)
       echo "tech-debt: неизвестное правило '$1' (см. tech-debt list)" >&2
       return 2
@@ -264,7 +318,7 @@ detect() {
   esac
 }
 
-NAMES='raw-error nest-exceptions eslint-disable money-number use-case-specs cross-module-imports foreign-writes'
+NAMES='raw-error nest-exceptions eslint-disable money-number use-case-specs service-specs cross-module-imports foreign-writes presentation-db'
 
 # Имя правила проверяется ДО любого редиректа в tech-debt/: `gen <опечатка>`
 # ранее создавал пустой tech-debt/<опечатка>.txt, который потом попадал в git

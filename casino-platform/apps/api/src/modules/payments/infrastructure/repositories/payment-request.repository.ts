@@ -7,9 +7,14 @@ import {
   type PaymentProvider,
   type PaymentRequest,
   type PaymentStatus,
+  type PaymentType,
 } from '@casino/database'
 
-import type { IPaymentRequestRepository } from '../../domain/payments.ports'
+import type {
+  IPaymentRequestRepository,
+  PaymentRequestAdminRow,
+  PaymentRequestDetailRow,
+} from '../../domain/payments.ports'
 
 export type { PaymentRequest, PaymentProvider, PaymentStatus, PaymentType } from '@casino/database'
 
@@ -35,6 +40,7 @@ export class PaymentRequestRepository implements IPaymentRequestRepository {
       errorMessage?: string | undefined
       externalId?: string | undefined
       paymentUrl?: string | undefined
+      amountRub?: string | undefined
     } = {},
   ): Promise<PaymentRequest> {
     // exactOptionalPropertyTypes: Prisma не принимает явный undefined —
@@ -49,6 +55,7 @@ export class PaymentRequestRepository implements IPaymentRequestRepository {
         ...(extra.errorMessage !== undefined && { errorMessage: extra.errorMessage }),
         ...(extra.externalId !== undefined && { externalId: extra.externalId }),
         ...(extra.paymentUrl !== undefined && { paymentUrl: extra.paymentUrl }),
+        ...(extra.amountRub !== undefined && { amountRub: extra.amountRub }),
       },
     })
   }
@@ -72,6 +79,59 @@ export class PaymentRequestRepository implements IPaymentRequestRepository {
       }),
       prisma.paymentRequest.count({ where }),
     ])
+  }
+
+  /**
+   * Админский список заявок (гард G27: SQL владельца таблицы, не контроллера).
+   * Фильтры попадают в `where` только когда пришли — пустая строка query не
+   * должна превращаться в `status: ''` и ронять запрос.
+   */
+  listAdmin(args: {
+    userId?: string | undefined
+    type?: PaymentType | undefined
+    status?: PaymentStatus | undefined
+    provider?: PaymentProvider | undefined
+    currency?: string | undefined
+    page: number
+    perPage: number
+  }): Promise<[PaymentRequestAdminRow[], number]> {
+    const where: Prisma.PaymentRequestWhereInput = {
+      ...(args.userId !== undefined && { userId: args.userId }),
+      ...(args.type !== undefined && { type: args.type }),
+      ...(args.status !== undefined && { status: args.status }),
+      ...(args.provider !== undefined && { provider: args.provider }),
+      ...(args.currency !== undefined && { currency: args.currency }),
+    }
+    return Promise.all([
+      prisma.paymentRequest.findMany({
+        where,
+        skip: (args.page - 1) * args.perPage,
+        take: args.perPage,
+        orderBy: { createdAt: 'desc' },
+        include: { user: { select: { email: true } } },
+      }),
+      prisma.paymentRequest.count({ where }),
+    ])
+  }
+
+  findDetail(id: string): Promise<PaymentRequestDetailRow | null> {
+    return prisma.paymentRequest.findUnique({
+      where: { id },
+      include: { callbacks: true, user: { select: { email: true } } },
+    })
+  }
+
+  /**
+   * Условное истечение (порт + гард G24): `status: 'pending'` в where, поэтому
+   * гонка с вебхуком не затирает completed. Условие держится здесь, а не в
+   * вызывающем коде: читатель не может гарантировать, что заявка ещё pending.
+   */
+  async expireIfPending(id: string): Promise<number> {
+    const res = await prisma.paymentRequest.updateMany({
+      where: { id, status: 'pending' },
+      data: { status: 'expired' },
+    })
+    return res.count
   }
   saveCallback(data: {
     provider: string

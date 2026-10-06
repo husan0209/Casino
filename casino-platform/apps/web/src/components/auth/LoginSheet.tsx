@@ -71,7 +71,7 @@ function OAuthSection({ referral }: { referral: string | undefined }): React.JSX
           Продолжить с Google
         </button>
       ) : (
-        <Link href="/google/callback" className={OAUTH_BUTTON_CLASS}>
+        <Link href="/auth/google/callback" className={OAUTH_BUTTON_CLASS}>
           <span className="grid h-6 w-6 place-items-center rounded-full bg-white">
             <GoogleMark size={14} />
           </span>
@@ -136,7 +136,7 @@ function TermsConsent({
           rel="noopener noreferrer"
           className="text-white underline"
         >
-          политику конфиденциальности
+          политика конфиденциальности
         </Link>
         .
       </span>
@@ -234,7 +234,7 @@ export function LoginSheet(): React.JSX.Element | null {
         await login(email, password, captchaRequired ? captchaToken : undefined)
       } else {
         // §5.1: сессия создаётся сразу, письмо подтверждения уходит фоном.
-        // Версия условий берётся из того же реестра, что и текст на /legal, —
+        // Версия условий берётся из того же реестра, что и текст на /legal/terms:
         // сервер сверит её и запишет акцепт (GAP-71, Terms §4).
         await register(email, password, {
           referral,
@@ -302,8 +302,14 @@ export function LoginSheet(): React.JSX.Element | null {
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs text-muted">Email</label>
+            <label className="mb-1 block text-xs text-muted" htmlFor="auth-email">
+              Email
+            </label>
             <input
+              id="auth-email"
+              name="email"
+              type="email"
+              autoComplete={mode === 'login' ? 'username' : 'email'}
               className="input"
               placeholder="you@example.com"
               value={email}
@@ -311,20 +317,25 @@ export function LoginSheet(): React.JSX.Element | null {
             />
           </div>
           <div>
-            <label className="mb-1 flex items-center justify-between text-xs text-muted">
-              <span>Пароль</span>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-xs text-muted" htmlFor="auth-password">
+                Пароль
+              </label>
               {mode === 'login' && (
                 <Link
                   href="/forgot-password"
-                  className="text-brand hover:underline"
+                  className="text-xs text-brand hover:underline"
                   onClick={closeLogin}
                 >
                   Забыли пароль?
                 </Link>
               )}
-            </label>
+            </div>
             <div className="relative">
               <input
+                id="auth-password"
+                name="password"
+                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 className="input pr-10"
                 type={showPassword ? 'text' : 'password'}
                 placeholder={mode === 'login' ? 'Введите пароль' : 'Мин. 8 символов'}
