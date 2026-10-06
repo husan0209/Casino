@@ -95,8 +95,9 @@ export class AffiliateAdminController {
    */
   @Get('partners')
   @Roles('admin', 'superadmin')
-  @UsePipes(new ZodValidationPipe(AffiliateListQuerySchema))
-  async listPartners(query: AffiliateListQueryDto): Promise<{
+  async listPartners(
+    @Query(new ZodValidationPipe(AffiliateListQuerySchema, ['query'])) query: AffiliateListQueryDto,
+  ): Promise<{
     data: Array<{
       id: string
       email: string
@@ -344,8 +345,10 @@ export class AffiliateAdminController {
   /** Все начисления программы с фильтрами (UC-AFF-24). */
   @Get('commissions')
   @Roles('admin', 'superadmin')
-  @UsePipes(new ZodValidationPipe(CommissionListQuerySchema))
-  async listCommissions(query: CommissionListQueryDto): Promise<{
+  async listCommissions(
+    @Query(new ZodValidationPipe(CommissionListQuerySchema, ['query']))
+    query: CommissionListQueryDto,
+  ): Promise<{
     data: Array<{
       id: string
       affiliate_id: string

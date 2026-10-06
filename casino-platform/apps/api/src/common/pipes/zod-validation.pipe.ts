@@ -5,12 +5,24 @@ import { errorMessage } from '@/common/utils/error-message'
 
 
 export class ZodValidationPipe implements PipeTransform {
-  constructor(private schema: ZodType) {}
+  constructor(
+    private schema: ZodType,
+    /**
+     * Какие типы параметров валидировать. По умолчанию — только `body`: pipe
+     * вешается скоупом на метод/контроллер и применяется ко ВСЕМ параметрам
+     * хендлера (в т.ч. @CurrentUser() и @Param()), иначе схема тела валидировала
+     * бы их (найдено E2E, PR #15).
+     *
+     * Для GET-эндпоинтов, где схема относится к строке запроса, типы передаются
+     * явно при точечном применении: @Query(new ZodValidationPipe(Schema, ['query'])).
+     * Без этого @UsePipes(new ZodValidationPipe(<query-схема>)) не валидировал
+     * ровным счётом ничего — ClickQuerySchema/CommissionListQuerySchema/
+     * AffiliateListQuerySchema существовали только как текст.
+     */
+    private types: readonly string[] = ['body'],
+  ) {}
   transform(value: unknown, metadata: ArgumentMetadata): unknown {
-    // Контроллер-скоуп @UsePipes применяется ко ВСЕМ параметрам хендлера
-    // (в т.ч. @CurrentUser() и @Param()) — валидируем только тело запроса.
-    // Без этого guard'а эндпоинты с pipe'ом всегда отдавали 400 (найдено E2E, PR #15).
-    if (metadata.type !== 'body') {
+    if (!this.types.includes(metadata.type)) {
       return value
     }
     try {
