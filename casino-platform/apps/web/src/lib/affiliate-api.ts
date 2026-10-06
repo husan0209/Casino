@@ -46,5 +46,23 @@ export async function affiliatePatch<T>(url: string, body?: unknown): Promise<T>
 export function affiliateErrText(error: unknown): string {
   const ax = error as AxiosError<ApiResponse<unknown>> | null
   const data = ax?.response?.data
-  return data?.error?.message ?? ((error as Error).message || 'Ошибка')
+  const message = data?.error?.message ?? (error as Error).message
+  if (typeof message !== 'string' || message === '') {
+    return 'Ошибка'
+  }
+  // VALIDATION_ERROR из ZodValidationPipe приходит как сериализованный массив
+  // проблем ('[{"code":"invalid_literal",…}]') — показывать его игроку нельзя,
+  // но внутри него лежит готовый человеческий текст от схемы.
+  if (message.startsWith('[')) {
+    try {
+      const issues = JSON.parse(message) as Array<{ message?: unknown }>
+      const first = Array.isArray(issues) ? issues[0]?.message : undefined
+      if (typeof first === 'string' && first !== '') {
+        return first
+      }
+    } catch {
+      /* не JSON — отдаём как есть */
+    }
+  }
+  return message
 }

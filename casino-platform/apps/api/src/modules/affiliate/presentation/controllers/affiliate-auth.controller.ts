@@ -65,7 +65,16 @@ export class AffiliateAuthController {
     access_token: string
     message: string
   }> {
-    const result = await this.registerUseCase.execute(body)
+    // Провод → snake_case, application-слой → camelCase: ключи маппятся явно,
+    // чтобы в домен не просочилось ничего лишнего из тела запроса.
+    const result = await this.registerUseCase.execute({
+      email: body.email,
+      password: body.password,
+      displayName: body.display_name,
+      telegram: body.telegram,
+      website: body.website,
+      acceptTerms: body.accept_terms,
+    })
     return {
       affiliate_id: result.affiliateId,
       tracking_code: result.trackingCode,

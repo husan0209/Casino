@@ -31,14 +31,27 @@ export const AffiliatePasswordSchema = z
   .min(8, 'Пароль должен быть не короче 8 символов')
   .max(128)
 
+/**
+ * Тело запроса — snake_case (§2.2 API_CONVENTIONS), и оба клиента шлют именно так:
+ * apps/web/src/stores/affiliate.ts и e2e-сценарий. Прежние camelCase-ключи здесь
+ * не совпадали ни с одним из них: `accept_terms` из запроса схема не видела и
+ * отбивала регистрацию «примите условия» при снятой галочке и при поставленной,
+ * а `display_name` молча терялся (поле опциональное).
+ *
+ * Сообщение задано `errorMap`, а не `message`: в zod 3.25 `message` у
+ * `z.literal` подставляется только когда ключ отсутствует, а при неверном
+ * значении (`false`) наружу идёт дефолт «Invalid literal value, expected true».
+ */
 export const RegisterAffiliateSchema = z.object({
   email: AffiliateEmailSchema,
   password: AffiliatePasswordSchema,
-  displayName: z.string().trim().max(128).optional(),
+  display_name: z.string().trim().max(128).optional(),
   telegram: z.string().trim().max(64).optional(),
   website: z.string().trim().url('Некорректный URL сайта').max(500).optional(),
   /** Принятие соглашения — обязательное для compliance (ТЗ ч.8 §14.1). */
-  acceptTerms: z.literal(true, { message: 'Необходимо принять условия партнёрской программы' }),
+  accept_terms: z.literal(true, {
+    errorMap: () => ({ message: 'Необходимо принять условия партнёрской программы' }),
+  }),
 })
 
 export const LoginAffiliateSchema = z.object({
