@@ -9,8 +9,9 @@
  * Это осознанное требование: ошибка в расчёте разрушает доверие быстрее, чем
  * низкая ставка (ТЗ ч.8 §3.9).
  */
-import { Controller, Get, Inject, Patch, Post, UseGuards, UsePipes } from '@nestjs/common'
+import { Body, Controller, Get, Inject, Patch, Post, Query, UseGuards } from '@nestjs/common'
 
+import { CurrentUser } from '@/common/decorators/current-user.decorator'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 import { type AffiliateActor } from '@/common/types/req-user'
 
@@ -77,7 +78,7 @@ export class AffiliateController {
    * «0.2000». Сырое значение тоже возвращается: оно попадает в расчёты.
    */
   @Get('me')
-  async me(actor: AffiliateActor): Promise<{
+  async me(@CurrentUser() actor: AffiliateActor): Promise<{
     affiliate_id: string
     email: string
     display_name: string | null
@@ -120,10 +121,9 @@ export class AffiliateController {
    * и крипту в одну цифру бессмысленно (курсовой конвертации NGR нет).
    */
   @Get('dashboard')
-  @UsePipes(new ZodValidationPipe(ClickQuerySchema))
   async dashboard(
-    actor: AffiliateActor,
-    query: ClickQueryDto,
+    @CurrentUser() actor: AffiliateActor,
+    @Query(new ZodValidationPipe(ClickQuerySchema, ['query'])) query: ClickQueryDto,
   ): Promise<{
     period_days: number
     clicks: { total: number; converted: number; conversion_rate: string }
@@ -171,9 +171,9 @@ export class AffiliateController {
    * сложилась его комиссия, иначе он не может проверить расчёт (ТЗ ч.8 §3.1).
    */
   @Get('commissions')
-  @UsePipes(new ZodValidationPipe(CommissionListQuerySchema))
   async commissions(
-    actor: AffiliateActor,
+    @CurrentUser() actor: AffiliateActor,
+    @Query(new ZodValidationPipe(CommissionListQuerySchema, ['query']))
     query: CommissionListQueryDto,
   ): Promise<{
     data: Array<{
@@ -229,7 +229,7 @@ export class AffiliateController {
 
   /** Приведённые игроки со статусами — партнёр видит качество своего трафика. */
   @Get('players')
-  async players(actor: AffiliateActor): Promise<{
+  async players(@CurrentUser() actor: AffiliateActor): Promise<{
     data: Array<{
       player_id: string
       status: string
@@ -266,7 +266,7 @@ export class AffiliateController {
 
   /** Промо-ссылки: базовая + deep-link на каталог/игру. */
   @Get('links')
-  async links(actor: AffiliateActor): Promise<{
+  async links(@CurrentUser() actor: AffiliateActor): Promise<{
     tracking_url: string
     cookie_days: number
     examples: Array<{ name: string; url: string }>
@@ -286,10 +286,9 @@ export class AffiliateController {
 
   /** Самостоятельное изменение только контактов. Ставку и статус — нельзя. */
   @Patch('me')
-  @UsePipes(new ZodValidationPipe(UpdateAffiliateSelfSchema))
   async updateMe(
-    body: UpdateAffiliateSelfDto,
-    actor: AffiliateActor,
+    @Body(new ZodValidationPipe(UpdateAffiliateSelfSchema)) body: UpdateAffiliateSelfDto,
+    @CurrentUser() actor: AffiliateActor,
   ): Promise<{ display_name: string | null; telegram: string | null; website: string | null }> {
     const updated = await this.updateProfileUseCase.execute({
       affiliateId: actor.affiliateId,
@@ -310,7 +309,7 @@ export class AffiliateController {
    * это не санкция, а отказ от работы.
    */
   @Post('leave')
-  async leave(actor: AffiliateActor): Promise<{ status: string; message: string }> {
+  async leave(@CurrentUser() actor: AffiliateActor): Promise<{ status: string; message: string }> {
     await this.leaveProgramUseCase.execute({ affiliateId: actor.affiliateId })
     return { status: 'suspended', message: 'Вы вышли из партнёрской программы' }
   }
