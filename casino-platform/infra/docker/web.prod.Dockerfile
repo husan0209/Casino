@@ -14,6 +14,10 @@ ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY=
 ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=$NEXT_PUBLIC_TURNSTILE_SITE_KEY
 ARG NEXT_PUBLIC_IMAGE_HOSTS=
 ENV NEXT_PUBLIC_IMAGE_HOSTS=$NEXT_PUBLIC_IMAGE_HOSTS
+# UC-AUTH-09: username бота для Telegram Login Widget — не секрет (в бандл идёт
+# только он; токен живёт на API), но тоже инлайнится на `next build`.
+ARG NEXT_PUBLIC_TELEGRAM_BOT_NAME=
+ENV NEXT_PUBLIC_TELEGRAM_BOT_NAME=$NEXT_PUBLIC_TELEGRAM_BOT_NAME
 # GAP-60: без этих двух файлов сборка этого образа падала ВСЕГДА (её просто не
 # гонял ни один CI до 2026-10-01 — docker-build собирал только api.prod).
 #   .npmrc — node-linker=hoisted. Без него pnpm изолирует транзитивные зависимости
