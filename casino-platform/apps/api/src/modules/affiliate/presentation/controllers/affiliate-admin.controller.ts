@@ -186,9 +186,9 @@ export class AffiliateAdminController {
     const created = await this.createPartnerUseCase.execute({
       email: body.email,
       password: body.password,
-      revshareRate: body.revshareRate,
-      payoutCurrency: body.payoutCurrency,
-      displayName: body.displayName,
+      revshareRate: body.revshare_rate,
+      payoutCurrency: body.payout_currency,
+      displayName: body.display_name,
       country: body.country,
     })
     await this.audit.logAction({
@@ -223,7 +223,20 @@ export class AffiliateAdminController {
     @CurrentUser() admin: AdminActor,
     @Req() request: Request,
   ): Promise<{ id: string; revshare_rate: string; status: string }> {
-    const result = await this.updatePartnerUseCase.execute({ affiliateId: id, changes: body })
+    const result = await this.updatePartnerUseCase.execute({
+      affiliateId: id,
+      changes: {
+        status: body.status,
+        revshareRate: body.revshare_rate,
+        displayName: body.display_name,
+        country: body.country,
+        telegram: body.telegram,
+        website: body.website,
+        payoutCurrency: body.payout_currency,
+        suspendedReason: body.suspended_reason,
+        isAgreed: body.is_agreed,
+      },
+    })
     await this.audit.logAction({
       actorType: 'admin',
       actorId: admin.id,
@@ -236,7 +249,7 @@ export class AffiliateAdminController {
           status: result.previous.status,
         },
         to: { revshareRate: result.affiliate.revshareRate, status: result.affiliate.status },
-        reason: body.suspendedReason ?? null,
+        reason: body.suspended_reason ?? null,
       },
       ipAddress: request.ip,
     })

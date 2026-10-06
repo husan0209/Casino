@@ -290,9 +290,14 @@ export class AffiliateController {
     @Body(new ZodValidationPipe(UpdateAffiliateSelfSchema)) body: UpdateAffiliateSelfDto,
     @CurrentUser() actor: AffiliateActor,
   ): Promise<{ display_name: string | null; telegram: string | null; website: string | null }> {
+    // Провод snake_case, application-слой camelCase (как в register после #195).
     const updated = await this.updateProfileUseCase.execute({
       affiliateId: actor.affiliateId,
-      changes: body,
+      changes: {
+        displayName: body.display_name,
+        telegram: body.telegram,
+        website: body.website,
+      },
     })
     return {
       display_name: updated.displayName,
