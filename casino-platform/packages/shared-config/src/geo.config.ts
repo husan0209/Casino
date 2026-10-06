@@ -83,7 +83,7 @@ export const CURRENCY_LIMITS: Record<DisplayCurrency, CurrencyLimitsDef> = {
     fiatLive: false,
   },
   USDT_TRC20: {
-    depositMin: '10',
+    depositMin: '20',
     depositMax: '50000',
     withdrawMin: '20',
     withdrawMax: '20000',
@@ -91,7 +91,7 @@ export const CURRENCY_LIMITS: Record<DisplayCurrency, CurrencyLimitsDef> = {
     fiatLive: false,
   },
   BTC: {
-    depositMin: '0.0001',
+    depositMin: '0.0003',
     depositMax: '2',
     withdrawMin: '0.0002',
     withdrawMax: '1',
