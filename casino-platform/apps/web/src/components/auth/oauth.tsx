@@ -1,15 +1,21 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
+
 import { apiGet, apiPost } from '@/lib/api'
 import { type WebUser } from '@/stores/auth'
 
 /**
- * OAuth-блок (pre-launch: ТЗ ч.2 UC-AUTH-08) — единственный на весь веб:
+ * OAuth-блок (pre-launch: ТЗ ч.2 UC-AUTH-08/09) — единственный на весь веб:
  * живёт внутри LoginSheet (§5), отдельные страницы входа/регистрации убраны.
  * Google: GET /auth/google/url → редирект на Google → /auth/google/callback
  *         обменивает code на сессию (state — подписанный CSRF-токен API).
- * Telegram: настоящий виджет (UC-AUTH-09) отложен до настройки бота и домена
- *         (тот же контур, что GAP-46) — в листе пока заглушка с фирменным знаком.
+ * Telegram: TelegramLoginWidget инжектит официальный скрипт
+ *         telegram-widget.js (бот из NEXT_PUBLIC_TELEGRAM_BOT_NAME), после
+ *         входа Telegram дёргает глобальный колбэк, exchangeTelegramAuth
+ *         меняет данные виджета на сессию (POST /auth/telegram). Iframe
+ *         виджета рендерится только на домене, добавленном боту через
+ *         /setdomain в BotFather, — на остальных Telegram показывает ошибку.
  *
  * Кнопка Google рисует реальный поток только когда задан
  * NEXT_PUBLIC_GOOGLE_CLIENT_ID — «подключается при наличии ключей».
@@ -17,6 +23,8 @@ import { type WebUser } from '@/stores/auth'
  */
 
 export const GOOGLE_CLIENT_ID = process.env['NEXT_PUBLIC_GOOGLE_CLIENT_ID']
+
+export const TELEGRAM_BOT_NAME = process.env['NEXT_PUBLIC_TELEGRAM_BOT_NAME']
 
 /** Единый стиль OAuth-плашек листа (Google/Telegram). */
 export const OAUTH_BUTTON_CLASS =
@@ -113,4 +121,86 @@ export async function exchangeGoogleCode(): Promise<{ accessToken: string; user:
   })
   sessionStorage.removeItem('oauth_referral_code')
   return res
+}
+
+/** Данные пользователя от Telegram Login Widget (UC-AUTH-09) до обмена на сессию. */
+export interface TelegramAuthPayload {
+  id: number | string
+  auth_date: number | string
+  hash: string
+  first_name?: string
+  last_name?: string
+  username?: string
+  photo_url?: string
+}
+
+/**
+ * Обмен данных виджета на сессию — POST /auth/telegram. Подпись Telegram
+ * проверяет API по HMAC от TELEGRAM_BOT_TOKEN (токен живёт только на сервере).
+ * Виджет присылает id/auth_date числами, DTO API требует строки — конвертация
+ * здесь, остальные поля едут как есть (серверный zod-схема passthrough).
+ */
+export async function exchangeTelegramAuth(
+  payload: TelegramAuthPayload,
+  referralCode?: string,
+): Promise<{ accessToken: string; user: WebUser }> {
+  return apiPost<{ accessToken: string; user: WebUser }>('/auth/telegram', {
+    id: String(payload.id),
+    auth_date: String(payload.auth_date),
+    hash: payload.hash,
+    first_name: payload.first_name,
+    last_name: payload.last_name,
+    username: payload.username,
+    photo_url: payload.photo_url,
+    referral_code: referralCode,
+  })
+}
+
+/** Имя глобального колбэка, который виджет вызывает после входа (data-onauth). */
+const TELEGRAM_ONAUTH_CALLBACK = 'onTelegramWidgetAuth'
+
+interface TelegramLoginWidgetProps {
+  onAuth: (payload: TelegramAuthPayload) => void
+}
+
+/**
+ * Официальный Telegram Login Widget (UC-AUTH-09). Скрипт telegram-widget.js
+ * заменяет собственный тег на iframe oauth.telegram.org, где игрок подтверждает
+ * вход; результат приходит в глобальный колбэк из data-onauth. Нативная кнопка
+ * Telegram (data-size=large) используется как есть — клик через невидимый
+ * оверлей виджет не поддерживает.
+ */
+export function TelegramLoginWidget({ onAuth }: TelegramLoginWidgetProps): React.JSX.Element {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const onAuthRef = useRef(onAuth)
+
+  // Колбэк читается из window после входа — держим ссылку на актуальный handler.
+  useEffect(() => {
+    onAuthRef.current = onAuth
+  }, [onAuth])
+
+  useEffect(() => {
+    const globalScope = window as unknown as Record<string, unknown>
+    globalScope[TELEGRAM_ONAUTH_CALLBACK] = (payload: TelegramAuthPayload): void => {
+      onAuthRef.current(payload)
+    }
+    const container = containerRef.current
+    // Strict Mode монтирует эффект дважды — во второй раз скрипт уже стоит.
+    if (container === null || container.childElementCount > 0) {
+      return
+    }
+    const widgetScript = document.createElement('script')
+    widgetScript.src = 'https://telegram.org/js/telegram-widget.js?22'
+    widgetScript.async = true
+    widgetScript.setAttribute('data-telegram-login', TELEGRAM_BOT_NAME ?? '')
+    widgetScript.setAttribute('data-size', 'large')
+    widgetScript.setAttribute('data-userpic', 'false')
+    widgetScript.setAttribute('data-radius', '12')
+    widgetScript.setAttribute('data-onauth', `${TELEGRAM_ONAUTH_CALLBACK}(user)`)
+    container.appendChild(widgetScript)
+  }, [])
+
+  return (
+    <div ref={containerRef} data-testid="telegram-widget-slot" className="flex justify-center" />
+  )
 }
