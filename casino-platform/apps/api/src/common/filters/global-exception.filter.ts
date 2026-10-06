@@ -20,12 +20,28 @@ function payloadMessage(res: unknown, fallback: string): unknown {
   return fallback
 }
 
-/** Стабильный UPPER_SNAKE код из поля error (BadRequestException -> BAD_REQUEST). */
+/**
+ * Стабильный UPPER_SNAKE код из payload Nest-исключения.
+ *
+ * Порядок веток важен: `code` — это намерение бросившего (ZodValidationPipe кладёт
+ * `VALIDATION_ERROR`), а `error` — дефолтное поле самого Nest
+ * (`new BadRequestException('…')` → `BAD_REQUEST`). Раньше читалось только `error`,
+ * поэтому pipe с явным кодом терял его и наружу уходил `HTTP_ERROR` — при том что
+ * фронт уже завязан на имя (`apps/web/src/lib/affiliate-api.ts` разбирает
+ * `VALIDATION_ERROR`). Явный код не должен зависеть от того, AppError бросили или
+ * встроенное исключение Nest: иначе G18 («pipes/guards бросают built-in») превращает
+ * потерю кода в норму.
+ */
 function payloadCode(res: unknown): string {
-  if (typeof res === 'object' && res !== null && 'error' in res) {
-    return String((res as { error: unknown }).error)
-      .toUpperCase()
-      .replace(/\s+/g, '_')
+  if (typeof res === 'object' && res !== null) {
+    const payload = res as Record<string, unknown>
+    const explicit = payload['code']
+    if (typeof explicit === 'string' && explicit.trim() !== '') {
+      return explicit.trim().toUpperCase().replace(/\s+/g, '_')
+    }
+    if ('error' in payload) {
+      return String(payload['error']).toUpperCase().replace(/\s+/g, '_')
+    }
   }
   return 'HTTP_ERROR'
 }
