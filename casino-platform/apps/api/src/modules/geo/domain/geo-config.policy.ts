@@ -107,10 +107,28 @@ export function convertRubToDisplayAmount(
 }
 
 export function toRubEquivalent(amount: string, currency: DisplayCurrency): string {
+  return toRubEquivalentWithRate(amount, currency, DISPLAY_RUB_RATES[currency] || '1')
+}
+
+/**
+ * Рубли по курсу, который передаёт вызывающий. Парная к
+ * `convertRubToDisplayAmount` сверху вниз: то, что показали игроку в его валюте,
+ * и то, что снимем с порога, — считаются от одного курса, иначе экран обещает
+ * одну сумму, а сервер на ней отказывает (поймано живым прогоном на стенде:
+ * экран 58,53 USDT, отказ уже на 55 — потому что пороги считались от константы
+ * 92,5, а витрина от боевого курса 85,6).
+ *
+ * Усечение, а не округление: округление вверх показало бы остаток, который сам
+ * же себе отказывает.
+ */
+export function toRubEquivalentWithRate(
+  amount: string,
+  currency: DisplayCurrency,
+  rate: string,
+): string {
   if (currency === 'RUB') {
     return amount
   }
-  const rate = DISPLAY_RUB_RATES[currency] || '1'
   const converted = money.multiply(amount, rate)
   const [intPart, fracPart = '00'] = converted.split('.')
   return `${intPart}.${fracPart.slice(0, 2)}`

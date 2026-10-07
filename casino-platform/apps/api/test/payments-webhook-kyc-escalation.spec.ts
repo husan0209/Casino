@@ -118,7 +118,7 @@ function makeRealKycFacade(args: {
       { get: () => args.limit } as never,
       // Геом этот сценарий не пользуется: эскалация читает только депозиты.
       // Порог вывода спрашивает курс, поэтому фасад обязан быть передан.
-      { toRubEquivalent: (amount: string) => amount } as never,
+      { convertToRubAtLiveRate: (amount: string) => amount } as never,
     ),
   )
 }

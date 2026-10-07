@@ -35,7 +35,7 @@ function harness(): Harness {
   const kyc = { assertCanWithdraw } as never
   // Заявки в этой спеке рублёвые, поэтому курс — тождественный: здесь проверяется
   // связь «проводка lock ↔ id заявки», а не пересчёт валют.
-  const geo = { toRubEquivalent: (amount: string) => amount } as never
+  const geo = { convertToRubAtLiveRate: (amount: string) => amount } as never
   return {
     useCase: new CreateWithdrawalUseCase(repo, wallet, kyc, geo),
     lock,

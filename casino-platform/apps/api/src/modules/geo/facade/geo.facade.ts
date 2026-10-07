@@ -14,6 +14,7 @@ import {
   getCurrencyLimits,
   resolveLegalCountryForUser,
   toRubEquivalent,
+  toRubEquivalentWithRate,
 } from '../domain/geo-config.policy'
 
 /** В4: presentation импортирует форму ответа только из фасада (публичный API
@@ -51,6 +52,17 @@ export class GeoFacade {
   async convertRubToDisplay(amountRub: string, currency: DisplayCurrency): Promise<string> {
     const { rate } = await this.rates.getRubRate(currency)
     return convertRubToDisplayAmount(amountRub, currency, rate)
+  }
+
+  /**
+   * Обратная сторона той же конверсии: рубли из суммы в валюте игрока по
+   * БОЕВОМУ курсу (тот же `getRubRate`, что и для display). Нужна там, где
+   * показанное число и решаемое по нему право обязаны совпадать — сейчас это
+   * порог вывода без верификации.
+   */
+  async convertToRubAtLiveRate(amount: string, currency: DisplayCurrency): Promise<string> {
+    const { rate } = await this.rates.getRubRate(currency)
+    return toRubEquivalentWithRate(amount, currency, rate)
   }
 
   toRubEquivalent(amount: string, currency: DisplayCurrency): string {

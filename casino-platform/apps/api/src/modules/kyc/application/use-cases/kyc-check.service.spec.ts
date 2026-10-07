@@ -72,7 +72,7 @@ function makeConfig(value: string | number | undefined): ConfigService {
  */
 function makeGeo(): GeoFacade {
   return {
-    toRubEquivalent: (amount: string, currency: string) =>
+    convertToRubAtLiveRate: (amount: string, currency: string) =>
       currency === 'RUB' ? amount : String(Number(amount) * 2),
   } as unknown as GeoFacade
 }
