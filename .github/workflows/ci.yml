@@ -404,8 +404,29 @@ jobs:
             # Зелёный деплой должен означать «прод отвечает», а не «команды
             # отработали». Домен берём из боевого .env.production, а не хардкодом,
             # иначе проверка разъедется при первом же переезде на другое имя.
+            #
+            # Цикл, а не один curl: `restart nginx` возвращается сразу, как контейнер
+            # запущен, а 443 он занимает на несколько секунд позже. Одиночная проба
+            # попадала в это окно и красила успешную выкатку в
+            # «Failed to connect … after 21 ms» (2026-10-07, выкатка #218: через
+            # минуту тот же URL отдавал 200, контейнеры были healthy). Ложно-красный
+            # деплой стоит дороже ложно-зелёного: он отправляет человека разбирать
+            # живой прод. Ждём до ~60 с, потом уже вердикт и живой дамп причин.
             DOMAIN_NAME=$(grep -E '^DOMAIN=' .env.production | cut -d= -f2-)
-            curl --fail --silent --show-error --max-time 45 \
-              "https://${DOMAIN_NAME}/api/v1/health" > /dev/null
+            HEALTH_OK=0
+            for _ in $(seq 1 20); do
+              if curl --fail --silent --show-error --max-time 10 \
+                "https://${DOMAIN_NAME}/api/v1/health" > /dev/null; then
+                HEALTH_OK=1
+                break
+              fi
+              sleep 3
+            done
+            if [ "$HEALTH_OK" != "1" ]; then
+              echo "::error::https://${DOMAIN_NAME}/api/v1/health не ответил за 60 с после restart nginx"
+              docker compose -f docker-compose.prod.yml ps
+              docker compose -f docker-compose.prod.yml logs --tail=40 nginx
+              exit 1
+            fi
             echo "Deploy OK $(date): ${DOMAIN_NAME} отвечает на /api/v1/health"
             docker compose -f docker-compose.prod.yml ps
