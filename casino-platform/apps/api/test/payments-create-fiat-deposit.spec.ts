@@ -1,16 +1,16 @@
 /**
  * Юнит-тесты CreateFiatDepositUseCase (G21).
  *
- * Пайплайн: geo-валидация метода → лимиты (money.*, string) → KYC-лимит →
- * заявка в БД → Rukassa createPayment → updateStatus(pending). Падение
+ * Пайплайн: geo-валидация метода → лимиты (money.*, string) → заявка в БД →
+ * Rukassa createPayment → updateStatus(pending). Верификации в депозите нет
+ * (2026-10-07): KYC обязателен на выводе. Падение
  * провайдера: заявка помечается failed, наружу PaymentProviderError.
- * Фасады geo/kyc/users подменены узкими объектами (`as unknown as`).
+ * Фасады geo/users подменены узкими объектами (`as unknown as`).
  */
 import { CreateFiatDepositUseCase } from '../src/modules/payments/application/use-cases/create-fiat-deposit.use-case'
 import {
   AmountTooLargeError,
   AmountTooSmallError,
-  KycRequiredError,
   PaymentProviderError,
 } from '../src/modules/payments/domain/errors'
 
@@ -28,7 +28,6 @@ type StatusUpdate = { id: string; status: string; extra: Record<string, unknown>
 function makeDeps(over: { rukassaError?: Error } = {}) {
   const created: CreatedRow[] = []
   const statusUpdates: StatusUpdate[] = []
-  const kycCalls: Array<{ userId: string; rub: string }> = []
   const geoCalls: Array<{ fn: string; args: unknown[] }> = []
 
   const repo = {
@@ -45,17 +44,11 @@ function makeDeps(over: { rukassaError?: Error } = {}) {
   const rukassa: IRukassaClient = {
     createPayment: async () => {
       if (over.rukassaError) {
-throw over.rukassaError
-}
+        throw over.rukassaError
+      }
       return { paymentId: 'pay-1', paymentUrl: 'https://pay.url' }
     },
   } as unknown as IRukassaClient
-
-  const kyc = {
-    assertCanDeposit: async (userId: string, newDepositRub: string) => {
-      kycCalls.push({ userId, rub: newDepositRub })
-    },
-  } as never
 
   const config = { get: () => undefined } as never
 
@@ -73,12 +66,12 @@ throw over.rukassaError
 
   const users = { getGeoContext: async () => ({ country: 'RU' }) } as never
 
-  const uc = new CreateFiatDepositUseCase(repo, rukassa, kyc, config, geo, users)
-  return { uc, created, statusUpdates, kycCalls, geoCalls }
+  const uc = new CreateFiatDepositUseCase(repo, rukassa, config, geo, users)
+  return { uc, created, statusUpdates, geoCalls }
 }
 
 describe('CreateFiatDepositUseCase', () => {
-  it('happy path: заявка pending с лимит-проверкой, Rukassa вызван, статус дополнен ссылками', async () => {
+  it('happy path: заявка pending, Rukassa вызван, статус дополнен ссылками', async () => {
     const d = makeDeps()
     const before = Date.now()
     const res = await d.uc.execute('u-1', INPUT)
@@ -87,8 +80,6 @@ describe('CreateFiatDepositUseCase', () => {
       { fn: 'resolveLegalCountry', args: ['RU'] },
       { fn: 'validateFiatDepositMethod', args: ['RU', 'RUB', 'card'] },
     ])
-    expect(d.kycCalls).toEqual([{ userId: 'u-1', rub: 'rub(1000)' }])
-
     const row = d.created[0]!
     expect(row.userId).toBe('u-1')
     expect(row.type).toBe('deposit')
@@ -121,7 +112,6 @@ describe('CreateFiatDepositUseCase', () => {
       AmountTooSmallError,
     )
     expect(d.created).toHaveLength(0)
-    expect(d.kycCalls).toHaveLength(0)
   })
 
   it('сумма выше depositMax → AmountTooLargeError', async () => {
@@ -132,32 +122,17 @@ describe('CreateFiatDepositUseCase', () => {
     expect(d.created).toHaveLength(0)
   })
 
-  it('KYC-лимит исчерпан → KycRequiredError пробрасывается до создания заявки', async () => {
-    const repo = {
-      create: async () => {
-        throw new Error('must not be called')
-      },
-    } as unknown as IPaymentRequestRepository
-    const kyc = {
-      assertCanDeposit: async () => {
-        throw new KycRequiredError()
-      },
-    } as never
-    const geo = {
-      resolveLegalCountry: () => 'RU',
-      validateFiatDepositMethod: () => {},
-      getLimits: () => ({ depositMin: '500', depositMax: '100000' }),
-      toRubEquivalent: (amount: string) => amount,
-    } as never
-    const uc = new CreateFiatDepositUseCase(
-      repo,
-      {} as unknown as IRukassaClient,
-      kyc,
-      { get: () => undefined } as never,
-      geo,
-      { getGeoContext: async () => null } as never,
-    )
-    await expect(uc.execute('u-1', INPUT)).rejects.toThrow(KycRequiredError)
+  // Прежний шлюз «суммарные пополнения до KYC_DEPOSIT_LIMIT_RUB» снят
+  // 2026-10-07: верификация обязательна на выводе, а не на пополнении (решение
+  // владельца). Тест фиксирует новую политику на сумме, которая раньше упиралась
+  // в порог 5000 ₽: заявка создаётся, ни в какой KYC use-case не ходит.
+  it('пополнение выше прежнего KYC-порога проходит без верификации', async () => {
+    const d = makeDeps()
+    const res = await d.uc.execute('u-1', { ...INPUT, amount: '6000' })
+
+    expect(res.payment_request_id).toBe('pr-1')
+    expect(d.created).toHaveLength(1)
+    expect(d.created[0]!.amount).toBe('6000')
   })
 
   it('Rukassa упал → заявка failed с errorMessage, наружу PaymentProviderError', async () => {

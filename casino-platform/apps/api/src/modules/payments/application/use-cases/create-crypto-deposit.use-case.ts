@@ -5,8 +5,6 @@ import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
 
-import { KycFacade } from '@modules/kyc/facade/kyc.facade'
-
 import { AppError } from '@casino/shared-utils'
 
 import { PaymentProviderError } from '../../domain/errors'
@@ -34,10 +32,6 @@ export class CreateCryptoDepositUseCase {
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(NOWPAYMENTS_CLIENT) private readonly np: INowPaymentsClient,
-    // KycFacade, а не KycCheckService напрямую: межмодульный доступ только
-    // через фасад (AGENTS.md правило 4, MODULE_BOUNDARIES). @Inject обязателен
-    // в этой сборке — design:paramtypes не выдаётся (CONVENTIONS §1.4).
-    @Inject(KycFacade) private kycCheck: KycFacade,
     @Inject(ConfigService) private config: ConfigService,
   ) {}
   async execute(
@@ -62,7 +56,6 @@ export class CreateCryptoDepositUseCase {
       currencyTo: 'RUB',
     })
     const estimatedRub = est.estimatedAmount || '0'
-    await this.kycCheck.assertCanDeposit(userId, estimatedRub)
     const idempotencyKey = `dep_${randomUUID()}`
     try {
       // create NP payment first to get pay_address

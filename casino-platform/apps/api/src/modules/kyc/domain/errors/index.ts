@@ -9,18 +9,6 @@ export class KycRequiredError extends AppError {
     super(msg)
   }
 }
-/**
- * Превышен лимит суммарных депозитов без KYC (KYC_DEPOSIT_LIMIT_RUB).
- * docs/API_CONVENTIONS.md §5.3 резервирует под этот случай код
- * DEPOSIT_LIMIT_EXCEEDED; наследование от KycRequiredError сохранено, чтобы
- * `instanceof KycRequiredError` (и общая ветка «нужен KYC») не сломались.
- */
-export class DepositLimitExceededError extends KycRequiredError {
-  override readonly code = 'DEPOSIT_LIMIT_EXCEEDED'
-  constructor(msg: string) {
-    super(msg)
-  }
-}
 export class KycAlreadySubmittedError extends AppError {
   readonly code = 'KYC_ALREADY_SUBMITTED'
   readonly httpStatus = 409

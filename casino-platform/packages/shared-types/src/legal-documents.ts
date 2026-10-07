@@ -20,7 +20,7 @@ export type LegalDocumentType = 'terms' | 'privacy' | 'cookies' | 'responsible_g
  * версий не переиспользуется — одна версия = один зафиксированный текст.
  */
 export const LEGAL_DOCUMENT_VERSIONS: Readonly<Record<LegalDocumentType, string>> = {
-  terms: '1.0',
+  terms: '1.1',
   privacy: '1.0',
   cookies: '1.0',
   responsible_gaming: '1.0',

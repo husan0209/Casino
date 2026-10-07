@@ -51,37 +51,13 @@ beforeEach(() => {
 
 afterEach(cleanup)
 
-describe('GAP-36/44: страница KYC — лимит из API', () => {
-  it('показывает остаток из API (limit_remaining/limit_currency) без пересчёта', async () => {
-    kycMock.mockResolvedValue({
-      status: 'not_submitted',
-      limit_remaining: '5000',
-      limit_currency: 'RUB',
-      deposit_limit_rub: '5000',
-    })
-    renderPage()
-    // остаток — как отдал API (limit_remaining + limit_currency), без пересчёта;
-    // «…» = query ещё pending — ждём замены на фактическое значение из API
-    const deepest =
-      (marker: string) =>
-      (_: unknown, el: Element | null): boolean => {
-        if (!el?.textContent) {
-          return false
-        }
-        const own = el.textContent.includes(marker) && el.textContent.includes('5 000')
-        if (!own) {
-          return false
-        }
-        // самый глубокий узел: дети не содержат marker (иначе матчились бы предки)
-        return !Array.from(el.children).some((ch) => ch.textContent.includes(marker))
-      }
-    const rest = await screen.findByText(deepest('Остаток лимита без KYC'), undefined, {
-      timeout: 3000,
-    })
-    expect(rest.textContent).toContain('5 000')
-  })
+describe('Страница KYC — верификация нужна для вывода, не для пополнения', () => {
+  // Раньше этот блок проверял обратное: страница показывала «Остаток лимита без
+  // KYC … из 5000 ₽ суммарных пополнений» и красную карточку «Лимит пополнений
+  // исчерпан». Шлюз снят 2026-10-07 (решение владельца): пополнять счёт можно
+  // без верификации, верификация обязательна, чтобы вывести.
 
-  it('исчерпан: красный блок + CTA «Пройти верификацию» на анкор формы', async () => {
+  it('не показывает остаток «лимита без KYC» и карточку исчерпания', async () => {
     kycMock.mockResolvedValue({
       status: 'not_submitted',
       limit_remaining: '0',
@@ -89,12 +65,14 @@ describe('GAP-36/44: страница KYC — лимит из API', () => {
       deposit_limit_rub: '5000',
     })
     renderPage()
-    const cta = await screen.findByRole('link', { name: /Пройти верификацию/i })
-    expect(cta.getAttribute('href')).toBe('#kyc-form')
-    expect(screen.getByText(/Лимит пополнений исчерпан/i)).toBeTruthy()
+    await waitFor(() =>
+      expect(screen.getByText(/Пополнять счёт можно без верификации/i)).toBeTruthy(),
+    )
+    expect(screen.queryByText(/Остаток лимита без KYC/i)).toBeNull()
+    expect(screen.queryByText(/Лимит пополнений исчерпан/i)).toBeNull()
   })
 
-  it('approved: «Лимит снят», блока исчерпания нет', async () => {
+  it('approved — про вывод, а не про «лимит снят»', async () => {
     kycMock.mockResolvedValue({
       status: 'approved',
       limit_remaining: '0',
@@ -102,8 +80,8 @@ describe('GAP-36/44: страница KYC — лимит из API', () => {
       deposit_limit_rub: '5000',
     })
     renderPage()
-    await waitFor(() => expect(screen.getByText(/Лимит снят/i)).toBeTruthy())
-    expect(screen.queryByText(/Лимит пополнений исчерпан/i)).toBeNull()
+    await waitFor(() => expect(screen.getByText(/вывод средств доступен/i)).toBeTruthy())
+    expect(screen.queryByText(/Лимит снят/i)).toBeNull()
   })
 
   /**

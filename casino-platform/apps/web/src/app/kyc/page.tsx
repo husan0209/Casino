@@ -5,7 +5,6 @@ import { useState } from 'react'
 import { toast } from '@/components/ui/toaster'
 import { apiPost, errText } from '@/lib/api'
 import { getKycStatus } from '@/lib/api/kyc.api'
-import { formatAmount } from '@/lib/format/currency'
 import { useAuth } from '@/stores/auth'
 
 /** Форма персональных данных KYC (первый шаг заявки). */
@@ -54,10 +53,7 @@ function KycForm({
           defaultValue="RU"
           onChange={(e) => onField('country', e.target.value)}
         />
-        <select
-          className="input"
-          onChange={(e) => onField('document_type', e.target.value)}
-        >
+        <select className="input" onChange={(e) => onField('document_type', e.target.value)}>
           <option value="passport">Паспорт</option>
           <option value="id_card">ID карта</option>
           <option value="drivers_license">Водительское</option>
@@ -152,38 +148,19 @@ export default function KycPage(): React.JSX.Element {
     return <div className="container-1 py-8">Войдите в аккаунт</div>
   }
   const status = data?.status || 'not_started'
-  const remaining = data?.limit_remaining
-  const remainingExhausted = remaining !== undefined && Number(remaining) <= 0
 
   return (
     <div className="container-1 py-8 max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">KYC Верификация</h1>
-      {status === 'approved' ? (
-        <div className="text-sm text-muted mb-6">
-          Лимит снят: пополнения и выводы доступны без ограничений.
-        </div>
-      ) : (
-        <div className="text-sm text-muted mb-6">
-          {/* GAP-36: значения — из API, не пересчёт на клиенте */}
-          Остаток лимита без KYC:{' '}
-          <b className={remainingExhausted ? 'text-red-400' : 'text-white'}>
-            {data ? formatAmount(data.limit_remaining, data.limit_currency, true) : '…'}
-          </b>{' '}
-          из {data?.deposit_limit_rub ? `${data.deposit_limit_rub} ₽` : '5000 ₽'} суммарных
-          пополнений. Вывод всегда требует KYC.
-        </div>
-      )}
-      {remainingExhausted && status !== 'approved' && (
-        <div className="card mb-6 border-red-500/40">
-          <div className="text-red-400 font-semibold">Лимит пополнений исчерпан</div>
-          <div className="text-sm text-muted mt-1">
-            Дальнейшие пополнения — после верификации личности.
-          </div>
-          <a href="#kyc-form" className="btn mt-3 inline-block">
-            Пройти верификацию
-          </a>
-        </div>
-      )}
+      {/* Верификация нужна, чтобы вывести деньги. Пополнение счёта доступно без
+          неё всегда — прежний лимит суммарных пополнений без KYC снят
+          (решение владельца 2026-10-07), поэтому здесь нет ни «остатка лимита»,
+          ни красной карточки про него. */}
+      <div className="text-sm text-muted mb-6">
+        {status === 'approved'
+          ? 'Верификация пройдена: вывод средств доступен.'
+          : 'Пополнять счёт можно без верификации. Вывод средств — только после неё.'}
+      </div>
       <div className="card mb-6">
         Статус:{' '}
         <b
@@ -211,9 +188,7 @@ export default function KycPage(): React.JSX.Element {
 
       {(status === 'not_started' ||
         status === 'requires_resubmission' ||
-        status === 'rejected') && (
-        <KycForm form={form} onField={setField} onSubmit={submit} />
-      )}
+        status === 'rejected') && <KycForm form={form} onField={setField} onSubmit={submit} />}
 
       {(status === 'pending' || status === 'requires_resubmission') && (
         <div className="card space-y-3">
