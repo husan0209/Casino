@@ -359,8 +359,25 @@ jobs:
             # api/web-слоя). Кэш только скорость, данные не трогает.
             FREE_KB=$(df --output=avail -k . | tail -1)
             if [ "$FREE_KB" -lt 6291456 ]; then
-              echo "свободно $((FREE_KB / 1024)) МБ — чищу build-кэш"
+              echo "свободно $((FREE_KB / 1024)) МБ — чищу build-кэш и висячие образы"
               docker builder prune -f
+              # Урок 2026-10-07: сборка падала именно здесь, и один builder prune
+              # не помогал — место держали не кэш, а висячие образы и их слои от
+              # прошлых выкаток (16,35 ГБ). Без этой строки следующий деплой после
+              # серии «пересобрал трижды» краснеет с невнятным exit 1.
+              # БЕЗ -a: не трогаем именованные образы, на которых стоят контейнеры.
+              # БЕЗ --volumes: не трогаем базу.
+              docker system prune -f
+              FREE_KB=$(df --output=avail -k . | tail -1)
+              echo "после чистки свободно $((FREE_KB / 1024)) МБ"
+            fi
+            # Дальше — падать сразу и громко. Молча начинать сборку на 3 ГБ значит
+            # получить тот самый `exit 1` без объяснений через восемь минут.
+            if [ "$FREE_KB" -lt 3145728 ]; then
+              echo "::error::свободно $((FREE_KB / 1024)) МБ — этого не хватит на сборку api+web+admin, выкатка остановлена до билда"
+              df -h /
+              docker system df
+              exit 1
             fi
             docker compose -f docker-compose.prod.yml pull || true
             docker compose -f docker-compose.prod.yml build --pull
