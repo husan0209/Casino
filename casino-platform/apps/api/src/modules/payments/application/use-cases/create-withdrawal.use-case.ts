@@ -3,9 +3,11 @@ import { randomUUID } from 'crypto'
 import { Inject, Injectable } from '@nestjs/common'
 import { Decimal } from 'decimal.js'
 
+import { GeoFacade } from '@modules/geo/facade/geo.facade'
 import { KycFacade } from '@modules/kyc/facade/kyc.facade'
 import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
+import type { DisplayCurrency } from '@casino/shared-config'
 import { type Currency } from '@casino/shared-types'
 
 import { AmountTooLargeError, AmountTooSmallError, InvalidAmountError } from '../../domain/errors'
@@ -25,12 +27,12 @@ export class CreateWithdrawalUseCase {
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(WalletFacade) private wallet: WalletFacade,
     @Inject(KycFacade) private kyc: KycFacade,
+    @Inject(GeoFacade) private geo: GeoFacade,
   ) {}
   async execute(
     userId: string,
     input: { amount: string; currency: string; method?: string; destination: string },
   ): Promise<{ payment_request_id: string }> {
-    await this.kyc.assertCanWithdraw(userId)
     // Сумму проверяем до `new Decimal()`: без этого мусорный вход бросал сырую
     // ошибку decimal.js и клиент получал 500. Паттерн тот же, что в DTO, и он же
     // обслуживает вызывающих, минующих presentation.
@@ -52,6 +54,16 @@ export class CreateWithdrawalUseCase {
     }
     // Отдельная проверка конечности не нужна: паттерн не пропускает ни `NaN`,
     // ни экспоненциальную форму, а сверхдлинное число отсекает `greaterThan(max)`.
+    //
+    // Право на вывод без верификации считается в РУБЛЯХ, а не в валюте заявки
+    // (порог один на все валюты — решение владельца 2026-10-07). Отсюда раздел
+    // ответственности: payments переводит сумму в ₽ (курс знает geo), а kyc
+    // сам добирает историю выводов и сравнивает с порогом — ровно как это уже
+    // делает агрегат пополнений (kyc.prisma.ts:getTotalDepositedRub, ADR GAP-51
+    // разрешает money-чтения). Вызывается ПОСЛЕ лимитов валюты и реквизитов:
+    // опечатку в номере карты показываем до требования пройти KYC.
+    const amountRub = this.geo.toRubEquivalent(input.amount, input.currency as DisplayCurrency)
+    await this.kyc.assertCanWithdraw(userId, amountRub)
     // GAP-55 (§11 «статус»): id заявки генерируется ДО блокировки, чтобы
     // проводка WITHDRAWAL_LOCK несла ссылку на payment_request — иначе строку
     // истории нечем присоединить к заявке и показать её статус. Порядок
@@ -75,6 +87,10 @@ export class CreateWithdrawalUseCase {
       method: input.method || null,
       currency: input.currency,
       amount: input.amount,
+      // RUB-эквивалент на интенте — то же число, по которому игрок получил
+      // право на вывод без верификации. Без него база порога считалась бы по
+      // курсу на каждый показ и расходилась бы с отказом.
+      amountRub,
       destination: input.destination,
       // GAP-55: ключ заявки тоже выводится из её id — уникальность та же (uuid),
       // но повтор запроса по той же заявке перестаёт быть невидимым для дедупликации.

@@ -27,5 +27,12 @@
       "sha256": "aeb00b7a06b21d464fe2335b729316db5ece8cfb40e7b21d783934bcc8ee5064",
       "publishedAt": "2026-10-07"
     }
+  },
+  "1.2": {
+    "terms": {
+      "file": "1.2/terms.md",
+      "sha256": "bc0fcc7746411a6e31b04d3d4187f0e939210b2641f2895d10cb32bd19de4400",
+      "publishedAt": "2026-10-07"
+    }
   }
 }

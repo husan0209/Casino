@@ -20,6 +20,7 @@ import {
   resolveWithdrawPrecheck,
   validateDestination,
   withdrawPresets,
+  type AmountCheck,
   type WithdrawMethod,
   type WithdrawPrecheck,
 } from '@/lib/ui/withdraw'
@@ -32,8 +33,10 @@ import { useWalletStore } from '@/stores/wallet'
  * GAP-55 (з) (ТЗ ч.5 §10.3/§16.1): WithdrawSheet — глобальный лист вывода,
  * смонтирован в корневом layout, открывается и из кошелька, и поверх игры.
  *
- * §10.3 соблюдён через resolveWithdrawPrecheck: KYC-стопер (без формы вообще) →
- * «ечего выводить» → предложить валюту с деньгами → форма. Форма выводит только
+ * §10.3 соблюдён через resolveWithdrawPrecheck: стоп по исчерпанному порогу
+ * верификации (без верификации вывод доступен до `KYC_WITHDRAW_LIMIT_RUB`,
+ * решение владельца 2026-10-07, поэтому форма открыта и неверифицированному) →
+ * «нечего выводить» → предложить валюту с деньгами → форма. Форма выводит только
  * в валюте выбранного кошелька и только на метод этой валюты (методы — из
  * GeoConfig, не из воздуха); сеть крипты не меняется и видна всегда (§2.7).
  * Перед заявкой — подтверждение с ЗАМАСКИРОВАННЫМИ реквизитами; на сервер уходит
@@ -90,8 +93,16 @@ export function WithdrawSheet(): React.JSX.Element | null {
     enabled: withdrawSheet && Boolean(user),
   })
 
+  // Сколько игрок может вывести БЕЗ верификации — в валюте листа. Считает бэк
+  // (GET /kyc/status переводит RUB-порог по своему курсу и уже вычел прошлые
+  // выводы), на клиенте арифметики с курсами нет. Одобренному порог не нужен
+  // вообще — для него null, чтобы форма не показывала лимит там, где его нет.
+  const approved = kyc?.status === 'approved'
+  const freeLimit = approved ? null : (kyc?.withdraw_remaining ?? null)
+
   const precheck = resolveWithdrawPrecheck({
-    kycApproved: kyc?.status === 'approved',
+    kycApproved: approved,
+    withdrawRemaining: freeLimit,
     activeCurrency: currency,
     wallets,
   })
@@ -150,9 +161,14 @@ export function WithdrawSheet(): React.JSX.Element | null {
   const fiatMethods = fiatMethodsFor(config?.paymentMethods, currency)
 
   const goConfirm = (): void => {
-    const amountCheck = checkWithdrawAmount({ amount, currency, available })
+    const amountCheck = checkWithdrawAmount({
+      amount,
+      currency,
+      available,
+      withdrawRemaining: freeLimit,
+    })
     if (!amountCheck.ok) {
-      setProblem(amountProblemText(amountCheck.reason, currency, limits))
+      setProblem(amountProblemText({ reason: amountCheck.reason, currency, limits, freeLimit }))
       return
     }
     const destinationProblem = crypto
@@ -168,46 +184,59 @@ export function WithdrawSheet(): React.JSX.Element | null {
 
   return (
     <SheetShell onClose={closeWithdraw} closing={withdrawSheetClosing}>
-        {stage === 'done' && (
-          <DonePanel
-            requestId={requestId}
-            amountLabel={formatAmount(amount, currency)}
-            onHistory={() => {
-              closeWithdraw()
-              router.push('/wallet')
-            }}
-            onClose={closeWithdraw}
-          />
-        )}
+      {stage === 'done' && (
+        <DonePanel
+          requestId={requestId}
+          amountLabel={formatAmount(amount, currency)}
+          onHistory={() => {
+            closeWithdraw()
+            router.push('/wallet')
+          }}
+          onClose={closeWithdraw}
+        />
+      )}
 
-        {stage === 'confirm' && (
-          <ConfirmPanel
-            amountLabel={formatAmount(amount, currency)}
-            destinationMask={maskDestination({ currency, method: crypto ? undefined : method, value: destination })}
-            methodLabel={crypto ? `Крипта · ${networkLabel(currency)}` : (fiatMethods.find((m) => m.id === method)?.label ?? fiatMethodLabel(method))}
-            pending={submit.isPending}
-            onBack={() => setStage('form')}
-            onSubmit={() => submit.mutate()}
-          />
-        )}
+      {stage === 'confirm' && (
+        <ConfirmPanel
+          amountLabel={formatAmount(amount, currency)}
+          destinationMask={maskDestination({
+            currency,
+            method: crypto ? undefined : method,
+            value: destination,
+          })}
+          methodLabel={
+            crypto
+              ? `Крипта · ${networkLabel(currency)}`
+              : (fiatMethods.find((m) => m.id === method)?.label ?? fiatMethodLabel(method))
+          }
+          pending={submit.isPending}
+          onBack={() => setStage('form')}
+          onSubmit={() => submit.mutate()}
+        />
+      )}
 
-        {stage === 'form' && (
-          <WithdrawForm
-            currency={currency}
-            crypto={crypto}
-            available={available}
-            fiatMethods={fiatMethods}
-            method={method}
-            amount={amount}
-            destination={destination}
-            problem={problem}
-            onMethodChange={setMethod}
-            onAmountChange={setAmount}
-            onDestinationChange={setDestination}
-            onSwitchWallet={openWalletSwitcher}
-            onSubmit={goConfirm}
-          />
-        )}
+      {stage === 'form' && (
+        <WithdrawForm
+          currency={currency}
+          crypto={crypto}
+          available={available}
+          fiatMethods={fiatMethods}
+          method={method}
+          amount={amount}
+          destination={destination}
+          problem={problem}
+          freeLimit={freeLimit}
+          onMethodChange={setMethod}
+          onAmountChange={setAmount}
+          onDestinationChange={setDestination}
+          onSwitchWallet={openWalletSwitcher}
+          onKyc={() => {
+            closeWithdraw()
+            router.push('/kyc')
+          }}
+          onSubmit={goConfirm}
+        />
+      )}
     </SheetShell>
   )
 }
@@ -227,11 +256,14 @@ function fiatMethodsFor(
   return currency === 'RUB' ? [...FALLBACK_FIAT_METHODS] : []
 }
 
-function amountProblemText(
-  reason: 'format' | 'min' | 'max' | 'insufficient' | undefined,
-  currency: string,
-  limits: { min: string; max: string },
-): string {
+function amountProblemText(args: {
+  reason: AmountCheck['reason']
+  currency: string
+  limits: { min: string; max: string }
+  /** Остаток порога «вывод без верификации» в валюте листа; null — порога нет. */
+  freeLimit: string | null
+}): string {
+  const { reason, currency, limits, freeLimit } = args
   if (reason === 'min') {
     return `Минимум для вывода — ${formatAmount(limits.min, currency)}`
   }
@@ -241,9 +273,11 @@ function amountProblemText(
   if (reason === 'insufficient') {
     return 'Не хватает доступного остатка'
   }
+  if (reason === 'over_free_limit' && freeLimit !== null) {
+    return `Без верификации можно вывести ${formatAmount(freeLimit, currency)}. Вывод больше — после верификации`
+  }
   return 'Введите сумму числом'
 }
-
 
 /**
  * Стадия «форма»: кошелёк/сеть, способы (только этой валюты, §10.3), сумма с
@@ -259,10 +293,12 @@ function WithdrawForm({
   amount,
   destination,
   problem,
+  freeLimit,
   onMethodChange,
   onAmountChange,
   onDestinationChange,
   onSwitchWallet,
+  onKyc,
   onSubmit,
 }: {
   currency: string
@@ -273,102 +309,118 @@ function WithdrawForm({
   amount: string
   destination: string
   problem: string | null
+  /** Остаток порога «вывод без верификации» в этой валюте; null — порога нет. */
+  freeLimit: string | null
   onMethodChange: (method: WithdrawMethod) => void
   onAmountChange: (amount: string) => void
   onDestinationChange: (destination: string) => void
   onSwitchWallet: () => void
+  onKyc: () => void
   onSubmit: () => void
 }): React.JSX.Element {
   const limits = limitsFor(currency)
   const presets = withdrawPresets(currency)
 
   return (
-<div className="space-y-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted">
-                Кошелёк: {currencyLabel(currency)}
-                {crypto && ` · сеть ${networkLabel(currency)}`}
-              </span>
-              <button type="button" className="text-[#6C63FF]" onClick={onSwitchWallet}>
-                сменить
-              </button>
-            </div>
-            <div className="text-2xl font-bold">{formatAmount(available, currency)}</div>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted">
+          Кошелёк: {currencyLabel(currency)}
+          {crypto && ` · сеть ${networkLabel(currency)}`}
+        </span>
+        <button type="button" className="text-[#6C63FF]" onClick={onSwitchWallet}>
+          сменить
+        </button>
+      </div>
+      <div className="text-2xl font-bold">{formatAmount(available, currency)}</div>
 
-            {!crypto && (
-              <div className="flex gap-2">
-                {fiatMethods.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => onMethodChange(item.id)}
-                    className={`rounded-xl px-3 py-1.5 text-xs ${
-                      method === item.id ? 'bg-[#6C63FF] text-white' : 'text-muted hover:bg-white/5'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div>
-              <input
-                className="input"
-                inputMode="decimal"
-                placeholder="Сумма"
-                value={amount}
-                onChange={(e) => onAmountChange(e.target.value)}
-                aria-label="Сумма вывода"
-              />
-              {presets.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {presets.map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      className="btn-ghost px-3 py-1.5 text-xs"
-                      onClick={() => onAmountChange(preset)}
-                    >
-                      {formatAmount(preset, currency)}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {/* суммы всегда с символом валюты (§2.5: голое число = ошибка) */}
-              <div className="mt-2 text-xs text-muted">
-                Минимум {formatAmount(limits.min, currency)} · зачисление до 24 часов
-              </div>
-            </div>
-
-            <div>
-              <input
-                className="input"
-                autoComplete="off"
-                placeholder={crypto ? 'Адрес кошелька' : (method === 'sbp' ? 'Телефон из реестра' : 'Номер карты')}
-                value={destination}
-                onChange={(e) => onDestinationChange(e.target.value)}
-                aria-label="Реквизиты для вывода"
-              />
-              {crypto && (
-                <p className="mt-2 text-xs text-[#FFB300]">
-                  Отправляйте только {currencyLabel(currency)} в сети {networkLabel(currency)}; другая сеть или валюта —
-                  потеря средств.
-                </p>
-              )}
-            </div>
-
-            {problem && <p className="text-sm text-[#FF3D71]">{problem}</p>}
-
+      {!crypto && (
+        <div className="flex gap-2">
+          {fiatMethods.map((item) => (
             <button
+              key={item.id}
               type="button"
-              className="btn w-full"
-              disabled={amount.length === 0 || destination.length === 0}
-              onClick={onSubmit}
+              onClick={() => onMethodChange(item.id)}
+              className={`rounded-xl px-3 py-1.5 text-xs ${
+                method === item.id ? 'bg-[#6C63FF] text-white' : 'text-muted hover:bg-white/5'
+              }`}
             >
-              Продолжить
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div>
+        <input
+          className="input"
+          inputMode="decimal"
+          placeholder="Сумма"
+          value={amount}
+          onChange={(e) => onAmountChange(e.target.value)}
+          aria-label="Сумма вывода"
+        />
+        {presets.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {presets.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className="btn-ghost px-3 py-1.5 text-xs"
+                onClick={() => onAmountChange(preset)}
+              >
+                {formatAmount(preset, currency)}
+              </button>
+            ))}
+          </div>
+        )}
+        {/* суммы всегда с символом валюты (§2.5: голое число = ошибка) */}
+        <div className="mt-2 text-xs text-muted">
+          Минимум {formatAmount(limits.min, currency)} · зачисление до 24 часов
+        </div>
+        {/* Правило без верификации показано ДО отправки и со ссылкой: игрок
+                  должен узнать про KYC не из 422. Число отдаёт бэк, включая
+                  уже выведенное — «до 5 000 ₽» это остаток, а не лимит заявки. */}
+        {freeLimit !== null && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+            <span>Без верификации — до {formatAmount(freeLimit, currency)}</span>
+            <button type="button" className="text-[#6C63FF]" onClick={onKyc}>
+              пройти верификацию
             </button>
           </div>
+        )}
+      </div>
+
+      <div>
+        <input
+          className="input"
+          autoComplete="off"
+          placeholder={
+            crypto ? 'Адрес кошелька' : method === 'sbp' ? 'Телефон из реестра' : 'Номер карты'
+          }
+          value={destination}
+          onChange={(e) => onDestinationChange(e.target.value)}
+          aria-label="Реквизиты для вывода"
+        />
+        {crypto && (
+          <p className="mt-2 text-xs text-[#FFB300]">
+            Отправляйте только {currencyLabel(currency)} в сети {networkLabel(currency)}; другая
+            сеть или валюта — потеря средств.
+          </p>
+        )}
+      </div>
+
+      {problem && <p className="text-sm text-[#FF3D71]">{problem}</p>}
+
+      <button
+        type="button"
+        className="btn w-full"
+        disabled={amount.length === 0 || destination.length === 0}
+        onClick={onSubmit}
+      >
+        Продолжить
+      </button>
+    </div>
   )
 }
 
@@ -394,7 +446,8 @@ function WithdrawPrecheckPanel({
     return (
       <div className="space-y-4">
         <p className="text-sm text-muted">
-          Вывод доступен после верификации — это одно действие, форма сама откроется следом.
+          Без верификации выводить уже нечего — лимит свободных выводов исчерпан. После верификации
+          вывод доступен целиком.
         </p>
         <button type="button" className="btn w-full" onClick={onKyc}>
           Пройти верификацию
@@ -416,7 +469,8 @@ function WithdrawPrecheckPanel({
     return (
       <div className="space-y-4">
         <p className="text-sm">
-          В {currencyLabel(precheck.from)} пусто. Вывести {formatAmount(precheck.amount, precheck.to)}?
+          В {currencyLabel(precheck.from)} пусто. Вывести{' '}
+          {formatAmount(precheck.amount, precheck.to)}?
         </p>
         <button type="button" className="btn w-full" onClick={() => onSwitchTo(precheck.to)}>
           Вывести в {currencyLabel(precheck.to)}
@@ -442,10 +496,7 @@ function SheetShell({
 }): React.JSX.Element {
   return (
     <>
-      <div
-        className={`sheet-backdrop${closing ? ' sheet-backdrop-out' : ''}`}
-        onClick={onClose}
-      />
+      <div className={`sheet-backdrop${closing ? ' sheet-backdrop-out' : ''}`} onClick={onClose} />
       <div className={`sheet-panel${closing ? ' sheet-panel-out' : ''}`}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Вывод средств</h2>
@@ -510,8 +561,8 @@ function DonePanel({
   return (
     <div className="space-y-4">
       <p className="text-sm">
-        Заявка <span className="font-mono">{requestId.slice(0, 8)}</span> создана, {amountLabel} заморожены.
-        Статус — в кошельке.
+        Заявка <span className="font-mono">{requestId.slice(0, 8)}</span> создана, {amountLabel}{' '}
+        заморожены. Статус — в кошельке.
       </p>
       <button type="button" className="btn w-full" onClick={onHistory}>
         История

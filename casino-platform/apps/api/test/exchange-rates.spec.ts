@@ -105,11 +105,11 @@ describe('ExchangeRatesService (GAP-34)', () => {
 function makeKycRepo(): never {
   return {
     getStatus: async () => ({ kyc_status: 'unverified' }),
-    getTotalDepositedRub: async () => '0',
+    listCountedWithdrawals: async () => [],
   } as never
 }
 
-describe('критерий 3: курс меняет limit_remaining в ответе KYC-API', () => {
+describe('критерий 3: курс меняет withdraw_remaining в ответе KYC-API', () => {
   function makeUseCase(rate: string | null): GetKycStatusUseCase {
     const reader = {
       getCachedRates: vi.fn().mockResolvedValue(null),
@@ -126,13 +126,13 @@ describe('критерий 3: курс меняет limit_remaining в отве�
 
   it('курс 4000 из БД → 5000 RUB = 1.25 USDT', async () => {
     const res = await makeUseCase('4000').execute('user-1', 'USDT_TRC20')
-    expect(res.limit_remaining).toBe('1.25')
-    expect(res.limit_currency).toBe('USDT_TRC20')
+    expect(res.withdraw_remaining).toBe('1.25')
+    expect(res.withdraw_currency).toBe('USDT_TRC20')
   })
 
   it('без записи в БД → старое значение по константе 92.5 (54.05 USDT)', async () => {
     const res = await makeUseCase(null).execute('user-1', 'USDT_TRC20')
-    expect(res.limit_remaining).toBe('54.05')
+    expect(res.withdraw_remaining).toBe('54.05')
   })
 })
 

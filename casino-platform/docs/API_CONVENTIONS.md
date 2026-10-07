@@ -280,10 +280,17 @@ CONFLICT                      409   State conflict (e.g., already verified)
 ### 5.3. Business Rules
 
 ```
-KYC_REQUIRED                  422   Action requires KYC approval
+KYC_REQUIRED                  422   Вывод сверх порога без верификации (KYC_WITHDRAW_LIMIT_RUB)
 KYC_PENDING                   422   KYC under review
 WITHDRAW_LIMIT_EXCEEDED       422   Daily/monthly limit reached
 ```
+
+> `WITHDRAW_LIMIT_EXCEEDED` в коде **не существует** (проверено по `rg` по
+> `apps/api/src`): суточного и месячного лимита вывода в проекте нет ни в конфиге,
+> ни в `system_settings`. Строка осталась в реестре с времён ТЗ и вводит в
+> заблуждение ровно в одну сторону — читатель ждёт отказа «500 000 ₽ в сутки»,
+> которого сервер не делает. Удалить её или реализовать — решение владельца по
+> числу лимита, а не техника; до решения код не отдаём.
 
 > Код `DEPOSIT_LIMIT_EXCEEDED` (422, «суммарные пополнения без KYC выше
 > `KYC_DEPOSIT_LIMIT_RUB`) выведен из обращения 2026-10-07: верификация требуется
