@@ -21,6 +21,7 @@ const uiState = vi.hoisted(() => ({
 const loginMock = vi.hoisted(() => vi.fn())
 const registerMock = vi.hoisted(() => vi.fn())
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+const telegramMock = vi.hoisted(() => vi.fn())
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
@@ -49,8 +50,9 @@ vi.mock('@/components/auth/oauth', () => ({
   GoogleMark: () => null,
   TelegramMark: () => null,
   startGoogleOAuth: vi.fn(),
-  TELEGRAM_BOT_NAME: 'test_bot',
-  TelegramLoginWidget: () => null,
+  startTelegramOAuth: telegramMock,
+  TELEGRAM_BOT_ID: '1234567890',
+  TelegramOAuthPlate: () => <span>Продолжить с Telegram</span>,
 }))
 
 vi.mock('@/components/affiliate/AffiliateCodeCapture', () => ({
@@ -131,10 +133,18 @@ describe('§5: LoginSheet — вход и регистрация в одном �
     expect(screen.getByText('Надёжный пароль')).toBeTruthy()
   })
 
-  it('UC-AUTH-09: при настроенном боте лист рисует redirect-виджет вместо заглушки', () => {
+  /**
+   * Кнопка Telegram — наша (без iframe и скрипта виджета), поэтому она либо
+   * активная и ведёт в OAuth, либо выключенная плашка. Мёртвой кнопки посреди
+   * листа входа быть не может.
+   */
+  it('UC-AUTH-09: при настроенном id бота кнопка Telegram активна и ведёт в OAuth', () => {
     render(<LoginSheet />)
-    // OAuthSection рендерит TelegramLoginWidget (замокан как null) — проверяем,
-    // что выключенная плашка «Войти через Telegram» не появляется.
-    expect(screen.queryByText('Войти через Telegram')).toBeNull()
+
+    const button = screen.getByRole('button', { name: 'Продолжить с Telegram' })
+    expect((button as HTMLButtonElement).disabled).toBe(false)
+
+    fireEvent.click(button)
+    expect(telegramMock).toHaveBeenCalled()
   })
 })

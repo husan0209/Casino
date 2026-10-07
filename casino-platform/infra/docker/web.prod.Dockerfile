@@ -18,6 +18,10 @@ ENV NEXT_PUBLIC_IMAGE_HOSTS=$NEXT_PUBLIC_IMAGE_HOSTS
 # только он; токен живёт на API), но тоже инлайнится на `next build`.
 ARG NEXT_PUBLIC_TELEGRAM_BOT_NAME=
 ENV NEXT_PUBLIC_TELEGRAM_BOT_NAME=$NEXT_PUBLIC_TELEGRAM_BOT_NAME
+# Числовой id бота нужен фронту, чтобы построить ссылку на oauth.telegram.org/auth
+# без виджета. Публичный (префикс токена до «:»), токен во фронт не едет.
+ARG NEXT_PUBLIC_TELEGRAM_BOT_ID=
+ENV NEXT_PUBLIC_TELEGRAM_BOT_ID=$NEXT_PUBLIC_TELEGRAM_BOT_ID
 # GAP-60: без этих двух файлов сборка этого образа падала ВСЕГДА (её просто не
 # гонял ни один CI до 2026-10-01 — docker-build собирал только api.prod).
 #   .npmrc — node-linker=hoisted. Без него pnpm изолирует транзитивные зависимости

@@ -104,6 +104,9 @@ services:
         # UC-AUTH-09: username бота для Telegram Login Widget (G23 — ARG из
         # web.prod.Dockerfile обязан доехать через build.args).
         - NEXT_PUBLIC_TELEGRAM_BOT_NAME=${NEXT_PUBLIC_TELEGRAM_BOT_NAME:-}
+        # И id: без него кнопка входа через Telegram собирается выключенной
+        # (URL авторизации строится на фронте, а не на API).
+        - NEXT_PUBLIC_TELEGRAM_BOT_ID=${NEXT_PUBLIC_TELEGRAM_BOT_ID:-}
     env_file: [.env.production]
     # Next standalone-сервер берёт порт из process.env.PORT (дефолт 3000) и хост из
     # process.env.HOSTNAME. Docker сам проставляет HOSTNAME = ID контейнера, и тогда
