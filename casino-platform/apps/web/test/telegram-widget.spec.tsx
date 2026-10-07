@@ -15,7 +15,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  *   Telegram считается от них, и разошедшиеся наборы отбивались бы «подпись не
  *   совпадает» на одном из двух шагов;
  * - виджет рисует нашу плашку (как у Google), а iframe лежит поверх прозрачным
- *   слоем: без загрузки скрипта остаётся выключенная плашка, а не мёртвая кнопка.
+ *   слоем: без загрузки скрипта остаётся выключенная плашка, а не мёртвая кнопка;
+ * - ответ без конверта {success,data} не проходит: undefined на чтении поля
+ *   ронял страницу колбэка в crash-границу «Что-то сломалось».
  */
 
 vi.hoisted(() => {
@@ -105,6 +107,33 @@ describe('previewTelegramAuth', () => {
       ...previewBody,
       referral_code: undefined,
     })
+  })
+})
+
+describe('ответ API без конверта {success,data}', () => {
+  /**
+   * Поймано на стенде: прокси отдал 200 с телом другой формы → apiPost вернул
+   * undefined → страница колбэка упала в crash-границу «Что-то сломалось». Шаг
+   * входа не имеет права показывать вместо ошибки границу падения.
+   */
+  const payload = { id: '42', auth_date: '1690000000', hash: 'HASH1' }
+
+  it('preview бросает внятную ошибку, а не отдаёт undefined', async () => {
+    api.apiPost.mockResolvedValue(undefined)
+
+    await expect(previewTelegramAuth(payload)).rejects.toThrow(/неожиданный ответ/)
+  })
+
+  it('preview без accountExists отвергается — экран не угадывает «регистрация»', async () => {
+    api.apiPost.mockResolvedValue({ displayName: 'Иван', username: null, photoUrl: null })
+
+    await expect(previewTelegramAuth(payload)).rejects.toThrow(/неожиданный ответ/)
+  })
+
+  it('обмен на сессию тоже проверяет форму ответа', async () => {
+    api.apiPost.mockResolvedValue(undefined)
+
+    await expect(exchangeTelegramAuth(payload)).rejects.toThrow(/неожиданный ответ/)
   })
 })
 

@@ -158,4 +158,22 @@ describe('/auth/telegram/callback', () => {
     expect(api.apiPost).toHaveBeenCalledTimes(1)
     expect(screen.getByText('данные виджета просрочены')).toBeTruthy()
   })
+
+  /**
+   * Поймано на стенде: 200 с телом другой формы → apiPost отдаёт undefined →
+   * страница падала в crash-границу «Что-то сломалось». Ошибка входа обязана
+   * оставаться ошибкой входа.
+   */
+  it('ответ без конверта — карточка ошибки, а не crash-граница', async () => {
+    atCallback()
+    api.apiPost.mockResolvedValue(undefined)
+
+    render(<TelegramCallbackPage />)
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Не удалось войти через Telegram' })).toBeTruthy(),
+    )
+
+    expect(screen.getByText(/неожиданный ответ/)).toBeTruthy()
+    expect(screen.queryByText('Что-то сломалось')).toBeNull()
+  })
 })
