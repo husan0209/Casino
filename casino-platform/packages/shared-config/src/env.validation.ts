@@ -90,6 +90,13 @@ export const envSchema = z
     JWT_REFRESH_EXPIRES_IN: z.string().default('30d'),
     CORS_ORIGINS: z.string().default('http://localhost:3000,http://localhost:3002'),
     KYC_DEPOSIT_LIMIT_RUB: z.coerce.number().default(5000),
+    // Порог вывода без верификации (решение владельца 2026-10-07): суммарно
+    // выведенного и замороженного на эту сумму хватает, чтобы игрок получил
+    // деньги без KYC-профиля; выше — KycRequiredError. Отдельный ключ, а не
+    // переиспользование KYC_DEPOSIT_LIMIT_RUB: у депозитного порога теперь
+    // смысл «риск-признак в логи», у этого — «отказ», и одно число на два
+    // разных решения связало бы их навсегда.
+    KYC_WITHDRAW_LIMIT_RUB: z.coerce.number().min(0).default(5000),
     REFERRAL_REWARD_RATE: z.coerce.number().default(0.05),
     INTERNAL_API_SECRET: z.string().optional(),
     GOOGLE_CLIENT_ID: z.string().optional(),

@@ -115,6 +115,51 @@ describe('GAP-55 проверка суммы (деньги — Decimal, не num
     )
   })
 
+  // Порог «вывод без верификации» (решение владельца 2026-10-07): остаток отдаёт
+  // бэк в валюте листа, поэтому сравнение — простое, без клиентского курса.
+  it('сумма выше свободной без верификации нормы — over_free_limit, ровно норма — ок', () => {
+    expect(
+      checkWithdrawAmount({
+        amount: '5000',
+        currency: 'RUB',
+        available: '9000',
+        withdrawRemaining: '5000',
+      }).ok,
+    ).toBe(true)
+    expect(
+      checkWithdrawAmount({
+        amount: '5000.01',
+        currency: 'RUB',
+        available: '9000',
+        withdrawRemaining: '5000',
+      }).reason,
+    ).toBe('over_free_limit')
+  })
+
+  it('аппрувенному (withdrawRemaining null) порога нет, и проверка пропускается', () => {
+    expect(
+      checkWithdrawAmount({
+        amount: '150000',
+        currency: 'RUB',
+        available: '200000',
+        withdrawRemaining: null,
+      }).ok,
+    ).toBe(true)
+  })
+
+  it('норма порога показывается раньше «не хватает остатка» только когда остатка хватает', () => {
+    // Порядок внутри checkWithdrawAmount: insufficient идёт до порога, и это
+    // правильно — «нет таких денег» важнее «нет верификации».
+    expect(
+      checkWithdrawAmount({
+        amount: '9000',
+        currency: 'RUB',
+        available: '500',
+        withdrawRemaining: '5000',
+      }).reason,
+    ).toBe('insufficient')
+  })
+
   it('разделители тысяч (пробел) принимаются, точная граница остатка — ок', () => {
     expect(checkWithdrawAmount({ amount: '1 000', currency: 'RUB', available: '1000' }).ok).toBe(
       true,
@@ -131,19 +176,46 @@ describe('GAP-55 порядок проверок до формы (§10.3)', () =
     { currency: 'USDT_TRC20', available: '150' },
   ]
 
-  it('KYC не approved — стоп ПЕРЕД всеми остальными проверками', () => {
+  it('без верификации и порог исчерпан — стоп ПЕРЕД всеми остальными проверками', () => {
     const blocked = resolveWithdrawPrecheck({
       kycApproved: false,
+      withdrawRemaining: '0',
       activeCurrency: 'RUB',
       wallets: [{ currency: 'RUB', available: '9999' }],
     })
     expect(blocked).toEqual({ kind: 'kyc_required' })
   })
 
+  // Решение владельца 2026-10-07: верификация нужна не для любого вывода, а для
+  // вывода выше порога. Поэтому неверифицированному игроку со свободным порогом
+  // форма открывается — прежний безусловный стоп отнимал у него мелкие выводы.
+  it('без верификации, порог свободен — форма открыта', () => {
+    expect(
+      resolveWithdrawPrecheck({
+        kycApproved: false,
+        withdrawRemaining: '5000',
+        activeCurrency: 'RUB',
+        wallets: [{ currency: 'RUB', available: '1200' }],
+      }),
+    ).toEqual({ kind: 'form', currency: 'RUB', available: '1200' })
+  })
+
+  it('бэк не ответил — форму не блокируем: «нужен KYC» по догалке это обещание впустую', () => {
+    expect(
+      resolveWithdrawPrecheck({
+        kycApproved: false,
+        withdrawRemaining: null,
+        activeCurrency: 'RUB',
+        wallets: [{ currency: 'RUB', available: '1200' }],
+      }),
+    ).toEqual({ kind: 'form', currency: 'RUB', available: '1200' })
+  })
+
   it('активный кошелёк с деньгами — форма в активной валюте', () => {
     expect(
       resolveWithdrawPrecheck({
         kycApproved: true,
+        withdrawRemaining: null,
         activeCurrency: 'RUB',
         wallets: [{ currency: 'RUB', available: '1200' }],
       }),
@@ -155,7 +227,12 @@ describe('GAP-55 порядок проверок до формы (§10.3)', () =
   })
 
   it('активный пуст, в другом есть — предлагаем вывести ту валюту', () => {
-    const result = resolveWithdrawPrecheck({ kycApproved: true, activeCurrency: 'RUB', wallets })
+    const result = resolveWithdrawPrecheck({
+      kycApproved: true,
+      withdrawRemaining: null,
+      activeCurrency: 'RUB',
+      wallets,
+    })
     expect(result).toMatchObject({
       kind: 'suggest_currency',
       from: 'RUB',
@@ -168,6 +245,7 @@ describe('GAP-55 порядок проверок до формы (§10.3)', () =
     expect(
       resolveWithdrawPrecheck({
         kycApproved: true,
+        withdrawRemaining: null,
         activeCurrency: 'RUB',
         wallets: [{ currency: 'RUB', available: '0' }],
       }),
@@ -176,7 +254,12 @@ describe('GAP-55 порядок проверок до формы (§10.3)', () =
 
   it('кошелька активной валюты вообще нет — не нулевая форма, а предложение/отказ', () => {
     expect(
-      resolveWithdrawPrecheck({ kycApproved: true, activeCurrency: 'KZT', wallets }),
+      resolveWithdrawPrecheck({
+        kycApproved: true,
+        withdrawRemaining: null,
+        activeCurrency: 'KZT',
+        wallets,
+      }),
     ).toMatchObject({
       kind: 'suggest_currency',
       to: 'USDT_TRC20',

@@ -105,17 +105,25 @@ export function normalizeDestination(input: {
 
 export interface AmountCheck {
   ok: boolean
-  reason?: 'format' | 'min' | 'max' | 'insufficient'
+  reason?: 'format' | 'min' | 'max' | 'insufficient' | 'over_free_limit'
 }
 
 /**
- * Сумма: формат, минимум/максимум валюты и доступный остаток (locked не трогаем —
- * в выводе участвует available). Деньги — Decimal через money.* (number запрещён).
+ * Сумма: формат, минимум/максимум валюты, доступный остаток (locked не трогаем —
+ * в выводе участвует available) и порог верификации. Деньги — Decimal через
+ * money.* (number запрещён).
+ *
+ * `withdrawRemaining` — сколько игрок может вывести БЕЗ верификации, в той же
+ * валюте, что и заявка: число считает бэк (`GET /kyc/status` переводит RUB-порог
+ * через свой курс), на клиенте арифметики с курсами нет. `null` — бэк не ответил
+ * или верификация не нужна: тогда проверку пропускаем, решение всё равно за
+ * сервером (422 `KYC_REQUIRED` обработан в листе).
  */
 export function checkWithdrawAmount(input: {
   amount: string
   currency: string
   available: string
+  withdrawRemaining?: string | null
 }): AmountCheck {
   const raw = input.amount.trim().replace(/\s/g, '')
   if (!/^\d+(\.\d+)?$/.test(raw)) {
@@ -131,15 +139,29 @@ export function checkWithdrawAmount(input: {
   if (!money.isGreaterOrEqual(input.available, raw)) {
     return { ok: false, reason: 'insufficient' }
   }
+  if (
+    input.withdrawRemaining !== null &&
+    input.withdrawRemaining !== undefined &&
+    !money.isGreaterOrEqual(input.withdrawRemaining, raw)
+  ) {
+    return { ok: false, reason: 'over_free_limit' }
+  }
   return { ok: true }
 }
 
 /**
  * §10.3 — проверки ДО формы, строгий порядок:
- *  1. KYC не approved → стоп, одна кнопка «Пройти верификацию», без формы;
+ *  1. без верификации и порог исчерпан → стоп, одна кнопка «Пройти верификацию»;
  *  2. активный кошелёк пустой и денег нет нигде → «Нечего выводить»;
  *  3. активный пустой, в другом есть → предложить ту валюту (не открывать нулевую форму);
  *  4. иначе — форма в активной валюте.
+ *
+ * Пункт 1 изменился 2026-10-07: раньше верификация требовалась для ЛЮБОГО вывода,
+ * теперь — только выше порога (решение владельца: до 5 000 ₽ вывод свободный).
+ * Поэтому форма открывается и неверифицированному игроку, а стоп наступает,
+ * когда без верификации выводить уже нечего. `withdrawRemaining === null`
+ * (бэк не ответил) форму не блокирует: отказ придёт с сервера, и показывать
+ * «нужен KYC» по собственной догадке значит врать.
  */
 export type WithdrawPrecheck =
   | { kind: 'kyc_required' }
@@ -149,10 +171,15 @@ export type WithdrawPrecheck =
 
 export function resolveWithdrawPrecheck(input: {
   kycApproved: boolean
+  withdrawRemaining: string | null
   activeCurrency: string
   wallets: WalletLike[]
 }): WithdrawPrecheck {
-  if (!input.kycApproved) {
+  const freeAllowanceExhausted =
+    !input.kycApproved &&
+    input.withdrawRemaining !== null &&
+    !money.isPositive(input.withdrawRemaining)
+  if (freeAllowanceExhausted) {
     return { kind: 'kyc_required' }
   }
   const active = input.wallets.find((wallet) => wallet.currency === input.activeCurrency)

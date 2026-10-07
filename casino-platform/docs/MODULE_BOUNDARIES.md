@@ -315,7 +315,7 @@ payment_callbacks    (raw callbacks от провайдеров)
 ### 6.4. Использует
 
 - `wallet` (WalletFacade — credit/debit/lock при confirm payments)
-- `kyc` (KycCheckService.assertCanDeposit / assertCanWithdraw)
+- `kyc` (KycFacade.assertCanWithdraw — порог вывода без верификации; `escalateOverDepositLimit` — риск-лог по пополнению)
 - `users` (UsersFacade — контекст, onDepositCompleted)
 - `geo` (GeoFacade)
 - NB: `audit` и `notifications` payments-модуль НЕ импортирует
@@ -769,7 +769,8 @@ users         → auth                (AuthGuard)
 geo           → users               (UsersFacade.getGeoContext)
               (читает exchange_rates — пишет их maintenance, §18)
 
-kyc           → geo                 (GeoFacade.convertRubToDisplay)
+kyc           → geo                 (GeoFacade.convertRubToDisplay + toRubEquivalent: порог вывода объявлен в ₽, а заявки приходят в USDT/BTC)
+              → (read-only payment_requests: база порога вывода, ADR GAP-51 — так же, как getTotalDepositedRub)
               → admin               (AdminAuthGuard для admin-review)
               exports KycCheckService
 
@@ -781,7 +782,7 @@ wallet        → auth                (AuthGuard)
               exports WalletFacade
 
 payments      → wallet              (WalletFacade.credit/debit/lock)
-              → kyc                 (KycCheckService.assertCanDeposit/assertCanWithdraw)
+              → kyc                 (KycFacade.assertCanWithdraw — сумма в ₽, которую переводит сам payments)
               → users               (UsersFacade)
               → geo                 (GeoFacade)
               exports PaymentsFacade (estimate, чтение заявки, смена статуса)

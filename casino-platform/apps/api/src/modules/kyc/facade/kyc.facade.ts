@@ -16,8 +16,14 @@ import { KycCheckService } from '../application/use-cases/kyc-check.service'
 export class KycFacade {
   constructor(@Inject(KycCheckService) private readonly check: KycCheckService) {}
 
-  assertCanWithdraw(userId: string): Promise<void> {
-    return this.check.assertCanWithdraw(userId)
+  /**
+   * можно ли игроку выводить `amountRub` — ₽-эквивалент заявки считает
+   * вызывающий (payments владеет курсом и суммой). Одобренный — всегда можно;
+   * неверифицированному — только пока сумма с уже выведенным не превышает
+   * `KYC_WITHDRAW_LIMIT_RUB`. Отказ — `KycRequiredError` (422).
+   */
+  assertCanWithdraw(userId: string, amountRub: string): Promise<void> {
+    return this.check.assertCanWithdraw(userId, amountRub)
   }
 
   /**

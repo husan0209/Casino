@@ -573,23 +573,39 @@ async createDeposit(input: CreateDepositInput) {
 }
 ```
 
-### 8.2. Withdrawal — всегда требует KYC
+### 8.2. Withdrawal — верификация выше порога
+
+Порог суммарного вывода без верификации — `KYC_WITHDRAW_LIMIT_RUB` (по умолчанию
+5 000 ₽, решение владельца 2026-10-07). До него платёж отдаётся и неверифицированному
+игроку, свыше — `KYC_REQUIRED`. Порог **суммарный**, а не на заявку: база — уже
+выведенное плюс замороженное pending-заявками. По одной заявке правило обходился бы
+десятью заявками по 5 000 ₽, а устроен он именно для того, чтобы этого не произошло.
+
+Заявка в обеих ветках остаётся ручной: подтверждает её оператор в админке,
+автоматической выплаты в проекте нет ни до порога, ни после (провайдеры payout не
+исполняют, §4). Порог отвечает на вопрос «нужен ли паспорт», а не «платим ли сами».
 
 ```typescript
 async createWithdrawal(input: CreateWithdrawalInput) {
-  const kycStatus = await this.kycFacade.getStatus(input.userId)
-
-  if (kycStatus !== 'approved') {
-    throw new KycRequiredError('Withdrawal requires KYC verification')
-  }
-
-  // ... создание withdrawal
+  // Лимиты валюты и реквизиты — до требования KYC: опечатку показываем раньше.
+  const amountRub = this.geo.toRubEquivalent(input.amount, input.currency)
+  // Отказ, если верификации нет, а сумма с уже выведенным выше порога.
+  await this.kycFacade.assertCanWithdraw(input.userId, amountRub)
+  // ... блокировка баланса и заявка
 }
 ```
 
+`assertCanWithdraw` fail-closed: падение хранилища KYC или истории выводов означает
+отказ, а не «пропустили» — это единственный guard вывода.
+
 ### 8.3. Display для фронта
 
-`GET /api/v1/kyc/status?currency=KZT` возвращает `limit_remaining` в запрошенной валюте. Это **только отображение**; enforcement остаётся на RUB-эквиваленте.
+`GET /api/v1/kyc/status?currency=KZT` возвращает `withdraw_limit_rub`,
+`withdrawn_rub`, `withdraw_remaining_rub` и `withdraw_remaining` — уже в запрошенной
+валюте. Это **только отображение**: решение принимает сервер по RUB-базе, а клиент
+не пересчитывает курсы. Полей про лимит пополнения (`deposit_limit_rub`,
+`total_deposited_rub`) в ответе нет: правила, которое они описывали, больше нет, а
+показанная цифра означала бы обещание.
 
 ---
 

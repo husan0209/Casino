@@ -13,6 +13,18 @@ export interface KycSubmitInput {
 import type { KycProfileRow } from '@casino/shared-types'
 
 export type { KycProfileRow }
+
+/**
+ * Одна посчитанная заявка на вывод. `amountRub` — то, что записано в заявку
+ * (для новых выводов — RUB-эквивалент на интенте); `null` у строк, созданных
+ * до того, как колонку стали заполнять, — их вызывающий переводит сам по
+ * `currency` + `amount`.
+ */
+export interface CountedWithdrawal {
+  currency: string
+  amount: string
+  amountRub: string | null
+}
 export interface IKycRepository {
   getByUserId(userId: string): Promise<KycProfileRow | null>
   getById(id: string): Promise<KycProfileRow | null>
@@ -45,5 +57,17 @@ export interface IKycRepository {
     reviewedBy?: string
   }): Promise<void>
   getTotalDepositedRub(userId: string): Promise<string>
+  /**
+   * Выводы игрока, которые уже считаются: `pending` (ждёт подтверждения
+   * оператором, баланс заморожен), `processing` и `completed`. `failed`,
+   * `cancelled` и `expired` не входят — эти деньги игроку не отдали, и
+   * учитывать их значит наказывать за чужую ошибку провайдера.
+   *
+   * Отдаются строки, а не сумма: `amount_rub` у заявок на вывод исторически
+   * пустой (колонку пишут только депозиты), поэтому перевод в рубли — дело
+   * вызывающего, у которого есть GeoFacade. Список одного игрока ограничен
+   * сверху тем же порогом, ради которого всё считается.
+   */
+  listCountedWithdrawals(userId: string): Promise<CountedWithdrawal[]>
 }
 export const KYC_REPOSITORY = Symbol('KYC_REPOSITORY')

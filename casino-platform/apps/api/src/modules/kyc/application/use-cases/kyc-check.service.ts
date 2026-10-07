@@ -3,11 +3,14 @@ import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
 
+import { GeoFacade } from '@modules/geo/facade/geo.facade'
+
 import { money } from '@casino/shared-utils'
 
 import { KycRequiredError } from '../../domain/errors'
 import { type IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
-import { kycDepositLimitRub } from '../deposit-limit'
+import { kycDepositLimitRub, kycWithdrawLimitRub } from '../kyc-limits'
+import { withdrawnRubTotal } from '../withdrawn-total'
 
 @Injectable()
 export class KycCheckService {
@@ -15,20 +18,41 @@ export class KycCheckService {
 
   constructor(
     @Inject(KYC_REPOSITORY) private repo: IKycRepository,
-    // Порог читается отсюда, а не литералом в коде: значения на сервере и в
-    // GET /kyc (GetKycStatusUseCase) обязаны совпадать — см. application/deposit-limit.ts.
+    // Пороги читаются отсюда, а не литералом в коде: значения на сервере и в
+    // GET /kyc (GetKycStatusUseCase) обязаны совпадать — см. application/kyc-limits.ts.
     @Inject(ConfigService) private config: ConfigService,
+    // RUB-эквивалент заявок, у которых не записан amount_rub. kyc → geo уже
+    // разрешён границами (GeoFacade используют и GetKycStatusUseCase, и
+    // процесс расчёта лимита), нового ребра модулей эта правка не создаёт.
+    @Inject(GeoFacade) private geo: GeoFacade,
   ) {}
 
   /**
-   * Верификация обязательна на ВЫВОДЕ. На пополнении её нет: игрок не обязан
-   * доказывать личность, чтобы внести свои деньги (решение владельца 2026-10-07),
-   * и `escalateOverDepositLimit` ниже — только про фиксацию риска, не про отказ.
+   * Вывод без верификации — до `KYC_WITHDRAW_LIMIT_RUB` **суммарно** (решение
+   * владельца 2026-10-07): «можно выводить до 5 000 ₽, захотел 5 000 ₽ 1 ₽ —
+   * нужен KYC». Считаем по обороту, а не по одной заявке, иначе порог обходится
+   * десятью заявками по 5 000 ₽ — ровно тем приёмом, от которого такой порог и
+   * защищает. Одобрённому игроку порога нет: limit — это потолок анонимного
+   * вывода, а не потолка вывода вообще (`withdrawMax` валюты проверяет payments).
+   *
+   * Заявка при этом остаётся ручной: оператор подтверждает её в админке и до, и
+   * после порога (порог решает вопрос «нужен ли паспорт», а не «платим ли сами»).
+   *
+   * Fail-closed: падение хранилища KYC или истории выводов означает отказ, а не
+   * «пропустили» — это единственный guard вывода.
    */
-  async assertCanWithdraw(userId: string): Promise<void> {
+  async assertCanWithdraw(userId: string, amountRub: string): Promise<void> {
     const status = await this.repo.getStatus(userId)
-    if (status?.status !== 'approved') {
-      throw new KycRequiredError('Вывод средств требует KYC верификации')
+    if (status?.status === 'approved') {
+      return
+    }
+    const limit = kycWithdrawLimitRub(this.config)
+    const alreadyRub = withdrawnRubTotal(
+      await this.repo.listCountedWithdrawals(userId),
+      (amount, currency) => this.geo.toRubEquivalent(amount, currency),
+    )
+    if (money.isGreaterThan(money.add(alreadyRub, amountRub), limit)) {
+      throw new KycRequiredError(`Вывод свыше ${limit} ₽ без верификации невозможен — пройдите KYC`)
     }
   }
 

@@ -54,10 +54,11 @@ export class KycController {
     @CurrentUser() u: UserActor,
     @Query('currency') currency?: string,
   ): Promise<{
-    deposit_limit_rub: string
-    total_deposited_rub: string
-    limit_remaining: string
-    limit_currency: DisplayCurrency
+    withdraw_limit_rub: string
+    withdrawn_rub: string
+    withdraw_remaining_rub: string
+    withdraw_remaining: string
+    withdraw_currency: DisplayCurrency
     status?: string
     submittedAt?: Date | null
     rejectionReason?: string | null

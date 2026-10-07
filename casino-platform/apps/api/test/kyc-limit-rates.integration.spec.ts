@@ -10,7 +10,7 @@ import { prisma } from '@casino/database'
 
 /**
  * GAP-34 критерий 3 (real Postgres): запись в exchange_rates меняет
- * limit_remaining в ответе KYC use-case. Без LEDGER_INTEGRATION=1 — скип
+ * withdraw_remaining в ответе KYC use-case. Без LEDGER_INTEGRATION=1 — скип
  * (нет локальной БД); в CI выполняется.
  */
 const d = process.env.LEDGER_INTEGRATION === '1' ? describe : describe.skip
@@ -26,7 +26,7 @@ async function makeUseCase(): Promise<GetKycStatusUseCase> {
   return new GetKycStatusUseCase(
     {
       getStatus: async () => ({ kyc_status: 'unverified' }),
-      getTotalDepositedRub: async () => '0',
+      listCountedWithdrawals: async () => [],
     } as never,
     facade,
     { get: () => '5000' } as never,
@@ -40,10 +40,10 @@ d('exchange_rates в реальном Postgres (GAP-34)', () => {
     }
   })
 
-  it('запись rate=4000 меняет limit_remaining: 5000 RUB → 1.25 USDT', async () => {
+  it('запись rate=4000 меняет withdraw_remaining: 5000 RUB → 1.25 USDT', async () => {
     // контроль: без записи — константа 92.5 → 54.05
     const before = await (await makeUseCase()).execute('user-x', 'USDT_TRC20')
-    expect(before.limit_remaining).toBe('54.05')
+    expect(before.withdraw_remaining).toBe('54.05')
 
     const row = await prisma.exchangeRate.create({
       data: { currencyFrom: 'USDT_TRC20', currencyTo: 'RUB', rate: '4000', source: 'spec-gap34' },
@@ -51,7 +51,7 @@ d('exchange_rates в реальном Postgres (GAP-34)', () => {
     createdIds.push(row.id)
 
     const res = await (await makeUseCase()).execute('user-x', 'USDT_TRC20')
-    expect(res.limit_remaining).toBe('1.25')
-    expect(res.limit_currency).toBe('USDT_TRC20')
+    expect(res.withdraw_remaining).toBe('1.25')
+    expect(res.withdraw_currency).toBe('USDT_TRC20')
   })
 })

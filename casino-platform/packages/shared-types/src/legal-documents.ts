@@ -20,7 +20,10 @@ export type LegalDocumentType = 'terms' | 'privacy' | 'cookies' | 'responsible_g
  * версий не переиспользуется — одна версия = один зафиксированный текст.
  */
 export const LEGAL_DOCUMENT_VERSIONS: Readonly<Record<LegalDocumentType, string>> = {
-  terms: '1.1',
+  // 1.2 (2026-10-07): верификация нужна для вывода сверх порога мелких выплат,
+  // а не для любого вывода; пополнение явно без верхней суммы. Копия 1.1
+  // осталась в архиве — то, что игрок принял под 1.1, не переписывается.
+  terms: '1.2',
   privacy: '1.0',
   cookies: '1.0',
   responsible_gaming: '1.0',

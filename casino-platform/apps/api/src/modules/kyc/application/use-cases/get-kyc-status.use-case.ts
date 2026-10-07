@@ -7,8 +7,19 @@ import type { DisplayCurrency } from '@casino/shared-config'
 import { money } from '@casino/shared-utils'
 
 import { type IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
-import { kycDepositLimitRub } from '../deposit-limit'
+import { kycWithdrawLimitRub } from '../kyc-limits'
+import { withdrawnRubTotal } from '../withdrawn-total'
 
+/**
+ * Что видит игрок про верификацию (GAP-36).
+ *
+ * Поля про пополнение здесь были и убраны 2026-10-07 вместе с отказом на
+ * депозите: `deposit_limit_rub` / `total_deposited_rub` больше ни в чём не
+ * отказывают, а показанная игроку цифра «остаток лимита пополнения» — это
+ * обещание правила, которого нет. Порог `KYC_DEPOSIT_LIMIT_RUB` остался только
+ * как риск-лог при зачислении (`KycCheckService.escalateOverDepositLimit`), и
+ * наружу он не выходит.
+ */
 @Injectable()
 export class GetKycStatusUseCase {
   constructor(
@@ -21,34 +32,41 @@ export class GetKycStatusUseCase {
     userId: string,
     currency = 'RUB',
   ): Promise<{
-    deposit_limit_rub: string
-    total_deposited_rub: string
-    limit_remaining: string
-    limit_currency: DisplayCurrency
+    withdraw_limit_rub: string
+    withdrawn_rub: string
+    withdraw_remaining_rub: string
+    withdraw_remaining: string
+    withdraw_currency: DisplayCurrency
     status?: string
     submittedAt?: Date | null
     rejectionReason?: string | null
     documents?: string[]
   }> {
     const status = await this.repo.getStatus(userId)
-    // Порог — общий с KycCheckService (application/deposit-limit.ts): цифра на
-    // этой странице и правило, которое сервер применяет к депозиту, обязаны
-    // читаться из одного места.
-    const limitRub = kycDepositLimitRub(this.config)
-    const totalRub = (await this.repo.getTotalDepositedRub(userId)) || '0'
-    const remainingRub = money.isGreaterThan(totalRub, limitRub)
+    // Порог и база — общие с KycCheckService.assertCanWithdraw (kyc-limits.ts и
+    // withdrawn-total.ts): цифра на странице обязана быть тем же числом, по
+    // которому сервер отказывает, иначе страница верификации врёт намеренно.
+    const limitRub = kycWithdrawLimitRub(this.config)
+    const withdrawnRub = withdrawnRubTotal(
+      await this.repo.listCountedWithdrawals(userId),
+      (amount, cur) => this.geo.toRubEquivalent(amount, cur),
+    )
+    // Для approved поле не используется: порога у одобренного игрока нет, и
+    // «остаток 0» означал бы, что ему нельзя выводить.
+    const remainingRub = money.isGreaterThan(withdrawnRub, limitRub)
       ? '0'
-      : money.subtract(limitRub, totalRub)
+      : money.subtract(limitRub, withdrawnRub)
 
     const displayCurrency = (currency || 'RUB') as DisplayCurrency
-    const limitRemaining = await this.geo.convertRubToDisplay(remainingRub, displayCurrency)
+    const remaining = await this.geo.convertRubToDisplay(remainingRub, displayCurrency)
 
     return {
       ...status,
-      deposit_limit_rub: limitRub,
-      total_deposited_rub: totalRub,
-      limit_remaining: limitRemaining,
-      limit_currency: displayCurrency,
+      withdraw_limit_rub: limitRub,
+      withdrawn_rub: withdrawnRub,
+      withdraw_remaining_rub: remainingRub,
+      withdraw_remaining: remaining,
+      withdraw_currency: displayCurrency,
     }
   }
 }

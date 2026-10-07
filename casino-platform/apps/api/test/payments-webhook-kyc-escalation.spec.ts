@@ -116,6 +116,9 @@ function makeRealKycFacade(args: {
     new KycCheckService(
       makeKycRepo({ status: args.status, lifetimeRub: args.lifetimeRub, throws: args.throws }),
       { get: () => args.limit } as never,
+      // Геом этот сценарий не пользуется: эскалация читает только депозиты.
+      // Порог вывода спрашивает курс, поэтому фасад обязан быть передан.
+      { toRubEquivalent: (amount: string) => amount } as never,
     ),
   )
 }

@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common'
 import { prisma, type KycDocumentType, type KycStatus, type KycFileType } from '@casino/database'
 
 import {
+  type CountedWithdrawal,
   type IKycRepository,
   type KycSubmitInput,
   type KycProfileRow,
@@ -13,9 +14,7 @@ export class PrismaKycRepository implements IKycRepository {
   async getByUserId(userId: string): Promise<KycProfileRow | null> {
     return prisma.kycProfile.findUnique({ where: { userId }, include: { documents: true } })
   }
-  async getById(
-    id: string,
-  ): Promise<
+  async getById(id: string): Promise<
     | (KycProfileRow & {
         user: { id: string; email: string | null; createdAt: Date; status: string }
       })
@@ -79,9 +78,7 @@ export class PrismaKycRepository implements IKycRepository {
       },
     })
   }
-  async getStatus(
-    userId: string,
-  ): Promise<{
+  async getStatus(userId: string): Promise<{
     status: string
     submittedAt: Date | null
     rejectionReason: string | null
@@ -157,5 +154,29 @@ export class PrismaKycRepository implements IKycRepository {
     })
     const sum = res._sum.amountRub ?? 0
     return String(sum)
+  }
+  /**
+   * Основание порога «вывод без верификации» — см. IKycRepository.
+   *
+   * Читаем `payment_requests` напрямую (деньги-чтения другому модулю разрешены
+   * по ADR GAP-51; так же устроен getTotalDepositedRub). Сумму в рубли здесь
+   * НЕ считаем: `_sum(amountRub)` по выводу сложил бы NULL-ы в 0 и показал бы
+   * «ничего не выведено» для всех заявок до 2026-10-07, а `_sum(amount)` смешал
+   * бы ₽, USDT и BTC в одно число.
+   */
+  async listCountedWithdrawals(userId: string): Promise<CountedWithdrawal[]> {
+    const rows = await prisma.paymentRequest.findMany({
+      where: {
+        userId,
+        type: 'withdrawal',
+        status: { in: ['pending', 'processing', 'completed'] },
+      },
+      select: { currency: true, amount: true, amountRub: true },
+    })
+    return rows.map((row) => ({
+      currency: row.currency,
+      amount: String(row.amount),
+      amountRub: row.amountRub === null ? null : String(row.amountRub),
+    }))
   }
 }

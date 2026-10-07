@@ -33,8 +33,11 @@ function harness(): Harness {
   const repo = { create } as never
   const wallet = { lock } as never
   const kyc = { assertCanWithdraw } as never
+  // Заявки в этой спеке рублёвые, поэтому курс — тождественный: здесь проверяется
+  // связь «проводка lock ↔ id заявки», а не пересчёт валют.
+  const geo = { toRubEquivalent: (amount: string) => amount } as never
   return {
-    useCase: new CreateWithdrawalUseCase(repo, wallet, kyc),
+    useCase: new CreateWithdrawalUseCase(repo, wallet, kyc, geo),
     lock,
     create,
     assertCanWithdraw,

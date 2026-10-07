@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { toast } from '@/components/ui/toaster'
 import { apiPost, errText } from '@/lib/api'
 import { getKycStatus } from '@/lib/api/kyc.api'
+import { formatAmount } from '@/lib/format/currency'
 import { useAuth } from '@/stores/auth'
 
 /** Форма персональных данных KYC (первый шаг заявки). */
@@ -152,15 +153,29 @@ export default function KycPage(): React.JSX.Element {
   return (
     <div className="container-1 py-8 max-w-2xl">
       <h1 className="text-2xl font-bold mb-2">KYC Верификация</h1>
-      {/* Верификация нужна, чтобы вывести деньги. Пополнение счёта доступно без
-          неё всегда — прежний лимит суммарных пополнений без KYC снят
-          (решение владельца 2026-10-07), поэтому здесь нет ни «остатка лимита»,
-          ни красной карточки про него. */}
+      {/* Верификация нужна, чтобы вывести больше порога. Пополнение счёта вообще
+          без неё и без верхней границы — прежний лимит суммарных пополнений снят
+          (решение владельца 2026-10-07), поэтому здесь нет ни «остатка лимита
+          пополнения», ни красной карточки про него. Порог вывода — суммарный:
+          бэк вычитает уже выведенное и замороженное, поэтому цифра честная, а не
+          «5 000 ₽ на каждую заявку». */}
       <div className="text-sm text-muted mb-6">
         {status === 'approved'
-          ? 'Верификация пройдена: вывод средств доступен.'
-          : 'Пополнять счёт можно без верификации. Вывод средств — только после неё.'}
+          ? 'Верификация пройдена: вывод средств доступен без лимита по сумме.'
+          : data
+            ? `Пополнять счёт можно без верификации. Вывод до ${formatAmount(
+                data.withdraw_limit_rub,
+                'RUB',
+              )} — тоже без неё; сверх этого вывод только после верификации.`
+            : 'Пополнять счёт можно без верификации. Вывод сверх порога — после неё.'}
       </div>
+      {status !== 'approved' && data && (
+        <div className="card mb-6 text-sm">
+          Без верификации доступно ещё <b>{formatAmount(data.withdraw_remaining_rub, 'RUB')}</b>
+          {' — уже выведено и в заявках: '}
+          {formatAmount(data.withdrawn_rub, 'RUB')}
+        </div>
+      )}
       <div className="card mb-6">
         Статус:{' '}
         <b

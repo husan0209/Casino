@@ -42,6 +42,8 @@ interface Harness {
   useCase: CreateWithdrawalUseCase
   lock: ReturnType<typeof vi.fn>
   create: ReturnType<typeof vi.fn>
+  /** Шпион гейта верификации: `assertCanWithdraw(userId, amountRub)`. */
+  kyc: { assertCanWithdraw: ReturnType<typeof vi.fn> }
 }
 
 function harness(): Harness {
@@ -50,10 +52,26 @@ function harness(): Harness {
     .fn()
     .mockImplementation((data: { id: string }) => Promise.resolve({ id: data.id }))
   const kyc = { assertCanWithdraw: vi.fn().mockResolvedValue(undefined) }
+  // Курс фиктивный и круглый (92,5 за USDT, 1 000 000 за BTC), чтобы RUB-база
+  // порога была видна в аргументе KYC и в amount_rub заявки.
+  const geo = {
+    toRubEquivalent: (amount: string, currency: string) => {
+      if (currency === 'RUB') {
+        return amount
+      }
+      return String(Number(amount) * (currency === 'BTC' ? 1000000 : 92.5))
+    },
+  }
   return {
-    useCase: new CreateWithdrawalUseCase({ create } as never, { lock } as never, kyc as never),
+    useCase: new CreateWithdrawalUseCase(
+      { create } as never,
+      { lock } as never,
+      kyc as never,
+      geo as never,
+    ),
     lock,
     create,
+    kyc,
   }
 }
 
@@ -250,6 +268,55 @@ describe('CreateWithdrawalUseCase: money-контракт и границы по
     expect(lockArg.amount).toBe('25.5')
     expect(createArg.amount).toBe('25.5')
     expect(createArg.destination).toBe(TRON_ADDRESS)
+  })
+
+  // Порог «вывод без верификации» объявлен в рублях и он один на все валюты,
+  // поэтому use-case обязан передавать в KYC RUB-эквивалент, а не монеты: с
+  // «25.5» гейт считал бы 25,5 ₽ и пропускал бы 2 359 ₽ (решение владельца
+  // 2026-10-07). Курс в стенке: USDT ×92,5, BTC ×1 000 000.
+  it('в KYC уходит RUB-эквивалент заявки, а не сумма в монетах', async () => {
+    await h.useCase.execute('u1', cryptoInput({ amount: '25.5' }))
+    expect(h.kyc.assertCanWithdraw).toHaveBeenCalledWith('u1', '2358.75')
+  })
+
+  it('RUB-заявка передаётся в KYC без пересчёта', async () => {
+    await h.useCase.execute('u1', {
+      amount: '5000',
+      currency: 'RUB',
+      method: 'card',
+      destination: '2200700012345678',
+    })
+    expect(h.kyc.assertCanWithdraw).toHaveBeenCalledWith('u1', '5000')
+  })
+
+  it('BTC считается по своему курсу, а не как RUB', async () => {
+    await h.useCase.execute(
+      'u1',
+      cryptoInput({ amount: '0.005', currency: 'BTC', destination: BTC_BECH32_ADDRESS }),
+    )
+    expect(h.kyc.assertCanWithdraw).toHaveBeenCalledWith('u1', '5000')
+  })
+
+  it('RUB-эквивалент записывается в заявку — база порога на следующие заявки', async () => {
+    await h.useCase.execute('u1', cryptoInput({ amount: '25.5' }))
+    const createArg = h.create.mock.calls[0]?.[0] as { amountRub: unknown }
+    expect(createArg.amountRub).toBe('2358.75')
+  })
+
+  it('отказ KYC не замораживает баланс и не создаёт заявку', async () => {
+    h.kyc.assertCanWithdraw.mockRejectedValue(new Error('KYC_REQUIRED'))
+    await expect(h.useCase.execute('u1', cryptoInput({ amount: '25.5' }))).rejects.toThrow(
+      'KYC_REQUIRED',
+    )
+    expect(h.lock).not.toHaveBeenCalled()
+    expect(h.create).not.toHaveBeenCalled()
+  })
+
+  it('границы валюты проверяются до требования KYC — опечатку показываем раньше', async () => {
+    await expect(h.useCase.execute('u1', cryptoInput({ amount: '5' }))).rejects.toThrow(
+      AmountTooSmallError,
+    )
+    expect(h.kyc.assertCanWithdraw).not.toHaveBeenCalled()
   })
 
   it('мусорная сумма даёт стабильный INVALID_AMOUNT, а не 500 от decimal.js', async () => {
