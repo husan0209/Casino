@@ -558,7 +558,9 @@ Env: добавлены опциональные `SMTP_PORT/SMTP_USER/SMTP_PASS`
   `GOOGLE_CLIENT_ID/SECRET`.
 - Telegram: `POST /auth/telegram` — верификация виджета (secret = SHA256(bot_token), HMAC по data-check-string,
   `timingSafeEqual`, `auth_date` ≤ 24 ч), пользователь без email (schema nullable), сессия. Требует `TELEGRAM_BOT_TOKEN`.
-- Контракт подписей закрыт спеком `oauth-verify.spec.ts` (11 кейсов, GAP-42); Telegram-хэш дополнительно проверен
+  `POST /auth/telegram/preview` — та же верификация, но БЕЗ сессии и без cookies: возвращает проверенный профиль и
+  `accountExists`, чтобы колбэк-страница спросила игрока («Вход» / «Регистрация») до того, как вход совершён.
+- Контракт подписей закрыт спеком `oauth-verify.spec.ts` (17 кейсов: GAP-42 + preview); Telegram-хэш дополнительно проверен
   2026-09-09 на payload, подписанном РЕАЛЬНЫМ токеном (наш `verify` принимает, подделка отбивается).
 - **Не сделано:** `GET /auth/google` против настоящего `redirect_uri` и живой логин виджетом на публичном домене
   (нужен BotFather `/setdomain`) → пункт 5 критерия GAP-46.

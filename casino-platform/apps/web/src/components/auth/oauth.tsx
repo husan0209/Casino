@@ -12,10 +12,12 @@ import { type WebUser } from '@/stores/auth'
  *         обменивает code на сессию (state — подписанный CSRF-токен API).
  * Telegram: TelegramLoginWidget инжектит официальный скрипт
  *         telegram-widget.js (бот из NEXT_PUBLIC_TELEGRAM_BOT_NAME) в режиме
- *         data-auth-url — после входа редирект на /auth/telegram/callback,
- *         где exchangeTelegramAuth меняет данные виджета на сессию (POST
- *         /auth/telegram). Iframe виджета рендерится только на домене,
- *         добавленном боту через /setdomain, — на остальных Telegram
+ *         data-auth-url — после подтверждения Telegram редирект на
+ *         /auth/telegram/callback. Там подпись сверяется (POST
+ *         /auth/telegram/preview, сессию не выдаёт), игрок видит, под каким
+ *         аккаунтом идёт вход, и только по «Продолжить» меняется данные на
+ *         сессию (POST /auth/telegram). Iframe виджета рендерится только на
+ *         домене, добавленном боту через /setdomain, — на остальных Telegram
  *         показывает ошибку.
  *
  * Кнопка Google рисует реальный поток только когда задан
@@ -145,16 +147,14 @@ export interface TelegramAuthPayload {
 }
 
 /**
- * Обмен данных виджета на сессию — POST /auth/telegram. Подпись Telegram
- * проверяет API по HMAC от TELEGRAM_BOT_TOKEN (токен живёт только на сервере).
- * Виджет присылает id/auth_date числами, DTO API требует строки — конвертация
- * здесь, остальные поля едут как есть (серверный zod-схема passthrough).
+ * Тело запроса к API для обоих шагов: виджет присылает id/auth_date числами,
+ * DTO API (TelegramLoginSchema) требует строки — конвертация здесь, остальные
+ * поля едут как есть (серверная zod-схема passthrough). Набор ключей общий не
+ * для красоты: подпись Telegram считается от них, и если preview и обмен
+ * отправят разные поля, один из двух шагов отбивается с «подпись не совпадает».
  */
-export async function exchangeTelegramAuth(
-  payload: TelegramAuthPayload,
-  referralCode?: string,
-): Promise<{ accessToken: string; user: WebUser }> {
-  return apiPost<{ accessToken: string; user: WebUser }>('/auth/telegram', {
+function telegramDtoBody(payload: TelegramAuthPayload): Record<string, string | undefined> {
+  return {
     id: String(payload.id),
     auth_date: String(payload.auth_date),
     hash: payload.hash,
@@ -162,8 +162,40 @@ export async function exchangeTelegramAuth(
     last_name: payload.last_name,
     username: payload.username,
     photo_url: payload.photo_url,
+  }
+}
+
+/**
+ * Обмен данных виджета на сессию — POST /auth/telegram. Подпись Telegram
+ * проверяет API по HMAC от TELEGRAM_BOT_TOKEN (токен живёт только на сервере).
+ */
+export async function exchangeTelegramAuth(
+  payload: TelegramAuthPayload,
+  referralCode?: string,
+): Promise<{ accessToken: string; user: WebUser }> {
+  return apiPost<{ accessToken: string; user: WebUser }>('/auth/telegram', {
+    ...telegramDtoBody(payload),
     referral_code: referralCode,
   })
+}
+
+/** Ответ POST /auth/telegram/preview — проверенный профиль до выдачи сессии. */
+export interface TelegramPreviewResult {
+  displayName: string | null
+  username: string | null
+  photoUrl: string | null
+  accountExists: boolean
+}
+
+/**
+ * Проверка подписи без входа (экран подтверждения). Имя и фото берём отсюда, а
+ * не из query: query подделывается ссылкой вида `…/callback?first_name=Админ`, и
+ * наша же страница предлагала бы «продолжить» под выдуманным аккаунтом.
+ */
+export async function previewTelegramAuth(
+  payload: TelegramAuthPayload,
+): Promise<TelegramPreviewResult> {
+  return apiPost<TelegramPreviewResult>('/auth/telegram/preview', telegramDtoBody(payload))
 }
 
 /**
@@ -195,6 +227,31 @@ export function telegramPayloadFromQuery(query: URLSearchParams): TelegramAuthPa
 }
 
 /**
+ * auth-url для виджета. Виджет наклеивает поля пользователя на РОВНО то, что
+ * стоит в data-auth-url (telegram-widget.js: `authUrl = a.href`, дальше `?`/`&`
+ * и params.join('&')) — query текущей страницы он не переносит. Значит тихий
+ * ?ref= из ссылки партнёра обязан попасть сюда, иначе регистрация через Telegram
+ * создаёт игрока без реферера, хотя колбэк честно читает ref из query.
+ */
+export function telegramAuthUrl(referralCode?: string): string {
+  const url = `${window.location.origin}/auth/telegram/callback`
+  return referralCode ? `${url}?ref=${encodeURIComponent(referralCode)}` : url
+}
+
+/**
+ * Видимая плашка Telegram. Подпись «Продолжить с Telegram» — по образцу
+ * соседней Google-плашки: обе говорят одно и то же про один и тот же шаг.
+ */
+export function TelegramOAuthPlate(): React.JSX.Element {
+  return (
+    <>
+      <TelegramMark size={20} />
+      Продолжить с Telegram
+    </>
+  )
+}
+
+/**
  * Официальный Telegram Login Widget (UC-AUTH-09) в redirect-режиме
  * (data-auth-url): после подтверждения виджет сам переводит страницу на
  * /auth/telegram/callback с данными пользователя в query. Режим выбран вместо
@@ -202,22 +259,32 @@ export function telegramPayloadFromQuery(query: URLSearchParams): TelegramAuthPa
  * Function('user', …) — это eval, который запрещён прод-CSP (P1 #11:
  * script-src без unsafe-eval) и ронял виджет с EvalError.
  *
- * Ширина берётся из контейнера (`data-min-width`/`data-max-width`): без них
- * embed рисует кнопку фиксированных 238 px, и рядом с растянутой на всю ширину
- * плашкой Google пара выглядела чужеродно (замер на стенде: 229 px против
- * 348 px). Параметр работает как задумано — embed отвечает postMessage `resize`,
- * и скрипт telegram-widget.js проставляет iframe ширину.
+ * Как выглядит кнопка — наше, а не Telegram: видимая плашка лежит снизу, iframe
+ * виджета — прозрачным слоем сверху (`opacity-0`), поэтому клик, фокус с
+ * клавиатуры и сама OAuth-проверка остаются настоящими, а цвет и подпись
+ * Telegram-embed'а (он cross-origin, стилизовать нельзя) игроку не видны. Без
+ * этого пара кношек различалась заливкой при одинаковых ширине, радиусе и
+ * высоте.
  *
- * Внутренности iframe нам не принадлежат: цвет (#54A9EB) и подпись «Войти через
- * Telegram» не задаются, поэтому пару выравниваем по тому, что в нашей власти:
- * ширина, радиус и высота (`h-10` у обеих плашек).
+ * Ширина сообщается виджету через `data-min-width`/`data-max-width`: без них
+ * embed рисует фиксированные 238 px, и слой-клик стал бы уже видимой плашки —
+ * часть кнопки не нажималась бы. Высота `data-size=large` — ровно 40 px, от неё
+ * и высота обеих плашек (`h-10`).
+ *
+ * Если скрипт виджета не загрузился (заблокирован, CSP, нет сети), прозрачного
+ * слоя нет и клика тоже — показываем выключенную плашку вместо мёртвой кнопки.
  */
-export function TelegramLoginWidget(): React.JSX.Element {
+export function TelegramLoginWidget({
+  referralCode,
+}: {
+  referralCode?: string | undefined
+}): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null)
   // undefined — ширину ещё не измеряли, монтировать рано; число — измерили, и
   // 0 допустим: так себя ведут jsdom и скрытый контейнер, тогда кнопка
   // остаётся в родных 238 px, но она есть.
   const [width, setWidth] = useState<number | undefined>(undefined)
+  const [scriptFailed, setScriptFailed] = useState(false)
 
   useEffect(() => {
     const el = containerRef.current
@@ -253,8 +320,11 @@ export function TelegramLoginWidget(): React.JSX.Element {
     const widgetScript = document.createElement('script')
     widgetScript.src = 'https://telegram.org/js/telegram-widget.js?22'
     widgetScript.async = true
+    widgetScript.onerror = (): void => {
+      setScriptFailed(true)
+    }
     widgetScript.setAttribute('data-telegram-login', TELEGRAM_BOT_NAME ?? '')
-    widgetScript.setAttribute('data-auth-url', `${window.location.origin}/auth/telegram/callback`)
+    widgetScript.setAttribute('data-auth-url', telegramAuthUrl(referralCode))
     widgetScript.setAttribute('data-size', 'large')
     widgetScript.setAttribute('data-userpic', 'false')
     widgetScript.setAttribute('data-radius', '12')
@@ -264,10 +334,36 @@ export function TelegramLoginWidget(): React.JSX.Element {
     }
     // Язык подписи закрепляем: без параметра Telegram берёт язык браузера, и у
     // части игроков кнопка была бы «Sign in with Telegram» рядом с русской
-    // формой.
+    // формой. Подпись embed'а глазами не видна, но скринридер читает её: iframe
+    // живёт в DOM, а наша плашка — aria-hidden.
     widgetScript.setAttribute('data-lang', 'ru')
     container.appendChild(widgetScript)
-  }, [width])
+  }, [width, referralCode])
 
-  return <div ref={containerRef} data-testid="telegram-widget-slot" className="w-full" />
+  if (scriptFailed) {
+    return (
+      <button type="button" className={OAUTH_BUTTON_CLASS} disabled data-testid="telegram-widget">
+        <TelegramOAuthPlate />
+      </button>
+    )
+  }
+
+  return (
+    <div
+      className="group relative rounded-xl focus-within:ring-2 focus-within:ring-white/40"
+      data-testid="telegram-widget"
+    >
+      <span
+        aria-hidden
+        className={`${OAUTH_BUTTON_CLASS} group-hover:bg-white/[0.07] group-focus-within:bg-white/[0.07]`}
+      >
+        <TelegramOAuthPlate />
+      </span>
+      <div
+        ref={containerRef}
+        data-testid="telegram-widget-slot"
+        className="absolute inset-0 cursor-pointer opacity-0"
+      />
+    </div>
+  )
 }

@@ -38,7 +38,11 @@ import {
 import { LoginUseCase } from '../../application/use-cases/login.use-case'
 import { LogoutUseCase } from '../../application/use-cases/logout.use-case'
 import { GoogleOAuthUseCase } from '../../application/use-cases/oauth/google-oauth.use-case'
-import { TelegramLoginUseCase } from '../../application/use-cases/oauth/telegram-login.use-case'
+import {
+  TelegramLoginUseCase,
+  type TelegramPreviewResult,
+  type TelegramWidgetPayload,
+} from '../../application/use-cases/oauth/telegram-login.use-case'
 import { RefreshUseCase } from '../../application/use-cases/refresh.use-case'
 import { RegisterUseCase } from '../../application/use-cases/register.use-case'
 import { ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case'
@@ -321,5 +325,18 @@ export class AuthController {
     )
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user }
+  }
+
+  /**
+   * Проверка подписи виджета ДО обмена на сессию: колбэк-страница показывает
+   * подтверждение («Продолжить как …» / «Создать аккаунт») и игрок может
+   * отказаться. Ни сессии, ни cookies: эндпоинт проверяет подпись Telegram и
+   * отвечает, есть ли в базе игрок с этим аккаунтом. Вход совершается только по
+   * кнопке «Продолжить» — POST /auth/telegram.
+   */
+  @Post('telegram/preview')
+  @UsePipes(new ZodValidationPipe(TelegramLoginSchema))
+  async telegramPreview(@Body() payload: Record<string, unknown>): Promise<TelegramPreviewResult> {
+    return this.telegramUc.preview(payload as unknown as TelegramWidgetPayload)
   }
 }

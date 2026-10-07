@@ -11,7 +11,7 @@ import {
   OAUTH_BUTTON_CLASS,
   TELEGRAM_BOT_NAME,
   TelegramLoginWidget,
-  TelegramMark,
+  TelegramOAuthPlate,
   startGoogleOAuth,
 } from '@/components/auth/oauth'
 import { toast } from '@/components/ui/toaster'
@@ -81,14 +81,15 @@ function OAuthSection({ referral }: { referral: string | undefined }): React.JSX
         </Link>
       )}
       {TELEGRAM_BOT_NAME !== undefined ? (
-        // Redirect-режим (data-auth-url): обмен происходит на /auth/telegram/callback.
-        <TelegramLoginWidget />
+        // Redirect-режим (data-auth-url): обмен происходит на /auth/telegram/callback,
+        // и реферальный код должен уехать вместе с auth-url — виджет переносит только
+        // его query.
+        <TelegramLoginWidget referralCode={referral} />
       ) : (
         // Бот не прописан в NEXT_PUBLIC_TELEGRAM_BOT_NAME — мёртвая кнопка хуже
         // отсутствующей: прячем настоящий виджет, показываем выключенную плашку.
         <button type="button" className={OAUTH_BUTTON_CLASS} disabled>
-          <TelegramMark size={24} />
-          Войти через Telegram
+          <TelegramOAuthPlate />
         </button>
       )}
     </div>

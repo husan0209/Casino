@@ -21,6 +21,19 @@ export interface TelegramWidgetPayload {
   photo_url?: string
 }
 
+/** Ответ /auth/telegram/preview: проверенный профиль + есть ли аккаунт. */
+export interface TelegramPreviewResult {
+  displayName: string | null
+  username: string | null
+  photoUrl: string | null
+  accountExists: boolean
+}
+
+/** Имя игрока для отображения: «Иван Петров», иначе @username, иначе пусто. */
+function telegramDisplayName(input: TelegramWidgetPayload): string | null {
+  return [input.first_name, input.last_name].filter(Boolean).join(' ') || input.username || null
+}
+
 /**
  * Telegram Login Widget — TZ part 2 §Telegram.
  * Верификация: secret = SHA256(bot_token); HMAC-SHA256(data-check-string) == hash.
@@ -64,15 +77,31 @@ export class TelegramLoginUseCase {
     meta?: { ip?: string | undefined; userAgent?: string | undefined },
   ): Promise<OAuthSignInResult> {
     this.verify(input)
-    const displayName =
-      [input.first_name, input.last_name].filter(Boolean).join(' ') || input.username
     return this.provisioning.signIn({
       provider: 'telegram',
       providerUserId: String(input.id),
-      displayName,
+      displayName: telegramDisplayName(input) ?? undefined,
       referralCode: input.referralCode,
       ip: meta?.ip,
       userAgent: meta?.userAgent,
     })
+  }
+
+  /**
+   * Проверка подписи без выдачи сессии — экран подтверждения входа
+   * («Продолжить как …», как у Google) показывает имя и статус аккаунта,
+   * которого ещё нет в базе. Данные берём из проверенной подписи, а не из
+   * query колбэка: иначе по ссылке `…/auth/telegram/callback?first_name=Админ`
+   * наша же страница предлагала бы вход от имени выдуманного аккаунта.
+   * Сессия не создаётся и не линкуется — игрок вправе отказаться.
+   */
+  async preview(input: TelegramWidgetPayload): Promise<TelegramPreviewResult> {
+    this.verify(input)
+    return {
+      displayName: telegramDisplayName(input),
+      username: input.username ?? null,
+      photoUrl: input.photo_url ?? null,
+      accountExists: await this.provisioning.hasAccount('telegram', String(input.id)),
+    }
   }
 }
