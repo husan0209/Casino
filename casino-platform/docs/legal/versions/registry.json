@@ -20,5 +20,12 @@
       "sha256": "4e0db47364ec96ee6025a88b7059da01abb60c76a213f3d4bbf87f1704879023",
       "publishedAt": "2026-10-03"
     }
+  },
+  "1.1": {
+    "terms": {
+      "file": "1.1/terms.md",
+      "sha256": "aeb00b7a06b21d464fe2335b729316db5ece8cfb40e7b21d783934bcc8ee5064",
+      "publishedAt": "2026-10-07"
+    }
   }
 }

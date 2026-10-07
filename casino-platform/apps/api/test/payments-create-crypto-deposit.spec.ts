@@ -13,7 +13,6 @@ import {
   AmountTooLargeError,
   AmountTooSmallError,
   InvalidCurrencyError,
-  KycRequiredError,
   PaymentProviderError,
 } from '../src/modules/payments/domain/errors'
 
@@ -35,7 +34,6 @@ type CreatedRow = Record<string, unknown>
 
 function makeDeps(over: { npError?: Error } = {}) {
   const created: CreatedRow[] = []
-  const kycCalls: Array<{ userId: string; rub: string }> = []
   // Аргументы createPayment раньше не захватывались: тест проверял только результат,
   // поэтому priceCurrency='USD' при сумме в монетах проходил как зелёный.
   const paymentCalls: Array<Record<string, unknown>> = []
@@ -62,16 +60,10 @@ function makeDeps(over: { npError?: Error } = {}) {
     },
   } as unknown as INowPaymentsClient
 
-  const kyc = {
-    assertCanDeposit: async (userId: string, newDepositRub: string) => {
-      kycCalls.push({ userId, rub: newDepositRub })
-    },
-  } as never
-
   const config = { get: () => undefined } as never
 
-  const uc = new CreateCryptoDepositUseCase(repo, np, kyc, config)
-  return { uc, created, kycCalls, paymentCalls }
+  const uc = new CreateCryptoDepositUseCase(repo, np, config)
+  return { uc, created, paymentCalls }
 }
 
 describe('CreateCryptoDepositUseCase', () => {
@@ -79,7 +71,6 @@ describe('CreateCryptoDepositUseCase', () => {
     const d = makeDeps()
     const res = await d.uc.execute('u-1', '99.9', 'USDT_TRC20')
 
-    expect(d.kycCalls).toEqual([{ userId: 'u-1', rub: '12345.5' }])
     const row = d.created[0]!
     expect(row.userId).toBe('u-1')
     expect(row.type).toBe('deposit')
@@ -129,7 +120,6 @@ describe('CreateCryptoDepositUseCase', () => {
     const d = makeDeps()
     await expect(d.uc.execute('u-1', '10', 'USDT_TRC20')).rejects.toThrow(AmountTooSmallError)
     expect(d.paymentCalls).toHaveLength(0)
-    expect(d.kycCalls).toHaveLength(0)
     expect(d.created).toHaveLength(0)
   })
 
@@ -143,29 +133,21 @@ describe('CreateCryptoDepositUseCase', () => {
     const d = makeDeps()
     await expect(d.uc.execute('u-1', '100', 'USD')).rejects.toThrow(InvalidCurrencyError)
     expect(d.created).toHaveLength(0)
-    expect(d.kycCalls).toHaveLength(0)
   })
 
-  it('KYC-лимит исчерпан → KycRequiredError до createPayment (заявки и NP-платежа нет)', async () => {
-    const np = {
-      getEstimatePrice: async () => ({ estimatedAmount: '999999' }),
-      createPayment: async () => {
-        throw new Error('must not be called')
-      },
-    } as unknown as INowPaymentsClient
-    const kyc = {
-      assertCanDeposit: async () => {
-        throw new KycRequiredError()
-      },
-    } as never
-    const repo = {
-      create: async () => {
-        throw new Error('must not be called')
-      },
-    } as unknown as IPaymentRequestRepository
+  // Верификация нужна на выводе, а не на пополнении (решение владельца
+  // 2026-10-07): прежний шлюз «суммарные депозиты до KYC_DEPOSIT_LIMIT_RUB» снят
+  // вместе с KycCheckService.assertCanDeposit. Тест держит именно это — большая
+  // сумма проходит, а RUB-оценка по-прежнему пишется в заявку (она нужна для
+  // риск-лога и для витрины, а не для отказа).
+  it('депозит много выше прежнего KYC-лимита проходит без верификации', async () => {
+    const d = makeDeps()
+    const res = await d.uc.execute('u-1', '0.001', 'BTC')
 
-    const uc = new CreateCryptoDepositUseCase(repo, np, kyc, { get: () => undefined } as never)
-    await expect(uc.execute('u-1', '0.001', 'BTC')).rejects.toThrow(KycRequiredError)
+    expect(res.payment_request_id).toBe('pr-1')
+    expect(d.created).toHaveLength(1)
+    expect(d.created[0]!.amountRub).toBe('12345.5')
+    expect(d.paymentCalls).toHaveLength(1)
   })
 
   it('NOWPayments упал на createPayment → PaymentProviderError, заявка не создана', async () => {
@@ -216,25 +198,19 @@ describe('CreateCryptoDepositUseCase: релизный набор валют (TZ
       }) => NP_PAYMENT,
     )
     const repoCreate = vi.fn(async (_data: Record<string, unknown>) => ({ id: 'pr-1' }))
-    const kycCalls: string[] = []
 
     const np = {
       getEstimatePrice: estimatePrice,
       createPayment,
     } as unknown as INowPaymentsClient
     const repo = { create: repoCreate } as unknown as IPaymentRequestRepository
-    const kyc = {
-      assertCanDeposit: async (_userId: string, amountRub: string) => {
-        kycCalls.push(amountRub)
-      },
-    } as never
 
-    const useCase = new CreateCryptoDepositUseCase(repo, np, kyc, { get: () => undefined } as never)
-    return { useCase, estimatePrice, createPayment, repoCreate, kycCalls }
+    const useCase = new CreateCryptoDepositUseCase(repo, np, { get: () => undefined } as never)
+    return { useCase, estimatePrice, createPayment, repoCreate }
   }
 
   it.each(RELEASE_CURRENCIES)(
-    'релизная валюта %s: оценка → KYC → платёж → заявка',
+    'релизная валюта %s: оценка → платёж → заявка (KYC не участвует)',
     async (currency) => {
       const deps = makeCountingDeps()
 
@@ -248,7 +224,6 @@ describe('CreateCryptoDepositUseCase: релизный набор валют (TZ
       expect(deps.createPayment).toHaveBeenCalledWith(
         expect.objectContaining({ payCurrency: currency }),
       )
-      expect(deps.kycCalls).toEqual(['9250.00'])
       expect(deps.repoCreate).toHaveBeenCalledTimes(1)
       expect(result.payment_request_id).toBe('pr-1')
     },
@@ -270,7 +245,6 @@ describe('CreateCryptoDepositUseCase: релизный набор валют (TZ
       expect(deps.estimatePrice).toHaveBeenCalledTimes(0)
       expect(deps.createPayment).toHaveBeenCalledTimes(0)
       expect(deps.repoCreate).toHaveBeenCalledTimes(0)
-      expect(deps.kycCalls).toHaveLength(0)
     },
   )
 
@@ -285,7 +259,6 @@ describe('CreateCryptoDepositUseCase: релизный набор валют (TZ
     const useCase = new CreateCryptoDepositUseCase(
       { create: repoCreate } as unknown as IPaymentRequestRepository,
       np,
-      { assertCanDeposit: async () => undefined } as never,
       { get: () => undefined } as never,
     )
 

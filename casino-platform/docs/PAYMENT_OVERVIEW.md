@@ -547,25 +547,20 @@ async reconcilePendingPayments() {
 
 ## 8. KYC Enforcement
 
-### 8.1. Deposit до лимита
+### 8.1. Deposit — без верификации
+
+Пополнение счёта не требует KYC и не ограничено порогом суммарных пополнений
+(решение владельца 2026-10-07): игрок не обязан доказывать личность, чтобы внести
+свои деньги. Единственное место, где верификация обязательна, — вывод (§8.2).
+
+`KYC_DEPOSIT_LIMIT_RUB` при этом не исчез: превышение порога фиксируется в момент
+зачисления по вебхуку (`escalateOverDepositLimit`, структурированный warn-лог) как
+риск-признак для комплаенса, и никому не отказывает.
 
 ```typescript
 async createDeposit(input: CreateDepositInput) {
-  const kycStatus = await this.kycFacade.getStatus(input.userId)
-
-  if (kycStatus !== 'approved') {
-    // Считаем RUB-эквивалент
-    const totalDepositRub = await this.paymentsRepo.sumDepositsByUserSinceRegistration(input.userId)
-
-    const newTotalRub = money.add(totalDepositRub, await this.exchangeService.toRub(input.amount, input.currency))
-
-    if (newTotalRub.gt(env.KYC_DEPOSIT_LIMIT_RUB)) {
-      throw new KycRequiredError(
-        `KYC required. Limit: ${env.KYC_DEPOSIT_LIMIT_RUB} RUB, used: ${totalDepositRub} RUB`
-      )
-    }
-  }
-
+  // geo-валидация метода, money-проверка depositMin/depositMax — и сразу заявка.
+  // KycFacade в этом use-case не участвует.
   // ... создание депозита
 }
 ```

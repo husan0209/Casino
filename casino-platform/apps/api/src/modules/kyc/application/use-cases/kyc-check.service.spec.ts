@@ -2,10 +2,15 @@
  * Юнит-тесты KycCheckService.
  *
  * Проверяются два разных контракта:
- * 1) assertCanDeposit — проверка ДО создания заявки (отказ возможен);
+ * 1) assertCanWithdraw — верификация обязательна на ВЫВОДЕ (отказ возможен);
  * 2) escalateOverDepositLimit — фиксация ПОСЛЕ зачисления по вебхуку
  *    (отказ невозможен: деньги игрока уже на балансе, поэтому здесь только
  *    структурированный warn-лог).
+ *
+ * Отдельно зафиксировано, чего здесь больше нет: `assertCanDeposit` (шлюз
+ * «суммарные пополнения до KYC_DEPOSIT_LIMIT_RUB») удалён 2026-10-07 по решению
+ * владельца — пополнение не требует верификации. Что порог после этого значит,
+ * видно в тестах escalate-блока ниже: он пишет риск-лог и никому не отказывает.
  *
  * Порог читается из KYC_DEPOSIT_LIMIT_RUB через application/deposit-limit.ts
  * (общий с GET /kyc). В рантайме ConfigService отдаёт число (env-схема
@@ -15,11 +20,10 @@
 import { Logger } from '@nestjs/common'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-
 import type { AppError } from '@casino/shared-utils'
 
 import { KycCheckService } from './kyc-check.service'
-import { DepositLimitExceededError, KycRequiredError } from '../../domain/errors'
+import { KycRequiredError } from '../../domain/errors'
 
 import type { IKycRepository } from '../../domain/repositories/kyc.repository'
 import type { ConfigService } from '@nestjs/config'
@@ -72,69 +76,6 @@ function makeService(args: {
     makeConfig(args.limit),
   )
 }
-
-describe('KycCheckService.assertCanDeposit', () => {
-  it('KYC approved — лимит не проверяется даже при огромной сумме', async () => {
-    const service = makeService({ status: { status: 'approved' }, total: '999999' })
-    await expect(service.assertCanDeposit('u-1', '500000')).resolves.toBeUndefined()
-  })
-
-  it('лимит не исчерпан (total + new <= threshold) — пропуск', async () => {
-    const service = makeService({ total: '4000', limit: 5000 })
-    await expect(service.assertCanDeposit('u-1', '1000')).resolves.toBeUndefined()
-  })
-
-  it('превышение — DepositLimitExceededError с кодом DEPOSIT_LIMIT_EXCEEDED и порогом в тексте', async () => {
-    const service = makeService({ total: '4500', limit: 5000 })
-    const error = await captureError(service.assertCanDeposit('u-1', '1000.01'))
-
-    expect(error).toBeInstanceOf(DepositLimitExceededError)
-    // совместимость: это всё ещё KycRequiredError (общая ветка «нужен KYC»)
-    expect(error).toBeInstanceOf(KycRequiredError)
-    expect(error.code).toBe('DEPOSIT_LIMIT_EXCEEDED')
-    expect(error.httpStatus).toBe(422)
-    expect(error.message).toContain('5000')
-  })
-
-  it('порог берётся из KYC_DEPOSIT_LIMIT_RUB, а не из литерала 5000', async () => {
-    // Конфиг — число (z.coerce.number в env.validation.ts:92).
-    const service = makeService({ total: '0', limit: 10000 })
-    await expect(service.assertCanDeposit('u-1', '6000')).resolves.toBeUndefined()
-
-    const overLimit = makeService({ total: '0', limit: 10000 })
-    await expect(overLimit.assertCanDeposit('u-1', '10000.01')).rejects.toBeInstanceOf(
-      DepositLimitExceededError,
-    )
-  })
-
-  it('порог строкой приводит money-строку без потери значения', async () => {
-    const service = makeService({ total: '0', limit: '10000' })
-    await expect(service.assertCanDeposit('u-1', '9999.99')).resolves.toBeUndefined()
-    await expect(service.assertCanDeposit('u-1', '10000.01')).rejects.toBeInstanceOf(
-      DepositLimitExceededError,
-    )
-  })
-
-  it('без настроенного порога — дефолт 5000 (как в GET /kyc)', async () => {
-    const service = makeService({ total: '0', limit: undefined })
-    await expect(service.assertCanDeposit('u-1', '5000')).resolves.toBeUndefined()
-    await expect(service.assertCanDeposit('u-1', '5001')).rejects.toBeInstanceOf(
-      DepositLimitExceededError,
-    )
-  })
-
-  it('явный limitRub от callers перекрывает конфиг', async () => {
-    const service = makeService({ total: '0', limit: 10000 })
-    await expect(service.assertCanDeposit('u-1', '600', '500')).rejects.toBeInstanceOf(
-      DepositLimitExceededError,
-    )
-  })
-
-  it('total = null в БД считается нулём', async () => {
-    const service = makeService({ total: '', limit: 5000 })
-    await expect(service.assertCanDeposit('u-1', '5000')).resolves.toBeUndefined()
-  })
-})
 
 describe('KycCheckService.assertCanWithdraw', () => {
   it('approved — пропуск', async () => {

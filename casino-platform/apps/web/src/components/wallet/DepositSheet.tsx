@@ -1,5 +1,4 @@
 'use client'
-import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeftRight,
   ArrowRight,
@@ -12,7 +11,6 @@ import {
   X,
   Zap,
 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { CurrencyIcon } from '@/components/ui/CurrencyIcon'
@@ -20,14 +18,12 @@ import { toast } from '@/components/ui/toaster'
 import { CryptoDepositTicketPanel } from '@/components/wallet/CryptoDepositTicket'
 import { saveDepositContext } from '@/components/wallet/DepositReturnHandler'
 import { errText } from '@/lib/api'
-import { getKycStatus } from '@/lib/api/kyc.api'
 import {
   createCryptoDeposit,
   createFiatDeposit,
   type CryptoDepositTicket,
 } from '@/lib/api/wallet.api'
 import { currencyLabel, formatAmount, isCryptoCurrency } from '@/lib/format/currency'
-import { useAuth } from '@/stores/auth'
 import { useGeoStore } from '@/stores/geo'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
@@ -246,8 +242,6 @@ export function DepositSheet(): React.JSX.Element | null {
   } = useUIStore()
   const { config, load } = useGeoStore()
   const { activeCurrency, fetchWallets, getActiveWallet, setActiveCurrency } = useWalletStore()
-  const { user } = useAuth()
-  const router = useRouter()
   const [amount, setAmount] = useState('')
   const [amountError, setAmountError] = useState('')
   const [method, setMethod] = useState('')
@@ -290,20 +284,9 @@ export function DepositSheet(): React.JSX.Element | null {
       ? (cryptoMethods.find((m) => m.id === method)?.currency ?? 'USDT_TRC20')
       : currency
 
-  const { data: kyc } = useQuery({
-    queryKey: ['kyc-status', payCurrency],
-    queryFn: () => getKycStatus(payCurrency),
-    enabled: Boolean(depositSheet) && Boolean(user),
-  })
-
   if (!depositSheet && !depositSheetClosing) {
     return null
   }
-
-  const kycNotApproved = Boolean(kyc) && kyc?.status !== 'approved'
-  const limitRemaining = kyc?.limit_remaining
-  const limitExhausted =
-    kycNotApproved && limitRemaining !== undefined && Number(limitRemaining) <= 0
 
   const pay = async (): Promise<void> => {
     // Валидация суммы ДО API: пусто/нечисло → подсказка у поля (фидбек был
@@ -420,37 +403,17 @@ export function DepositSheet(): React.JSX.Element | null {
               className="btn-money mt-5 w-full py-3.5 text-base"
               disabled={loading}
               onClick={() => {
-                if (limitExhausted) {
-                  closeDeposit()
-                  router.push('/kyc')
-                  return
-                }
                 void pay()
               }}
             >
-              {loading
-                ? 'Переход к оплате…'
-                : limitExhausted
-                  ? 'Лимит исчерпан — пройти верификацию'
-                  : 'Перейти к оплате'}
-              {!loading && !limitExhausted && <ArrowRight size={16} aria-hidden />}
+              {loading ? 'Переход к оплате…' : 'Перейти к оплате'}
+              {!loading && <ArrowRight size={16} aria-hidden />}
             </button>
 
             <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted">
               <ShieldCheck size={14} aria-hidden className="text-money-dark" />
               Платёж защищён · зачисление обычно за 1 минуту
             </p>
-
-            {kycNotApproved && limitRemaining !== undefined && !limitExhausted && (
-              <p className="mt-2 text-center text-xs text-muted">
-                {/* Честная копия: limit_remaining — это остаток ДЕПОЗИТНОГО лимита
-                    без KYC; вывод же требует одобренной верификации целиком
-                    (KycCheckService.assertCanWithdraw), обещать «вывод до N» нельзя. */}
-                Без верификации — пополнения до{' '}
-                {formatAmount(limitRemaining, kyc?.limit_currency ?? '', true)}; вывод — после
-                верификации
-              </p>
-            )}
 
             {pendingGameSlug && (
               <p className="mt-2 text-center text-xs text-muted">После оплаты — вернётесь в игру</p>

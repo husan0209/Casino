@@ -168,8 +168,25 @@ describe('Валидация суммы кассы (фидбек вместо м
   })
 })
 
-describe('GAP-36/44: DepositSheet — KYC-лимит из API', () => {
-  it('показывает остаток лимита из API в валюте шита (без пересчёта)', async () => {
+describe('Пополнение не требует верификации (решение владельца 2026-10-07)', () => {
+  // Раньше этот блок проверял обратное: касса читала `limit_remaining` из
+  // GET /kyc, показывала «Без верификации можно выводить до …» и при нуле
+  // уводила на /kyc вместо пополнения. Шлюз снят и на сервере, и здесь:
+  // верификация нужна, чтобы ВЫВЕСТИ деньги, а не чтобы внести свои.
+  it('CTA всегда «Перейти к оплате», на /kyc не отправляет', async () => {
+    kycMock.mockResolvedValue({
+      status: 'not_submitted',
+      limit_remaining: '0',
+      limit_currency: 'RUB',
+      deposit_limit_rub: '5000',
+    })
+    renderSheet()
+    const cta = await screen.findByRole('button', { name: 'Перейти к оплате' })
+    cta.click()
+    expect(pushMock).not.toHaveBeenCalledWith('/kyc')
+  })
+
+  it('не показывает остаток «лимита без верификации» в кассе', async () => {
     kycMock.mockResolvedValue({
       status: 'not_submitted',
       limit_remaining: '5000',
@@ -177,53 +194,15 @@ describe('GAP-36/44: DepositSheet — KYC-лимит из API', () => {
       deposit_limit_rub: '5000',
     })
     renderSheet()
-    // значение — как отдал API, без клиентской арифметики; пресет-кнопки «5 000 ₽»
-    // не считаем — берём именно параграф остатка целиком (текст в двух узлах:
-    // «Без верификации — пополнения до » + «5 000 ₽»), матчим самый глубокий узел
-    // с маркером. Копия честная: лимит без KYC — депозитный; вывод — после
-    // верификации (assertCanWithdraw), никакого «вывода до N».
-    const deepest = (_: unknown, el: Element | null): boolean => {
-      const marker = 'Без верификации — пополнения до'
-      if (!el?.textContent.includes(marker) || !el.textContent.includes('5 000')) {
-        return false
-      }
-      return !Array.from(el.children).some((ch) => ch.textContent.includes(marker))
-    }
-    const rest = await screen.findByText(deepest, undefined, { timeout: 3000 })
-    expect(rest.textContent).toContain('5 000')
-    expect(rest.textContent).toContain('вывод — после верификации')
-  })
-
-  it('исчерпан: CTA «Лимит исчерпан» и роут на /kyc ДО отправки формы', async () => {
-    kycMock.mockResolvedValue({
-      status: 'not_submitted',
-      limit_remaining: '0',
-      limit_currency: 'RUB',
-      deposit_limit_rub: '5000',
-    })
-    renderSheet()
-    const cta = await screen.findByRole('button', {
-      name: /Лимит исчерпан — пройти верификацию/i,
-    })
-    cta.click()
-    expect(depositMock).not.toHaveBeenCalled()
-    expect(pushMock).toHaveBeenCalledWith('/kyc')
-  })
-
-  it('approved: лимит снят — обычная кнопка «Перейти к оплате»', async () => {
-    kycMock.mockResolvedValue({
-      status: 'approved',
-      limit_remaining: '0',
-      limit_currency: 'RUB',
-      deposit_limit_rub: '5000',
-    })
-    renderSheet()
-    const cta = await screen.findByRole('button', { name: 'Перейти к оплате' })
-    // фиатная шкала из /geo/config на месте — её крипто-тест и не должен видеть
-    expect(screen.getByText('1 000 ₽')).toBeTruthy()
-    expect(screen.getByText('Минимум 1 000 ₽')).toBeTruthy()
-    cta.click()
-    expect(pushMock).not.toHaveBeenCalledWith('/kyc')
+    await screen.findByRole('button', { name: 'Перейти к оплате' })
+    // Ни плашки про «лимит без верификации», ни кнопки «Лимит исчерпан». После
+    // #208 пополнение вообще не ограничено верификацией, поэтому в кассе нечего
+    // показывать. Отдельно держим правку из #207 (агент B): остаток
+    // `limit_remaining` — величина депозитного лимита, и называть её «вывод до N»
+    // нельзя: вывод требует approved KYC целиком (assertCanWithdraw). Теперь эта
+    // ложь невозможна структурно — параграфа нет.
+    expect(screen.queryByText(/Без верификации/)).toBeNull()
+    expect(screen.queryByText(/Лимит исчерпан/)).toBeNull()
   })
 })
 

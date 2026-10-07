@@ -5,7 +5,7 @@ import { errorMessage } from '@/common/utils/error-message'
 
 import { money } from '@casino/shared-utils'
 
-import { DepositLimitExceededError, KycRequiredError } from '../../domain/errors'
+import { KycRequiredError } from '../../domain/errors'
 import { type IKycRepository, KYC_REPOSITORY } from '../../domain/repositories/kyc.repository'
 import { kycDepositLimitRub } from '../deposit-limit'
 
@@ -20,25 +20,11 @@ export class KycCheckService {
     @Inject(ConfigService) private config: ConfigService,
   ) {}
 
-  async assertCanDeposit(
-    userId: string,
-    newDepositRub: string,
-    limitRub?: string,
-  ): Promise<void> {
-    const status = await this.repo.getStatus(userId)
-    if (status?.status === 'approved') {
-      return
-    }
-    // limitRub — явное переопределение от callers; по умолчанию всегда конфиг.
-    const limit = limitRub ?? this.depositLimitRub()
-    const total = (await this.repo.getTotalDepositedRub(userId)) || '0'
-    if (money.isGreaterThan(money.add(total, newDepositRub), limit)) {
-      throw new DepositLimitExceededError(
-        `Превышен лимит ${limit} RUB без KYC. Пройдите верификацию.`,
-      )
-    }
-  }
-
+  /**
+   * Верификация обязательна на ВЫВОДЕ. На пополнении её нет: игрок не обязан
+   * доказывать личность, чтобы внести свои деньги (решение владельца 2026-10-07),
+   * и `escalateOverDepositLimit` ниже — только про фиксацию риска, не про отказ.
+   */
   async assertCanWithdraw(userId: string): Promise<void> {
     const status = await this.repo.getStatus(userId)
     if (status?.status !== 'approved') {

@@ -283,54 +283,69 @@ CONFLICT                      409   State conflict (e.g., already verified)
 KYC_REQUIRED                  422   Action requires KYC approval
 KYC_PENDING                   422   KYC under review
 WITHDRAW_LIMIT_EXCEEDED       422   Daily/monthly limit reached
-DEPOSIT_LIMIT_EXCEEDED        422   KYC limit exceeded (5000₽)
-INSUFFICIENT_FUNDS            422   Wallet balance insufficient
-GAME_SESSION_INVALID          422   Session expired/unknown
-PROVIDER_MAINTENANCE          422   Provider offline
-GAME_NOT_FOUND                404   Game slug doesn't exist
+```
+
+> Код `DEPOSIT_LIMIT_EXCEEDED` (422, «суммарные пополнения без KYC выше
+> `KYC_DEPOSIT_LIMIT_RUB`) выведен из обращения 2026-10-07: верификация требуется
+> на вывод, а не на пополнение, и отказывать может только вывод (`KYC_REQUIRED`).
+> Класс ошибки удалён, чтобы контракт не обещал код, который сервер уже не отдаёт.
+> `docs/LEGAL_COMPLIANCE.md` и `docs/QA_CHECKLIST.md` обновлены в том же PR.
+> INSUFFICIENT_FUNDS 422 Wallet balance insufficient
+> GAME_SESSION_INVALID 422 Session expired/unknown
+> PROVIDER_MAINTENANCE 422 Provider offline
+> GAME_NOT_FOUND 404 Game slug doesn't exist
+
 ```
 
 ### 5.4. Payment Specific
 
 ```
-PAYMENT_PROVIDER_ERROR        502   Rukassa/NOWPayments down
-INVALID_SIGNATURE             400   Webhook signature invalid
-PAYMENT_EXPIRED               410   Invoice expired (>30 min)
-DUPLICATE_REQUEST             409   Idempotency key conflict
-AMOUNT_TOO_SMALL              422   Below minimum
-AMOUNT_TOO_LARGE              422   Above maximum
-INVALID_CURRENCY              422   Currency not supported
+
+PAYMENT_PROVIDER_ERROR 502 Rukassa/NOWPayments down
+INVALID_SIGNATURE 400 Webhook signature invalid
+PAYMENT_EXPIRED 410 Invoice expired (>30 min)
+DUPLICATE_REQUEST 409 Idempotency key conflict
+AMOUNT_TOO_SMALL 422 Below minimum
+AMOUNT_TOO_LARGE 422 Above maximum
+INVALID_CURRENCY 422 Currency not supported
+
 ```
 
 ### 5.5. Rate Limit
 
 ```
-RATE_LIMITED                  429   Too many requests
+
+RATE_LIMITED 429 Too many requests
+
 ```
 
 ### 5.6. Affiliate (партнёрская программа, ТЗ ч.8 §10.4)
 
 ```
-AFFILIATE_NOT_FOUND              404   Партнёр не найден (по id или tracking_code)
-AFFILIATE_NOT_ACTIVE             403   Партнёр suspended/rejected: клик не атрибутируется
-AFFILIATE_CODE_INVALID           400   Некорректный код в трекинг-ссылке
-AFFILIATE_ALREADY_EXISTS         409   Email уже зарегистрирован в программе
-AFFILIATE_CREDENTIALS_INVALID    401   Неверный email/пароль партнёра
-AFFILIATE_ALREADY_ATTRIBUTED     409   Игрок уже привязан к другому партнёру
-AFFILIATE_SELF_REFERRAL          422   Обнаружено самопривлечение (F1/F2)
-AFFILIATE_RATE_OUT_OF_RANGE      422   Ставка RevShare вне [0, 1]
-AFFILIATE_SETTINGS_INVALID       422   Некорректное значение настройки программы
-AFFILIATE_FRAUD_SUSPECTED        422   Фрод-скор выше порога (F3, ip_flood)
-AFFILIATE_CLAWBACK_NOT_ALLOWED   422   Отмена начисления вне допустимого статуса
+
+AFFILIATE_NOT_FOUND 404 Партнёр не найден (по id или tracking_code)
+AFFILIATE_NOT_ACTIVE 403 Партнёр suspended/rejected: клик не атрибутируется
+AFFILIATE_CODE_INVALID 400 Некорректный код в трекинг-ссылке
+AFFILIATE_ALREADY_EXISTS 409 Email уже зарегистрирован в программе
+AFFILIATE_CREDENTIALS_INVALID 401 Неверный email/пароль партнёра
+AFFILIATE_ALREADY_ATTRIBUTED 409 Игрок уже привязан к другому партнёру
+AFFILIATE_SELF_REFERRAL 422 Обнаружено самопривлечение (F1/F2)
+AFFILIATE_RATE_OUT_OF_RANGE 422 Ставка RevShare вне [0, 1]
+AFFILIATE_SETTINGS_INVALID 422 Некорректное значение настройки программы
+AFFILIATE_FRAUD_SUSPECTED 422 Фрод-скор выше порога (F3, ip_flood)
+AFFILIATE_CLAWBACK_NOT_ALLOWED 422 Отмена начисления вне допустимого статуса
+
 ```
 
 ### 5.7. Internal
 
 ```
-INTERNAL_ERROR                500   Generic server error
-DATABASE_ERROR                500   Prisma error
-EXTERNAL_SERVICE_ERROR        502   Failed external call
-NOT_IMPLEMENTED               501   Feature not ready
+
+INTERNAL_ERROR 500 Generic server error
+DATABASE_ERROR 500 Prisma error
+EXTERNAL_SERVICE_ERROR 502 Failed external call
+NOT_IMPLEMENTED 501 Feature not ready
+
 ```
 
 ### 5.8. Расширение error codes
@@ -348,8 +363,10 @@ NOT_IMPLEMENTED               501   Feature not ready
 ### 6.1. Стратегия: Offset-based (для MVP)
 
 ```
+
 GET /api/v1/casino/games?page=1&per-page=24
 GET /api/v1/admin/users?page=1&per-page=50
+
 ```
 
 ### 6.2. Параметры
@@ -364,7 +381,9 @@ GET /api/v1/admin/users?page=1&per-page=50
 Для transactions, ledger_entries — cursor-based:
 
 ```
+
 GET /api/v1/wallet/transactions?cursor=2024-01-15T00:00:00Z&limit=50
+
 ```
 
 Курсор = base64 от `{timestamp, id}`.
@@ -380,19 +399,23 @@ Frontend (apps/web) для game catalog — Intersection Observer + auto-load pa
 ### 7.1. Filters
 
 ```
+
 GET /api/v1/admin/users
-  ?status=active
-  &kyc-status=approved
-  &has-balance=true
-  &registered-from=2024-01-01
-  &registered-to=2024-12-31
+?status=active
+&kyc-status=approved
+&has-balance=true
+&registered-from=2024-01-01
+&registered-to=2024-12-31
+
 ```
 
 ### 7.2. Sorting
 
 ```
+
 GET /api/v1/admin/users?sort=created-at&order=desc
 GET /api/v1/admin/users?sort=balance&order=desc
+
 ```
 
 - `sort` — поле
@@ -403,7 +426,9 @@ GET /api/v1/admin/users?sort=balance&order=desc
 ### 7.3. Search
 
 ```
+
 GET /api/v1/admin/users?search=ivan@example.com
+
 ```
 
 Search работает по `ILIKE` для PostgreSQL на определённых полях (email, username).
@@ -424,17 +449,19 @@ Search работает по `ILIKE` для PostgreSQL на определённ
 ### 8.2. Response при превышении
 
 ```
+
 HTTP 429 Too Many Requests
 Retry-After: 30
 
 {
-  "success": false,
-  "error": {
-    "code": "RATE_LIMITED",
-    "message": "Too many requests. Try again in 30 seconds."
-  }
+"success": false,
+"error": {
+"code": "RATE_LIMITED",
+"message": "Too many requests. Try again in 30 seconds."
 }
-```
+}
+
+````
 
 ---
 
@@ -445,7 +472,7 @@ Retry-After: 30
 ```json
 "createdAt": "2024-01-15T15:30:42.123Z"
 "expiresAt": "2024-01-15T16:30:42.000Z"
-```
+````
 
 **Не использовать:**
 
