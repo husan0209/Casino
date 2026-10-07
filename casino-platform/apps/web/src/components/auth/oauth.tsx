@@ -11,11 +11,12 @@ import { type WebUser } from '@/stores/auth'
  * Google: GET /auth/google/url → редирект на Google → /auth/google/callback
  *         обменивает code на сессию (state — подписанный CSRF-токен API).
  * Telegram: TelegramLoginWidget инжектит официальный скрипт
- *         telegram-widget.js (бот из NEXT_PUBLIC_TELEGRAM_BOT_NAME), после
- *         входа Telegram дёргает глобальный колбэк, exchangeTelegramAuth
- *         меняет данные виджета на сессию (POST /auth/telegram). Iframe
- *         виджета рендерится только на домене, добавленном боту через
- *         /setdomain в BotFather, — на остальных Telegram показывает ошибку.
+ *         telegram-widget.js (бот из NEXT_PUBLIC_TELEGRAM_BOT_NAME) в режиме
+ *         data-auth-url — после входа редирект на /auth/telegram/callback,
+ *         где exchangeTelegramAuth меняет данные виджета на сессию (POST
+ *         /auth/telegram). Iframe виджета рендерится только на домене,
+ *         добавленном боту через /setdomain, — на остальных Telegram
+ *         показывает ошибку.
  *
  * Кнопка Google рисует реальный поток только когда задан
  * NEXT_PUBLIC_GOOGLE_CLIENT_ID — «подключается при наличии ключей».
@@ -156,34 +157,46 @@ export async function exchangeTelegramAuth(
   })
 }
 
-/** Имя глобального колбэка, который виджет вызывает после входа (data-onauth). */
-const TELEGRAM_ONAUTH_CALLBACK = 'onTelegramWidgetAuth'
-
-interface TelegramLoginWidgetProps {
-  onAuth: (payload: TelegramAuthPayload) => void
+/**
+ * Разобрать данные пользователя из query колбэк-страницы. Виджет в режиме
+ * data-auth-url делает location.href на auth-url, добавляя поля пользователя
+ * (id, auth_date, hash, first_name, …) как query-параметры; обязательны три
+ * криптографических поля — без них обмен не начинать.
+ */
+export function telegramPayloadFromQuery(query: URLSearchParams): TelegramAuthPayload | null {
+  const id = query.get('id')
+  const authDate = query.get('auth_date')
+  const hash = query.get('hash')
+  if (id === null || authDate === null || hash === null) {
+    return null
+  }
+  const firstName = query.get('first_name')
+  const lastName = query.get('last_name')
+  const username = query.get('username')
+  const photoUrl = query.get('photo_url')
+  return {
+    id,
+    auth_date: authDate,
+    hash,
+    ...(firstName !== null && { first_name: firstName }),
+    ...(lastName !== null && { last_name: lastName }),
+    ...(username !== null && { username }),
+    ...(photoUrl !== null && { photo_url: photoUrl }),
+  }
 }
 
 /**
- * Официальный Telegram Login Widget (UC-AUTH-09). Скрипт telegram-widget.js
- * заменяет собственный тег на iframe oauth.telegram.org, где игрок подтверждает
- * вход; результат приходит в глобальный колбэк из data-onauth. Нативная кнопка
- * Telegram (data-size=large) используется как есть — клик через невидимый
- * оверлей виджет не поддерживает.
+ * Официальный Telegram Login Widget (UC-AUTH-09) в redirect-режиме
+ * (data-auth-url): после подтверждения виджет сам переводит страницу на
+ * /auth/telegram/callback с данными пользователя в query. Режим выбран вместо
+ * data-onauth сознательно: строковый колбэк виджет собирает через
+ * Function('user', …) — это eval, который запрещён прод-CSP (P1 #11:
+ * script-src без unsafe-eval) и ронял виджет с EvalError.
  */
-export function TelegramLoginWidget({ onAuth }: TelegramLoginWidgetProps): React.JSX.Element {
+export function TelegramLoginWidget(): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const onAuthRef = useRef(onAuth)
-
-  // Колбэк читается из window после входа — держим ссылку на актуальный handler.
-  useEffect(() => {
-    onAuthRef.current = onAuth
-  }, [onAuth])
 
   useEffect(() => {
-    const globalScope = window as unknown as Record<string, unknown>
-    globalScope[TELEGRAM_ONAUTH_CALLBACK] = (payload: TelegramAuthPayload): void => {
-      onAuthRef.current(payload)
-    }
     const container = containerRef.current
     // Strict Mode монтирует эффект дважды — во второй раз скрипт уже стоит.
     if (container === null || container.childElementCount > 0) {
@@ -193,10 +206,10 @@ export function TelegramLoginWidget({ onAuth }: TelegramLoginWidgetProps): React
     widgetScript.src = 'https://telegram.org/js/telegram-widget.js?22'
     widgetScript.async = true
     widgetScript.setAttribute('data-telegram-login', TELEGRAM_BOT_NAME ?? '')
+    widgetScript.setAttribute('data-auth-url', `${window.location.origin}/auth/telegram/callback`)
     widgetScript.setAttribute('data-size', 'large')
     widgetScript.setAttribute('data-userpic', 'false')
     widgetScript.setAttribute('data-radius', '12')
-    widgetScript.setAttribute('data-onauth', `${TELEGRAM_ONAUTH_CALLBACK}(user)`)
     container.appendChild(widgetScript)
   }, [])
 

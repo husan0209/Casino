@@ -3,13 +3,15 @@ import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * UC-AUTH-09: настоящий Telegram Login Widget.
+ * UC-AUTH-09: Telegram Login Widget в redirect-режиме (data-auth-url).
  * - скрипт telegram-widget.js инжектится с ботом из NEXT_PUBLIC_TELEGRAM_BOT_NAME
- *   и глобальным колбэком data-onauth;
- * - данные виджета (id/auth_date приходят числами) конвертируются в строки до
- *   POST /auth/telegram — DTO API (TelegramLoginSchema) требует строки.
- * Iframe с нативной кнопкой рендерится только на домене из /setdomain — в
- * jsdom тестируем инжект скрипта и проводку колбэка, не сам Telegram.
+ *   и auth-url на /auth/telegram/callback;
+ * - РЕЖИМ КРИТИЧЕН ДЛЯ CSP: data-onauth виджет компилирует через
+ *   Function('user', …) — это eval, запрещённый прод-CSP (P1 #11, EvalError на
+ *   проде #203). Спека храповик: data-onauth в DOM не появляется;
+ * - telegramPayloadFromQuery разбирает query колбэка: без обязательных
+ *   id/auth_date/hash — null, с ними — payload (все поля строками);
+ * - exchangeTelegramAuth конвертирует и отправляет payload на API.
  */
 
 vi.hoisted(() => {
@@ -22,8 +24,8 @@ vi.mock('@/lib/api', () => api)
 
 import {
   exchangeTelegramAuth,
+  telegramPayloadFromQuery,
   TelegramLoginWidget,
-  type TelegramAuthPayload,
 } from '@/components/auth/oauth'
 
 beforeEach(() => {
@@ -72,9 +74,34 @@ describe('exchangeTelegramAuth', () => {
   })
 })
 
+describe('telegramPayloadFromQuery', () => {
+  it('собирает payload из query колбэка (виджет кладёт поля пользователя строками)', () => {
+    const query = new URLSearchParams(
+      'id=42&auth_date=1690000000&hash=HASH1&first_name=Иван&photo_url=https%3A%2F%2Ft.me%2Fi.jpg&ref=REF9',
+    )
+
+    const payload = telegramPayloadFromQuery(query)
+
+    expect(payload).toEqual({
+      id: '42',
+      auth_date: '1690000000',
+      hash: 'HASH1',
+      first_name: 'Иван',
+      last_name: undefined,
+      username: undefined,
+      photo_url: 'https://t.me/i.jpg',
+    })
+  })
+
+  it('без hash/id/auth_date возвращает null — обмен не начинать', () => {
+    expect(telegramPayloadFromQuery(new URLSearchParams('id=42&auth_date=1'))).toBeNull()
+    expect(telegramPayloadFromQuery(new URLSearchParams())).toBeNull()
+  })
+})
+
 describe('TelegramLoginWidget', () => {
-  it('инжектит скрипт виджета с ботом и колбэком data-onauth', () => {
-    render(<TelegramLoginWidget onAuth={() => {}} />)
+  it('инжектит скрипт виджета с ботом и auth-url колбэк-страницей', () => {
+    render(<TelegramLoginWidget />)
 
     const script = screen
       .getByTestId('telegram-widget-slot')
@@ -83,7 +110,19 @@ describe('TelegramLoginWidget', () => {
     expect(script).toBeTruthy()
     expect(script?.getAttribute('src')).toBe('https://telegram.org/js/telegram-widget.js?22')
     expect(script?.getAttribute('data-telegram-login')).toBe('test_bot')
-    expect(script?.getAttribute('data-onauth')).toBe('onTelegramWidgetAuth(user)')
+    expect(script?.getAttribute('data-auth-url')).toBe(
+      `${window.location.origin}/auth/telegram/callback`,
+    )
+  })
+
+  it('CSP-храповик: НЕ ставит data-onauth — строковый колбэк виджета требует eval', () => {
+    render(<TelegramLoginWidget />)
+
+    const script = screen
+      .getByTestId('telegram-widget-slot')
+      .querySelector('script[data-telegram-login]')
+
+    expect(script?.hasAttribute('data-onauth')).toBe(false)
   })
 
   it('не инжектит второй скрипт при повторном эффекте (Strict Mode)', () => {
@@ -91,26 +130,10 @@ describe('TelegramLoginWidget', () => {
     // не должен плодить скрипты: контейнер уже занят первым.
     render(
       <StrictMode>
-        <TelegramLoginWidget onAuth={() => {}} />
+        <TelegramLoginWidget />
       </StrictMode>,
     )
 
     expect(screen.getByTestId('telegram-widget-slot').querySelectorAll('script')).toHaveLength(1)
-  })
-
-  it('глобальный колбэк виджета доезжает до onAuth', () => {
-    const onAuth = vi.fn()
-    render(<TelegramLoginWidget onAuth={onAuth} />)
-
-    const globalScope = window as unknown as Record<string, unknown>
-    const widgetCallback = globalScope['onTelegramWidgetAuth'] as
-      | ((payload: TelegramAuthPayload) => void)
-      | undefined
-    expect(widgetCallback).toBeTypeOf('function')
-
-    const payload: TelegramAuthPayload = { id: 42, auth_date: 1690000000, hash: 'HASH1' }
-    widgetCallback?.(payload)
-
-    expect(onAuth).toHaveBeenCalledWith(payload)
   })
 })
