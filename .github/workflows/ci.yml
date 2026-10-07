@@ -379,6 +379,16 @@ jobs:
               docker system df
               exit 1
             fi
+            # Интерполяция build-args в compose берёт значения из `.env` рядом с
+            # файлом compose, а НЕ из `env_file` сервиса (.env.production). Ключ,
+            # добавленный только в боевой файл, собирается ПУСТЫМ и молча: так
+            # кнопка входа через Telegram выкатилась на стенд выключенной, хотя id
+            # бота в .env.production был (#220). Экспорт ставит боевой файл выше
+            # `.env` — один источник правды вместо двух, которые надо синхронизировать
+            # руками.
+            set -a
+            . ./.env.production
+            set +a
             docker compose -f docker-compose.prod.yml pull || true
             docker compose -f docker-compose.prod.yml build --pull
             # `up -d` с service_healthy-условиями (см. docker-compose.prod.yml) НЕ
