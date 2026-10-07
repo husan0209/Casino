@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -135,5 +135,44 @@ describe('TelegramLoginWidget', () => {
     )
 
     expect(screen.getByTestId('telegram-widget-slot').querySelectorAll('script')).toHaveLength(1)
+  })
+
+  /**
+   * Кнопка Telegram по умолчанию имеет фиксированную ширину (238 px), и рядом с
+   * растянутой плашкой Google пара выглядит разнородно. Ширину контейнера
+   * передаём через data-min-width/data-max-width: на стенде это 229 px → 348 px,
+   * проверено замером embed-страницы.
+   */
+  it('растягивает кнопку на ширину контейнера через data-min-width/data-max-width', () => {
+    const observers: Array<(entries: ResizeObserverEntry[]) => void> = []
+    vi.stubGlobal(
+      'ResizeObserver',
+      vi.fn((cb: (entries: ResizeObserverEntry[]) => void) => {
+        observers.push(cb)
+        return { observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() }
+      }),
+    )
+
+    render(<TelegramLoginWidget />)
+    // До первого замера монтировать рано: иначе кнопка родилась бы в 238 px и
+    // осталась бы такой до перемонтирования листа.
+    expect(
+      screen.getByTestId('telegram-widget-slot').querySelector('script[data-min-width]'),
+    ).toBeNull()
+
+    // Колбэк шлёт браузер, не React — без act() перерендер не дождаться.
+    act(() => {
+      observers[0]?.([{ contentRect: { width: 348 } as DOMRectReadOnly } as ResizeObserverEntry])
+    })
+
+    const script = screen
+      .getByTestId('telegram-widget-slot')
+      .querySelector('script[data-telegram-login]')
+    expect(script?.getAttribute('data-min-width')).toBe('348')
+    expect(script?.getAttribute('data-max-width')).toBe('348')
+    expect(script?.getAttribute('data-radius')).toBe('12')
+    // Подпись закрепляем русским: без параметра её диктует язык браузера.
+    expect(script?.getAttribute('data-lang')).toBe('ru')
+    vi.unstubAllGlobals()
   })
 })
