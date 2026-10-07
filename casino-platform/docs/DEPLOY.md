@@ -113,6 +113,12 @@ SEED_ADMIN_PASSWORD=<сгенерированный пароль>
   (GAP-46)**: домен выбирает оператор в `.env.production` (`DOMAIN`), рабочего адреса в репозитории нет.
   Честный readiness: БД 503 при недоступности, Redis → degraded — GAP-35.
 - Logs: `docker compose logs -f api`
+- **Место под сборку.** На 20 ГБ корне выкатка падает на `pnpm install --frozen-lockfile` с голым
+  `exit 1`, и виноват не BuildKit-кэш: за series из трёх пересборок место держат **висячие образы и
+  их слои** (2026-10-07: 16,35 ГБ из 20). Deploy-джоба чистит и кэш, и `docker system prune -f` при
+  свободных <6 ГБ и останавливается с внятной ошибкой при <3 ГБ — до начала сборки, а не через восемь
+  минут. Ручная версия той же чистки: `docker system prune -f` (без `-a` — не трогать образы
+  работающих контейнеров, без `--volumes` — не трогать базу).
 - Email-воркер: консьюмер очереди `email` — отдельный сервис `worker` (тот же образ, что api, `apps/api/src/worker.ts`), логи `docker compose logs -f worker`; в процессе API он отключён флагом `EMAIL_WORKER_IN_PROCESS=false`
 - DB: `SELECT * FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 10;`
 
