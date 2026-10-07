@@ -47,9 +47,9 @@ export class KycCheckService {
       return
     }
     const limit = kycWithdrawLimitRub(this.config)
-    const alreadyRub = withdrawnRubTotal(
+    const alreadyRub = await withdrawnRubTotal(
       await this.repo.listCountedWithdrawals(userId),
-      (amount, currency) => this.geo.toRubEquivalent(amount, currency),
+      (amount, currency) => this.geo.convertToRubAtLiveRate(amount, currency),
     )
     if (money.isGreaterThan(money.add(alreadyRub, amountRub), limit)) {
       throw new KycRequiredError(`Вывод свыше ${limit} ₽ без верификации невозможен — пройдите KYC`)

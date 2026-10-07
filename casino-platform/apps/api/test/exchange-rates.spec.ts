@@ -10,12 +10,13 @@ import {
   RATE_STALE_AFTER_MS,
 } from '@modules/geo/application/exchange-rates.service'
 import { GetGeoConfigUseCase } from '@modules/geo/application/use-cases/get-geo-config.use-case'
-import { convertRubToDisplayAmount } from '@modules/geo/domain/geo-config.policy'
+import { convertRubToDisplayAmount, toRubEquivalent } from '@modules/geo/domain/geo-config.policy'
 import { GeoFacade } from '@modules/geo/facade/geo.facade'
 import { PrismaExchangeRatesReader } from '@modules/geo/infrastructure/exchange-rates.prisma.reader'
 import { GetKycStatusUseCase } from '@modules/kyc/application/use-cases/get-kyc-status.use-case'
 
 import { prisma } from '@casino/database'
+import { money } from '@casino/shared-utils'
 
 const findFirst = vi.mocked(prisma.exchangeRate.findFirst)
 
@@ -133,6 +134,76 @@ describe('критерий 3: курс меняет withdraw_remaining в отв
   it('без записи в БД → старое значение по константе 92.5 (54.05 USDT)', async () => {
     const res = await makeUseCase(null).execute('user-1', 'USDT_TRC20')
     expect(res.withdraw_remaining).toBe('54.05')
+  })
+})
+
+/**
+ * Инвариант, которого не хватало: цифра на экране и число, по которому сервер
+ * отказывает, обязаны считаться ОТ ОДНОГО КУРСА.
+ *
+ * Поймано живым прогоном на стенде 2026-10-07: `GET /kyc/status?currency=USDT_TRC20`
+ * обещал 58,53 USDT (боевой курс 85,6 из exchange_rates), а вывод отклонялся уже
+ * на 55 USDT, потому что порог считался от константы `DISPLAY_RUB_RATES` = 92,5.
+ * Игрок видел одно, вводил меньше обещанного и получал 422 — ровно тот класс
+ * расхождения, из-за которого порог когда-то вынесли в общий источник.
+ */
+describe('порог вывода: экран и отказ считаются от одного курса', () => {
+  const LIMIT_RUB = '5000'
+
+  /** Настоящая пара методов GeoFacade поверх фейкового читателя курса. */
+  function makeFacade(rate: string | null): GeoFacade {
+    const reader = {
+      getCachedRates: vi.fn().mockResolvedValue(null),
+      getLatestRate: rate
+        ? vi.fn().mockResolvedValue({ rate, fetchedAt: new Date(), source: 'test' })
+        : vi.fn().mockResolvedValue(null),
+    }
+    return new GeoFacade(
+      new GetGeoConfigUseCase({} as never),
+      new ExchangeRatesService(reader as never),
+    )
+  }
+
+  for (const currency of ['USDT_TRC20', 'BTC'] as const) {
+    for (const rate of ['85.62959362', '4000', null]) {
+      it(`${currency} при курсе ${rate ?? 'константа'}: обещанный остаток сервер принимает`, async () => {
+        // Arrange — два пути одной facade: display (экран) и toRub (отказ).
+        const geo = makeFacade(rate)
+        const advertised = await geo.convertRubToDisplay(LIMIT_RUB, currency)
+        const backToRub = await geo.convertToRubAtLiveRate(advertised, currency)
+
+        // Assert 1: то, что показали, не больше порога в рублях — иначе отказ
+        // на сумме, которую экран назвал доступной. Это и был живой дефект.
+        expect(money.isGreaterThan(backToRub, LIMIT_RUB), `${advertised} → ${backToRub} ₽`).toBe(
+          false,
+        )
+
+        // Assert 2: и не занижает вдвое — потеря ограничена точностью показа
+        // (USDT 0,01 ≈ до рубля, BTC 1e-8 ≈ доли копейки при любом вменяемом
+        // курсе). Без этой границы тест прошёл бы и на «0».
+        expect(money.isGreaterThan(backToRub, money.subtract(LIMIT_RUB, '1'))).toBe(true)
+      })
+    }
+  }
+
+  it('боевой курс действительно ведёт цифру, а не константа 92.5', async () => {
+    // Без этого кейса выше можно было бы «починить» переходом на константы:
+    // инвариант выполнялся бы, а GAP-34 (живой курс в отображении) молча умер бы.
+    const live = await makeFacade('4000').convertRubToDisplay(LIMIT_RUB, 'USDT_TRC20')
+    const constant = await makeFacade(null).convertRubToDisplay(LIMIT_RUB, 'USDT_TRC20')
+    expect(live).toBe('1.25')
+    expect(constant).toBe('54.05')
+  })
+
+  it('ловушка: два разных курса на двух концах одной цифры — это и есть дефект', async () => {
+    // Анти-вакуум для инварианта выше: экран считает по боевому курсу 85,63, а
+    // отказ по константе 92,5 — ровно так было до правки. Если смешать источники,
+    // тест должен покраснеть; значит он не пустой.
+    const advertised = await makeFacade('85.62959362').convertRubToDisplay(LIMIT_RUB, 'USDT_TRC20')
+    // 5 000 ₽ по боевому курсу = 58,39 USDT; те же 58,39 по константе 92,5 = 5 401 ₽.
+    expect(advertised).toBe('58.39')
+    expect(toRubEquivalent(advertised, 'USDT_TRC20')).toBe('5401.07')
+    expect(money.isGreaterThan(toRubEquivalent(advertised, 'USDT_TRC20'), LIMIT_RUB)).toBe(true)
   })
 })
 

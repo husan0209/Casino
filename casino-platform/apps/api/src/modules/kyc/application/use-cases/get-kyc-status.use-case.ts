@@ -47,9 +47,9 @@ export class GetKycStatusUseCase {
     // withdrawn-total.ts): цифра на странице обязана быть тем же числом, по
     // которому сервер отказывает, иначе страница верификации врёт намеренно.
     const limitRub = kycWithdrawLimitRub(this.config)
-    const withdrawnRub = withdrawnRubTotal(
+    const withdrawnRub = await withdrawnRubTotal(
       await this.repo.listCountedWithdrawals(userId),
-      (amount, cur) => this.geo.toRubEquivalent(amount, cur),
+      (amount, cur) => this.geo.convertToRubAtLiveRate(amount, cur),
     )
     // Для approved поле не используется: порога у одобренного игрока нет, и
     // «остаток 0» означал бы, что ему нельзя выводить.

@@ -55,7 +55,7 @@ function harness(): Harness {
   // Курс фиктивный и круглый (92,5 за USDT, 1 000 000 за BTC), чтобы RUB-база
   // порога была видна в аргументе KYC и в amount_rub заявки.
   const geo = {
-    toRubEquivalent: (amount: string, currency: string) => {
+    convertToRubAtLiveRate: (amount: string, currency: string) => {
       if (currency === 'RUB') {
         return amount
       }

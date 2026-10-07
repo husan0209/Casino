@@ -33,7 +33,7 @@ describe('GetKycStatusUseCase', () => {
   // ответе, иначе строки старых выводов молча сойдут нулём.
   const geo = {
     convertRubToDisplay: async (rub: string) => `${rub} RUB`,
-    toRubEquivalent: (amount: string, currency: string) =>
+    convertToRubAtLiveRate: (amount: string, currency: string) =>
       currency === 'RUB' ? amount : String(Number(amount) * 92.5),
   }
   const config = { get: () => undefined }

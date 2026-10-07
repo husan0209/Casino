@@ -66,10 +66,11 @@ function makeService() {
   const config = {
     get: (key: string) => (key === 'KYC_WITHDRAW_LIMIT_RUB' ? WITHDRAW_LIMIT : undefined),
   }
-  // Курс нужен только строкам без amount_rub; в этих тестах он умножает на 2,
-  // чтобы «перевёл по курсу» было отличимо от «взял как есть».
+  // Курс нужен только строкам без amount_rub; в этом стенке он умножает на 2,
+  // чтобы «перевёл по курсу» было отличимо от «взял как есть». Боевой источник —
+  // convertToRubAtLiveRate: тот же, что отдаёт цифру на GET /kyc.
   const geo = {
-    toRubEquivalent: (amount: string) => String(Number(amount) * 2),
+    convertToRubAtLiveRate: async (amount: string) => String(Number(amount) * 2),
   }
   const service = new KycCheckService(
     repo as unknown as IKycRepository,

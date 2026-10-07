@@ -62,7 +62,10 @@ export class CreateWithdrawalUseCase {
     // делает агрегат пополнений (kyc.prisma.ts:getTotalDepositedRub, ADR GAP-51
     // разрешает money-чтения). Вызывается ПОСЛЕ лимитов валюты и реквизитов:
     // опечатку в номере карты показываем до требования пройти KYC.
-    const amountRub = this.geo.toRubEquivalent(input.amount, input.currency as DisplayCurrency)
+    const amountRub = await this.geo.convertToRubAtLiveRate(
+      input.amount,
+      input.currency as DisplayCurrency,
+    )
     await this.kyc.assertCanWithdraw(userId, amountRub)
     // GAP-55 (§11 «статус»): id заявки генерируется ДО блокировки, чтобы
     // проводка WITHDRAWAL_LOCK несла ссылку на payment_request — иначе строку
