@@ -81,8 +81,10 @@ function OAuthSection({ referral }: { referral: string | undefined }): React.JSX
         </Link>
       )}
       {TELEGRAM_BOT_NAME !== undefined ? (
-        // Redirect-режим (data-auth-url): обмен происходит на /auth/telegram/callback.
-        <TelegramLoginWidget />
+        // Redirect-режим (data-auth-url): обмен происходит на /auth/telegram/callback,
+        // и реферальный код должен уехать вместе с auth-url — виджет переносит только
+        // его query.
+        <TelegramLoginWidget referralCode={referral} />
       ) : (
         // Бот не прописан в NEXT_PUBLIC_TELEGRAM_BOT_NAME — мёртвая кнопка хуже
         // отсутствующей: прячем настоящий виджет, показываем выключенную плашку.

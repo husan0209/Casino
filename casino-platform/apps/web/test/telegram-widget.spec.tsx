@@ -149,6 +149,24 @@ describe('TelegramLoginWidget', () => {
     )
   })
 
+  /**
+   * Виджет наклеивает поля пользователя ровно на data-auth-url и не переносит
+   * query страницы (telegram-widget.js: `authUrl = a.href`). Без ?ref= здесь
+   * регистрация через Telegram создаёт игрока без реферера — и колбэк не виноват,
+   * ему читать нечего.
+   */
+  it('переносит тихий ?ref= в data-auth-url', () => {
+    render(<TelegramLoginWidget referralCode="REF9" />)
+
+    const script = screen
+      .getByTestId('telegram-widget-slot')
+      .querySelector('script[data-telegram-login]')
+
+    expect(script?.getAttribute('data-auth-url')).toBe(
+      `${window.location.origin}/auth/telegram/callback?ref=REF9`,
+    )
+  })
+
   it('CSP-храповик: НЕ ставит data-onauth — строковый колбэк виджета требует eval', () => {
     render(<TelegramLoginWidget />)
 

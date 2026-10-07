@@ -227,6 +227,18 @@ export function telegramPayloadFromQuery(query: URLSearchParams): TelegramAuthPa
 }
 
 /**
+ * auth-url для виджета. Виджет наклеивает поля пользователя на РОВНО то, что
+ * стоит в data-auth-url (telegram-widget.js: `authUrl = a.href`, дальше `?`/`&`
+ * и params.join('&')) — query текущей страницы он не переносит. Значит тихий
+ * ?ref= из ссылки партнёра обязан попасть сюда, иначе регистрация через Telegram
+ * создаёт игрока без реферера, хотя колбэк честно читает ref из query.
+ */
+export function telegramAuthUrl(referralCode?: string): string {
+  const url = `${window.location.origin}/auth/telegram/callback`
+  return referralCode ? `${url}?ref=${encodeURIComponent(referralCode)}` : url
+}
+
+/**
  * Видимая плашка Telegram. Подпись «Продолжить с Telegram» — по образцу
  * соседней Google-плашки: обе говорят одно и то же про один и тот же шаг.
  */
@@ -262,7 +274,11 @@ export function TelegramOAuthPlate(): React.JSX.Element {
  * Если скрипт виджета не загрузился (заблокирован, CSP, нет сети), прозрачного
  * слоя нет и клика тоже — показываем выключенную плашку вместо мёртвой кнопки.
  */
-export function TelegramLoginWidget(): React.JSX.Element {
+export function TelegramLoginWidget({
+  referralCode,
+}: {
+  referralCode?: string | undefined
+}): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null)
   // undefined — ширину ещё не измеряли, монтировать рано; число — измерили, и
   // 0 допустим: так себя ведут jsdom и скрытый контейнер, тогда кнопка
@@ -308,7 +324,7 @@ export function TelegramLoginWidget(): React.JSX.Element {
       setScriptFailed(true)
     }
     widgetScript.setAttribute('data-telegram-login', TELEGRAM_BOT_NAME ?? '')
-    widgetScript.setAttribute('data-auth-url', `${window.location.origin}/auth/telegram/callback`)
+    widgetScript.setAttribute('data-auth-url', telegramAuthUrl(referralCode))
     widgetScript.setAttribute('data-size', 'large')
     widgetScript.setAttribute('data-userpic', 'false')
     widgetScript.setAttribute('data-radius', '12')
@@ -322,7 +338,7 @@ export function TelegramLoginWidget(): React.JSX.Element {
     // живёт в DOM, а наша плашка — aria-hidden.
     widgetScript.setAttribute('data-lang', 'ru')
     container.appendChild(widgetScript)
-  }, [width])
+  }, [width, referralCode])
 
   if (scriptFailed) {
     return (
