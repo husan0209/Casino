@@ -51,6 +51,17 @@ function atCallback(query = 'id=42&auth_date=1690000000&hash=HASH1&ref=REF9'): v
   window.history.replaceState(null, '', `/auth/telegram/callback?${query}`)
 }
 
+/** Прямой заход на oauth.telegram.org/auth: результат в #tgAuthResult. */
+function atCallbackHash(ref = 'REF9'): void {
+  const payload = { id: 42, auth_date: 1690000000, hash: 'HASH1', first_name: 'Иван' }
+  const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  window.history.replaceState(
+    null,
+    '',
+    `/auth/telegram/callback?ref=${ref}#tgAuthResult=${encoded}`,
+  )
+}
+
 beforeEach(() => {
   api.apiGet.mockReset()
   api.apiPost.mockReset()
@@ -96,6 +107,24 @@ describe('/auth/telegram/callback', () => {
     // Реферальный код переживает экран подтверждения — он едет в обмен.
     expect(api.apiPost.mock.calls[1]![1]).toMatchObject({ referral_code: 'REF9' })
     expect(setAccessToken).toHaveBeenCalledWith('tok')
+  })
+
+  /**
+   * Результат приезжает то хэшем (прямой заход на oauth.telegram.org/auth), то
+   * query (redirect-режим виджета). Оба контракта принадлежат Telegram — на
+   * колбэке обязаны разбираться одинаково, иначе вход встанет на одном из них.
+   */
+  it('принимает данные и из #tgAuthResult, и очищает хэш из адресной строки', async () => {
+    atCallbackHash()
+    api.apiPost.mockResolvedValue(PREVIEW_KNOWN)
+
+    render(<TelegramCallbackPage />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Продолжить' })).toBeTruthy())
+
+    expect(api.apiPost.mock.calls[0]![0]).toBe('/auth/telegram/preview')
+    expect(api.apiPost.mock.calls[0]![1]).toMatchObject({ id: '42', hash: 'HASH1' })
+    expect(window.location.hash).toBe('')
+    expect(window.location.search).toBe('?ref=REF9')
   })
 
   it('«Отмена» не отправляет ни одного запроса на вход', async () => {

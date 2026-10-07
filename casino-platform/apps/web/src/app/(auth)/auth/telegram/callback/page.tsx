@@ -6,6 +6,7 @@ import {
   exchangeTelegramAuth,
   previewTelegramAuth,
   TelegramMark,
+  telegramPayloadFromHash,
   telegramPayloadFromQuery,
   type TelegramAuthPayload,
   type TelegramPreviewResult,
@@ -16,8 +17,9 @@ import { type AuthState, useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 
 /**
- * Callback Telegram Login (UC-AUTH-09, redirect-режим data-auth-url): сюда
- * виджет переводит страницу после подтверждения в Telegram.
+ * Callback Telegram Login (UC-AUTH-09): сюда Telegram возвращает игрока после
+ * подтверждения — с результатом в `#tgAuthResult` (прямой заход на
+ * oauth.telegram.org/auth) или в query (redirect-режим виджета).
  *
  * Подтверждение игрока — наше, а не Telegram. Сначала проверяем подпись
  * (POST /auth/telegram/preview — он не выдаёт сессию) и показываем, под каким
@@ -27,13 +29,14 @@ import { useUIStore } from '@/stores/ui'
  * Telegram своего экрана нет, и без нашего вход выглядел бы молчаливой
  * регистрацией.
  *
- * Имя и фото берём из проверенного ответа API, а не из query: query подделывается
+ * Имя и фото берём из проверенного ответа API, а не из URL: URL подделывается
  * ссылкой `…/callback?first_name=Админ`, и наша страница предлагала бы вход под
  * выдуманным аккаунтом.
  *
- * Query чистим сразу после чтения: id + auth_date + hash — готовый токен входа с
- * суточным TTL, и без чистки он остаётся в адресной строке и в истории браузера
- * (на общем компьютере его можно перезалить).
+ * Реквизиты выметаются из адресной строки сразу после чтения (и query, и хэш):
+ * id + auth_date + hash — готовый токен входа с суточным TTL, и без чистки он
+ * остаётся в адресной строке и в истории браузера (на общем компьютере его
+ * можно перезалить).
  */
 
 type Stage = 'checking' | 'confirm' | 'submitting' | 'done' | 'failed'
@@ -55,7 +58,11 @@ function TelegramCallbackInner(): React.JSX.Element {
 
   useEffect((): void => {
     const query = new URLSearchParams(window.location.search)
-    const parsed = telegramPayloadFromQuery(query)
+    // Результат приходит либо хэшем (`#tgAuthResult` — прямой заход на
+    // oauth.telegram.org/auth), либо query (redirect-режим виджета). Оба
+    // контракта принадлежат Telegram, и оба он может вернуть на один и тот же
+    // return_to — читать надо оба, иначе вход молча встанет.
+    const parsed = telegramPayloadFromHash() ?? telegramPayloadFromQuery(query)
     // Поля Telegram от виджета приходят только строками (см. telegram-widget.js:
     // params.push(key + '=' + encodeURIComponent(user[key])) — DTO API совпадает.
     if (parsed === null) {

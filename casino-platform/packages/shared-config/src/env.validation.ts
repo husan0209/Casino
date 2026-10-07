@@ -191,6 +191,9 @@ export const envSchema = z
     NEXT_PUBLIC_DOMAIN: z.string().optional(),
     NEXT_PUBLIC_GOOGLE_CLIENT_ID: z.string().optional(),
     NEXT_PUBLIC_TELEGRAM_BOT_NAME: z.string().optional(),
+    // id бота нужен фронту, чтобы построить ссылку на oauth.telegram.org/auth
+    // без виджета; пусто ⇒ кнопка входа через Telegram выключена.
+    NEXT_PUBLIC_TELEGRAM_BOT_ID: z.string().optional(),
     NEXT_PUBLIC_IMAGE_HOSTS: z.string().optional(),
     // GAP-55 (ж) §5.2: капча Turnstile. Оба ключа optional: без них механизм
     // выключен (вход не должен ломаться непронастроенным окружением).
