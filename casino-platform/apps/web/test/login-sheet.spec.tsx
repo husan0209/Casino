@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  * 18+ блокирует submit до согласия, реферальный код из ?ref= едет тихо,
  * affiliate — из AffiliateCodeCapture (localStorage после /go/<code>).
  * Отдельных страниц /login и /register больше нет.
+ * Вход через Telegram — redirect-режим (data-auth-url): обмен живёт на
+ * /auth/telegram/callback (см. telegram-widget.spec), лист только рисует виджет.
  */
 
 const uiState = vi.hoisted(() => ({
@@ -18,14 +20,7 @@ const uiState = vi.hoisted(() => ({
 
 const loginMock = vi.hoisted(() => vi.fn())
 const registerMock = vi.hoisted(() => vi.fn())
-const setSessionMock = vi.hoisted(() => vi.fn())
-const setAccessTokenMock = vi.hoisted(() => vi.fn())
-const exchangeTelegramMock = vi.hoisted(() => vi.fn())
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
-/** TelegramLoginWidget — заглушка: запоминает onAuth, чтобы тест дёрнул вход. */
-const telegramCapture = vi.hoisted(() => ({
-  onAuth: null as ((payload: unknown) => void) | null,
-}))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
@@ -36,13 +31,12 @@ vi.mock('@/stores/ui', () => ({
 }))
 
 vi.mock('@/stores/auth', () => ({
-  useAuth: () => ({ login: loginMock, register: registerMock, setSession: setSessionMock }),
+  useAuth: () => ({ login: loginMock, register: registerMock }),
 }))
 
 vi.mock('@/lib/api', () => ({
   errCode: () => undefined,
   errText: () => 'Ошибка',
-  setAccessToken: setAccessTokenMock,
 }))
 
 vi.mock('@/components/auth/CaptchaField', () => ({
@@ -56,11 +50,7 @@ vi.mock('@/components/auth/oauth', () => ({
   TelegramMark: () => null,
   startGoogleOAuth: vi.fn(),
   TELEGRAM_BOT_NAME: 'test_bot',
-  TelegramLoginWidget: ({ onAuth }: { onAuth: (payload: unknown) => void }) => {
-    telegramCapture.onAuth = onAuth
-    return null
-  },
-  exchangeTelegramAuth: exchangeTelegramMock,
+  TelegramLoginWidget: () => null,
 }))
 
 vi.mock('@/components/affiliate/AffiliateCodeCapture', () => ({
@@ -78,12 +68,8 @@ import { LEGAL_DOCUMENT_VERSIONS } from '@casino/shared-types'
 beforeEach(() => {
   loginMock.mockReset()
   registerMock.mockReset()
-  setSessionMock.mockReset()
-  setAccessTokenMock.mockReset()
-  exchangeTelegramMock.mockReset()
   toastMock.success.mockReset()
   toastMock.error.mockReset()
-  telegramCapture.onAuth = null
   uiState.closeLogin.mockReset()
   uiState.loginSheet = true
   uiState.loginSheetMode = 'register'
@@ -145,44 +131,10 @@ describe('§5: LoginSheet — вход и регистрация в одном �
     expect(screen.getByText('Надёжный пароль')).toBeTruthy()
   })
 
-  it('UC-AUTH-09: вход через Telegram — обмен на сессию с тихим ref, setSession и закрытие листа', async () => {
-    uiState.loginSheetMode = 'login'
-    exchangeTelegramMock.mockResolvedValue({
-      accessToken: 'tg-token',
-      user: { id: 'u9', email: null, role: 'user' },
-    })
+  it('UC-AUTH-09: при настроенном боте лист рисует redirect-виджет вместо заглушки', () => {
     render(<LoginSheet />)
-
-    expect(telegramCapture.onAuth).toBeTypeOf('function')
-    await act(async () => {
-      telegramCapture.onAuth?.({ id: 42, auth_date: 1690000000, hash: 'HASH1' })
-    })
-
-    await waitFor(() => {
-      // referral из ?ref= едет в обмен так же, как в email-регистрации.
-      expect(exchangeTelegramMock).toHaveBeenCalledWith(
-        { id: 42, auth_date: 1690000000, hash: 'HASH1' },
-        'REF9',
-      )
-    })
-    expect(setAccessTokenMock).toHaveBeenCalledWith('tg-token')
-    expect(setSessionMock).toHaveBeenCalledWith('tg-token', { id: 'u9', email: null, role: 'user' })
-    expect(toastMock.success).toHaveBeenCalled()
-    expect(uiState.closeLogin).toHaveBeenCalled()
-  })
-
-  it('UC-AUTH-09: ошибка обмена Telegram — toast и лист остаётся открытым', async () => {
-    uiState.loginSheetMode = 'login'
-    exchangeTelegramMock.mockRejectedValue(new Error('подпись Telegram не совпадает'))
-    render(<LoginSheet />)
-
-    await act(async () => {
-      telegramCapture.onAuth?.({ id: 42, auth_date: 1690000000, hash: 'BAD' })
-    })
-
-    await waitFor(() => {
-      expect(toastMock.error).toHaveBeenCalledWith('Ошибка')
-    })
-    expect(uiState.closeLogin).not.toHaveBeenCalled()
+    // OAuthSection рендерит TelegramLoginWidget (замокан как null) — проверяем,
+    // что выключенная плашка «Войти через Telegram» не появляется.
+    expect(screen.queryByText('Войти через Telegram')).toBeNull()
   })
 })

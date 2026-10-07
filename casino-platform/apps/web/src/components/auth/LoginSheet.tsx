@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react'
 import { getAffiliateCode } from '@/components/affiliate/AffiliateCodeCapture'
 import { CaptchaField } from '@/components/auth/CaptchaField'
 import {
-  exchangeTelegramAuth,
   GOOGLE_CLIENT_ID,
   GoogleMark,
   OAUTH_BUTTON_CLASS,
@@ -14,10 +13,9 @@ import {
   TelegramLoginWidget,
   TelegramMark,
   startGoogleOAuth,
-  type TelegramAuthPayload,
 } from '@/components/auth/oauth'
 import { toast } from '@/components/ui/toaster'
-import { errCode, errText, setAccessToken } from '@/lib/api'
+import { errCode, errText } from '@/lib/api'
 import { useAuth } from '@/stores/auth'
 import { type LoginSheetMode, useUIStore } from '@/stores/ui'
 
@@ -60,15 +58,7 @@ function getQuietReferral(): string | undefined {
 }
 
 /** §4.8: OAuth сверху — Google и Telegram; Google включается при наличии ключа. */
-function OAuthSection({
-  referral,
-  onTelegramAuth,
-  telegramLoading,
-}: {
-  referral: string | undefined
-  onTelegramAuth: (payload: TelegramAuthPayload) => void
-  telegramLoading: boolean
-}): React.JSX.Element {
+function OAuthSection({ referral }: { referral: string | undefined }): React.JSX.Element {
   return (
     <div className="mt-4 space-y-2.5">
       {GOOGLE_CLIENT_ID !== undefined ? (
@@ -91,11 +81,8 @@ function OAuthSection({
         </Link>
       )}
       {TELEGRAM_BOT_NAME !== undefined ? (
-        // Нативная кнопка виджета кликается через iframe — на время обмена
-        // входом блокируем повторные клики, но не прячем статус Telegram.
-        <div className={telegramLoading ? 'pointer-events-none opacity-60' : undefined}>
-          <TelegramLoginWidget onAuth={onTelegramAuth} />
-        </div>
+        // Redirect-режим (data-auth-url): обмен происходит на /auth/telegram/callback.
+        <TelegramLoginWidget />
       ) : (
         // Бот не прописан в NEXT_PUBLIC_TELEGRAM_BOT_NAME — мёртвая кнопка хуже
         // отсутствующей: прячем настоящий виджет, показываем выключенную плашку.
@@ -202,7 +189,7 @@ function ModeSwitch({
 export function LoginSheet(): React.JSX.Element | null {
   const { loginSheet, loginSheetClosing, loginSheetMode, closeLogin, pendingGameSlug } =
     useUIStore()
-  const { login, register, setSession } = useAuth()
+  const { login, register } = useAuth()
   const [mode, setMode] = useState<LoginSheetMode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -235,22 +222,6 @@ export function LoginSheet(): React.JSX.Element | null {
     closeLogin()
     if (pendingGameSlug) {
       window.location.href = `/casino/${pendingGameSlug}?launch=1`
-    }
-  }
-
-  /** UC-AUTH-09: данные виджета Telegram меняем на сессию тем же afterAuth-путём. */
-  const onTelegramAuth = async (payload: TelegramAuthPayload): Promise<void> => {
-    setLoading(true)
-    try {
-      const res = await exchangeTelegramAuth(payload, referral)
-      setAccessToken(res.accessToken)
-      setSession(res.accessToken, res.user)
-      toast.success('Вход через Telegram выполнен')
-      afterAuth()
-    } catch (e) {
-      toast.error(errText(e))
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -289,8 +260,11 @@ export function LoginSheet(): React.JSX.Element | null {
 
   return (
     <>
-      <div className={`sheet-backdrop${loginSheetClosing ? ' sheet-backdrop-out' : ""}`} onClick={closeLogin} />
-      <div className={`sheet-panel${loginSheetClosing ? ' sheet-panel-out' : ""}`}>
+      <div
+        className={`sheet-backdrop${loginSheetClosing ? ' sheet-backdrop-out' : ''}`}
+        onClick={closeLogin}
+      />
+      <div className={`sheet-panel${loginSheetClosing ? ' sheet-panel-out' : ''}`}>
         <div className="sheet-handle" />
         <div className="flex items-center justify-between">
           <div>
@@ -309,11 +283,7 @@ export function LoginSheet(): React.JSX.Element | null {
           </button>
         </div>
 
-        <OAuthSection
-          referral={referral}
-          onTelegramAuth={(payload) => void onTelegramAuth(payload)}
-          telegramLoading={loading}
-        />
+        <OAuthSection referral={referral} />
 
         {/* Разделитель */}
         <div className="my-4 flex items-center gap-3">
