@@ -70,6 +70,16 @@ export class OAuthUserProvisioningService {
     throw new ReferralCodeGenerationError()
   }
 
+  /**
+   * Есть ли у провайдера связка с игроком — экран подтверждения OAuth отвечает
+   * «Вход» или «Регистрация», не угадывая. Верно только для провайдеров без
+   * email: у Telegram линк — единственный путь, а Google дополнительно линкует
+   * по почте (signIn), так что для него `false` здесь не означает «новый игрок».
+   */
+  async hasAccount(provider: AuthProviderKind, providerUserId: string): Promise<boolean> {
+    return (await this.authProviders.findByProvider(provider, providerUserId)) !== null
+  }
+
   async signIn(input: ProviderSignInInput): Promise<OAuthSignInResult> {
     let link = await this.authProviders.findByProvider(input.provider, input.providerUserId)
     const wasLinked = Boolean(link)

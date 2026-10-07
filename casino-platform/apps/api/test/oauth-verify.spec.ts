@@ -21,6 +21,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
  *     9) state отсутствует → OAuthStateError;
  *    10) без GOOGLE_CLIENT_ID → OAuthNotConfiguredError (503) на buildAuthUrl;
  *    11) без GOOGLE_CLIENT_SECRET → OAuthNotConfiguredError (503) на execute.
+ *   Preview (экран подтверждения до входа):
+ *    12) валидная подпись → проверенный профиль + accountExists, сессии нет;
+ *    13) подпись проверяется ДО обращения к базе (публичный endpoint).
  *
  * HTTP-обмен с Google НЕ мокается: это runtime (GAP-46). Здесь мы затрагиваем
  * только локальные криптопримитивы (signState/verifyState). state-кейсы ловятся
@@ -101,8 +104,8 @@ function makeTelegramUseCase(configValues: Record<string, string> = {}) {
   }
   const config = new ConfigService({ ...defaults, ...configValues })
   // Прямой stub: use-case получает provisioning через DI (конструктор), не через
-  // import — vi.mock на модуль здесь не поможет.
-  const provisioning = { signIn: vi.fn() } as never
+  // import — vi.mock на модуль здесь не поможет. hasAccount нужен preview-кейсам.
+  const provisioning = { signIn: vi.fn(), hasAccount: vi.fn() } as never
   return { useCase: new TelegramLoginUseCase(config, provisioning), provisioning }
 }
 
@@ -198,6 +201,99 @@ describe('GAP-42 TelegramLoginUseCase.verify', () => {
 
     await expect(useCase.execute(payload)).rejects.toBeInstanceOf(OAuthExchangeError)
     expect(signIn).not.toHaveBeenCalled()
+  })
+})
+
+// ==================== Telegram: preview (экран подтверждения) ====================
+
+/**
+ * POST /auth/telegram/preview кормит экран «Продолжить как … / Зарегистрировать?».
+ * Два инварианта, которые может нарушить только этот слой:
+ *  1) preview НЕ входит — signIn не вызывается, сессии и пользователя нет;
+ *  2) подпись проверяется ДО обращения к базе — иначе подделанным query щупали
+ *     бы чужие Telegram id (endpoint публичный).
+ */
+describe('TelegramLoginUseCase.preview', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const hasAccountOf = (provisioning: never): ReturnType<typeof vi.fn> =>
+    (provisioning as { hasAccount: ReturnType<typeof vi.fn> }).hasAccount
+
+  it('валидная подпись: проверенный профиль + accountExists, без signIn', async () => {
+    const { useCase, provisioning } = makeTelegramUseCase()
+    const signIn = (provisioning as { signIn: ReturnType<typeof vi.fn> }).signIn
+    const hasAccount = hasAccountOf(provisioning)
+    hasAccount.mockResolvedValue(true)
+
+    const { payload } = buildTelegramPayload({
+      first_name: 'Ivan',
+      last_name: 'Petrov',
+      username: 'ivan',
+      photo_url: 'https://t.me/i/userpic.jpg',
+    })
+
+    await expect(useCase.preview(payload)).resolves.toEqual({
+      displayName: 'Ivan Petrov',
+      username: 'ivan',
+      photoUrl: 'https://t.me/i/userpic.jpg',
+      accountExists: true,
+    })
+    expect(hasAccount).toHaveBeenCalledWith('telegram', '12345')
+    expect(signIn).not.toHaveBeenCalled()
+  })
+
+  it('незнакомый Telegram: accountExists=false, игрок по-прежнему не создан', async () => {
+    const { useCase, provisioning } = makeTelegramUseCase()
+    const signIn = (provisioning as { signIn: ReturnType<typeof vi.fn> }).signIn
+    const hasAccount = hasAccountOf(provisioning)
+    hasAccount.mockResolvedValue(false)
+
+    const { payload } = buildTelegramPayload({ first_name: 'Ivan' })
+    const result = await useCase.preview(payload)
+
+    expect(result.accountExists).toBe(false)
+    expect(signIn).not.toHaveBeenCalled()
+  })
+
+  it('подделанный hash → OAuthExchangeError до запроса к базе', async () => {
+    const { useCase, provisioning } = makeTelegramUseCase()
+    const hasAccount = hasAccountOf(provisioning)
+    hasAccount.mockResolvedValue(true)
+
+    const { payload } = buildTelegramPayload({ tamperHash: () => 'abcd' })
+
+    await expect(useCase.preview(payload)).rejects.toBeInstanceOf(OAuthExchangeError)
+    expect(hasAccount).not.toHaveBeenCalled()
+  })
+
+  it('auth_date старше 24ч → OAuthExchangeError', async () => {
+    const { useCase, provisioning } = makeTelegramUseCase()
+    const hasAccount = hasAccountOf(provisioning)
+    hasAccount.mockResolvedValue(true)
+
+    const { payload } = buildTelegramPayload({
+      auth_date: Math.floor(Date.now() / 1000) - 86_401,
+    })
+
+    await expect(useCase.preview(payload)).rejects.toBeInstanceOf(OAuthExchangeError)
+    expect(hasAccount).not.toHaveBeenCalled()
+  })
+
+  it('ни имени, ни username → displayName=null: экран не выдумывает имя', async () => {
+    const { useCase, provisioning } = makeTelegramUseCase()
+    const hasAccount = hasAccountOf(provisioning)
+    hasAccount.mockResolvedValue(false)
+
+    const { payload } = buildTelegramPayload()
+
+    await expect(useCase.preview(payload)).resolves.toEqual({
+      displayName: null,
+      username: null,
+      photoUrl: null,
+      accountExists: false,
+    })
   })
 })
 

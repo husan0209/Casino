@@ -11,7 +11,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  *   проде #203). Спека храповик: data-onauth в DOM не появляется;
  * - telegramPayloadFromQuery разбирает query колбэка: без обязательных
  *   id/auth_date/hash — null, с ними — payload (все поля строками);
- * - exchangeTelegramAuth конвертирует и отправляет payload на API.
+ * - exchangeTelegramAuth / previewTelegramAuth шлют ОДИН набор полей: подпись
+ *   Telegram считается от них, и разошедшиеся наборы отбивались бы «подпись не
+ *   совпадает» на одном из двух шагов;
+ * - виджет рисует нашу плашку (как у Google), а iframe лежит поверх прозрачным
+ *   слоем: без загрузки скрипта остаётся выключенная плашка, а не мёртвая кнопка.
  */
 
 vi.hoisted(() => {
@@ -24,6 +28,7 @@ vi.mock('@/lib/api', () => api)
 
 import {
   exchangeTelegramAuth,
+  previewTelegramAuth,
   telegramPayloadFromQuery,
   TelegramLoginWidget,
 } from '@/components/auth/oauth'
@@ -69,6 +74,35 @@ describe('exchangeTelegramAuth', () => {
       last_name: undefined,
       username: undefined,
       photo_url: undefined,
+      referral_code: undefined,
+    })
+  })
+})
+
+describe('previewTelegramAuth', () => {
+  /**
+   * Проверка подписи (экран подтверждения) и обмен на сессию обязаны отправить
+   * один и тот же набор полей: data-check-string строится из них, и если один
+   * шаг пришлёт меньше полей, второй отобьётся «подпись Telegram не совпадает».
+   */
+  it('шлёт те же поля, что и обмен, — разница только в referral_code', async () => {
+    const payload = { id: 42, auth_date: 1690000000, hash: 'HASH1', first_name: 'Иван' }
+
+    api.apiPost.mockResolvedValue({
+      displayName: 'Иван',
+      username: null,
+      photoUrl: null,
+      accountExists: false,
+    })
+    await previewTelegramAuth(payload)
+    const previewBody = api.apiPost.mock.calls[0]![1] as Record<string, unknown>
+    expect(api.apiPost).toHaveBeenCalledWith('/auth/telegram/preview', previewBody)
+
+    api.apiPost.mockResolvedValue({ accessToken: 'token', user: { id: 'u1' } })
+    await exchangeTelegramAuth(payload)
+
+    expect(api.apiPost.mock.calls[1]![1]).toStrictEqual({
+      ...previewBody,
       referral_code: undefined,
     })
   })
@@ -174,5 +208,36 @@ describe('TelegramLoginWidget', () => {
     // Подпись закрепляем русским: без параметра её диктует язык браузера.
     expect(script?.getAttribute('data-lang')).toBe('ru')
     vi.unstubAllGlobals()
+  })
+
+  /**
+   * Заливку и подпись кнопки Telegram-embed'а стилизовать нельзя (iframe
+   * cross-origin), поэтому видимая часть — наша плашка, а iframe лежит поверх
+   * прозрачным слоем: клик, фокус и сама проверка по-прежнему настоящие.
+   */
+  it('показывает нашу плашку, а iframe виджета — прозрачным слоем поверх неё', () => {
+    render(<TelegramLoginWidget />)
+
+    const plate = screen.getByTestId('telegram-widget').querySelector('[aria-hidden="true"]')
+    expect(plate?.textContent).toContain('Продолжить с Telegram')
+
+    const slot = screen.getByTestId('telegram-widget-slot')
+    expect(slot.className).toContain('absolute')
+    expect(slot.className).toContain('opacity-0')
+  })
+
+  it('если скрипт виджета не загрузился — выключенная плашка, а не мёртвая кнопка', () => {
+    render(<TelegramLoginWidget />)
+
+    act(() => {
+      screen
+        .getByTestId('telegram-widget-slot')
+        .querySelector('script[data-telegram-login]')
+        ?.dispatchEvent(new Event('error'))
+    })
+
+    const button = screen.getByRole('button', { name: 'Продолжить с Telegram' })
+    expect((button as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByTestId('telegram-widget-slot')).toBeNull()
   })
 })
