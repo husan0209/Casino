@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { apiGet, apiPost } from '@/lib/api'
 import { type WebUser } from '@/stores/auth'
@@ -28,8 +28,17 @@ export const GOOGLE_CLIENT_ID = process.env['NEXT_PUBLIC_GOOGLE_CLIENT_ID']
 export const TELEGRAM_BOT_NAME = process.env['NEXT_PUBLIC_TELEGRAM_BOT_NAME']
 
 /** Единый стиль OAuth-плашек листа (Google/Telegram). */
+/**
+ * Единый стиль OAuth-плашек листа (Google/Telegram).
+ *
+ * Высота задана явно (`h-10` = 40 px), а не подушкой `py-*`: кнопку Telegram
+ * рисует его iframe, и её высота — ровно 40 px, изменить её мы не можем. С
+ * `py-3` наша плашка выходила 46 px, и в одном столбце кнопки были разного
+ * роста — подстраиваемся под тот размер, который нам не принадлежит. Радиус 12
+ * px совпадает с `data-radius` виджета.
+ */
 export const OAUTH_BUTTON_CLASS =
-  'flex w-full items-center justify-center gap-3 rounded-xl border border-[#2A2A4A] bg-white/[0.04] px-4 py-3 text-sm font-medium transition hover:bg-white/[0.07]'
+  'flex h-10 w-full items-center justify-center gap-3 rounded-xl border border-[#2A2A4A] bg-white/[0.04] px-4 text-sm font-medium transition hover:bg-white/[0.07]'
 
 /** Официальный четырёхцветный знак Google (брендинг «Sign in with Google»). */
 export function GoogleMark({ size = 14 }: { size?: number }): React.JSX.Element {
@@ -192,16 +201,55 @@ export function telegramPayloadFromQuery(query: URLSearchParams): TelegramAuthPa
  * data-onauth сознательно: строковый колбэк виджет собирает через
  * Function('user', …) — это eval, который запрещён прод-CSP (P1 #11:
  * script-src без unsafe-eval) и ронял виджет с EvalError.
+ *
+ * Ширина берётся из контейнера (`data-min-width`/`data-max-width`): без них
+ * embed рисует кнопку фиксированных 238 px, и рядом с растянутой на всю ширину
+ * плашкой Google пара выглядела чужеродно (замер на стенде: 229 px против
+ * 348 px). Параметр работает как задумано — embed отвечает postMessage `resize`,
+ * и скрипт telegram-widget.js проставляет iframe ширину.
+ *
+ * Внутренности iframe нам не принадлежат: цвет (#54A9EB) и подпись «Войти через
+ * Telegram» не задаются, поэтому пару выравниваем по тому, что в нашей власти:
+ * ширина, радиус и высота (`h-10` у обеих плашек).
  */
 export function TelegramLoginWidget(): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null)
+  // undefined — ширину ещё не измеряли, монтировать рано; число — измерили, и
+  // 0 допустим: так себя ведут jsdom и скрытый контейнер, тогда кнопка
+  // остаётся в родных 238 px, но она есть.
+  const [width, setWidth] = useState<number | undefined>(undefined)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (el === null) {
+      return
+    }
+    const read = (): number => Math.round(el.getBoundingClientRect().width)
+    if (typeof ResizeObserver === 'undefined') {
+      setWidth(read())
+      return
+    }
+    const observer = new ResizeObserver(([entry]) => {
+      const next = Math.round(entry?.contentRect.width ?? read())
+      // Перемонтируем только на заметное изменение: iframe мигает на каждый
+      // вызов, а дробные ширины у лейаута бывают почти всегда.
+      setWidth((prev) => (prev === undefined || Math.abs(prev - next) >= 2 ? next : prev))
+    })
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+    }
+  }, [])
 
   useEffect(() => {
     const container = containerRef.current
-    // Strict Mode монтирует эффект дважды — во второй раз скрипт уже стоит.
-    if (container === null || container.childElementCount > 0) {
+    if (container === null || width === undefined) {
       return
     }
+    // Пересоздаём, а не дополняем: атрибуты читаются один раз при
+    // инициализации скрипта, и без этого поворот телефона оставил бы кнопку
+    // прежней ширины. Заодно это переживает двойной монтаж Strict Mode.
+    container.replaceChildren()
     const widgetScript = document.createElement('script')
     widgetScript.src = 'https://telegram.org/js/telegram-widget.js?22'
     widgetScript.async = true
@@ -210,10 +258,16 @@ export function TelegramLoginWidget(): React.JSX.Element {
     widgetScript.setAttribute('data-size', 'large')
     widgetScript.setAttribute('data-userpic', 'false')
     widgetScript.setAttribute('data-radius', '12')
+    if (width > 0) {
+      widgetScript.setAttribute('data-min-width', String(width))
+      widgetScript.setAttribute('data-max-width', String(width))
+    }
+    // Язык подписи закрепляем: без параметра Telegram берёт язык браузера, и у
+    // части игроков кнопка была бы «Sign in with Telegram» рядом с русской
+    // формой.
+    widgetScript.setAttribute('data-lang', 'ru')
     container.appendChild(widgetScript)
-  }, [])
+  }, [width])
 
-  return (
-    <div ref={containerRef} data-testid="telegram-widget-slot" className="flex justify-center" />
-  )
+  return <div ref={containerRef} data-testid="telegram-widget-slot" className="w-full" />
 }
