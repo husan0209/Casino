@@ -8,11 +8,7 @@
  * Фасады geo/users подменены узкими объектами (`as unknown as`).
  */
 import { CreateFiatDepositUseCase } from '../src/modules/payments/application/use-cases/create-fiat-deposit.use-case'
-import {
-  AmountTooLargeError,
-  AmountTooSmallError,
-  PaymentProviderError,
-} from '../src/modules/payments/domain/errors'
+import { AmountTooSmallError, PaymentProviderError } from '../src/modules/payments/domain/errors'
 
 import type {
   IPaymentRequestRepository,
@@ -60,7 +56,7 @@ function makeDeps(over: { rukassaError?: Error } = {}) {
     validateFiatDepositMethod: (...args: unknown[]) => {
       geoCalls.push({ fn: 'validateFiatDepositMethod', args })
     },
-    getLimits: () => ({ depositMin: '500', depositMax: '100000' }),
+    getLimits: () => ({ depositMin: '500' }),
     toRubEquivalent: (amount: string) => `rub(${amount})`,
   } as never
 
@@ -114,12 +110,16 @@ describe('CreateFiatDepositUseCase', () => {
     expect(d.created).toHaveLength(0)
   })
 
-  it('сумма выше depositMax → AmountTooLargeError', async () => {
+  // Прежний `depositMax` 100 000 ₽ давал на этой сумме AMOUNT_TOO_LARGE. Верхней
+  // границы у пополнения больше нет (решение владельца 2026-10-07) — предельный
+  // контроль стоит только на выдаче (withdrawMax, withdrawal-currency-limits).
+  it('сумма выше прежнего depositMax проходит: верхнего лимита на пополнении нет', async () => {
     const d = makeDeps()
-    await expect(d.uc.execute('u-1', { ...INPUT, amount: '100000.01' })).rejects.toThrow(
-      AmountTooLargeError,
-    )
-    expect(d.created).toHaveLength(0)
+    const res = await d.uc.execute('u-1', { ...INPUT, amount: '1000000.00' })
+
+    expect(res.payment_request_id).toBe('pr-1')
+    expect(d.created).toHaveLength(1)
+    expect(d.created[0]!.amount).toBe('1000000.00')
   })
 
   // Прежний шлюз «суммарные пополнения до KYC_DEPOSIT_LIMIT_RUB» снят

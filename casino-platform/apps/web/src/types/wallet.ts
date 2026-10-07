@@ -18,7 +18,6 @@ export interface GeoConfig {
   cryptoMethods: PaymentMethod[]
   depositPresets: string[]
   depositMin: string
-  depositMax: string
   fiatDepositsLive: boolean
 }
 

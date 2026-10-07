@@ -305,8 +305,8 @@ PAYMENT_PROVIDER_ERROR 502 Rukassa/NOWPayments down
 INVALID_SIGNATURE 400 Webhook signature invalid
 PAYMENT_EXPIRED 410 Invoice expired (>30 min)
 DUPLICATE_REQUEST 409 Idempotency key conflict
-AMOUNT_TOO_SMALL 422 Below minimum
-AMOUNT_TOO_LARGE 422 Above maximum
+AMOUNT_TOO_SMALL 422 Ниже минимума (на пополнении — минимум провайдера)
+AMOUNT_TOO_LARGE 422 Выше максимума (только вывод: у пополнения верха нет)
 INVALID_CURRENCY 422 Currency not supported
 
 ```
