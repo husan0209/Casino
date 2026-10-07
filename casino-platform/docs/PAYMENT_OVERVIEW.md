@@ -135,7 +135,7 @@ export interface ProviderWebhookEvent {
     │ 1. POST /payments/deposit       │                          │
     │ { amount, currency, method }    │                          │
     ├────────────────────────────────►│                          │
-    │                                  │ 2. Validate KYC limit    │
+    │                                  │ 2. Validate deposit min  │
     │                                  │    CheckMethodSupport   │
     │                                  │    CheckCurrencySupport │
     │                                  │                          │
@@ -170,6 +170,14 @@ export interface ProviderWebhookEvent {
     │                                  │ 15. Return 200 OK        │
     │                                  ├─────────────────────────►│
 ```
+
+**Сумма пополнения (границы).** Верхней границы нет — решение владельца
+2026-10-07: игрок вносит сколько хочет, и `depositMax` удалён из
+`CurrencyLimitsDef`, а не оставлен пустой опцией. Проверка на депозите одна —
+`depositMin`, и она равна минимуму провайдера (20 USDT / 0.0003 BTC): ниже NOWPayments
+отклоняет сам, а наш 422 с человеческим текстом дешевле его 502 с сырым JSON.
+Предел стоит на выдаче — `withdrawMin`/`withdrawMax` плюс обязательная верификация
+(§8.2).
 
 ### 3.1. Депозит для фиата (Rukassa)
 
@@ -559,7 +567,7 @@ async reconcilePendingPayments() {
 
 ```typescript
 async createDeposit(input: CreateDepositInput) {
-  // geo-валидация метода, money-проверка depositMin/depositMax — и сразу заявка.
+  // geo-валидация метода, money-проверка depositMin (верха нет, §3) — и сразу заявка.
   // KycFacade в этом use-case не участвует.
   // ... создание депозита
 }

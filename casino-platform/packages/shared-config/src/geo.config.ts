@@ -13,8 +13,15 @@ export interface PaymentMethodDef {
 }
 
 export interface CurrencyLimitsDef {
+  /** Нижняя граница пополнения: минимум платёжного провайдера (NOWPayments
+   * 20 USDT / 0.0003 BTC, Rukassa — свой). Наш отказ по ней дешевле, чем
+   * 502 с сырым JSON провайдера (см. #194). */
   depositMin: string
-  depositMax: string
+  /**
+   * Верхней границы у пополнения нет и в типе её тоже нет (решение владельца
+   * 2026-10-07): игрок вносит сколько хочет. Ограничена только выдача —
+   * поэтому пара `min`/`max` стоит на `withdraw*`, а на депозите один `min`.
+   */
   withdrawMin: string
   withdrawMax: string
   depositPresets: string[]
@@ -44,7 +51,6 @@ export const DISPLAY_RUB_RATES: Record<DisplayCurrency, string> = {
 export const CURRENCY_LIMITS: Record<DisplayCurrency, CurrencyLimitsDef> = {
   RUB: {
     depositMin: '100',
-    depositMax: '500000',
     withdrawMin: '500',
     withdrawMax: '200000',
     depositPresets: ['1000', '2000', '5000', '10000'],
@@ -52,7 +58,6 @@ export const CURRENCY_LIMITS: Record<DisplayCurrency, CurrencyLimitsDef> = {
   },
   UAH: {
     depositMin: '200',
-    depositMax: '200000',
     withdrawMin: '200',
     withdrawMax: '80000',
     depositPresets: ['500', '1000', '2000', '5000'],
@@ -60,7 +65,6 @@ export const CURRENCY_LIMITS: Record<DisplayCurrency, CurrencyLimitsDef> = {
   },
   BYN: {
     depositMin: '10',
-    depositMax: '10000',
     withdrawMin: '15',
     withdrawMax: '5000',
     depositPresets: ['30', '50', '100', '200'],
@@ -68,7 +72,6 @@ export const CURRENCY_LIMITS: Record<DisplayCurrency, CurrencyLimitsDef> = {
   },
   KZT: {
     depositMin: '2000',
-    depositMax: '25000000',
     withdrawMin: '3000',
     withdrawMax: '10000000',
     depositPresets: ['5000', '10000', '20000', '50000'],
@@ -76,7 +79,6 @@ export const CURRENCY_LIMITS: Record<DisplayCurrency, CurrencyLimitsDef> = {
   },
   UZS: {
     depositMin: '50000',
-    depositMax: '500000000',
     withdrawMin: '100000',
     withdrawMax: '200000000',
     depositPresets: ['100000', '200000', '500000', '1000000'],
@@ -84,7 +86,6 @@ export const CURRENCY_LIMITS: Record<DisplayCurrency, CurrencyLimitsDef> = {
   },
   USDT_TRC20: {
     depositMin: '20',
-    depositMax: '50000',
     withdrawMin: '20',
     withdrawMax: '20000',
     depositPresets: ['20', '50', '100', '200'],
@@ -92,7 +93,6 @@ export const CURRENCY_LIMITS: Record<DisplayCurrency, CurrencyLimitsDef> = {
   },
   BTC: {
     depositMin: '0.0003',
-    depositMax: '2',
     withdrawMin: '0.0002',
     withdrawMax: '1',
     depositPresets: [],

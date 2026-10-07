@@ -2,15 +2,15 @@
  * Юнит-тесты CreateCryptoDepositUseCase (G21).
  *
  * Пайплайн: проверка релизной валюты (TZ-02, домен → @casino/shared-config) →
- * RUB-оценка через NOWPayments → KYC-лимит → NP createPayment → заявка в БД
- * (pay_address в metadata). Ошибка NP оборачивается в PaymentProviderError,
- * заявка до БД не доезжает; AppError из клиента наружу идёт без изменений.
+ * лимиты суммы (только минимум провайдера) → RUB-оценка через NOWPayments →
+ * NP createPayment → заявка в БД (pay_address в metadata). Ошибка NP
+ * оборачивается в PaymentProviderError, заявка до БД не доезжает; AppError из
+ * клиента наружу идёт без изменений.
  */
 import { vi } from 'vitest'
 
 import { CreateCryptoDepositUseCase } from '../src/modules/payments/application/use-cases/create-crypto-deposit.use-case'
 import {
-  AmountTooLargeError,
   AmountTooSmallError,
   InvalidCurrencyError,
   PaymentProviderError,
@@ -123,10 +123,16 @@ describe('CreateCryptoDepositUseCase', () => {
     expect(d.created).toHaveLength(0)
   })
 
-  it('сумма выше депозитного максимума → AmountTooLargeError, NP не дёргается', async () => {
+  // depositMax ('2' BTC / '50 000' USDT) в конфиге был и давал здесь
+  // AMOUNT_TOO_LARGE. Верхней границы у пополнения нет (решение владельца
+  // 2026-10-07): сумма игрока, а предел стоит только на выдаче.
+  it('сумма выше прежнего депозитного максимума проходит', async () => {
     const d = makeDeps()
-    await expect(d.uc.execute('u-1', '3', 'BTC')).rejects.toThrow(AmountTooLargeError)
-    expect(d.paymentCalls).toHaveLength(0)
+    const res = await d.uc.execute('u-1', '3', 'BTC')
+
+    expect(res.payment_request_id).toBe('pr-1')
+    expect(d.paymentCalls).toHaveLength(1)
+    expect(d.created).toHaveLength(1)
   })
 
   it('валюта вне whitelist → InvalidCurrencyError, NP не дёргается', async () => {

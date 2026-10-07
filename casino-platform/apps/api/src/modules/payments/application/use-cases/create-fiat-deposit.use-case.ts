@@ -11,7 +11,7 @@ import { UsersFacade } from '@modules/users/facade/users.facade'
 import type { DisplayCurrency } from '@casino/shared-config'
 import { money } from '@casino/shared-utils'
 
-import { AmountTooLargeError, AmountTooSmallError, PaymentProviderError } from '../../domain/errors'
+import { AmountTooSmallError, PaymentProviderError } from '../../domain/errors'
 import {
   type IRukassaClient,
   type IPaymentRequestRepository,
@@ -53,9 +53,9 @@ export class CreateFiatDepositUseCase {
     if (!money.isGreaterOrEqual(amount, limits.depositMin)) {
       throw new AmountTooSmallError(limits.depositMin)
     }
-    if (money.isGreaterThan(amount, limits.depositMax)) {
-      throw new AmountTooLargeError(limits.depositMax)
-    }
+    // Верхней границы у пополнения нет (решение владельца 2026-10-07): 1 000 ₽
+    // или 1 000 000 ₽ — сумма игрока, и оба его дело. Максимум платёжного метода
+    // приходит отказом провайдера; наш предельный контроль стоит на выводе.
 
     const amountRub = this.geo.toRubEquivalent(amount, currency as DisplayCurrency)
 

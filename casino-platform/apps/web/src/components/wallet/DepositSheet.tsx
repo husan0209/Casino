@@ -300,10 +300,6 @@ export function DepositSheet(): React.JSX.Element | null {
       setAmountError(`Минимальная сумма — ${formatAmount(config.depositMin, currency, true)}`)
       return
     }
-    if (mode === 'fiat' && config?.depositMax && amountNum > Number(config.depositMax)) {
-      setAmountError(`Максимальная сумма — ${formatAmount(config.depositMax, currency, true)}`)
-      return
-    }
     if (!method) {
       setAmountError('Выберите способ оплаты')
       return

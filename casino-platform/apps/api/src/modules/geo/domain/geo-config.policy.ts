@@ -33,7 +33,6 @@ export interface GeoConfigResult {
   cryptoMethods: PaymentMethodDef[]
   depositPresets: string[]
   depositMin: string
-  depositMax: string
   fiatDepositsLive: boolean
 }
 
@@ -61,7 +60,6 @@ export function resolveGeoConfig(input: {
     cryptoMethods: cryptoMethods(),
     depositPresets: limits.depositPresets,
     depositMin: limits.depositMin,
-    depositMax: limits.depositMax,
     fiatDepositsLive: limits.fiatLive && enabledFiat.includes(activeCurrency),
   }
 }
