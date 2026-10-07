@@ -18,7 +18,10 @@ const row = (
   amount = amountRub ?? '0',
 ): CountedWithdrawal => ({ currency, amount, amountRub })
 
-function makeRepo(status: { status: string } | null, withdrawals: CountedWithdrawal[]) {
+function makeRepo(
+  status: { status: string } | null,
+  withdrawals: CountedWithdrawal[],
+): IKycRepository {
   return {
     getStatus: async () => status as never,
     listCountedWithdrawals: async () => withdrawals,
