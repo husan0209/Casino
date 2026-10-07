@@ -443,8 +443,12 @@ export function DepositSheet(): React.JSX.Element | null {
 
             {kycNotApproved && limitRemaining !== undefined && !limitExhausted && (
               <p className="mt-2 text-center text-xs text-muted">
-                Без верификации можно выводить до{' '}
-                {formatAmount(limitRemaining, kyc?.limit_currency ?? '', true)}
+                {/* Честная копия: limit_remaining — это остаток ДЕПОЗИТНОГО лимита
+                    без KYC; вывод же требует одобренной верификации целиком
+                    (KycCheckService.assertCanWithdraw), обещать «вывод до N» нельзя. */}
+                Без верификации — пополнения до{' '}
+                {formatAmount(limitRemaining, kyc?.limit_currency ?? '', true)}; вывод — после
+                верификации
               </p>
             )}
 

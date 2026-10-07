@@ -179,9 +179,11 @@ describe('GAP-36/44: DepositSheet — KYC-лимит из API', () => {
     renderSheet()
     // значение — как отдал API, без клиентской арифметики; пресет-кнопки «5 000 ₽»
     // не считаем — берём именно параграф остатка целиком (текст в двух узлах:
-    // «Без верификации можно выводить до » + «5 000 ₽»), матчим самый глубокий узел с маркером
+    // «Без верификации — пополнения до » + «5 000 ₽»), матчим самый глубокий узел
+    // с маркером. Копия честная: лимит без KYC — депозитный; вывод — после
+    // верификации (assertCanWithdraw), никакого «вывода до N».
     const deepest = (_: unknown, el: Element | null): boolean => {
-      const marker = 'Без верификации можно выводить до'
+      const marker = 'Без верификации — пополнения до'
       if (!el?.textContent.includes(marker) || !el.textContent.includes('5 000')) {
         return false
       }
@@ -189,6 +191,7 @@ describe('GAP-36/44: DepositSheet — KYC-лимит из API', () => {
     }
     const rest = await screen.findByText(deepest, undefined, { timeout: 3000 })
     expect(rest.textContent).toContain('5 000')
+    expect(rest.textContent).toContain('вывод — после верификации')
   })
 
   it('исчерпан: CTA «Лимит исчерпан» и роут на /kyc ДО отправки формы', async () => {
