@@ -166,6 +166,20 @@ function telegramDtoBody(payload: TelegramAuthPayload): Record<string, string | 
 }
 
 /**
+ * Ответы API лежат в конверте {success,data}, и apiPost отдаёт его внутренность.
+ * Если конверт потерялся (прокси вернул 200 с пустым телом, другой контракт),
+ * внутри undefined, и экран входа падал в «Что-то сломалось» на первом же
+ * чтении поля. Форма проверяется здесь: игрок получает внятную ошибку вместо
+ * crash-границы, и никто не видит «создадим новый аккаунт» там, где ответа нет.
+ */
+function expectData<T>(value: T | undefined, endpoint: string): T {
+  if (typeof value !== 'object' || value === null) {
+    throw new Error(`${endpoint} вернул неожиданный ответ`)
+  }
+  return value
+}
+
+/**
  * Обмен данных виджета на сессию — POST /auth/telegram. Подпись Telegram
  * проверяет API по HMAC от TELEGRAM_BOT_TOKEN (токен живёт только на сервере).
  */
@@ -173,10 +187,11 @@ export async function exchangeTelegramAuth(
   payload: TelegramAuthPayload,
   referralCode?: string,
 ): Promise<{ accessToken: string; user: WebUser }> {
-  return apiPost<{ accessToken: string; user: WebUser }>('/auth/telegram', {
+  const res = await apiPost<{ accessToken: string; user: WebUser } | undefined>('/auth/telegram', {
     ...telegramDtoBody(payload),
     referral_code: referralCode,
   })
+  return expectData(res, 'POST /auth/telegram')
 }
 
 /** Ответ POST /auth/telegram/preview — проверенный профиль до выдачи сессии. */
@@ -195,7 +210,15 @@ export interface TelegramPreviewResult {
 export async function previewTelegramAuth(
   payload: TelegramAuthPayload,
 ): Promise<TelegramPreviewResult> {
-  return apiPost<TelegramPreviewResult>('/auth/telegram/preview', telegramDtoBody(payload))
+  const res = await apiPost<TelegramPreviewResult | undefined>(
+    '/auth/telegram/preview',
+    telegramDtoBody(payload),
+  )
+  const preview = expectData(res, 'POST /auth/telegram/preview')
+  if (typeof preview.accountExists !== 'boolean') {
+    throw new Error('POST /auth/telegram/preview вернул неожиданный ответ')
+  }
+  return preview
 }
 
 /**
