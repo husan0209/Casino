@@ -39,14 +39,24 @@ function deviceLabel(userAgent: string | null): string {
   return 'Другое устройство'
 }
 
-export function SecurityTab({ me, onLogout }: { me: MeDto; onLogout: () => void }): React.JSX.Element {
+export function SecurityTab({
+  me,
+  onLogout,
+}: {
+  me: MeDto
+  onLogout: () => void
+}): React.JSX.Element {
   const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '' })
+  // Повтор живёт отдельно: `changePassword` отправляет passwordForm как есть, а
+  // схема эндпоинта `.strict()` — лишнее поле в теле дало бы 400.
+  const [repeat, setRepeat] = useState('')
 
   const passwordMutation = useMutation({
     mutationFn: () => changePassword(passwordForm),
     onSuccess: () => {
       toast.success('Пароль изменён. Остальные сессии завершены.')
       setPasswordForm({ current_password: '', new_password: '' })
+      setRepeat('')
     },
     onError: (e: unknown) => {
       if (errCode(e) === 'INVALID_CREDENTIALS') {
@@ -74,12 +84,28 @@ export function SecurityTab({ me, onLogout }: { me: MeDto; onLogout: () => void 
             value={passwordForm.new_password}
             onChange={(e) => setPasswordForm((f) => ({ ...f, new_password: e.target.value }))}
           />
+          {/* Опечатка в новом пароле здесь стоит игрока доступа к кошельку:
+              текущий-то он знает, а новый набрал вслепую и увидит «неверный
+              пароль» уже при следующем входе. */}
+          <PasswordField
+            placeholder="Повторите новый пароль"
+            autoComplete="new-password"
+            value={repeat}
+            onChange={(e) => setRepeat(e.target.value)}
+            aria-invalid={repeat !== '' && repeat !== passwordForm.new_password}
+          />
+          {repeat !== '' && repeat !== passwordForm.new_password ? (
+            <p className="-mt-2 text-xs text-[#FF3D71]" role="alert">
+              Пароли не совпадают
+            </p>
+          ) : null}
           <button
             type="button"
             disabled={
               passwordMutation.isPending ||
               passwordForm.current_password.length === 0 ||
-              passwordForm.new_password.length < 8
+              passwordForm.new_password.length < 8 ||
+              repeat !== passwordForm.new_password
             }
             onClick={() => passwordMutation.mutate()}
             className="btn w-full"
@@ -208,7 +234,12 @@ export function SettingsTab({ me }: { me: MeDto }): React.JSX.Element {
       </label>
       <label className="flex items-center justify-between gap-3 text-sm">
         <span>Push-уведомления</span>
-        <input type="checkbox" defaultChecked={s?.notificationsPush ?? false} disabled className="opacity-50" />
+        <input
+          type="checkbox"
+          defaultChecked={s?.notificationsPush ?? false}
+          disabled
+          className="opacity-50"
+        />
       </label>
       <label className="block space-y-2 text-sm">
         <span className="text-muted">Часовой пояс</span>
