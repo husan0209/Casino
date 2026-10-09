@@ -21,6 +21,16 @@ export interface TelegramWidgetPayload {
   photo_url?: string
 }
 
+/**
+ * Именуемые поля профиля Telegram: их одинаково дают Login Widget (`id`,
+ * `first_name`… в подписанном объекте) и Mini App (`user` внутри initData).
+ */
+export interface TelegramProfileNames {
+  first_name?: string | undefined
+  last_name?: string | undefined
+  username?: string | undefined
+}
+
 /** Ответ /auth/telegram/preview: проверенный профиль + есть ли аккаунт. */
 export interface TelegramPreviewResult {
   displayName: string | null
@@ -30,8 +40,8 @@ export interface TelegramPreviewResult {
 }
 
 /** Имя игрока для отображения: «Иван Петров», иначе @username, иначе пусто. */
-function telegramDisplayName(input: TelegramWidgetPayload): string | null {
-  return [input.first_name, input.last_name].filter(Boolean).join(' ') || input.username || null
+export function telegramDisplayName(names: TelegramProfileNames): string | null {
+  return [names.first_name, names.last_name].filter(Boolean).join(' ') || names.username || null
 }
 
 /**
