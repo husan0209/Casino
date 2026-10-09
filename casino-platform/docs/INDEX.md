@@ -89,6 +89,7 @@ last_updated: 2026-08-28
 ### Безопасность
 
 - [SECURITY_BASELINE.md](./SECURITY_BASELINE.md) — security rules
+- [TELEGRAM_MINI_APP.md](./TELEGRAM_MINI_APP.md) — вход по initData и настройка Mini App в BotFather
 - [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md) — env vars и secrets
 
 ### Процессы
