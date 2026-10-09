@@ -15,6 +15,7 @@ import { DepositSheet } from '@/components/wallet/DepositSheet'
 import { LaunchCurrencySheet } from '@/components/wallet/LaunchCurrencySheet'
 import { WalletSwitcher } from '@/components/wallet/WalletSwitcher'
 import { WithdrawSheet } from '@/components/wallet/WithdrawSheet'
+import { useTelegramSurface } from '@/hooks/useTelegramSurface'
 import { isAuthPath, isLegalPath, isSearchShortcut } from '@/lib/ui/desktop-nav'
 
 /** §4.5: состояние pin панели переживает reload. */
@@ -34,6 +35,10 @@ export function MainShell({ children }: { children: React.ReactNode }): React.JS
   const router = useRouter()
   const pathname = usePathname()
   const [pinned, setPinned] = useState(false)
+
+  // Mini App (GAP-21): разворачиваем окно и красим шапку в свой цвет. Вне
+  // Telegram хук молчит.
+  useTelegramSurface()
 
   useEffect(() => {
     try {

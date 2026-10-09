@@ -37,7 +37,7 @@ export function BottomNav(): React.JSX.Element | null {
     href === '/' ? pathname === '/' : pathname.startsWith(href)
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#2A2A4A]/60 bg-[#0F0F1A]/95 backdrop-blur md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#2A2A4A]/60 bg-[#0F0F1A]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
       <div className="grid grid-cols-4 py-2 text-center text-[11px]">
         {items.map((item) => {
           const isFav = item.href === '/favorites'

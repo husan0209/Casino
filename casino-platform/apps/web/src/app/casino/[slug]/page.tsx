@@ -12,6 +12,7 @@ import { LaunchErrorScreen } from '@/components/game/LaunchErrorScreen'
 import { useFavorites } from '@/hooks/useFavorites'
 import { apiGet, apiPost, errCode, errIsNetwork, errStatus } from '@/lib/api'
 import { fetchGamesPage } from '@/lib/api/casino.api'
+import { openDemoGame } from '@/lib/open-game'
 import { EMPTY_FILTERS } from '@/lib/ui/catalog-filters'
 import { gameDisplayName, gameHasDemo, gameRtpLabel } from '@/lib/ui/game'
 import {
@@ -253,7 +254,7 @@ export default function GamePage(): React.JSX.Element {
                       currency,
                     })
                     if (res.launch_url) {
-                      window.open(res.launch_url, '_blank')
+                      openDemoGame(slug, res.launch_url)
                     }
                   }}
                 >
