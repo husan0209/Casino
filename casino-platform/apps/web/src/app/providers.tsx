@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 
 import { errStatus } from '@/lib/api'
 import { setupApiInterceptors } from '@/lib/api-interceptors'
+import { handshakeTelegramWebApp } from '@/lib/telegram-webapp-auth'
 import { useAuthStore } from '@/stores/auth'
 
 export function Providers({ children }: { children: React.ReactNode }): React.JSX.Element {
@@ -36,8 +37,21 @@ export function Providers({ children }: { children: React.ReactNode }): React.JS
 
   // P1 #11: восстановление сессии после reload — access-token только в памяти,
   // новый получаем по httpOnly-cookie; user подтягиваем из /users/me
-  useEffect(() => {
-    void useAuthStore.getState().hydrate()
+  //
+  // Mini App (GAP-21): если страница открыта внутри Telegram, сначала пробуем
+  // silent-вход по подписанному initData. Cookie в WebView переживает не каждый
+  // перезапуск приложения, а подпись Telegram доступна всегда — игрок уже в чате
+  // с ботом. Провал (не Telegram, отказ сервера) = обычная гидрация, то есть
+  // привычный экран входа: путь Telegram ничего не ломает в браузере.
+  useEffect((): void => {
+    void handshakeTelegramWebApp().then((signedIn): void => {
+      if (!signedIn) {
+        void useAuthStore.getState().hydrate()
+      }
+    })
+    // Только при монтировании: повторный запуск после очистки URL от initData
+    // дал бы вторую попытку входа без данных (тот же класс ошибки, что был на
+    // колбэк-странице виджета).
   }, [])
 
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>
