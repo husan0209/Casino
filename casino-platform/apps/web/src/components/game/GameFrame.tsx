@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 
+import { detectTelegramWebApp } from '@/lib/telegram-webapp'
+
 /**
  * GAP-55 (е) (ТЗ §22): игровой iframe вынесен в отдельный чанк — play-страница
  * грузит его через `dynamic(..., { ssr:false })`, чтобы шапка с балансом и
@@ -27,6 +29,15 @@ export function GameFrame({ url }: { url: string }): React.JSX.Element {
   const [stalled, setStalled] = useState(false)
 
   /**
+   * Смена игры обязана сбрасывать оба флага: иначе заглушка переживает
+   * перемонтирование, и вторая игра в сессии не открывается никогда.
+   */
+  useEffect((): void => {
+    setLoaded(false)
+    setStalled(false)
+  }, [url])
+
+  /**
    * Засечка ловит «фрейм не ответил вообще» — зависший провайдер, блокировка
    * сети клиента. Пустой кадр из-за X-Frame-Options браузер тоже считает
    * загруженным, так что против «белого экрана» эта засечка бессильна: её
@@ -44,6 +55,16 @@ export function GameFrame({ url }: { url: string }): React.JSX.Element {
     }
   }, [loaded, url])
 
+  const openOutsideFrame = (): void => {
+    // Внутри Telegram новой вкладки нет (см. lib/open-game.ts): уводим игру в
+    // этот же документ, иначе кнопка выбросила бы игрока из приложения.
+    if (detectTelegramWebApp()) {
+      window.location.href = url
+      return
+    }
+    window.open(url, '_blank', 'noopener')
+  }
+
   if (stalled) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
@@ -51,9 +72,9 @@ export function GameFrame({ url }: { url: string }): React.JSX.Element {
           Игра не открылась. Провайдер мог запретить встраивание в чужое окно — попробуй открыть её
           отдельно.
         </p>
-        <a className="btn px-4 py-2 text-sm" href={url} target="_blank" rel="noopener">
+        <button type="button" className="btn px-4 py-2 text-sm" onClick={openOutsideFrame}>
           Открыть игру
-        </a>
+        </button>
       </div>
     )
   }

@@ -119,7 +119,9 @@ export function MainShell({ children }: { children: React.ReactNode }): React.JS
         }`}
       >
         <AppHeader />
-        <main className="flex-1 pb-20 md:pb-0">{children}</main>
+        <main className="flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+          {children}
+        </main>
         <SiteFooter />
       </div>
       <BottomNav />
