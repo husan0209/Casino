@@ -180,8 +180,9 @@ openssl rand -hex 64
 считает секрет как SHA256 от TELEGRAM_BOT_TOKEN, Mini App — как HMAC-SHA256 с
 константой «WebAppData» на ключах из TELEGRAM_BOT_TOKEN. Смешивать нельзя
 (подробности и настройки бота — TELEGRAM_MINI_APP.md). Новых переменных Mini App
-не вводит: достаточно TELEGRAM_BOT_TOKEN на API и NEXT_PUBLIC_TELEGRAM_BOT_ID в
-бандле веба (§13).
+не вводит: ему достаточно TELEGRAM_BOT_TOKEN на API. NEXT_PUBLIC_TELEGRAM_BOT_ID
+(§18) нужен только редиректной кнопке Login Widget — из окна Telegram вход идёт
+без неё.
 
 ---
 
