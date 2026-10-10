@@ -10,12 +10,26 @@ import {
 import { telegramDisplayName } from '@modules/auth/application/use-cases/oauth/telegram-login.use-case'
 import { OAuthExchangeError, OAuthNotConfiguredError } from '@modules/auth/domain/errors'
 
-const MAX_AUTH_AGE_SEC = 86_400 // тот же срок, что у Login Widget
+/**
+ * Окно жизни подписи — 15 минут, а не сутки как у Login Widget. Причина не в
+ * Telegram, а в том, что вход здесь молчаливый: у виджета есть экран
+ * «Продолжить как …», где игрок видит, под каким аккаунтом он заходит, а здесь
+ * сессия выдаётся без касания. `init_data` при этом пересылается как есть, и
+ * любой, кто подсунул её чужому браузеру (ссылка с параметром, перехват), получает
+ * вход в чужой аккаунт — поэтому срок, в течение который подпись остаётся
+ * годной, сокращён до реального времени запуска приложения.
+ */
+const MAX_AUTH_AGE_SEC = 900
+/** Часы клиента могут спешить; больше минуты — это уже подозрительный auth_date. */
+const MAX_FUTURE_SKEW_SEC = 60
+/** id аккаунта Telegram: положительное число без ведущего нуля, в пределах int64. */
+const TELEGRAM_ID_RE = /^[1-9][0-9]{0,18}$/
 const HASH_SECRET_LABEL = 'WebAppData' // константа Telegram для Mini App
 
 /** Профиль игрока из `user` внутри initData. */
 export interface TelegramWebAppUser {
-  id: number | string
+  /** Нормализованный id аккаунта Telegram — десятичная строка без ведущего нуля. */
+  id: string
   first_name?: string | undefined
   last_name?: string | undefined
   username?: string | undefined
@@ -67,6 +81,21 @@ export function buildInitDataCheckString(fields: Record<string, string>): string
     .join('\n')
 }
 
+/**
+ * id аккаунта Telegram из разобранного `user`. Форма проверяется здесь, а не
+ * «на доверии»: связка auth_providers(telegram, provider_user_id) уникальна по
+ * СТРОКЕ, и «045367» или «45367 » создали бы второго беспарольного игрока с
+ * отдельным кошельком и отдельной реферальной веткой на того же человека.
+ */
+function normalizeUserId(candidate: Record<string, unknown>): string {
+  const rawId = candidate['id']
+  const providerUserId = typeof rawId === 'number' ? String(rawId) : rawId
+  if (typeof providerUserId !== 'string' || !TELEGRAM_ID_RE.test(providerUserId)) {
+    throw new OAuthExchangeError('id пользователя в init_data некорректен')
+  }
+  return providerUserId
+}
+
 /** `user` из initData: JSON лежит строкой внутри подписанных полей. */
 function readInitDataUser(fields: Record<string, string>): TelegramWebAppUser {
   const rawUser = fields['user']
@@ -83,11 +112,8 @@ function readInitDataUser(fields: Record<string, string>): TelegramWebAppUser {
     throw new OAuthExchangeError('user в init_data не объект')
   }
   const candidate = parsed as Record<string, unknown>
-  if (typeof candidate['id'] !== 'number' && typeof candidate['id'] !== 'string') {
-    throw new OAuthExchangeError('у пользователя init_data нет id')
-  }
   return {
-    id: candidate['id'],
+    id: normalizeUserId(candidate),
     first_name: typeof candidate['first_name'] === 'string' ? candidate['first_name'] : undefined,
     last_name: typeof candidate['last_name'] === 'string' ? candidate['last_name'] : undefined,
     username: typeof candidate['username'] === 'string' ? candidate['username'] : undefined,
@@ -95,7 +121,7 @@ function readInitDataUser(fields: Record<string, string>): TelegramWebAppUser {
 }
 
 /**
- * Telegram Mini App (TZ ч.2 §Telegram, GAP-21): игрок открывает сайт внутри
+ * Telegram Mini App (TZ ч.2 §Telegram, GAP-75): игрок открывает сайт внутри
  * клиента Telegram и получает сессию по подписанному `initData` — без
  * редиректа на oauth.telegram.org и без вопроса про номер телефона.
  *
@@ -138,7 +164,12 @@ export class TelegramWebAppLoginUseCase {
     }
 
     const authDate = Number(fields['auth_date'])
-    if (!Number.isFinite(authDate) || Math.floor(Date.now() / 1000) - authDate > MAX_AUTH_AGE_SEC) {
+    const nowSec = Math.floor(Date.now() / 1000)
+    if (
+      !Number.isFinite(authDate) ||
+      nowSec - authDate > MAX_AUTH_AGE_SEC ||
+      authDate - nowSec > MAX_FUTURE_SKEW_SEC
+    ) {
       throw new OAuthExchangeError('данные Mini App просрочены')
     }
   }
@@ -150,9 +181,25 @@ export class TelegramWebAppLoginUseCase {
     const fields = parseInitDataFields(input.initData)
     this.verify(fields)
     const user = readInitDataUser(fields)
+
+    /**
+     * Регистрация — НЕ молчаливая. `init_data` — предъявительский токен: кто его
+     * получил, тот и входит, и подпись не отличает «клиент запустил приложение»
+     * от «игроку прислали ссылку с чужой подписью». Для входа в существующий
+     * аккаунт это приемлемый риск (окно подписи — 15 минут), для СОЗДАНИЯ
+     * беспарольного аккаунта с кошельком — нет: жертва ссылки молча получила бы
+     * чужой профиль и потом пополняла его. Новый игрок проходит через экран
+     * подтверждения виджета, где видно имя аккаунта («Продолжить как …»).
+     */
+    if (!(await this.provisioning.hasAccount('telegram', user.id))) {
+      throw new OAuthExchangeError(
+        'этот Telegram ещё не зарегистрирован — подтвердите создание аккаунта на сайте',
+      )
+    }
+
     return this.provisioning.signIn({
       provider: 'telegram',
-      providerUserId: String(user.id),
+      providerUserId: user.id,
       displayName: telegramDisplayName(user) ?? undefined,
       referralCode: input.referralCode,
       ip: meta?.ip,

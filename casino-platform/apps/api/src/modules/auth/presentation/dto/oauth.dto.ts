@@ -20,7 +20,7 @@ export const TelegramLoginSchema = z
   })
   .passthrough()
 
-// GAP-21: Telegram Mini App. Клиент присылает СЫРУЮ строку
+// GAP-75: Telegram Mini App. Клиент присылает СЫРУЮ строку
 // window.Telegram.WebApp.initData, а не набор полей: подпись считается от
 // точных байт Telegram, и любой пересобранный клиентом JSON (порядок ключей,
 // экранирование вложенного `user`) ломает её на живом устройстве. .strict():
