@@ -34,6 +34,10 @@ export const LOG_REDACT_PATHS = [
   'cookie',
   'apiKey',
   'api_key',
+  // Telegram Mini App: init_data — подписанный токен входа с TTL (GAP-75).
+  // Попадает в лог вместе с телом запроса на /auth/telegram/webapp.
+  'init_data',
+  'initData',
   // один уровень вложенности
   '*.password',
   '*.passwordHash',
@@ -51,6 +55,8 @@ export const LOG_REDACT_PATHS = [
   '*.cookie',
   '*.apiKey',
   '*.api_key',
+  '*.init_data',
+  '*.initData',
   // два уровня вложенности
   '*.*.password',
   '*.*.passwordHash',
@@ -76,6 +82,7 @@ export const LOG_REDACT_PATHS = [
   'req.body.token',
   'req.body.refresh_token',
   'req.body.secret',
+  'req.body.init_data',
 ] as const
 
 /**
@@ -102,8 +109,7 @@ export function buildPinoHttpOptions(): Options {
     redact: { paths: [...LOG_REDACT_PATHS], censor: REDACT_CENSOR },
     // Корреляция с X-Request-Id: RequestIdMiddleware и pino используют одну
     // логику resolveRequestId; кто сработал первым — тот id и живёт в req.id.
-    genReqId: (req) =>
-      (req as LogReq).id ?? resolveRequestId(req.headers['x-request-id']),
+    genReqId: (req) => (req as LogReq).id ?? resolveRequestId(req.headers['x-request-id']),
     autoLogging: { ignore: (req) => req.url?.includes('/health') ?? false },
     serializers: {
       // Кастомный req-сериализатор: добавляет body (тела нужны для отладки,

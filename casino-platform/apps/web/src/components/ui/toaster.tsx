@@ -41,7 +41,7 @@ export function Toaster(): React.JSX.Element | null {
     return null
   }
   return (
-    <div className="fixed bottom-4 right-4 z-50 space-y-2">
+    <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-50 space-y-2">
       {list.map((t) => (
         <div
           key={t.id}

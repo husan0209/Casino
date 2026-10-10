@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { toast } from '@/components/ui/toaster'
 import { errText } from '@/lib/api'
 import { launchDemo } from '@/lib/api/casino.api'
+import { openDemoGame } from '@/lib/open-game'
 
 /**
  * Демо-запуск (ТЗ ч.5 §7: «Demo запускается с превью игры»). Идёт мимо
@@ -23,7 +24,7 @@ export function useDemoLaunch(): {
     try {
       const res = await launchDemo(slug, currency)
       if (res.launch_url) {
-        window.open(res.launch_url, '_blank')
+        openDemoGame(slug, res.launch_url)
       }
     } catch (error) {
       toast.error(errText(error) || 'Не удалось запустить демо')

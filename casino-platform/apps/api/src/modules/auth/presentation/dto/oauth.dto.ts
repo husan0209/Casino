@@ -9,7 +9,7 @@ export const GoogleLoginSchema = z.object({
   referral_code: z.string().max(32).optional(),
 })
 
-// GAP-21: Telegram WebApp initData — плоский объект строк; hash/id/auth_date
+// GAP-21: Telegram Login Widget — плоский объект строк; hash/id/auth_date
 // обязательны (их проверяет крипто-верификация в use-case). passthrough —
 // остальные поля провайдера (first_name, username, lang, photo_url…) не режем.
 export const TelegramLoginSchema = z
@@ -20,5 +20,18 @@ export const TelegramLoginSchema = z
   })
   .passthrough()
 
+// GAP-75: Telegram Mini App. Клиент присылает СЫРУЮ строку
+// window.Telegram.WebApp.initData, а не набор полей: подпись считается от
+// точных байт Telegram, и любой пересобранный клиентом JSON (порядок ключей,
+// экранирование вложенного `user`) ломает её на живом устройстве. .strict():
+// лишние ключи в теле — признак подделки, а не вариант провайдера.
+export const TelegramWebAppLoginSchema = z
+  .object({
+    init_data: z.string().min(24).max(8192),
+    referral_code: z.string().max(32).optional(),
+  })
+  .strict()
+
 export type GoogleLoginDto = z.infer<typeof GoogleLoginSchema>
 export type TelegramLoginDto = z.infer<typeof TelegramLoginSchema>
+export type TelegramWebAppLoginDto = z.infer<typeof TelegramWebAppLoginSchema>

@@ -36,7 +36,11 @@ describe('GAP-23 pino redact', () => {
       deep: { inner: { token: SECRET_BODY_TOKEN } },
       req: {
         headers: { authorization: SECRET_TOKEN, cookie: SECRET_COOKIE },
-        body: { password: SECRET_PASSWORD, email: 'user@example.com' },
+        body: {
+          password: SECRET_PASSWORD,
+          init_data: SECRET_BODY_TOKEN,
+          email: 'user@example.com',
+        },
       },
     })
 
@@ -48,6 +52,8 @@ describe('GAP-23 pino redact', () => {
     expect(parsed.req.headers.authorization).toBe(REDACT_CENSOR)
     expect(parsed.req.headers.cookie).toBe(REDACT_CENSOR)
     expect(parsed.req.body.password).toBe(REDACT_CENSOR)
+    // GAP-75: init_data Mini App — предъявительский токен входа, годный минуты
+    expect(parsed.req.body.init_data).toBe(REDACT_CENSOR)
     // не задетые поля остаются
     expect(parsed.req.body.email).toBe('user@example.com')
 
@@ -65,6 +71,7 @@ describe('GAP-23 pino redact', () => {
     expect(redact.censor).toBe(REDACT_CENSOR)
     expect(redact.paths).toContain('req.headers.authorization')
     expect(redact.paths).toContain('req.body.password')
+    expect(redact.paths).toContain('req.body.init_data')
     expect(redact.paths).toContain('res.headers["set-cookie"]')
     expect(opts.level).toBe(process.env['LOG_LEVEL'] ?? 'info')
   })

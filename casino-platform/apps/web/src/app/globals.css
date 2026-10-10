@@ -97,6 +97,9 @@ body {
 
 .sheet-panel {
   @apply fixed inset-x-0 bottom-0 z-50 max-h-[90vh] overflow-y-auto rounded-t-3xl border border-[#2A2A4A]/60 bg-[#1A1A2E] p-5 pb-8;
+  /* Mini App (GAP-21): низ экрана в WebView — жестовая область iOS и панель
+     Android. pb-8 не хватает: кнопка «Пополнить» оказывалась под свайпом. */
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom));
   animation: sheet-up 320ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 

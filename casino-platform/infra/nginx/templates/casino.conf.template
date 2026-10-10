@@ -34,7 +34,14 @@ server {
   # security headers: общий набор — в snippets/security-headers.conf (включается и
   # здесь, и в location'ах со своими add_header — иначе nginx их теряет по наследованию).
   include /etc/nginx/snippets/security-headers.conf;
-  add_header X-Frame-Options "SAMEORIGIN" always;
+  # X-Frame-Options для веб-хоста СОЗНАТЕЛЬНО нет (GAP-21, Telegram Mini App).
+  # XFO умеет только DENY/SAMEORIGIN и не выражает «разрешить вот эти хосты», а
+  # Mini App в Telegram Web и на десктопе открывается внутри iframe на
+  # *.telegram.org — с SAMEORIGIN наш же сайт отказывался рисоваться в Telegram.
+  # Ограничивает встраивание CSP `frame-ancestors 'self' <хосты Telegram>`,
+  # который отдаёт Next (apps/web/src/lib/csp.ts): он имеет приоритет над XFO во всех
+  # поддерживаемых браузерах и при этом точнее. Админка остаётся при DENY ниже,
+  # /api защищён helmet'ом на Nest.
   # P1 #11: CSP здесь сознательно НЕ дублируется — его отдаёт сам Next в
   # apps/web/src/middleware.ts (для admin-хоста — apps/admin/src/middleware.ts).
   # Браузер пересекает несколько CSP-заголовков, и второй не «ослабит», а ужесточит
@@ -84,8 +91,9 @@ server {
     add_header Cache-Control "public";
     # Своя add_header в location ОТМЕНЯЕТ всё унаследованное от server: без этого
     # include аватарки отдавались без nosniff / Referrer-Policy / X-XSS-Protection /
-    # HSTS / X-Frame-Options, хотя в server-блоке они объявлены. Полный набор
-    # повторяем явно (X-Frame-Options — тот же, что у веб-хоста: файл своего домена).
+    # HSTS, хотя в server-блоке они объявлены. Набор повторяем явно; X-Frame-Options
+    # здесь остаётся (картинку никто не фреимит, а наследовать её из веб-хоста
+    # больше нечего — см. почему XFO убран на уровне server выше).
     include /etc/nginx/snippets/security-headers.conf;
     add_header X-Frame-Options "SAMEORIGIN" always;
   }

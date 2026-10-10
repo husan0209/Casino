@@ -54,7 +54,7 @@ export function AppHeader(): React.JSX.Element {
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[#2A2A4A] bg-[#0F0F1A]/95 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-[#2A2A4A] bg-[#0F0F1A]/95 pt-[env(safe-area-inset-top)] backdrop-blur">
       <div className="container-1 flex h-14 items-center gap-2 min-[400px]:gap-3">
         <Link href="/" aria-label="На главную" className="shrink-0">
           <span aria-hidden className="inline min-[400px]:hidden">

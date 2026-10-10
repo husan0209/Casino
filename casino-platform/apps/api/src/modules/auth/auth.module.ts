@@ -10,6 +10,7 @@ import { LogoutUseCase } from './application/use-cases/logout.use-case'
 import { GoogleOAuthUseCase } from './application/use-cases/oauth/google-oauth.use-case'
 import { OAuthUserProvisioningService } from './application/use-cases/oauth/oauth-user-provisioning.service'
 import { TelegramLoginUseCase } from './application/use-cases/oauth/telegram-login.use-case'
+import { TelegramWebAppLoginUseCase } from './application/use-cases/oauth/telegram-webapp-login.use-case'
 import { RefreshUseCase } from './application/use-cases/refresh.use-case'
 import { RegisterUseCase } from './application/use-cases/register.use-case'
 import { ResetPasswordUseCase } from './application/use-cases/reset-password.use-case'
@@ -85,6 +86,7 @@ import { RolesGuard } from './presentation/guards/roles.guard'
     ChangePasswordUseCase,
     GoogleOAuthUseCase,
     TelegramLoginUseCase,
+    TelegramWebAppLoginUseCase,
     // NB: инжектится GoogleOAuthUseCase/TelegramLoginUseCase; был забыт в providers —
     // собранный сервер падал на DI (найдено E2E-шагом, см. PR #15)
     OAuthUserProvisioningService,

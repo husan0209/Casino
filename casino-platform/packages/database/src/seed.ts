@@ -1,6 +1,7 @@
 import * as argon2 from 'argon2'
 
 import { prisma } from './index'
+import { DEMO_GAMES } from './seed-demo-games'
 import { assertSeedAdminConfig } from './seed-guard'
 
 /**
@@ -56,13 +57,7 @@ async function seedAdmin(): Promise<void> {
   log(`Seeded admin ${admin.email}`)
 }
 
-const DEMO_GAMES = [
-  { slug: 'demo-sweet-fruits', name: 'Sweet Fruits', nameRu: 'Сладкие фрукты' },
-  { slug: 'demo-lucky-sevens', name: 'Lucky Sevens', nameRu: 'Счастливые семёрки' },
-  { slug: 'demo-book-of-demo', name: 'Book of Demo', nameRu: 'Книга демо' },
-] as const
-
-/** Демо-провайдер + три игры. Идемпотентно по slug. */
+/** Демо-провайдер + витрина из десяти игр. Идемпотентно по slug. */
 async function seedDemoGames(): Promise<void> {
   const demoProvider = await prisma.gameProvider.upsert({
     where: { slug: 'demo-provider' },
@@ -92,7 +87,7 @@ async function seedDemoGames(): Promise<void> {
         isFeatured: true,
         isPopular: true,
         hasDemo: true,
-        rtp: 96.5,
+        rtp: game.rtp,
         supportedCurrencies: ['RUB', 'USDT_TRC20'],
       },
     })

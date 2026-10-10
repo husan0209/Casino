@@ -35,6 +35,12 @@ export const metadata: Metadata = {
 /** Next 14: themeColor живёт в viewport, не в metadata (build-warning). */
 export const viewport: Viewport = {
   themeColor: '#0F0F1A',
+  width: 'device-width',
+  initialScale: 1,
+  // Mini App (GAP-21): WebView Telegram занимает окно целиком, вместе с «чёлкой»
+  // и жестовой полосой. Без `cover` браузер считает safe-area нулями, и нижняя
+  // навигация уходит под системный жест.
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }): React.JSX.Element {

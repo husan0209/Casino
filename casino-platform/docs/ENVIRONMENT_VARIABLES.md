@@ -176,6 +176,14 @@ openssl rand -hex 64
 | `TELEGRAM_BOT_TOKEN` | string | ✅       | —       | From @BotFather    |
 | `TELEGRAM_BOT_NAME`  | string | ✅       | —       | `@your_casino_bot` |
 
+Вход из Telegram в проекте два, и проверяются они по-разному: Login Widget
+считает секрет как SHA256 от TELEGRAM_BOT_TOKEN, Mini App — как HMAC-SHA256 с
+константой «WebAppData» на ключах из TELEGRAM_BOT_TOKEN. Смешивать нельзя
+(подробности и настройки бота — TELEGRAM_MINI_APP.md). Новых переменных Mini App
+не вводит: ему достаточно TELEGRAM_BOT_TOKEN на API. NEXT_PUBLIC_TELEGRAM_BOT_ID
+(§18) нужен только редиректной кнопке Login Widget — из окна Telegram вход идёт
+без неё.
+
 ---
 
 ## 8. Rukassa (Fiat Payments)

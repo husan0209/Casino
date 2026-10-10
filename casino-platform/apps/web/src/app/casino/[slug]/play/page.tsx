@@ -44,7 +44,7 @@ export default function GamePlayPage(): React.JSX.Element {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#0F0F1A]">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#0F0F1A] pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)]">
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-[#2A2A4A] px-3">
         <button
           type="button"

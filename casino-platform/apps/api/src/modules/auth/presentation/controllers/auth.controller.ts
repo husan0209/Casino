@@ -43,12 +43,18 @@ import {
   type TelegramPreviewResult,
   type TelegramWidgetPayload,
 } from '../../application/use-cases/oauth/telegram-login.use-case'
+import { TelegramWebAppLoginUseCase } from '../../application/use-cases/oauth/telegram-webapp-login.use-case'
 import { RefreshUseCase } from '../../application/use-cases/refresh.use-case'
 import { RegisterUseCase } from '../../application/use-cases/register.use-case'
 import { ResetPasswordUseCase } from '../../application/use-cases/reset-password.use-case'
 import { VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case'
 import { type LoginDto, LoginSchema } from '../dto/login.dto'
-import { GoogleLoginSchema, TelegramLoginSchema } from '../dto/oauth.dto'
+import {
+  GoogleLoginSchema,
+  TelegramLoginSchema,
+  TelegramWebAppLoginSchema,
+  type TelegramWebAppLoginDto,
+} from '../dto/oauth.dto'
 import {
   ChangePasswordSchema,
   ForgotPasswordSchema,
@@ -87,6 +93,8 @@ export class AuthController {
     @Inject(ChangePasswordUseCase) private readonly changePasswordUc: ChangePasswordUseCase,
     @Inject(GoogleOAuthUseCase) private readonly googleUc: GoogleOAuthUseCase,
     @Inject(TelegramLoginUseCase) private readonly telegramUc: TelegramLoginUseCase,
+    @Inject(TelegramWebAppLoginUseCase)
+    private readonly telegramWebAppUc: TelegramWebAppLoginUseCase,
     @Inject(ListTermsAcceptancesUseCase)
     private readonly termsAcceptancesUc: ListTermsAcceptancesUseCase,
     @Inject(AcceptTermsUseCase) private readonly acceptTermsUc: AcceptTermsUseCase,
@@ -338,5 +346,31 @@ export class AuthController {
   @UsePipes(new ZodValidationPipe(TelegramLoginSchema))
   async telegramPreview(@Body() payload: Record<string, unknown>): Promise<TelegramPreviewResult> {
     return this.telegramUc.preview(payload as unknown as TelegramWidgetPayload)
+  }
+
+  /**
+   * Вход из Telegram Mini App: сайт открыт внутри клиента Telegram, игрок
+   * узнаётся по подписанному `initData`. Отдельного подтверждения, как на
+   * колбэке виджета, здесь нет — сам факт, что приложение открыто из чата с
+   * ботом, и есть подтверждение игрока.
+   *
+   * Проверяется подпись, а не слова клиента: `init_data` принимается одной
+   * строкой и разбирается на сервере (см. TelegramWebAppLoginUseCase).
+   * Классовый @Throttle (10/мин/IP) не поднимали: запрос — один на холодный
+   * старт Mini App, а не поверхность брутфорса.
+   */
+  @Post('telegram/webapp')
+  @UsePipes(new ZodValidationPipe(TelegramWebAppLoginSchema))
+  async telegramWebApp(
+    @Body() dto: TelegramWebAppLoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: string } }> {
+    const result = await this.telegramWebAppUc.execute(
+      { initData: dto.init_data, referralCode: dto.referral_code },
+      { ip: req.ip, userAgent: req.headers['user-agent'] },
+    )
+    setRefreshTokenCookie(res, result.refreshToken)
+    return { accessToken: result.accessToken, user: result.user }
   }
 }

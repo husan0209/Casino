@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom'
 import { GameThumb } from '@/components/casino/GameThumb'
 import { apiPost } from '@/lib/api'
 import { playersCountLabel } from '@/lib/format/plural'
+import { openDemoGame } from '@/lib/open-game'
 import { gameBadge, gameDisplayName, gameRtpLabel } from '@/lib/ui/game'
 import { bigWinLabel, playersOnline } from '@/lib/ui/vitrine-stats'
 import { useAuth, type WebUser } from '@/stores/auth'
@@ -353,7 +354,7 @@ function useDeckPreview(onPlayFront: () => void): {
     try {
       const launch = await apiPost<GameLaunchDto>(`/casino/games/${game.slug}/demo`, { currency })
       if (launch.launch_url) {
-        window.open(launch.launch_url, '_blank', 'noopener')
+        openDemoGame(game.slug, launch.launch_url)
       }
     } catch {
       // демо может быть недоступно (провайдер/гео) — остаёмся в превью

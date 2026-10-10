@@ -9,6 +9,8 @@ import {
   type ProviderGameRow,
 } from '@modules/casino/domain/provider-adapter.interface'
 
+import { DEMO_GAMES } from '@casino/database'
+
 import { DemoProviderDisabledError } from '../../../domain/errors'
 
 @Injectable()
@@ -19,33 +21,20 @@ export class DemoProviderAdapter implements GameProviderAdapter {
     const url = `${webUrl}/demo-game?token=${encodeURIComponent(params.sessionToken)}&game=${encodeURIComponent(params.gameExternalId)}&currency=${params.currency}&demo=${params.isDemo ? '1' : '0'}`
     return { url }
   }
+  /**
+   * Каталог демо-провайдера — из того же списка, что и сид
+   * (`DEMO_GAMES` в @casino/database): сид заводит карточки витрины, отсюда их
+   * берёт синхронизация каталога в админке.
+   */
   async fetchGameList(): Promise<ProviderGameRow[]> {
-    return [
-      {
-        externalGameId: 'demo-sweet-fruits',
-        name: 'Sweet Fruits',
-        type: 'slot',
-        category: 'slots',
-        hasDemo: true,
-        rtp: 96.5,
-      },
-      {
-        externalGameId: 'demo-lucky-sevens',
-        name: 'Lucky Sevens',
-        type: 'slot',
-        category: 'slots',
-        hasDemo: true,
-        rtp: 96.0,
-      },
-      {
-        externalGameId: 'demo-book-of-demo',
-        name: 'Book of Demo',
-        type: 'slot',
-        category: 'slots',
-        hasDemo: true,
-        rtp: 96.21,
-      },
-    ]
+    return DEMO_GAMES.map((game) => ({
+      externalGameId: game.slug,
+      name: game.name,
+      type: 'slot' as const,
+      category: 'slots',
+      hasDemo: true,
+      rtp: game.rtp,
+    }))
   }
   verifyCallback(): boolean {
     const env = this.config.get<string>('NODE_ENV')
