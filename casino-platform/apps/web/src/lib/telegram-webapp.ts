@@ -21,6 +21,8 @@
 const TELEGRAM_WEBAPP_SCRIPT_URL = 'https://telegram.org/js/telegram-web-app.js'
 /** Сколько ждём объект Telegram после вставки скрипта. */
 const BRIDGE_TIMEOUT_MS = 2500
+/** WebView Telegram выдаёт себя в UA; обычный браузер — нет. */
+const TELEGRAM_USER_AGENT = /Telegram\/|TelegramWebview|Telegram-iOS|TelegramAndroid/i
 
 /** Узкий срез API Telegram: только то, что мы реально вызываем. */
 export interface TelegramWebAppBridge {
@@ -55,6 +57,8 @@ function bridgeOf(window: Window & TelegramWindow): TelegramWebAppBridge | undef
  * пустой экран вместо обычного листа входа.
  */
 let bridgePromise: Promise<TelegramWebAppBridge | null> | null = null
+/** Скрипт вставляется ровно один раз на документ, даже если пробуем дважды. */
+let scriptRequested = false
 
 /**
  * Возвращает объект Telegram: уже влитый клиентом — сразу, иначе вставляет их
@@ -89,6 +93,12 @@ export function ensureTelegramWebAppBridge(): Promise<TelegramWebAppBridge | nul
       finish(null)
     }, BRIDGE_TIMEOUT_MS)
 
+    if (scriptRequested) {
+      // Повторная попытка: скрипт уже в DOM, осталось дождаться объекта —
+      // клиент может влить его позже нашего первого запроса.
+      return
+    }
+    scriptRequested = true
     const script = document.createElement('script')
     script.src = TELEGRAM_WEBAPP_SCRIPT_URL
     script.async = true
@@ -99,6 +109,13 @@ export function ensureTelegramWebAppBridge(): Promise<TelegramWebAppBridge | nul
       finish(null)
     }
     document.head.appendChild(script)
+  })
+  // Провал не клеймит документ: следующая попытка (смена роута, возврат
+  // фокуса) должна получить шанс прочитать объект, который влился позже.
+  void bridgePromise.then((bridge): void => {
+    if (bridge === null) {
+      bridgePromise = null
+    }
   })
   return bridgePromise
 }
@@ -125,7 +142,14 @@ function readTelegramParams(window: Window): URLSearchParams {
   return params
 }
 
-/** Мы внутри Telegram Mini App? Определяем до любого сетевого запроса. */
+/**
+ * Мы внутри Telegram Mini App?
+ *
+ * Параметры `tgWebApp*` в адресе НИЧЕГО не включают: их сочиняет автор ссылки,
+ * а не клиент, и «молчаливый вход по строке из URL» — это вход жертвы в чужой
+ * аккаунт. Сигналы берутся те, что подделывает только сам клиент: UA WebView и
+ * объект `window.Telegram`, влитый до нашей гидрации.
+ */
 export function detectTelegramWebApp(): boolean {
   if (typeof window === 'undefined') {
     return false
@@ -133,10 +157,13 @@ export function detectTelegramWebApp(): boolean {
   if (bridgeOf(window as Window & TelegramWindow)?.initData !== undefined) {
     return true
   }
-  const params = readTelegramParams(window)
-  return (
-    params.has('tgWebAppData') || params.has('tgWebAppVersion') || params.has('tgWebAppPlatform')
-  )
+  if (TELEGRAM_USER_AGENT.test(navigator.userAgent)) {
+    return true
+  }
+  // Веб-клиент Telegram (K/A) держит Mini App в iframe на своём origin. Это
+  // надёжный признак именно потому, что CSP `frame-ancestors` допускает сюда
+  // только нас самих и telegram.org: чужая страница нас во фрейм не положит.
+  return window.self !== window.top
 }
 
 /**
