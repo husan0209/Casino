@@ -9,19 +9,16 @@ import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-import { buildHouseSlotLottery, cryptoRandom, drawHouseSlotOutcome } from './house-slot-lottery'
 import {
-  DEMO_TOKEN_PREFIX,
-  OriginalsSessionLoader,
-  TIGER_EXTERNAL_GAME_ID,
-} from './originals-session-loader'
+  buildHouseSlotLottery,
+  cryptoRandom,
+  drawHouseSlotOutcome,
+  houseSlotRtpCeiling,
+} from './house-slot-lottery'
+import { DEMO_TOKEN_PREFIX, OriginalsSessionLoader } from './originals-session-loader'
 import { TIGER_DEMO_START_CREDIT } from './originals-session.use-case'
 import { InvalidBetRequestError } from '../../domain/errors'
-import {
-  HOUSE_SLOT_GAMES,
-  type HouseSlotGameConfig,
-  type IHouseSlotGames,
-} from '../../domain/house-slot-game'
+import { type HouseSlotGameConfig } from '../../domain/house-slot-game'
 import {
   GAME_PLAY_REPOSITORY,
   type GameRow,
@@ -117,13 +114,23 @@ function toFrontMoney(amount: string): number {
   return new Decimal(amount).toDecimalPlaces(2).toNumber()
 }
 
+/**
+ * RTP демо-спина: витринные 96, но не выше потолка таблиц игры. В демо нет
+ * строки games и цели админской витрины, а просить у узких таблиц (Ox ~90%)
+ * 96% означало бы ошибку на каждом спине.
+ */
+function demoRtpFor(game: HouseSlotGameConfig): string {
+  const winPayouts = game.winRows.map((row) => row[TIGER_ROW_INDEX.payout])
+  const ceiling = Math.floor(houseSlotRtpCeiling(winPayouts, game.paylines))
+  return String(Math.min(Number(HOUSE_SLOT_DEMO_RTP_PERCENT), ceiling))
+}
+
 @Injectable()
 export class OriginalsSpinUseCase {
   constructor(
     @Inject(OriginalsSessionLoader) private readonly sessionLoader: OriginalsSessionLoader,
     @Inject(WalletFacade) private readonly wallet: WalletFacade,
     @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
-    @Inject(HOUSE_SLOT_GAMES) private readonly slotGames: IHouseSlotGames,
   ) {}
 
   async execute(request: TigerSpinRequest): Promise<TigerSpinData> {
@@ -134,7 +141,7 @@ export class OriginalsSpinUseCase {
     })
     const betTotal = money.multiply(money.multiply(parsed.betamount, parsed.cpl), parsed.numline)
     if (request.sessionToken.startsWith(DEMO_TOKEN_PREFIX)) {
-      return this.executeDemoSpin(parsed, betTotal)
+      return this.executeDemoSpin(request.sessionToken, parsed, betTotal)
     }
     return this.executeRealSpin(request.sessionToken, parsed, betTotal)
   }
@@ -164,13 +171,14 @@ export class OriginalsSpinUseCase {
     })
   }
 
-  private executeDemoSpin(parsed: OriginalsSpinInput, betTotal: string): TigerSpinData {
-    const game = this.slotGames.getGameConfig(TIGER_EXTERNAL_GAME_ID)
-    if (!game) {
-      throw new InvalidBetRequestError()
-    }
+  private executeDemoSpin(
+    sessionToken: string,
+    parsed: OriginalsSpinInput,
+    betTotal: string,
+  ): TigerSpinData {
+    const game = this.sessionLoader.loadDemoSlotGame(sessionToken)
     this.assertPaylines(parsed.numline, game)
-    const outcome = this.drawOutcome(game, HOUSE_SLOT_DEMO_RTP_PERCENT)
+    const outcome = this.drawOutcome(game, demoRtpFor(game))
     const winTotal = money.multiply(
       money.multiply(parsed.betamount, parsed.cpl),
       String(outcome[TIGER_ROW_INDEX.payout]),

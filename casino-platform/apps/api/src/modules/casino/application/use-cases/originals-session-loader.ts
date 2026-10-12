@@ -1,3 +1,5 @@
+import { randomBytes } from 'crypto'
+
 import { Inject, Injectable } from '@nestjs/common'
 
 import { OriginalsGameNotSupportedError, SessionInvalidError } from '../../domain/errors'
@@ -20,6 +22,24 @@ export const PLINKO_EXTERNAL_GAME_ID = 'plinko'
 
 /** Префикс токенов демо-запуска (launch без сессии, см. LaunchGameUseCase). */
 export const DEMO_TOKEN_PREFIX = 'demo_'
+
+/**
+ * Токен демо-запуска. Сессии у демо нет, а фронт Construct знает только токен —
+ * поэтому externalGameId зашит в сам токен: без него демо крутило бы таблицы
+ * одной игры на всех слотах каталога.
+ */
+export function buildDemoSessionToken(gameExternalId: string): string {
+  return `${DEMO_TOKEN_PREFIX}${gameExternalId}_${randomBytes(16).toString('hex')}`
+}
+
+/** ExternalGameId из демо-токена; null — не демо или пустая игра. */
+export function parseDemoSessionGameId(sessionToken: string): string | null {
+  if (!sessionToken.startsWith(DEMO_TOKEN_PREFIX)) {
+    return null
+  }
+  const gameExternalId = sessionToken.slice(DEMO_TOKEN_PREFIX.length).split('_')[0]
+  return gameExternalId ? gameExternalId : null
+}
 
 /**
  * Общая загрузка активных сессий house-игр для vgames/plinko-эндпоинтов.
@@ -52,6 +72,23 @@ export class OriginalsSessionLoader {
     }
     await this.play.touchSession(session.id)
     return { session, game }
+  }
+
+  /**
+   * Конфиг слота для демо-токена: игра берётся из самого токена, сессии в демо нет.
+   * Токен без игры (старый формат) или игра вне реестра — та же ошибка, что и
+   * на боевом пути: демо не должно молча крутить чужие таблицы.
+   */
+  loadDemoSlotGame(sessionToken: string): HouseSlotGameConfig {
+    const gameExternalId = parseDemoSessionGameId(sessionToken)
+    if (!gameExternalId) {
+      throw new SessionInvalidError()
+    }
+    const game = this.slotGames.getGameConfig(gameExternalId)
+    if (!game) {
+      throw new OriginalsGameNotSupportedError(gameExternalId)
+    }
+    return game
   }
 
   async loadActiveHouseSession(

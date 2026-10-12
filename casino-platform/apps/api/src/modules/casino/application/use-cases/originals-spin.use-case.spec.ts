@@ -99,6 +99,7 @@ function makeSlotGames(): IHouseSlotGames {
     externalGameId: 'fortunetiger',
     displayName: 'Fortune Tiger',
     paylines: 5,
+    defaultRtp: '96',
     winRows: FORTUNE_TIGER_WIN_ROWS as HouseSlotGameConfig['winRows'],
     loseRows: FORTUNE_TIGER_LOSE_ROWS as HouseSlotGameConfig['loseRows'],
     icons: {
@@ -271,7 +272,7 @@ describe('OriginalsSpinUseCase demo', () => {
     const slotGames = makeSlotGames()
     const loader = new OriginalsSessionLoader(play.repository, slotGames)
     return {
-      useCase: new OriginalsSpinUseCase(loader, wallet.facade, play.repository, slotGames),
+      useCase: new OriginalsSpinUseCase(loader, wallet.facade, play.repository),
       wallet,
     }
   }
@@ -282,7 +283,7 @@ describe('OriginalsSpinUseCase demo', () => {
     const creditSpy = vi.spyOn(wallet.facade, 'credit')
 
     const result = await useCase.execute({
-      sessionToken: 'demo_pilot_token',
+      sessionToken: 'demo_fortunetiger_pilot',
       betamount: '2',
       numline: '5',
       cpl: '1',
@@ -299,7 +300,31 @@ describe('OriginalsSpinUseCase demo', () => {
   it('демо с чужим числом линий отказывает', async () => {
     const { useCase } = makeDemoUseCase()
     await expect(
-      useCase.execute({ sessionToken: 'demo_pilot_token', betamount: '2', numline: '3', cpl: '1' }),
+      useCase.execute({
+        sessionToken: 'demo_fortunetiger_pilot',
+        betamount: '2',
+        numline: '3',
+        cpl: '1',
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('демо-токен играет таблицами игры из токена, а не всегда тигром', async () => {
+    const { useCase } = makeDemoUseCase()
+    await expect(
+      useCase.execute({
+        sessionToken: 'demo_fortunemouse_pilot',
+        betamount: '2',
+        numline: '5',
+        cpl: '1',
+      }),
+    ).rejects.toThrow('ORIGINALS_GAME_NOT_SUPPORTED')
+  })
+
+  it('демо-токен без игры в токене — сессия невалидна', async () => {
+    const { useCase } = makeDemoUseCase()
+    await expect(
+      useCase.execute({ sessionToken: 'demo_pilot', betamount: '2', numline: '5', cpl: '1' }),
     ).rejects.toThrow()
   })
 })
@@ -315,7 +340,7 @@ describe('OriginalsSpinUseCase real', () => {
     wallet = makeWalletFacade('500.00')
     slotGames = makeSlotGames()
     const loader = new OriginalsSessionLoader(play.repository, slotGames)
-    useCase = new OriginalsSpinUseCase(loader, wallet.facade, play.repository, slotGames)
+    useCase = new OriginalsSpinUseCase(loader, wallet.facade, play.repository)
   })
 
   it('debits the bet once and keeps money consistent', async () => {
@@ -364,7 +389,6 @@ describe('OriginalsSpinUseCase real', () => {
       closedLoader,
       wallet.facade,
       closedPlay.repository,
-      slotGames,
     )
 
     await expect(
@@ -384,7 +408,6 @@ describe('OriginalsSpinUseCase real', () => {
       foreignLoader,
       wallet.facade,
       foreignPlay.repository,
-      slotGames,
     )
 
     await expect(

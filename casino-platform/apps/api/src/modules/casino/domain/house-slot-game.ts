@@ -61,6 +61,13 @@ export interface HouseSlotGameConfig {
    * numline обязано совпадать с этим числом — иначе игрок подбирает отдачу.
    */
   paylines: number
+  /**
+   * RTP, который провайдер заявляет о себе при синхронизации каталога.
+   * Узкие таблицы донора (максимум 15x при 5 линиях) 96% не отдают — для них
+   * это реальная верхняя граница, а не пожелание. Боевое значение живёт в
+   * поле games.rtp и правится админом; каталожное проверяется спеком.
+   */
+  defaultRtp: string
   winRows: TigerSpinRow[]
   loseRows: TigerSpinRow[]
   icons: TigerIconDoc

@@ -9,6 +9,8 @@ import {
   type ProviderGameRow,
 } from '@modules/casino/domain/provider-adapter.interface'
 
+import { HOUSE_SLOT_CATALOG } from './house-slot-games.registry'
+
 /**
  * House-провайдер оригинальных игр (пилот: Fortune Tiger).
  *
@@ -18,6 +20,16 @@ import {
  * Внешних HTTP-вызовов адаптер не делает: это seamless-провайдер,
  * у которого «провайдер» — наш собственный API.
  */
+const HOUSE_PLINKO_GAME_ROW: ProviderGameRow = {
+  externalGameId: 'plinko',
+  name: 'Plinko',
+  type: 'other',
+  category: 'instant_games',
+  thumbnailUrl: '/house/plinko/thumbnail.svg',
+  hasDemo: true,
+  rtp: 99,
+}
+
 @Injectable()
 export class HouseOriginalsAdapter implements GameProviderAdapter {
   constructor(@Inject(ConfigService) private config: ConfigService) {}
@@ -34,33 +46,16 @@ export class HouseOriginalsAdapter implements GameProviderAdapter {
 
   async fetchGameList(): Promise<ProviderGameRow[]> {
     return [
-      {
-        externalGameId: 'fortunetiger',
-        name: 'Fortune Tiger',
+      ...HOUSE_SLOT_CATALOG.map((config) => ({
+        externalGameId: config.externalGameId,
+        name: config.displayName,
         type: 'slot',
         category: 'slots',
-        thumbnailUrl: '/house/fortunetiger/icons/icon-512.png',
+        thumbnailUrl: `/house/${config.externalGameId}/icons/icon-512.png`,
         hasDemo: true,
-        rtp: 70,
-      },
-      {
-        externalGameId: 'fortuneox',
-        name: 'Fortune Ox',
-        type: 'slot',
-        category: 'slots',
-        thumbnailUrl: '/house/fortuneox/icons/icon-512.png',
-        hasDemo: true,
-        rtp: 70,
-      },
-      {
-        externalGameId: 'plinko',
-        name: 'Plinko',
-        type: 'other',
-        category: 'instant_games',
-        thumbnailUrl: '/house/plinko/thumbnail.svg',
-        hasDemo: true,
-        rtp: 99,
-      },
+        rtp: Number(config.defaultRtp),
+      })),
+      HOUSE_PLINKO_GAME_ROW,
     ]
   }
 
