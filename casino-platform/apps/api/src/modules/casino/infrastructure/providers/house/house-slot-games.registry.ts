@@ -1,59 +1,22 @@
 import { Injectable } from '@nestjs/common'
 
-import {
-  BIKINI_PARADISE_ICONS,
-  BIKINI_PARADISE_LOSE_ROWS,
-  BIKINI_PARADISE_WIN_ROWS,
-} from './spin-data/bikini-paradise.tables'
-import {
-  FORTUNE_MOUSE_ICONS,
-  FORTUNE_MOUSE_LOSE_ROWS,
-  FORTUNE_MOUSE_WIN_ROWS,
-} from './spin-data/fortune-mouse.tables'
-import {
-  FORTUNE_OX_ICONS,
-  FORTUNE_OX_LOSE_ROWS,
-  FORTUNE_OX_WIN_ROWS,
-} from './spin-data/fortune-ox.tables'
-import {
-  FORTUNE_PANDA_ICONS,
-  FORTUNE_PANDA_LOSE_ROWS,
-  FORTUNE_PANDA_WIN_ROWS,
-} from './spin-data/fortune-panda.tables'
-import {
-  FORTUNE_RABBIT_ICONS,
-  FORTUNE_RABBIT_LOSE_ROWS,
-  FORTUNE_RABBIT_WIN_ROWS,
-} from './spin-data/fortune-rabbit.tables'
-import {
-  FORTUNE_TIGER_ICONS,
-  FORTUNE_TIGER_LOSE_ROWS,
-  FORTUNE_TIGER_WIN_ROWS,
-} from './spin-data/fortune-tiger.tables'
-import {
-  HOOD_VS_WOOLF_ICONS,
-  HOOD_VS_WOOLF_LOSE_ROWS,
-  HOOD_VS_WOOLF_WIN_ROWS,
-} from './spin-data/hood-vs-woolf.tables'
-import {
-  JACK_FROST_ICONS,
-  JACK_FROST_LOSE_ROWS,
-  JACK_FROST_WIN_ROWS,
-} from './spin-data/jack-frost.tables'
-import {
-  PHOENIX_RISES_ICONS,
-  PHOENIX_RISES_LOSE_ROWS,
-  PHOENIX_RISES_WIN_ROWS,
-} from './spin-data/phoenix-rises.tables'
-import {
-  SONGKRAN_PARTY_ICONS,
-  SONGKRAN_PARTY_LOSE_ROWS,
-  SONGKRAN_PARTY_WIN_ROWS,
-} from './spin-data/songkran-party.tables'
+import { BIKINI_PARADISE_TABLES } from './spin-data/bikini-paradise.tables'
+import { FORTUNE_MOUSE_TABLES } from './spin-data/fortune-mouse.tables'
+import { FORTUNE_OX_TABLES } from './spin-data/fortune-ox.tables'
+import { FORTUNE_PANDA_TABLES } from './spin-data/fortune-panda.tables'
+import { FORTUNE_RABBIT_TABLES } from './spin-data/fortune-rabbit.tables'
+import { FORTUNE_TIGER_TABLES } from './spin-data/fortune-tiger.tables'
+import { HOOD_VS_WOOLF_TABLES } from './spin-data/hood-vs-woolf.tables'
+import { JACK_FROST_TABLES } from './spin-data/jack-frost.tables'
+import { PHOENIX_RISES_TABLES } from './spin-data/phoenix-rises.tables'
+import { QUEEN_OF_BOUNTY_TABLES } from './spin-data/queen-of-bounty.tables'
+import { SONGKRAN_PARTY_TABLES } from './spin-data/songkran-party.tables'
 import { TigerIconDocSchema, TigerSpinRowSchema } from './spin-data/tiger-spin-row'
 import {
-  TIGER_ROW_INDEX,
+  houseRowPayout,
   type HouseSlotGameConfig,
+  type HouseSlotPayoutModel,
+  type HouseSlotTables,
   type IHouseSlotGames,
 } from '../../../domain/house-slot-game'
 
@@ -65,102 +28,52 @@ import {
  * (FortuneoxController вызывает FortuneTiger*), родные файлы при этом
  * написаны и не используются. Отклонение зафиксировано в REPORT пилота.
  *
- * Queen of Bounty и Treasures of Aztec в каталоге нет: у них payout собирается
- * по 2-3 выигрышным линиям в row[2] (row[5] = null) и 20 линий вместо 5 —
- * это другой денежный движок, не однострочная доводка таблиц.
+ * Queen of Bounty и Treasures of Aztec — вторая модель выплаты (`lines`):
+ * у них row[5] = null во всех 620 win-строках, то есть в рантайме самого
+ * донора эти игры платят 0. Расчёт взят из статического API фронта
+ * (public/originals/queenofbounty/api/endpoints/spin.php): сумма payout по
+ * выигрышным линиям плюс линии каскадов со своими множителями. 20 линий.
+ * Их таблицы исходов в доноре байт-в-байт совпадают — разные игры, одна
+ * математика; это проверено md5, а не на глаз.
  */
-export const HOUSE_SLOT_CATALOG: readonly HouseSlotGameConfig[] = [
-  {
-    externalGameId: 'fortunetiger',
-    displayName: 'Fortune Tiger',
-    paylines: 5,
-    defaultRtp: '96',
-    winRows: FORTUNE_TIGER_WIN_ROWS,
-    loseRows: FORTUNE_TIGER_LOSE_ROWS,
-    icons: FORTUNE_TIGER_ICONS,
-  },
-  {
-    externalGameId: 'fortuneox',
-    displayName: 'Fortune Ox',
-    paylines: 5,
-    defaultRtp: '70',
-    winRows: FORTUNE_OX_WIN_ROWS,
-    loseRows: FORTUNE_OX_LOSE_ROWS,
-    icons: FORTUNE_OX_ICONS,
-  },
-  {
-    externalGameId: 'fortunemouse',
-    displayName: 'Fortune Mouse',
-    paylines: 5,
-    defaultRtp: '96',
-    winRows: FORTUNE_MOUSE_WIN_ROWS,
-    loseRows: FORTUNE_MOUSE_LOSE_ROWS,
-    icons: FORTUNE_MOUSE_ICONS,
-  },
-  {
-    externalGameId: 'fortunepanda',
-    displayName: 'Fortune Panda',
-    paylines: 5,
-    defaultRtp: '70',
-    winRows: FORTUNE_PANDA_WIN_ROWS,
-    loseRows: FORTUNE_PANDA_LOSE_ROWS,
-    icons: FORTUNE_PANDA_ICONS,
-  },
-  {
-    externalGameId: 'fortunerabbit',
-    displayName: 'Fortune Rabbit',
-    paylines: 5,
-    defaultRtp: '96',
-    winRows: FORTUNE_RABBIT_WIN_ROWS,
-    loseRows: FORTUNE_RABBIT_LOSE_ROWS,
-    icons: FORTUNE_RABBIT_ICONS,
-  },
-  {
-    externalGameId: 'hoodvswoolf',
-    displayName: 'Hood vs Woolf',
-    paylines: 5,
-    defaultRtp: '96',
-    winRows: HOOD_VS_WOOLF_WIN_ROWS,
-    loseRows: HOOD_VS_WOOLF_LOSE_ROWS,
-    icons: HOOD_VS_WOOLF_ICONS,
-  },
-  {
-    externalGameId: 'jackfrost',
-    displayName: 'Jack Frost',
-    paylines: 5,
-    defaultRtp: '96',
-    winRows: JACK_FROST_WIN_ROWS,
-    loseRows: JACK_FROST_LOSE_ROWS,
-    icons: JACK_FROST_ICONS,
-  },
-  {
-    externalGameId: 'phoenixrises',
-    displayName: 'Phoenix Rises',
-    paylines: 5,
-    defaultRtp: '96',
-    winRows: PHOENIX_RISES_WIN_ROWS,
-    loseRows: PHOENIX_RISES_LOSE_ROWS,
-    icons: PHOENIX_RISES_ICONS,
-  },
-  {
-    externalGameId: 'songkranparty',
-    displayName: 'Songkran Party',
-    paylines: 5,
-    defaultRtp: '96',
-    winRows: SONGKRAN_PARTY_WIN_ROWS,
-    loseRows: SONGKRAN_PARTY_LOSE_ROWS,
-    icons: SONGKRAN_PARTY_ICONS,
-  },
-  {
-    externalGameId: 'bikiniparadise',
-    displayName: 'Bikini Paradise',
-    paylines: 5,
-    defaultRtp: '96',
-    winRows: BIKINI_PARADISE_WIN_ROWS,
-    loseRows: BIKINI_PARADISE_LOSE_ROWS,
-    icons: BIKINI_PARADISE_ICONS,
-  },
+type CatalogSource = readonly [
+  externalGameId: string,
+  displayName: string,
+  paylines: number,
+  payoutModel: HouseSlotPayoutModel,
+  defaultRtp: string,
+  tables: HouseSlotTables,
 ]
+
+const CATALOG_SOURCES: readonly CatalogSource[] = [
+  ['fortunetiger', 'Fortune Tiger', 5, 'single', '96', FORTUNE_TIGER_TABLES],
+  ['fortuneox', 'Fortune Ox', 5, 'single', '70', FORTUNE_OX_TABLES],
+  ['fortunemouse', 'Fortune Mouse', 5, 'single', '96', FORTUNE_MOUSE_TABLES],
+  ['fortunepanda', 'Fortune Panda', 5, 'single', '70', FORTUNE_PANDA_TABLES],
+  ['fortunerabbit', 'Fortune Rabbit', 5, 'single', '96', FORTUNE_RABBIT_TABLES],
+  ['hoodvswoolf', 'Hood vs Woolf', 5, 'single', '96', HOOD_VS_WOOLF_TABLES],
+  ['jackfrost', 'Jack Frost', 5, 'single', '96', JACK_FROST_TABLES],
+  ['phoenixrises', 'Phoenix Rises', 5, 'single', '96', PHOENIX_RISES_TABLES],
+  ['songkranparty', 'Songkran Party', 5, 'single', '96', SONGKRAN_PARTY_TABLES],
+  ['bikiniparadise', 'Bikini Paradise', 5, 'single', '96', BIKINI_PARADISE_TABLES],
+  ['queenofbounty', 'Queen of Bounty', 20, 'lines', '96', QUEEN_OF_BOUNTY_TABLES],
+  // Treasures of Aztec НЕ в каталоге: её таблицы исходов донор скопировал с
+  // Queen of Bounty — 15 ячеек в строке при клиенте 6x5 = 30 (проверено: и в
+  // win, и в lose длина строки 15, максимальный индекс подсвеченной ячейки 15).
+  // На доске из 30 клеток такая строка рисуется дырявой, что и видно в кадре
+  // после спина. Починка — не конфигурацией, а новыми таблицами на 30 ячеек.
+]
+
+export const HOUSE_SLOT_CATALOG: readonly HouseSlotGameConfig[] = CATALOG_SOURCES.map(
+  ([externalGameId, displayName, paylines, payoutModel, defaultRtp, tables]) => ({
+    externalGameId,
+    displayName,
+    paylines,
+    payoutModel,
+    defaultRtp,
+    ...tables,
+  }),
+)
 
 @Injectable()
 export class HouseSlotGamesRegistry implements IHouseSlotGames {
@@ -185,17 +98,36 @@ export class HouseSlotGamesRegistry implements IHouseSlotGames {
     if (!Number.isInteger(config.paylines) || config.paylines <= 0) {
       throw new Error(`house slot game ${config.externalGameId} has invalid paylines`)
     }
+    if (config.session.iconData.length === 0 || config.session.betSizeList.length === 0) {
+      throw new Error(`house slot game ${config.externalGameId} has empty session defaults`)
+    }
+    // Фронт берёт число линий из нашего же session(); ставка и знаменатель RTP
+    // считаются от paylines — разошедутся, и каждый спин получит отказ.
+    if (config.paylines !== config.session.numLine) {
+      throw new Error(`house slot game ${config.externalGameId} paylines != session num_line`)
+    }
     for (const row of [...config.winRows, ...config.loseRows]) {
       TigerSpinRowSchema.parse(row)
     }
-    // Лотерея решает RTP по payout win-строк: строка без payout (у донора
-    // так у multi-line игр) сделала бы недостижимый RTP молчаливым.
+    this.assertRowPayouts(config)
+    TigerIconDocSchema.parse(config.icons)
+  }
+
+  /**
+   * Лотерея решает RTP по payout win-строк, а проигрышные строки не должны
+   * платить: строка без выплаты (у донора так в поле [5] у multi-line игр)
+   * сделала бы недостижимый RTP молчаливым.
+   */
+  private assertRowPayouts(config: HouseSlotGameConfig): void {
     for (const row of config.winRows) {
-      const payout = row[TIGER_ROW_INDEX.payout]
-      if (!(payout > 0)) {
+      if (!(houseRowPayout(row, config.payoutModel) > 0)) {
         throw new Error(`house slot game ${config.externalGameId} has a win row without payout`)
       }
     }
-    TigerIconDocSchema.parse(config.icons)
+    for (const row of config.loseRows) {
+      if (houseRowPayout(row, config.payoutModel) > 0) {
+        throw new Error(`house slot game ${config.externalGameId} has a paid lose row`)
+      }
+    }
   }
 }

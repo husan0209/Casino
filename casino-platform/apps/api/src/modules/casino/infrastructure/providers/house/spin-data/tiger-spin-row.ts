@@ -8,7 +8,7 @@ export type {
 } from '../../../../domain/house-slot-game'
 export { TIGER_ROW_INDEX } from '../../../../domain/house-slot-game'
 
-/** Одна выигрышная линия исхода Fortune Tiger (позиция [2] строки). */
+/** Одна выигрышная линия house-слота (позиция [2] строки). */
 export const TigerActiveLineSchema = z.object({
   index: z.number(),
   name: z.string(),
@@ -16,13 +16,15 @@ export const TigerActiveLineSchema = z.object({
   way_243: z.number(),
   payout: z.number(),
   multiply: z.number(),
-  win_amount: z.number(),
+  // Заполняет сервер; в multi-line таблицах донора поля нет вовсе.
+  win_amount: z.number().optional(),
   active_icon: z.array(z.number()),
 })
 
 /**
  * Строка исхода спина — позиционный кортеж донора:
- * [символы 3x3, подсвеченные ячейки, выигрышные линии, drop-данные, множитель, payout].
+ * [символы, подсвеченные ячейки, выигрышные линии, drop-данные, множитель, payout].
+ * payout = null у multi-line игр (3x5), где выплата собирается по линиям.
  */
 export const TigerSpinRowSchema = z.tuple([
   z.array(z.string()),
@@ -30,7 +32,7 @@ export const TigerSpinRowSchema = z.tuple([
   z.array(TigerActiveLineSchema),
   z.array(z.unknown()),
   z.number(),
-  z.number(),
+  z.number().nullable(),
 ])
 
 /** Запись таблицы иконок (paytable). */

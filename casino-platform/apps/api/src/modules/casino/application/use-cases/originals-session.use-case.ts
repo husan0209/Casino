@@ -6,6 +6,7 @@ import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 import { type Currency } from '@casino/shared-types'
 
 import { OriginalsSessionLoader } from './originals-session-loader'
+import { type HouseSlotGameConfig } from '../../domain/house-slot-game'
 
 /**
  * Session house-слота для фронта Construct 3.
@@ -52,33 +53,6 @@ export interface TigerSessionData {
 /** Стартовый лицевой баланс демо-режима пилота (донор хранит balance_demo в БД). */
 export const TIGER_DEMO_START_CREDIT = '1000.00'
 
-const TIGER_DEFAULT_BET_SIZES = ['0.2', '2', '20', '100']
-
-const TIGER_IDLE_ICONS = [
-  'Symbol_2',
-  'Symbol_1',
-  'Symbol_3',
-  'Symbol_4',
-  'Symbol_6',
-  'Symbol_5',
-  'Symbol_4',
-  'Symbol_4',
-  'Symbol_4',
-]
-
-const TIGER_IDLE_LINES = [
-  {
-    name: 'Symbol_4',
-    index: 3,
-    payout: 10,
-    combine: 3,
-    way_243: 1,
-    multiply: 0,
-    win_amount: 2,
-    active_icon: [7, 8, 9],
-  },
-]
-
 @Injectable()
 export class OriginalsSessionUseCase {
   constructor(
@@ -88,52 +62,58 @@ export class OriginalsSessionUseCase {
 
   async execute(sessionToken: string): Promise<TigerSessionData> {
     if (this.sessionLoader.isDemoToken(sessionToken)) {
-      return this.buildSessionData({
+      const game = this.sessionLoader.loadDemoSlotGame(sessionToken)
+      return this.buildSessionData(game, {
         displayName: 'Guest',
         credit: TIGER_DEMO_START_CREDIT,
         currencyLabel: 'RUB',
       })
     }
-    const { session } = await this.sessionLoader.loadActiveSlotSession(sessionToken)
+    const { session, game } = await this.sessionLoader.loadActiveSlotSession(sessionToken)
     const balance = await this.wallet.getBalance(session.userId, session.currency as Currency)
-    return this.buildSessionData({
+    return this.buildSessionData(game, {
       displayName: this.sessionLoader.buildDisplayName(session.userId),
       credit: balance.available,
       currencyLabel: session.currency,
     })
   }
 
-  private buildSessionData(args: {
-    displayName: string
-    credit: string
-    currencyLabel: string
-  }): TigerSessionData {
+  /**
+   * Idle-блок берётся из таблиц конкретной игры: у «пятилинейной» ветки донора
+   * он один на всех (9 ячеек, 27 ways), у 3x5 игр — свой (15 ячеек, 243 ways,
+   * несколько подсвеченных линий).
+   */
+  private buildSessionData(
+    game: HouseSlotGameConfig,
+    args: { displayName: string; credit: string; currencyLabel: string },
+  ): TigerSessionData {
+    const defaults = game.session
     return {
       user_name: args.displayName,
       credit: new Decimal(args.credit).toDecimalPlaces(2).toNumber(),
-      num_line: 5,
-      line_num: 5,
-      bet_amount: 0.2,
+      num_line: defaults.numLine,
+      line_num: defaults.numLine,
+      bet_amount: Number(defaults.betSizeList[0]),
       free_num: 0,
       free_total: -1,
-      free_amount: 4,
+      free_amount: defaults.freeAmount,
       free_multi: 0,
       freespin_mode: 0,
       multiple_list: [],
-      credit_line: 1,
-      buy_feature: 50,
-      buy_max: 1300,
+      credit_line: defaults.creditLine,
+      buy_feature: defaults.buyFeature,
+      buy_max: defaults.buyMax,
       feature: [],
-      total_way: 27,
+      total_way: defaults.totalWay,
       multiply: 0,
-      icon_data: [...TIGER_IDLE_ICONS],
-      active_lines: [...TIGER_IDLE_LINES],
-      drop_line: [],
+      icon_data: [...defaults.iconData],
+      active_lines: defaults.activeLines.map((line) => ({ ...line })),
+      drop_line: [...defaults.dropLine],
       currency_prefix: args.currencyLabel,
       currency_suffix: '',
       currency_thousand: '.',
       currency_decimal: ',',
-      bet_size_list: [...TIGER_DEFAULT_BET_SIZES],
+      bet_size_list: [...defaults.betSizeList],
       previous_session: false,
       game_state: '',
       feature_result: [],

@@ -8,18 +8,10 @@ import {
   drawHouseSlotOutcome,
 } from './house-slot-lottery'
 import { OriginalsRtpUnreachableError } from '../../domain/errors'
-import {
-  FORTUNE_OX_LOSE_ROWS,
-  FORTUNE_OX_WIN_ROWS,
-} from '../../infrastructure/providers/house/spin-data/fortune-ox.tables'
-import {
-  FORTUNE_TIGER_LOSE_ROWS,
-  FORTUNE_TIGER_WIN_ROWS,
-} from '../../infrastructure/providers/house/spin-data/fortune-tiger.tables'
-import {
-  TIGER_ROW_INDEX,
-  type TigerSpinRow,
-} from '../../infrastructure/providers/house/spin-data/tiger-spin-row'
+import { houseRowPayout } from '../../domain/house-slot-game'
+import { FORTUNE_OX_TABLES } from '../../infrastructure/providers/house/spin-data/fortune-ox.tables'
+import { FORTUNE_TIGER_TABLES } from '../../infrastructure/providers/house/spin-data/fortune-tiger.tables'
+import { type TigerSpinRow } from '../../infrastructure/providers/house/spin-data/tiger-spin-row'
 
 const PAYLINES = 5
 
@@ -35,7 +27,7 @@ function seededRandom(seed: number): () => number {
 }
 
 function payoutsOf(rows: readonly TigerSpinRow[]): number[] {
-  return rows.map((row) => row[TIGER_ROW_INDEX.payout])
+  return rows.map((row) => houseRowPayout(row, 'single'))
 }
 
 /** Эмпирический RTP прогона: сумма выплат относительно ставки за спин. */
@@ -62,7 +54,7 @@ function simulateRtp(args: {
       loseRows: args.loseRows,
       random,
     })
-    const payout = outcome[TIGER_ROW_INDEX.payout]
+    const payout = houseRowPayout(outcome, 'single')
     if (payout > 0) {
       wins += 1
       totalPaid = totalPaid.plus(payout)
@@ -77,7 +69,7 @@ function simulateRtp(args: {
 
 describe('buildHouseSlotLottery', () => {
   it('аналитическое матожидание весов даёт ровно целевой RTP', () => {
-    const winPayouts = payoutsOf(FORTUNE_TIGER_WIN_ROWS)
+    const winPayouts = payoutsOf(FORTUNE_TIGER_TABLES.winRows)
     const lottery = buildHouseSlotLottery({
       gameCode: 'fortunetiger',
       winPayouts,
@@ -95,7 +87,7 @@ describe('buildHouseSlotLottery', () => {
   it('сумма вероятностей win-строк равна доле выигрышных спинов', () => {
     const lottery = buildHouseSlotLottery({
       gameCode: 'fortunetiger',
-      winPayouts: payoutsOf(FORTUNE_TIGER_WIN_ROWS),
+      winPayouts: payoutsOf(FORTUNE_TIGER_TABLES.winRows),
       targetRtp: '96',
       paylines: PAYLINES,
     })
@@ -104,7 +96,7 @@ describe('buildHouseSlotLottery', () => {
   })
 
   it('крупные выплаты весят меньше мелких', () => {
-    const winRows = FORTUNE_TIGER_WIN_ROWS
+    const winRows = FORTUNE_TIGER_TABLES.winRows
     const lottery = buildHouseSlotLottery({
       gameCode: 'fortunetiger',
       winPayouts: payoutsOf(winRows),
@@ -112,7 +104,7 @@ describe('buildHouseSlotLottery', () => {
       paylines: PAYLINES,
     })
     const byPayout = winRows.map((row, index) => ({
-      payout: row[TIGER_ROW_INDEX.payout],
+      payout: houseRowPayout(row, 'single'),
       probability: lottery.winProbabilities[index] as number,
     }))
     const small = byPayout.find((entry) => entry.payout === 3)
@@ -123,7 +115,7 @@ describe('buildHouseSlotLottery', () => {
   it('RTP 0 — лотерея без выигрышей', () => {
     const lottery = buildHouseSlotLottery({
       gameCode: 'fortunetiger',
-      winPayouts: payoutsOf(FORTUNE_TIGER_WIN_ROWS),
+      winPayouts: payoutsOf(FORTUNE_TIGER_TABLES.winRows),
       targetRtp: '0',
       paylines: PAYLINES,
     })
@@ -134,7 +126,7 @@ describe('buildHouseSlotLottery', () => {
     expect(() =>
       buildHouseSlotLottery({
         gameCode: 'fortuneox',
-        winPayouts: payoutsOf(FORTUNE_OX_WIN_ROWS),
+        winPayouts: payoutsOf(FORTUNE_OX_TABLES.winRows),
         targetRtp: '96',
         paylines: PAYLINES,
       }),
@@ -145,7 +137,7 @@ describe('buildHouseSlotLottery', () => {
     expect(() =>
       buildHouseSlotLottery({
         gameCode: 'queenofbounty',
-        winPayouts: payoutsOf(FORTUNE_TIGER_WIN_ROWS).concat(0),
+        winPayouts: payoutsOf(FORTUNE_TIGER_TABLES.winRows).concat(0),
         targetRtp: '96',
         paylines: PAYLINES,
       }),
@@ -209,23 +201,23 @@ describe('drawHouseSlotOutcome', () => {
   it('проигрышный билет отдаёт lose-строку с payout 0', () => {
     const lottery = buildHouseSlotLottery({
       gameCode: 'fortunetiger',
-      winPayouts: payoutsOf(FORTUNE_TIGER_WIN_ROWS),
+      winPayouts: payoutsOf(FORTUNE_TIGER_TABLES.winRows),
       targetRtp: '96',
       paylines: PAYLINES,
     })
     const outcome = drawHouseSlotOutcome({
       lottery,
-      winRows: FORTUNE_TIGER_WIN_ROWS,
-      loseRows: FORTUNE_TIGER_LOSE_ROWS,
+      winRows: FORTUNE_TIGER_TABLES.winRows,
+      loseRows: FORTUNE_TIGER_TABLES.loseRows,
       random: () => 0.99,
     })
-    expect(outcome[TIGER_ROW_INDEX.payout]).toBe(0)
+    expect(houseRowPayout(outcome, 'single')).toBe(0)
   })
 
   it('розыгрыш покрывает все win-строки', () => {
     const lottery = buildHouseSlotLottery({
       gameCode: 'fortunetiger',
-      winPayouts: payoutsOf(FORTUNE_TIGER_WIN_ROWS),
+      winPayouts: payoutsOf(FORTUNE_TIGER_TABLES.winRows),
       targetRtp: '96',
       paylines: PAYLINES,
     })
@@ -233,13 +225,13 @@ describe('drawHouseSlotOutcome', () => {
     for (let step = 0; step < 400; step++) {
       const outcome = drawHouseSlotOutcome({
         lottery,
-        winRows: FORTUNE_TIGER_WIN_ROWS,
-        loseRows: FORTUNE_TIGER_LOSE_ROWS,
+        winRows: FORTUNE_TIGER_TABLES.winRows,
+        loseRows: FORTUNE_TIGER_TABLES.loseRows,
         random: cryptoRandom,
       })
       seen.add(JSON.stringify(outcome))
     }
-    expect(seen.size).toBeGreaterThan(FORTUNE_TIGER_WIN_ROWS.length)
+    expect(seen.size).toBeGreaterThan(FORTUNE_TIGER_TABLES.winRows.length)
   })
 })
 
@@ -250,8 +242,8 @@ describe('drawHouseSlotOutcome', () => {
 describe('house slot RTP calibration (симуляция)', () => {
   it('Fortune Tiger: 200k спинов на 96% дают 96% ± 1 п.п.', () => {
     const { rtpPercent, hitRate } = simulateRtp({
-      winRows: FORTUNE_TIGER_WIN_ROWS,
-      loseRows: FORTUNE_TIGER_LOSE_ROWS,
+      winRows: FORTUNE_TIGER_TABLES.winRows,
+      loseRows: FORTUNE_TIGER_TABLES.loseRows,
       targetRtp: '96',
       spins: 200_000,
     })
@@ -261,8 +253,8 @@ describe('house slot RTP calibration (симуляция)', () => {
 
   it('Fortune Tiger: 85% тоже достижимы', () => {
     const { rtpPercent } = simulateRtp({
-      winRows: FORTUNE_TIGER_WIN_ROWS,
-      loseRows: FORTUNE_TIGER_LOSE_ROWS,
+      winRows: FORTUNE_TIGER_TABLES.winRows,
+      loseRows: FORTUNE_TIGER_TABLES.loseRows,
       targetRtp: '85',
       spins: 100_000,
       seed: 7,
@@ -272,8 +264,8 @@ describe('house slot RTP calibration (симуляция)', () => {
 
   it('Fortune Ox: витринные 70% сходятся, частота выигрышей в разумных границах', () => {
     const { rtpPercent, hitRate } = simulateRtp({
-      winRows: FORTUNE_OX_WIN_ROWS,
-      loseRows: FORTUNE_OX_LOSE_ROWS,
+      winRows: FORTUNE_OX_TABLES.winRows,
+      loseRows: FORTUNE_OX_TABLES.loseRows,
       targetRtp: '70',
       spins: 200_000,
     })

@@ -18,10 +18,7 @@ import {
   type GameRow,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
-import {
-  FORTUNE_TIGER_LOSE_ROWS,
-  FORTUNE_TIGER_WIN_ROWS,
-} from '../../infrastructure/providers/house/spin-data/fortune-tiger.tables'
+import { FORTUNE_TIGER_TABLES } from '../../infrastructure/providers/house/spin-data/fortune-tiger.tables'
 import { type TigerSpinRow } from '../../infrastructure/providers/house/spin-data/tiger-spin-row'
 
 import type { HouseSlotGameConfig, IHouseSlotGames } from '../../domain/house-slot-game'
@@ -99,9 +96,11 @@ function makeSlotGames(): IHouseSlotGames {
     externalGameId: 'fortunetiger',
     displayName: 'Fortune Tiger',
     paylines: 5,
+    payoutModel: 'single',
     defaultRtp: '96',
-    winRows: FORTUNE_TIGER_WIN_ROWS as HouseSlotGameConfig['winRows'],
-    loseRows: FORTUNE_TIGER_LOSE_ROWS as HouseSlotGameConfig['loseRows'],
+    session: FORTUNE_TIGER_TABLES.session,
+    winRows: FORTUNE_TIGER_TABLES.winRows as HouseSlotGameConfig['winRows'],
+    loseRows: FORTUNE_TIGER_TABLES.loseRows as HouseSlotGameConfig['loseRows'],
     icons: {
       success: true as const,
       data: [],
@@ -234,7 +233,10 @@ describe('resolveTargetRtpPercent', () => {
 
 describe('донорская форма таблицы', () => {
   it('каждая строка хранит 6 колонок донора', () => {
-    const allRows: TigerSpinRow[] = [...FORTUNE_TIGER_WIN_ROWS, ...FORTUNE_TIGER_LOSE_ROWS]
+    const allRows: TigerSpinRow[] = [
+      ...FORTUNE_TIGER_TABLES.winRows,
+      ...FORTUNE_TIGER_TABLES.loseRows,
+    ]
     expect(allRows.length).toBe(32)
     for (const row of allRows) {
       expect(row[0].length).toBe(9)
@@ -257,7 +259,7 @@ describe('OriginalsSpinSchema', () => {
     expect(() => OriginalsSpinSchema.parse({ betamount: '0', numline: '5', cpl: '1' })).toThrow()
     expect(() => OriginalsSpinSchema.parse({ betamount: '-2', numline: '5', cpl: '1' })).toThrow()
     expect(() => OriginalsSpinSchema.parse({ betamount: '5000', numline: '5', cpl: '1' })).toThrow()
-    expect(() => OriginalsSpinSchema.parse({ betamount: '0.2', numline: '9', cpl: '1' })).toThrow()
+    expect(() => OriginalsSpinSchema.parse({ betamount: '0.2', numline: '21', cpl: '1' })).toThrow()
     expect(() => OriginalsSpinSchema.parse({ betamount: '0.2', numline: '5', cpl: '0' })).toThrow()
   })
 })

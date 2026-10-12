@@ -18,7 +18,11 @@ import {
 import { DEMO_TOKEN_PREFIX, OriginalsSessionLoader } from './originals-session-loader'
 import { TIGER_DEMO_START_CREDIT } from './originals-session.use-case'
 import { InvalidBetRequestError } from '../../domain/errors'
-import { type HouseSlotGameConfig } from '../../domain/house-slot-game'
+import {
+  houseRowBaseLinesPayout,
+  houseRowPayout,
+  type HouseSlotGameConfig,
+} from '../../domain/house-slot-game'
 import {
   GAME_PLAY_REPOSITORY,
   type GameRow,
@@ -34,6 +38,8 @@ import {
 /**
  * Вход спина от фронта Construct 3 (x-www-form-urlencoded):
  * betamount/numline/cpl. Деньги — строками, целые — строками целых.
+ * Потолок numline = 20: больше линий нет ни в одной ветке донора, а
+ * совпадает ли numline с линиями ИГРЫ — проверяет assertPaylines.
  */
 export const OriginalsSpinSchema = z.object({
   betamount: z
@@ -41,7 +47,7 @@ export const OriginalsSpinSchema = z.object({
     .regex(/^\d+(\.\d{1,8})?$/, 'betamount must be a decimal string')
     .refine((value) => money.isGreaterThan(value, '0'), 'betamount must be positive')
     .refine((value) => !money.isGreaterThan(value, '1000'), 'betamount is too large'),
-  numline: z.coerce.number().int().min(1).max(5).transform(String),
+  numline: z.coerce.number().int().min(1).max(20).transform(String),
   cpl: z.coerce.number().int().min(1).max(10).transform(String),
 })
 export type OriginalsSpinInput = z.infer<typeof OriginalsSpinSchema>
@@ -69,6 +75,8 @@ export interface TigerSpinPull {
   MultipleList: unknown[]
   WinAmount: number
   WinOnDrop: number
+  HasNewSpawn: boolean
+  HasPlaceHolder: boolean
   SlotIcons: string[]
   ActiveIcons: number[]
   ActiveLines: unknown[]
@@ -120,7 +128,7 @@ function toFrontMoney(amount: string): number {
  * 96% означало бы ошибку на каждом спине.
  */
 function demoRtpFor(game: HouseSlotGameConfig): string {
-  const winPayouts = game.winRows.map((row) => row[TIGER_ROW_INDEX.payout])
+  const winPayouts = game.winRows.map((row) => houseRowPayout(row, game.payoutModel))
   const ceiling = Math.floor(houseSlotRtpCeiling(winPayouts, game.paylines))
   return String(Math.min(Number(HOUSE_SLOT_DEMO_RTP_PERCENT), ceiling))
 }
@@ -159,7 +167,7 @@ export class OriginalsSpinUseCase {
   private drawOutcome(game: HouseSlotGameConfig, targetRtpPercent: string): TigerSpinRow {
     const lottery = buildHouseSlotLottery({
       gameCode: game.externalGameId,
-      winPayouts: game.winRows.map((row) => row[TIGER_ROW_INDEX.payout]),
+      winPayouts: game.winRows.map((row) => houseRowPayout(row, game.payoutModel)),
       targetRtp: targetRtpPercent,
       paylines: game.paylines,
     })
@@ -171,6 +179,16 @@ export class OriginalsSpinUseCase {
     })
   }
 
+  /** Выигрыш спина: payout строки (по модели игры) на cpl * betamount. */
+  private winTotalFor(
+    game: HouseSlotGameConfig,
+    parsed: OriginalsSpinInput,
+    outcome: TigerSpinRow,
+  ): string {
+    const payout = houseRowPayout(outcome, game.payoutModel)
+    return money.multiply(money.multiply(parsed.betamount, parsed.cpl), String(payout))
+  }
+
   private executeDemoSpin(
     sessionToken: string,
     parsed: OriginalsSpinInput,
@@ -179,13 +197,11 @@ export class OriginalsSpinUseCase {
     const game = this.sessionLoader.loadDemoSlotGame(sessionToken)
     this.assertPaylines(parsed.numline, game)
     const outcome = this.drawOutcome(game, demoRtpFor(game))
-    const winTotal = money.multiply(
-      money.multiply(parsed.betamount, parsed.cpl),
-      String(outcome[TIGER_ROW_INDEX.payout]),
-    )
+    const winTotal = this.winTotalFor(game, parsed, outcome)
     const displayCredit = money.add(money.subtract(TIGER_DEMO_START_CREDIT, betTotal), winTotal)
     return this.buildSpinData({
       credit: displayCredit,
+      game,
       parsed,
       betTotal,
       winTotal,
@@ -242,10 +258,7 @@ export class OriginalsSpinUseCase {
       return this.buildDuplicateSpinData(session, game, parsed, betTotal)
     }
     const outcome = this.drawOutcome(game, resolveTargetRtpPercent(session.game.rtp))
-    const winTotal = money.multiply(
-      money.multiply(parsed.betamount, parsed.cpl),
-      String(outcome[TIGER_ROW_INDEX.payout]),
-    )
+    const winTotal = this.winTotalFor(game, parsed, outcome)
     const round = await this.openRound({ session, providerId, roundExternalId, transaction })
     const settled = await this.settleBet({
       session,
@@ -275,6 +288,7 @@ export class OriginalsSpinUseCase {
         })
     return this.buildSpinData({
       credit: balanceAfter,
+      game,
       parsed,
       betTotal,
       winTotal,
@@ -423,6 +437,7 @@ export class OriginalsSpinUseCase {
     const balance = await this.wallet.getBalance(session.userId, session.currency as Currency)
     return this.buildSpinData({
       credit: balance.balance,
+      game,
       parsed,
       betTotal,
       winTotal: '0',
@@ -430,18 +445,32 @@ export class OriginalsSpinUseCase {
     })
   }
 
+  /**
+   * Форма ответа донора зависит от модели выплаты:
+   * - `single` (одна линия, payout в row[5]): вся сумма ложится на единственную
+   *   линию, TotalWay 27 и DropLine 3 — стабы донора, на них фронт работает;
+   * - `lines` (3x5 игры): деньги пишутся на КАЖДУЮ линию (payout × cpl ×
+   *   betamount), WinOnDrop считает только базовые линии без каскадов,
+   *   TotalWay 243 при выигрыше, DropLine — число каскадов в строке.
+   *   Зеркалит public/originals/queenofbounty/api/endpoints/spin.php.
+   */
   private buildSpinData(args: {
     credit: string
+    game: HouseSlotGameConfig
     parsed: OriginalsSpinInput
     betTotal: string
     winTotal: string
     outcome: TigerSpinRow
   }): TigerSpinData {
-    const { credit, parsed, betTotal, winTotal, outcome } = args
+    const { credit, game, parsed, betTotal, winTotal, outcome } = args
     const validated: TigerSpinRow = TigerSpinRowSchema.parse(outcome)
-    const activeLines = validated[TIGER_ROW_INDEX.activeLines].map((line) => ({
+    const multiLine = game.payoutModel === 'lines'
+    const stake = money.multiply(parsed.betamount, parsed.cpl)
+    const lines = validated[TIGER_ROW_INDEX.activeLines]
+    const dropLines = validated[TIGER_ROW_INDEX.dropLineData]
+    const activeLines = lines.map((line) => ({
       ...line,
-      win_amount: toFrontMoney(winTotal),
+      win_amount: toFrontMoney(multiLine ? money.multiply(stake, String(line.payout)) : winTotal),
     }))
     return {
       credit: toFrontMoney(credit),
@@ -455,7 +484,7 @@ export class OriginalsSpinUseCase {
       betamount: Number(parsed.betamount),
       bet_amount: toFrontMoney(betTotal),
       pull: {
-        TotalWay: 27,
+        TotalWay: multiLine ? (money.isPositive(winTotal) ? 243 : 0) : 27,
         FreeSpin: 0,
         LastMultiply: 0,
         WildFixedIcons: [],
@@ -464,16 +493,20 @@ export class OriginalsSpinUseCase {
         CountScatter: 0,
         WildColumIcon: '',
         MultipyScatter: 0,
-        MultiplyCount: 2,
+        MultiplyCount: multiLine ? validated[TIGER_ROW_INDEX.multiplyCount] : 2,
         WinLogs: this.buildWinLogs(parsed, betTotal, winTotal, validated),
-        DropLine: 3,
+        DropLine: multiLine ? dropLines.length : 3,
         MultipleList: [],
         WinAmount: toFrontMoney(winTotal),
-        WinOnDrop: toFrontMoney(winTotal),
+        WinOnDrop: toFrontMoney(
+          multiLine ? money.multiply(stake, String(houseRowBaseLinesPayout(validated))) : winTotal,
+        ),
+        HasNewSpawn: multiLine && dropLines.length > 0,
+        HasPlaceHolder: false,
         SlotIcons: validated[TIGER_ROW_INDEX.slotIcons],
         ActiveIcons: validated[TIGER_ROW_INDEX.activeIcons],
         ActiveLines: activeLines,
-        DropLineData: validated[TIGER_ROW_INDEX.dropLineData],
+        DropLineData: dropLines,
       },
     }
   }
