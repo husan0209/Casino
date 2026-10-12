@@ -112,6 +112,26 @@ describe('buildHouseSlotLottery', () => {
     expect(small && jackpot && small.probability > jackpot.probability).toBe(true)
   })
 
+  it('заявленный RTP держится при любом числе линий запроса', () => {
+    // Клиент Construct сам выбирает линии (Tiger — 5, Jack Frost — 20), и
+    // ставка умножается на них же: знаменатель калибровки обязан быть тот же.
+    const winPayouts = payoutsOf(FORTUNE_TIGER_TABLES.winRows)
+    for (const paylines of [1, 5, 10, 20]) {
+      const lottery = buildHouseSlotLottery({
+        gameCode: 'fortunetiger',
+        winPayouts,
+        targetRtp: '96',
+        paylines,
+      })
+      const weighted = lottery.winProbabilities.reduce(
+        (acc, probability, index) => acc + probability * (winPayouts[index] as number),
+        0,
+      )
+      const rtp = new Decimal(weighted).div(paylines).times(100)
+      expect(rtp.minus(96).abs().lt(new Decimal('0.001'))).toBe(true)
+    }
+  })
+
   it('RTP 0 — лотерея без выигрышей', () => {
     const lottery = buildHouseSlotLottery({
       gameCode: 'fortunetiger',

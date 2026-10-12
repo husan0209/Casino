@@ -95,7 +95,6 @@ function makeSlotGames(): IHouseSlotGames {
   const tigerConfig: HouseSlotGameConfig = {
     externalGameId: 'fortunetiger',
     displayName: 'Fortune Tiger',
-    paylines: 5,
     payoutModel: 'single',
     defaultRtp: '96',
     session: FORTUNE_TIGER_TABLES.session,
@@ -299,16 +298,16 @@ describe('OriginalsSpinUseCase demo', () => {
     expect(result.credit).toBeCloseTo(expectedCredit, 8)
   })
 
-  it('демо с чужим числом линий отказывает', async () => {
+  it('демо считается по числу линий из запроса', async () => {
     const { useCase } = makeDemoUseCase()
-    await expect(
-      useCase.execute({
-        sessionToken: 'demo_fortunetiger_pilot',
-        betamount: '2',
-        numline: '3',
-        cpl: '1',
-      }),
-    ).rejects.toThrow()
+    const result = await useCase.execute({
+      sessionToken: 'demo_fortunetiger_pilot',
+      betamount: '2',
+      numline: '20',
+      cpl: '1',
+    })
+    expect(result.bet_amount).toBe(40)
+    expect(result.num_line).toBe(20)
   })
 
   it('демо-токен играет таблицами игры из токена, а не всегда тигром', async () => {
@@ -374,9 +373,21 @@ describe('OriginalsSpinUseCase real', () => {
     }
   })
 
-  it('отказывает другому числу линий: ставка меньше линий иначе завышает RTP', async () => {
+  it('меньшее число линий не завышает отдачу: ставка и знаменатель — от запроса', async () => {
+    const result = await useCase.execute({
+      sessionToken: SESSION_TOKEN,
+      betamount: '2',
+      numline: '1',
+      cpl: '1',
+    })
+    expect(result.bet_amount).toBe(2)
+    expect(result.num_line).toBe(1)
+    expect(wallet.calls.debits).toBe(1)
+  })
+
+  it('число линий выше потолка игры — отказ', async () => {
     await expect(
-      useCase.execute({ sessionToken: SESSION_TOKEN, betamount: '2', numline: '1', cpl: '1' }),
+      useCase.execute({ sessionToken: SESSION_TOKEN, betamount: '2', numline: '21', cpl: '1' }),
     ).rejects.toThrow()
     expect(wallet.calls.debits).toBe(0)
     expect(play.transactions.length).toBe(0)

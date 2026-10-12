@@ -131,16 +131,18 @@ export interface HouseSlotTables {
   session: HouseSlotSessionDefaults
 }
 
+/**
+ * Верхняя граница линий одного спина. Клиент Construct сам решает, сколько
+ * линий играть: Tiger шлёт 5, Jack Frost и Treasures of Aztec — 20. Потолок
+ * ограничивает только размер ставки, потому что RTP калибруется по этому же
+ * числу (см. OriginalsSpinUseCase.drawOutcome).
+ */
+export const HOUSE_SLOT_MAX_PAYLINES = 20
+
 /** Конфиг одной house-игры: таблицы исходов + paytable. */
 export interface HouseSlotGameConfig {
   externalGameId: string
   displayName: string
-  /**
-   * Число линий игры донора: ставка = betamount * cpl * paylines, выплата =
-   * betamount * cpl * payout. RTP = E[payout] / paylines, поэтому клиентское
-   * numline обязано совпадать с этим числом — иначе игрок подбирает отдачу.
-   */
-  paylines: number
   /** Откуда строка исхода несёт выплату (см. HouseSlotPayoutModel). */
   payoutModel: HouseSlotPayoutModel
   /**

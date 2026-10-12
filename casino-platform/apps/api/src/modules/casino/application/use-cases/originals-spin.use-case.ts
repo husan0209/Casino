@@ -21,6 +21,7 @@ import { InvalidBetRequestError } from '../../domain/errors'
 import {
   houseRowBaseLinesPayout,
   houseRowPayout,
+  HOUSE_SLOT_MAX_PAYLINES,
   type HouseSlotGameConfig,
 } from '../../domain/house-slot-game'
 import {
@@ -38,8 +39,9 @@ import {
 /**
  * Вход спина от фронта Construct 3 (x-www-form-urlencoded):
  * betamount/numline/cpl. Деньги — строками, целые — строками целых.
- * Потолок numline = 20: больше линий нет ни в одной ветке донора, а
- * совпадает ли numline с линиями ИГРЫ — проверяет assertPaylines.
+ * Потолок numline = HOUSE_SLOT_MAX_PAYLINES: клиент сам решает линиями (Tiger 5,
+ * потолок 20 — максимум из наблюдаемых клиентов донора (Tiger шлёт 5, Jack Frost и
+ * Aztec — 20); калибровка RTP идёт по этому же числу.
  */
 export const OriginalsSpinSchema = z.object({
   betamount: z
@@ -47,7 +49,7 @@ export const OriginalsSpinSchema = z.object({
     .regex(/^\d+(\.\d{1,8})?$/, 'betamount must be a decimal string')
     .refine((value) => money.isGreaterThan(value, '0'), 'betamount must be positive')
     .refine((value) => !money.isGreaterThan(value, '1000'), 'betamount is too large'),
-  numline: z.coerce.number().int().min(1).max(20).transform(String),
+  numline: z.coerce.number().int().min(1).max(HOUSE_SLOT_MAX_PAYLINES).transform(String),
   cpl: z.coerce.number().int().min(1).max(10).transform(String),
 })
 export type OriginalsSpinInput = z.infer<typeof OriginalsSpinSchema>
@@ -127,9 +129,9 @@ function toFrontMoney(amount: string): number {
  * строки games и цели админской витрины, а просить у узких таблиц (Ox ~90%)
  * 96% означало бы ошибку на каждом спине.
  */
-function demoRtpFor(game: HouseSlotGameConfig): string {
+function demoRtpFor(game: HouseSlotGameConfig, paylines: number): string {
   const winPayouts = game.winRows.map((row) => houseRowPayout(row, game.payoutModel))
-  const ceiling = Math.floor(houseSlotRtpCeiling(winPayouts, game.paylines))
+  const ceiling = Math.floor(houseSlotRtpCeiling(winPayouts, paylines))
   return String(Math.min(Number(HOUSE_SLOT_DEMO_RTP_PERCENT), ceiling))
 }
 
@@ -155,21 +157,21 @@ export class OriginalsSpinUseCase {
   }
 
   /**
-   * Клиент обязан играть ровно линиями игры: ставка = bet*cpl*numline, а
-   * выплата от numline не зависит, поэтому меньше линий = выше отдача.
+   * Лотерея калибруется по ФАКТИЧЕСКОму числу линий этого спина: ставка =
+   * bet*cpl*numline, выплата от numline не зависит, поэтому знаменатель RTP
+   * обязан быть тем же, что и в ставке. Иначе игрок крутит 1 линией и получает
+   * x5 к отдаче (на этом донор и стоял: 527% у Tiger).
    */
-  private assertPaylines(numline: string, game: HouseSlotGameConfig): void {
-    if (Number(numline) !== game.paylines) {
-      throw new InvalidBetRequestError()
-    }
-  }
-
-  private drawOutcome(game: HouseSlotGameConfig, targetRtpPercent: string): TigerSpinRow {
+  private drawOutcome(
+    game: HouseSlotGameConfig,
+    targetRtpPercent: string,
+    paylines: number,
+  ): TigerSpinRow {
     const lottery = buildHouseSlotLottery({
       gameCode: game.externalGameId,
       winPayouts: game.winRows.map((row) => houseRowPayout(row, game.payoutModel)),
       targetRtp: targetRtpPercent,
-      paylines: game.paylines,
+      paylines,
     })
     return drawHouseSlotOutcome({
       lottery,
@@ -195,8 +197,8 @@ export class OriginalsSpinUseCase {
     betTotal: string,
   ): TigerSpinData {
     const game = this.sessionLoader.loadDemoSlotGame(sessionToken)
-    this.assertPaylines(parsed.numline, game)
-    const outcome = this.drawOutcome(game, demoRtpFor(game))
+    const paylines = Number(parsed.numline)
+    const outcome = this.drawOutcome(game, demoRtpFor(game, paylines), paylines)
     const winTotal = this.winTotalFor(game, parsed, outcome)
     const displayCredit = money.add(money.subtract(TIGER_DEMO_START_CREDIT, betTotal), winTotal)
     return this.buildSpinData({
@@ -215,7 +217,6 @@ export class OriginalsSpinUseCase {
     betTotal: string,
   ): Promise<TigerSpinData> {
     const { session, game } = await this.sessionLoader.loadActiveSlotSession(sessionToken)
-    this.assertPaylines(parsed.numline, game)
     const providerId = session.providerId
     const roundExternalId = `${game.externalGameId}_${randomBytes(8).toString('hex')}`
     const betExternalId = `${roundExternalId}_bet`
@@ -257,7 +258,8 @@ export class OriginalsSpinUseCase {
     if (raceDuplicate) {
       return this.buildDuplicateSpinData(session, game, parsed, betTotal)
     }
-    const outcome = this.drawOutcome(game, resolveTargetRtpPercent(session.game.rtp))
+    const paylines = Number(parsed.numline)
+    const outcome = this.drawOutcome(game, resolveTargetRtpPercent(session.game.rtp), paylines)
     const winTotal = this.winTotalFor(game, parsed, outcome)
     const round = await this.openRound({ session, providerId, roundExternalId, transaction })
     const settled = await this.settleBet({

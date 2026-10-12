@@ -27,13 +27,13 @@ function analyticRtpPercent(gameCode: string, targetRtp: string): Decimal {
     gameCode,
     winPayouts,
     targetRtp,
-    paylines: config.paylines,
+    paylines: config.session.numLine,
   })
   const weighted = lottery.winProbabilities.reduce(
     (acc, probability, index) => acc + probability * (winPayouts[index] as number),
     0,
   )
-  return new Decimal(weighted).div(config.paylines).times(100)
+  return new Decimal(weighted).div(config.session.numLine).times(100)
 }
 
 describe('houseRowPayout', () => {

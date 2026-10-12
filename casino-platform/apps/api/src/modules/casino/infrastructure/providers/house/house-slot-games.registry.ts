@@ -13,6 +13,7 @@ import { QUEEN_OF_BOUNTY_TABLES } from './spin-data/queen-of-bounty.tables'
 import { SONGKRAN_PARTY_TABLES } from './spin-data/songkran-party.tables'
 import { TigerIconDocSchema, TigerSpinRowSchema } from './spin-data/tiger-spin-row'
 import {
+  HOUSE_SLOT_MAX_PAYLINES,
   houseRowPayout,
   type HouseSlotGameConfig,
   type HouseSlotPayoutModel,
@@ -39,24 +40,23 @@ import {
 type CatalogSource = readonly [
   externalGameId: string,
   displayName: string,
-  paylines: number,
   payoutModel: HouseSlotPayoutModel,
   defaultRtp: string,
   tables: HouseSlotTables,
 ]
 
 const CATALOG_SOURCES: readonly CatalogSource[] = [
-  ['fortunetiger', 'Fortune Tiger', 5, 'single', '96', FORTUNE_TIGER_TABLES],
-  ['fortuneox', 'Fortune Ox', 5, 'single', '70', FORTUNE_OX_TABLES],
-  ['fortunemouse', 'Fortune Mouse', 5, 'single', '96', FORTUNE_MOUSE_TABLES],
-  ['fortunepanda', 'Fortune Panda', 5, 'single', '70', FORTUNE_PANDA_TABLES],
-  ['fortunerabbit', 'Fortune Rabbit', 5, 'single', '96', FORTUNE_RABBIT_TABLES],
-  ['hoodvswoolf', 'Hood vs Woolf', 5, 'single', '96', HOOD_VS_WOOLF_TABLES],
-  ['jackfrost', 'Jack Frost', 5, 'single', '96', JACK_FROST_TABLES],
-  ['phoenixrises', 'Phoenix Rises', 5, 'single', '96', PHOENIX_RISES_TABLES],
-  ['songkranparty', 'Songkran Party', 5, 'single', '96', SONGKRAN_PARTY_TABLES],
-  ['bikiniparadise', 'Bikini Paradise', 5, 'single', '96', BIKINI_PARADISE_TABLES],
-  ['queenofbounty', 'Queen of Bounty', 20, 'lines', '96', QUEEN_OF_BOUNTY_TABLES],
+  ['fortunetiger', 'Fortune Tiger', 'single', '96', FORTUNE_TIGER_TABLES],
+  ['fortuneox', 'Fortune Ox', 'single', '70', FORTUNE_OX_TABLES],
+  ['fortunemouse', 'Fortune Mouse', 'single', '96', FORTUNE_MOUSE_TABLES],
+  ['fortunepanda', 'Fortune Panda', 'single', '70', FORTUNE_PANDA_TABLES],
+  ['fortunerabbit', 'Fortune Rabbit', 'single', '96', FORTUNE_RABBIT_TABLES],
+  ['hoodvswoolf', 'Hood vs Woolf', 'single', '96', HOOD_VS_WOOLF_TABLES],
+  ['jackfrost', 'Jack Frost', 'single', '96', JACK_FROST_TABLES],
+  ['phoenixrises', 'Phoenix Rises', 'single', '96', PHOENIX_RISES_TABLES],
+  ['songkranparty', 'Songkran Party', 'single', '96', SONGKRAN_PARTY_TABLES],
+  ['bikiniparadise', 'Bikini Paradise', 'single', '96', BIKINI_PARADISE_TABLES],
+  ['queenofbounty', 'Queen of Bounty', 'lines', '96', QUEEN_OF_BOUNTY_TABLES],
   // Treasures of Aztec НЕ в каталоге: её таблицы исходов донор скопировал с
   // Queen of Bounty — 15 ячеек в строке при клиенте 6x5 = 30 (проверено: и в
   // win, и в lose длина строки 15, максимальный индекс подсвеченной ячейки 15).
@@ -65,10 +65,9 @@ const CATALOG_SOURCES: readonly CatalogSource[] = [
 ]
 
 export const HOUSE_SLOT_CATALOG: readonly HouseSlotGameConfig[] = CATALOG_SOURCES.map(
-  ([externalGameId, displayName, paylines, payoutModel, defaultRtp, tables]) => ({
+  ([externalGameId, displayName, payoutModel, defaultRtp, tables]) => ({
     externalGameId,
     displayName,
-    paylines,
     payoutModel,
     defaultRtp,
     ...tables,
@@ -95,16 +94,18 @@ export class HouseSlotGamesRegistry implements IHouseSlotGames {
     if (config.winRows.length === 0 || config.loseRows.length === 0) {
       throw new Error(`house slot game ${config.externalGameId} has empty outcome tables`)
     }
-    if (!Number.isInteger(config.paylines) || config.paylines <= 0) {
-      throw new Error(`house slot game ${config.externalGameId} has invalid paylines`)
-    }
     if (config.session.iconData.length === 0 || config.session.betSizeList.length === 0) {
       throw new Error(`house slot game ${config.externalGameId} has empty session defaults`)
     }
-    // Фронт берёт число линий из нашего же session(); ставка и знаменатель RTP
-    // считаются от paylines — разошедутся, и каждый спин получит отказ.
-    if (config.paylines !== config.session.numLine) {
-      throw new Error(`house slot game ${config.externalGameId} paylines != session num_line`)
+    // num_line из session() — это то, что клиент считает своей ставкой. Число
+    // линий каждого спина приходит в запросе и калибрует RTP, поэтому за
+    // пределом допуска остаётся только размер ставки, а не отдача.
+    if (
+      !Number.isInteger(config.session.numLine) ||
+      config.session.numLine < 1 ||
+      config.session.numLine > HOUSE_SLOT_MAX_PAYLINES
+    ) {
+      throw new Error(`house slot game ${config.externalGameId} has invalid session num_line`)
     }
     for (const row of [...config.winRows, ...config.loseRows]) {
       TigerSpinRowSchema.parse(row)
