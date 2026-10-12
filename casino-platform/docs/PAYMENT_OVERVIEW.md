@@ -83,13 +83,12 @@ export interface PaymentProvider {
 }
 
 export interface CreateDepositInput {
-  orderId: string // payment_request.id
+  orderId: string // числовой id для PSP (их order_id имеет тип Int)
   amount: MoneyAmount
   currency: Currency
   userId: string
   description?: string
-  successUrl: string
-  failUrl: string
+  data: string // JSON, который провайдер вернёт в уведомлении (наш payment_request.id)
   metadata?: Record<string, string>
 }
 
@@ -435,9 +434,12 @@ async processWebhook(provider: string, rawBody: string, headers: Record<string, 
   })
 
   try {
-    // 2. Verify signature
+    // 2. Verify signature — имя заголовка и склейка подписи у провайдеров разные
+    // (Rukassa: `signature` = HMAC-SHA256 по `id|createdDateTime|amount` на
+    // API-токене, см. tz-part-3 §5.3), поэтому проверке отдают весь набор
+    // заголовков, а не одно поле.
     const adapter = this.getAdapter(provider)
-    const isValid = adapter.verifyWebhookSignature(rawBody, headers['x-signature'])
+    const isValid = adapter.verifyWebhookSignature(rawBody, headers)
     if (!isValid) {
       throw new InvalidSignatureError()
     }
@@ -463,19 +465,18 @@ async processWebhook(provider: string, rawBody: string, headers: Record<string, 
 }
 ```
 
-### 6.2. Возвращать 200 OK всегда
+### 6.2. HTTP-статус вебхука — всегда 200
 
-Даже при ошибке возвращаем 200 OK, чтобы провайдер не делал retry:
+Статусом провайдеру не отказываем (AGENTS.md правило 9), но **тело отвечает по
+его контракту**: NOWPayments принимает JSON, Rukassa — только текст `OK`, и
+`{ ok: true }` он прочитал бы как отказ и повторил доставку 5 раз.
 
 ```typescript
-@Post('webhooks/:provider')
-async handleWebhook() {
-  try {
-    return await this.paymentsService.processWebhook(...)
-  } catch (err) {
-    // Можно логировать, но 200 уже отправлен
-    return { ok: true }
-  }
+@Post('webhooks/rukassa')
+async rukassaCb(@Res() res: Response) {
+  const reply = await this.rukassa.execute(...)
+  // always 200; исход — текстом: OK | ERROR AMOUNT | FAIL
+  return res.status(200).type('text/plain').send(reply)
 }
 ```
 

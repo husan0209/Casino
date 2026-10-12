@@ -22,7 +22,6 @@ describe('Environment Validation', () => {
       const env = {
         ...baseEnv,
         NODE_ENV: 'development',
-        RUKASSA_SECRET_KEY: 'dev_secret_key',
         NOWPAYMENTS_IPN_SECRET: 'dev_ipn_secret',
         DEMO_PROVIDER_ENABLED: 'true',
       }
@@ -45,20 +44,20 @@ describe('Environment Validation', () => {
   describe('Production environment', () => {
     const prodEnv = { ...baseEnv, NODE_ENV: 'production' }
 
-    it('rejects production without RUKASSA_SECRET_KEY', () => {
+    // Rukassa не блокирует старт: подпись уведомлений и создание платежа
+    // fail-closed в самом клиенте (RUKASSA_API_KEY), поэтому боевой ключ —
+    // условие приёма платежей, а не условие запуска API.
+    it('accepts production without Rukassa keys', () => {
       const env = {
         ...prodEnv,
         NOWPAYMENTS_IPN_SECRET: 'real_production_secret_1234567890abcdef',
       }
 
-      expect(() => validateEnv(env)).toThrow()
+      expect(() => validateEnv(env)).not.toThrow()
     })
 
     it('rejects production without NOWPAYMENTS_IPN_SECRET', () => {
-      const env = {
-        ...prodEnv,
-        RUKASSA_SECRET_KEY: 'real_production_secret_1234567890abcdef',
-      }
+      const env = { ...prodEnv }
 
       expect(() => validateEnv(env)).toThrow()
     })
@@ -66,7 +65,6 @@ describe('Environment Validation', () => {
     it('rejects production with DEMO_PROVIDER_ENABLED=true', () => {
       const env = {
         ...prodEnv,
-        RUKASSA_SECRET_KEY: 'real_production_secret_rukassa',
         NOWPAYMENTS_IPN_SECRET: 'real_production_secret_nowpayments',
         DEMO_PROVIDER_ENABLED: 'true',
       }
@@ -87,7 +85,7 @@ describe('Environment Validation', () => {
       for (const placeholder of placeholders) {
         const env = {
           ...prodEnv,
-          RUKASSA_SECRET_KEY: placeholder,
+          JWT_ACCESS_SECRET: placeholder,
           NOWPAYMENTS_IPN_SECRET: 'real_production_secret_1234567890abcdef',
         }
 
@@ -98,7 +96,6 @@ describe('Environment Validation', () => {
     it('accepts production with non-empty secrets and demo disabled', () => {
       const env = {
         ...prodEnv,
-        RUKASSA_SECRET_KEY: 'real_production_secret_1234567890abcdefghij',
         NOWPAYMENTS_IPN_SECRET: 'real_production_secret_0987654321fedcbahgij',
         DEMO_PROVIDER_ENABLED: 'false',
       }
@@ -111,7 +108,6 @@ describe('Environment Validation', () => {
       it('rejects production with SMTP_HOST + SMTP_USER but no SMTP_PASSWORD', () => {
         const env = {
           ...prodEnv,
-          RUKASSA_SECRET_KEY: 'real_production_secret_1234567890abcdefghij',
           NOWPAYMENTS_IPN_SECRET: 'real_production_secret_0987654321fedcbahgij',
           DEMO_PROVIDER_ENABLED: 'false',
           SMTP_HOST: 'smtp.resend.com',
@@ -123,7 +119,6 @@ describe('Environment Validation', () => {
       it('accepts production with full SMTP configuration', () => {
         const env = {
           ...prodEnv,
-          RUKASSA_SECRET_KEY: 'real_production_secret_1234567890abcdefghij',
           NOWPAYMENTS_IPN_SECRET: 'real_production_secret_0987654321fedcbahgij',
           DEMO_PROVIDER_ENABLED: 'false',
           SMTP_HOST: 'smtp.resend.com',
@@ -136,7 +131,6 @@ describe('Environment Validation', () => {
       it('не требует SMTP_PASSWORD если SMTP_HOST не задан', () => {
         const env = {
           ...prodEnv,
-          RUKASSA_SECRET_KEY: 'real_production_secret_1234567890abcdefghij',
           NOWPAYMENTS_IPN_SECRET: 'real_production_secret_0987654321fedcbahgij',
           DEMO_PROVIDER_ENABLED: 'false',
         }
@@ -160,7 +154,10 @@ describe('Environment Validation', () => {
       .map((line) => line.slice(0, line.indexOf('=')))
 
     const validated = fs
-      .readFileSync(path.join(root, 'packages', 'shared-config', 'src', 'env.validation.ts'), 'utf8')
+      .readFileSync(
+        path.join(root, 'packages', 'shared-config', 'src', 'env.validation.ts'),
+        'utf8',
+      )
       .split('\n')
       .flatMap((line) => {
         const m = /^\s+([A-Z][A-Z0-9_]*):/.exec(line)

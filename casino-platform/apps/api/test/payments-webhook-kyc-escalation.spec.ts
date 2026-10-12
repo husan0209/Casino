@@ -35,6 +35,7 @@ type FakeRow = {
   id: string
   userId: string
   externalId: string
+  provider: string
   type: string
   status: string
   currency: string
@@ -170,7 +171,8 @@ function depositRow(over: Partial<FakeRow> = {}): FakeRow {
   return {
     id: 'pr-1',
     userId: 'u-1',
-    externalId: 'ord-100',
+    externalId: '4242',
+    provider: 'rukassa',
     type: 'deposit',
     status: 'pending',
     currency: 'RUB',
@@ -180,11 +182,42 @@ function depositRow(over: Partial<FakeRow> = {}): FakeRow {
   }
 }
 
-function rukassaInput(body: Record<string, unknown>) {
+/**
+ * Уведомление Rukassa — как их транспорт: form-urlencoded POST с семью полями
+ * (id, order_id, amount, in_amount, data, createdDateTime, status) и подписью в
+ * заголовке `signature`. `data` мы сами положили при создании платежа, поэтому
+ * платёжка находится по нашему id, а не по их номерам.
+ */
+/**
+ * Крипто-заявка: provider nowpayments обязателен — Rukassa-вебхук по `data`
+ * принимает только свою платёжку, и фейк не должен это скрывать.
+ */
+function cryptoRow(over: Partial<FakeRow> = {}): FakeRow {
+  return depositRow({
+    provider: 'nowpayments',
+    currency: 'USDT_TRC20',
+    externalId: 'np-1',
+    ...over,
+  })
+}
+
+function rukassaInput(body: Record<string, unknown>, paymentRequestId = 'pr-1') {
+  const payload: Record<string, unknown> = {
+    id: 4242,
+    order_id: '1750000000000999',
+    amount: '3000',
+    in_amount: '3000',
+    createdDateTime: '2026-10-12T10:00:00Z',
+    status: 'PAID',
+    data: JSON.stringify({ payment_request_id: paymentRequestId }),
+    ...body,
+  }
   return {
-    rawHeaders: { 'x-signature': 'ok' },
-    body,
-    rawBody: JSON.stringify(body),
+    rawHeaders: { signature: 'a'.repeat(64) },
+    body: payload,
+    rawBody: new URLSearchParams(
+      Object.entries(payload).map(([key, value]) => [key, String(value)] as [string, string]),
+    ).toString(),
     ip: '1.2.3.4',
   }
 }
@@ -220,11 +253,11 @@ describe('webhook эскалация KYC-лимита: Rukassa', () => {
     const rows = [depositRow()]
     const d = makeDeps({ rows, lifetimeRub: '8000', limitRub: 5000 })
 
-    const res = await d.rukassaUc.execute(rukassaInput({ order_id: 'ord-100', status: 'success' }))
+    const res = await d.rukassaUc.execute(rukassaInput({}))
 
-    expect(res).toEqual({ ok: true })
+    expect(res).toBe('OK')
     expect(d.credited).toHaveLength(1)
-    expect(d.credited[0]!.idempotencyKey).toBe('deposit_rukassa_ord-100')
+    expect(d.credited[0]!.idempotencyKey).toBe('deposit_rukassa_4242')
     expect(d.credited[0]!.amount).toBe('3000')
     expect(rows[0]!.status).toBe('completed')
     expect(d.payment.callbackResults).toEqual([{ id: 'cb-1', result: 'ok' }])
@@ -244,10 +277,10 @@ describe('webhook эскалация KYC-лимита: Rukassa', () => {
   it('повторная доставка того же коллбэка: ни второго зачисления, ни второй эскалации', async () => {
     const rows = [depositRow()]
     const d = makeDeps({ rows, lifetimeRub: '8000', limitRub: 5000 })
-    const body = { order_id: 'ord-100', status: 'success' }
+    const notification = rukassaInput({})
 
-    await d.rukassaUc.execute(rukassaInput(body))
-    await d.rukassaUc.execute(rukassaInput(body))
+    await d.rukassaUc.execute(notification)
+    await d.rukassaUc.execute(notification)
 
     expect(d.credited).toHaveLength(1)
     expect(escalationLogs()).toHaveLength(1)
@@ -261,28 +294,28 @@ describe('webhook эскалация KYC-лимита: Rukassa', () => {
     const rows = [depositRow()]
     const d = makeDeps({ rows, lifetimeRub: '8000', limitRub: 10000 })
 
-    await d.rukassaUc.execute(rukassaInput({ order_id: 'ord-100', status: 'success' }))
+    await d.rukassaUc.execute(rukassaInput({}))
 
     expect(d.credited).toHaveLength(1)
     expect(escalationLogs()).toHaveLength(0)
   })
 
   it('число и строка в конфиге дают один и тот же порог', async () => {
-    const asNumber = [depositRow({ id: 'pr-1', externalId: 'ord-1' })]
+    const asNumber = [depositRow({ id: 'pr-1', externalId: '4242' })]
     await makeDeps({ rows: asNumber, lifetimeRub: '8000', limitRub: 10000 }).rukassaUc.execute(
-      rukassaInput({ order_id: 'ord-1', status: 'success' }),
+      rukassaInput({}, 'pr-1'),
     )
     expect(escalationLogs()).toHaveLength(0)
 
-    const asString = [depositRow({ id: 'pr-2', externalId: 'ord-2' })]
+    const asString = [depositRow({ id: 'pr-2', externalId: '4242' })]
     await makeDeps({ rows: asString, lifetimeRub: '8000', limitRub: '10000' }).rukassaUc.execute(
-      rukassaInput({ order_id: 'ord-2', status: 'success' }),
+      rukassaInput({}, 'pr-2'),
     )
     expect(escalationLogs()).toHaveLength(0)
 
-    const below = [depositRow({ id: 'pr-3', externalId: 'ord-3' })]
+    const below = [depositRow({ id: 'pr-3', externalId: '4242' })]
     await makeDeps({ rows: below, lifetimeRub: '8000', limitRub: '5000' }).rukassaUc.execute(
-      rukassaInput({ order_id: 'ord-3', status: 'success' }),
+      rukassaInput({}, 'pr-3'),
     )
     expect(escalationLogs()[0]!.threshold_rub).toBe('5000')
   })
@@ -291,7 +324,7 @@ describe('webhook эскалация KYC-лимита: Rukassa', () => {
     const rows = [depositRow()]
     const d = makeDeps({ rows, kycStatus: 'approved', lifetimeRub: '8000', limitRub: 5000 })
 
-    await d.rukassaUc.execute(rukassaInput({ order_id: 'ord-100', status: 'success' }))
+    await d.rukassaUc.execute(rukassaInput({}))
 
     expect(d.credited).toHaveLength(1)
     expect(escalationLogs()).toHaveLength(0)
@@ -301,17 +334,17 @@ describe('webhook эскалация KYC-лимита: Rukassa', () => {
     const rows = [depositRow()]
     const d = makeDeps({ rows, lifetimeRub: '3000', limitRub: 5000 })
 
-    await d.rukassaUc.execute(rukassaInput({ order_id: 'ord-100', status: 'success' }))
+    await d.rukassaUc.execute(rukassaInput({}))
 
     expect(d.credited).toHaveLength(1)
     expect(escalationLogs()).toHaveLength(0)
   })
 
-  it('провал платежа провайдером — ни зачисления, ни эскалации', async () => {
+  it('отмена платежа провайдером (их CANCEL) — ни зачисления, ни эскалации', async () => {
     const rows = [depositRow()]
     const d = makeDeps({ rows, lifetimeRub: '8000', limitRub: 5000 })
 
-    await d.rukassaUc.execute(rukassaInput({ order_id: 'ord-100', status: 'rejected' }))
+    await d.rukassaUc.execute(rukassaInput({ status: 'CANCEL' }))
 
     expect(d.credited).toHaveLength(0)
     expect(escalationLogs()).toHaveLength(0)
@@ -322,9 +355,9 @@ describe('webhook эскалация KYC-лимита: Rukassa', () => {
     const rows = [depositRow()]
     const d = makeDeps({ rows, lifetimeRub: '8000', limitRub: 5000, kycThrows: true })
 
-    const res = await d.rukassaUc.execute(rukassaInput({ order_id: 'ord-100', status: 'success' }))
+    const res = await d.rukassaUc.execute(rukassaInput({}))
 
-    expect(res).toEqual({ ok: true })
+    expect(res).toBe('OK')
     expect(d.credited).toHaveLength(1)
     expect(rows[0]!.status).toBe('completed')
     expect(d.payment.callbackResults).toEqual([{ id: 'cb-1', result: 'ok' }])
@@ -337,9 +370,7 @@ describe('webhook эскалация KYC-лимита: Rukassa', () => {
 
 describe('webhook эскалация KYC-лимита: NOWPayments', () => {
   it('finished: actually_paid зачислен, эскалация зафиксирована', async () => {
-    const rows = [
-      depositRow({ externalId: 'np-1', currency: 'USDT_TRC20', amount: { toString: () => '100' } }),
-    ]
+    const rows = [cryptoRow({ amount: { toString: () => '100' } })]
     const d = makeDeps({ rows, lifetimeRub: '12000', limitRub: 5000 })
 
     const res = await d.nowpaymentsUc.execute(
@@ -365,7 +396,7 @@ describe('webhook эскалация KYC-лимита: NOWPayments', () => {
   })
 
   it('повторный IPN по тому же payment_id: duplicate, эскалация не повторяется', async () => {
-    const rows = [depositRow({ externalId: 'np-1' })]
+    const rows = [cryptoRow()]
     const d = makeDeps({ rows, lifetimeRub: '12000', limitRub: 5000 })
     const body = { payment_id: 'np-1', payment_status: 'finished', actually_paid: '110' }
 
@@ -381,7 +412,7 @@ describe('webhook эскалация KYC-лимита: NOWPayments', () => {
   })
 
   it('порог из конфига: при KYC_DEPOSIT_LIMIT_RUB=10000 сумма 9000 не эскалируется', async () => {
-    const rows = [depositRow({ externalId: 'np-1' })]
+    const rows = [cryptoRow()]
     const d = makeDeps({ rows, lifetimeRub: '9000', limitRub: 10000 })
 
     await d.nowpaymentsUc.execute(
@@ -393,7 +424,7 @@ describe('webhook эскалация KYC-лимита: NOWPayments', () => {
   })
 
   it('промежуточный статус (waiting) — ни зачисления, ни эскалации', async () => {
-    const rows = [depositRow({ externalId: 'np-1' })]
+    const rows = [cryptoRow()]
     const d = makeDeps({ rows, lifetimeRub: '12000', limitRub: 5000 })
 
     await d.nowpaymentsUc.execute(
@@ -412,9 +443,7 @@ describe('webhook эскалация KYC-лимита: NOWPayments', () => {
     // lifetimeRub — функция, читающая amountRub из фейковых строк, поэтому тест
     // ломается и на арифметике, и на порядке (запись должна быть до эскалации).
     const rows = [
-      depositRow({
-        externalId: 'np-1',
-        currency: 'USDT_TRC20',
+      cryptoRow({
         amount: { toString: () => '100' },
         amountRub: '3000',
         metadata: { pay_amount: '100' },
@@ -446,9 +475,7 @@ describe('webhook эскалация KYC-лимита: NOWPayments', () => {
 
   it('факт равен запрошенному: amountRub не трогается, эскалация считает оценку', async () => {
     const rows = [
-      depositRow({
-        externalId: 'np-1',
-        currency: 'USDT_TRC20',
+      cryptoRow({
         amount: { toString: () => '100' },
         amountRub: '3000',
         metadata: { pay_amount: '100' },
@@ -465,7 +492,7 @@ describe('webhook эскалация KYC-лимита: NOWPayments', () => {
   })
 
   it('сбой зачисления — эскалации нет (деньги не зачислены, превышения нет)', async () => {
-    const rows = [depositRow({ externalId: 'np-1' })]
+    const rows = [cryptoRow()]
     const payment = makePaymentRepo(rows)
     const uc = new ProcessNOWPaymentsWebhookUseCase(
       payment.repo,

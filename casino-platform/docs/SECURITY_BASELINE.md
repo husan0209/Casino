@@ -327,13 +327,44 @@ const upload = multer({
 
 ### 8.1. Rukassa
 
-```typescript
-function verifyRukassaSignature(payload: string, signature: string): boolean {
-  const expected = crypto.createHmac('sha256', env.RUKASSA_SECRET_KEY).update(payload).digest('hex')
+Уведомление приходит form-urlencoded-полями `id`, `order_id`, `amount`,
+`in_amount`, `data`, `createdDateTime`, `status`. Подпись — HMAC-SHA256 от
+склейки `id|createdDateTime|amount` на **API-токен мерчанта** (отдельного
+webhook-секрета у Rukassa нет), в заголовке `Signature`:
 
-  return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'))
+```typescript
+function verifyRukassaSignature(
+  fields: NotificationFields,
+  received: string,
+  apiToken: string,
+): boolean {
+  const payload = `${fields.id}|${fields.createdDateTime}|${fields.amount}`
+  const expected = crypto.createHmac('sha256', apiToken).update(payload).digest('hex')
+
+  return (
+    /^[0-9a-f]{64}$/.test(received) &&
+    crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(received, 'hex'))
+  )
 }
 ```
+
+Подпись сверяется только по заголовку: поле подписи в самом теле атакующий
+дописал бы себе сам. Дополнительно к подписи зачисление требует равенства суммы
+заявки подписанной `amount` и их условия `in_amount >= amount` — иначе недоплата
+или чужая сумма прошли бы как успешный платёж. Ответ провайдеру — текст: `OK`
+принимает доставку, `ERROR AMOUNT`/`FAIL` он повторяет до 5 раз. HTTP-статус
+всегда 200 (статусом вебхуку не отказываем — AGENTS.md правило 9): `FAIL` при
+неподписанной или необработанной доставке задуман как повод повторить, а
+повтор безопасен — зачисление идемпотентно по `id` платежа провайдера.
+
+**Остаточный риск их схемы подписи.** Подписаны только `id`, `createdDateTime`,
+`amount`. Поля `data`, `order_id`, `in_amount`, `status` — нет, поэтому перехваченное
+подлинное уведомление можно переписать на другую платёжку. Что мы этому
+противопоставляем: `data` принимается только если external_id заявки совпадает с
+подписанным `id` (или ещё не записан, а сумма заявки равна подписанной `amount`);
+заявка обязана быть `provider=rukassa` и `type=deposit`; зачисление требует
+равенства `pr.amount == amount` при их условии `in_amount >= amount`. Полностью
+риск закрывается только на стороне провайдера — подписью всего тела.
 
 **Алгоритм при webhook:**
 

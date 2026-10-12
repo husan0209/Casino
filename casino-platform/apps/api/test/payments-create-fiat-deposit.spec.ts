@@ -7,13 +7,17 @@
  * провайдера: заявка помечается failed, наружу PaymentProviderError.
  * Фасады geo/users подменены узкими объектами (`as unknown as`).
  */
-import { CreateFiatDepositUseCase } from '../src/modules/payments/application/use-cases/create-fiat-deposit.use-case'
+import {
+  CreateFiatDepositUseCase,
+  rukassaOrderId,
+} from '../src/modules/payments/application/use-cases/create-fiat-deposit.use-case'
 import { AmountTooSmallError, PaymentProviderError } from '../src/modules/payments/domain/errors'
 
 import type {
   IPaymentRequestRepository,
   IRukassaClient,
   PaymentRequest,
+  RukassaCreatePayment,
 } from '../src/modules/payments/domain/payments.ports'
 
 const INPUT = { amount: '1000', currency: 'RUB', method: 'card' }
@@ -37,16 +41,16 @@ function makeDeps(over: { rukassaError?: Error } = {}) {
     },
   } as unknown as IPaymentRequestRepository
 
+  const rukassaCalls: Array<Record<string, unknown>> = []
   const rukassa: IRukassaClient = {
-    createPayment: async () => {
+    createPayment: async (params: RukassaCreatePayment) => {
       if (over.rukassaError) {
         throw over.rukassaError
       }
-      return { paymentId: 'pay-1', paymentUrl: 'https://pay.url' }
+      rukassaCalls.push(params as unknown as Record<string, unknown>)
+      return { paymentId: '4242', paymentUrl: 'https://pay.url' }
     },
   } as unknown as IRukassaClient
-
-  const config = { get: () => undefined } as never
 
   const geo = {
     resolveLegalCountry: (country: string | null) => {
@@ -62,8 +66,8 @@ function makeDeps(over: { rukassaError?: Error } = {}) {
 
   const users = { getGeoContext: async () => ({ country: 'RU' }) } as never
 
-  const uc = new CreateFiatDepositUseCase(repo, rukassa, config, geo, users)
-  return { uc, created, statusUpdates, geoCalls }
+  const uc = new CreateFiatDepositUseCase(repo, rukassa, geo, users)
+  return { uc, created, statusUpdates, geoCalls, rukassaCalls }
 }
 
 describe('CreateFiatDepositUseCase', () => {
@@ -91,7 +95,7 @@ describe('CreateFiatDepositUseCase', () => {
       {
         id: 'pr-1',
         status: 'pending',
-        extra: { externalId: 'pay-1', paymentUrl: 'https://pay.url' },
+        extra: { externalId: '4242', paymentUrl: 'https://pay.url' },
       },
     ])
     expect(res).toEqual({
@@ -100,6 +104,26 @@ describe('CreateFiatDepositUseCase', () => {
       currency: 'RUB',
       method: 'card',
     })
+
+    // Контракт Rukassa: order_id числом + сквозной data, по которому вебхук
+    // находит нашу заявку (их уведомление не содержит наш UUID).
+    expect(d.rukassaCalls).toHaveLength(1)
+    const call = d.rukassaCalls[0]!
+    expect(call.amount).toBe('1000')
+    expect(call.currency).toBe('RUB')
+    expect(call.method).toBe('card')
+    expect(String(call.orderId)).toMatch(/^\d{13,18}$/)
+    expect(call.data).toBe('{"payment_request_id":"pr-1"}')
+  })
+
+  it('order_id числовой и не повторяется в пределах одного запуска', async () => {
+    const first = rukassaOrderId(1_750_000_000_000)
+    const second = rukassaOrderId(1_750_000_000_000)
+    const nextMs = rukassaOrderId(1_750_000_000_001)
+
+    expect(first).toMatch(/^\d+$/)
+    expect(second).not.toBe(first)
+    expect(nextMs.startsWith('1750000000001')).toBe(true)
   })
 
   it('сумма ниже depositMin → AmountTooSmallError, заявка не создаётся', async () => {

@@ -43,16 +43,14 @@ describe('Provider Stubs Security', () => {
       await expect(
         rukassaClient.createPayment({
           amount: '100',
-          orderId: 'order_1',
+          orderId: '1750000000000001',
+          data: '{"payment_request_id":"pr-1"}',
           method: 'card',
-          webhookUrl: 'http://localhost/webhook',
-          successUrl: 'http://localhost/success',
-          failUrl: 'http://localhost/fail',
         }),
       ).rejects.toThrow(/обязательные ключи/)
     })
 
-    it('fails closed in production when verifying callback without secret', () => {
+    it('fails closed in production when verifying callback without api token', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') {
           return 'production'
@@ -60,23 +58,23 @@ describe('Provider Stubs Security', () => {
         return undefined
       })
 
-      expect(() => rukassaClient.verifyCallback({}, { order_id: '123', amount: '100' })).toThrow(
-        /обязательные ключи/,
-      )
+      expect(() =>
+        rukassaClient.verifyCallback({ signature: 'a'.repeat(64) }, { order_id: '123' }),
+      ).toThrow(/обязательные ключи/)
     })
 
-    it('returns false in development when secret is not configured', () => {
+    it('returns false in development when api token is not configured', () => {
       vi.spyOn(config, 'get').mockImplementation((key: string) => {
         if (key === 'NODE_ENV') {
           return 'development'
         }
-        if (key === 'RUKASSA_SECRET_KEY') {
-          return undefined
-        }
         return undefined
       })
 
-      const result = rukassaClient.verifyCallback({}, { order_id: '123', amount: '100' })
+      const result = rukassaClient.verifyCallback(
+        { signature: 'a'.repeat(64) },
+        { order_id: '123' },
+      )
 
       expect(result).toBe(false)
     })

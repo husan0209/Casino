@@ -33,14 +33,41 @@ export type PaymentRequestDetailRow = Prisma.PaymentRequestGetPayload<{
   include: { callbacks: true; user: { select: { email: true } } }
 }>
 
-/** Параметры создания платежа в Rukassa (TZ part 3 §5, UC-PAY-01). */
+/**
+ * Платёжные методы Rukassa (страница «Разработчикам»: lk.rukassa.io/api/v1).
+ * Наш `method` уходит провайдеру только если он здесь; иначе поле не отправляем
+ * и форма Rukassa показывает методы, включённые в кабинете мерчанта.
+ */
+export const RUKASSA_METHODS = [
+  'card',
+  'card_kzt',
+  'card_azn',
+  'skinpay',
+  'crypta',
+  'sbp',
+  'clever',
+  'sbp_kyc',
+  'sbp_qr',
+] as const
+
+export type RukassaMethod = (typeof RUKASSA_METHODS)[number]
+
+export function isRukassaMethod(value: string | undefined): value is RukassaMethod {
+  return value !== undefined && (RUKASSA_METHODS as readonly string[]).includes(value)
+}
+
+/**
+ * Параметры создания платежа в Rukassa (TZ part 3 §5, UC-PAY-01).
+ * `orderId` — их `order_id` (тип Int): наш числовой id, а не UUID заявки.
+ * `data` — JSON, который провайдер вернёт в уведомлении: по нему и находим
+ * платёжку, потому что `order_id` в вебхуке приходит без нашего UUID.
+ */
 export interface RukassaCreatePayment {
   amount: string
   orderId: string
+  data: string
   method?: string
-  webhookUrl: string
-  successUrl: string
-  failUrl: string
+  currency?: string
 }
 
 /** Доступ к платёжкам и коллбэкам (Prisma payment_request / payment_callback). */
@@ -121,7 +148,8 @@ export interface IPaymentRequestRepository {
 export interface IRukassaClient {
   createPayment(params: RukassaCreatePayment): Promise<{ paymentId: string; paymentUrl: string }>
   getPaymentStatus(paymentId: string): Promise<{ status: string; amount: string }>
-  verifyCallback(headers: Record<string, string>, rawBody: unknown): boolean
+  /** Уведомление об оплате: подпись в заголовке `signature`, ключ — API-токен. */
+  verifyCallback(headers: Record<string, string>, body: Record<string, unknown>): boolean
 }
 
 /** NOWPayments PSP-клиент (TZ part 3 §6): крипто-платежи, курс, IPN-подпись. */

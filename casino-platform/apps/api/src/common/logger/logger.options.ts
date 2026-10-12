@@ -34,6 +34,9 @@ export const LOG_REDACT_PATHS = [
   'cookie',
   'apiKey',
   'api_key',
+  // Подписи уведомлений PSP (Rukassa `signature` = HMAC(id|createdDateTime|amount)).
+  // Это подпись-токен платежа: в лог ей место не нужно.
+  'signature',
   // Telegram Mini App: init_data — подписанный токен входа с TTL (GAP-75).
   // Попадает в лог вместе с телом запроса на /auth/telegram/webapp.
   'init_data',
@@ -55,6 +58,7 @@ export const LOG_REDACT_PATHS = [
   '*.cookie',
   '*.apiKey',
   '*.api_key',
+  '*.signature',
   '*.init_data',
   '*.initData',
   // два уровня вложенности
@@ -71,6 +75,7 @@ export const LOG_REDACT_PATHS = [
   // http-слой
   'req.headers.authorization',
   'req.headers.cookie',
+  'req.headers.signature',
   'req.headers["x-api-key"]',
   'req.headers["x-csrf-token"]',
   'res.headers["set-cookie"]',

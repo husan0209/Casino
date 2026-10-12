@@ -26,20 +26,20 @@ const isUnsafeSecret = (value: string): boolean => {
 /**
  * Секреты, для которых в production запрещено placeholder-значение
  * (`dev_…`, `your_…`, `stub` и т.п. — UNSAFE_SECRET_PATTERNS).
+ *
+ * RUKASSA_API_KEY здесь не проверяется: ключ нужен только для боя, а dev/CI
+ * поднимаются без него. Подпись уведомлений и создание платежа fail-closed в
+ * самом клиенте (PaymentProviderNotConfiguredError), поэтому старт без ключа
+ * не открывает приём платежей — он его выключает.
  */
 const PRODUCTION_SECRET_KEYS = [
   'JWT_ACCESS_SECRET',
   'JWT_REFRESH_SECRET',
-  'RUKASSA_SECRET_KEY',
   'NOWPAYMENTS_IPN_SECRET',
 ] as const
 
 /** Обязательные в production переменные: ключ → сообщение об ошибке. */
 const PRODUCTION_REQUIRED: ReadonlyArray<readonly [string, string]> = [
-  [
-    'RUKASSA_SECRET_KEY',
-    'Required in production. Cannot start without Rukassa signature verification secret.',
-  ],
   [
     'NOWPAYMENTS_IPN_SECRET',
     'Required in production. Cannot start without NOWPayments IPN verification secret.',
@@ -104,8 +104,8 @@ export const envSchema = z
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     RUKASSA_API_BASE: z.string().url().optional(),
     RUKASSA_SHOP_ID: z.string().optional(),
+    // Он же ключ подписи уведомлений: у Rukassa отдельного webhook-секрета нет.
     RUKASSA_API_KEY: z.string().optional(),
-    RUKASSA_SECRET_KEY: z.string().optional(),
     NOWPAYMENTS_API_KEY: z.string().optional(),
     NOWPAYMENTS_API_BASE: z.string().url().optional(),
     GITSLOTPARK_AGENT_ID: z.string().optional(),
@@ -156,9 +156,6 @@ export const envSchema = z
     JWT_AUDIENCE_ADMIN: z.string().optional(),
     GOOGLE_CALLBACK_URL: z.string().url().optional(),
     TELEGRAM_BOT_NAME: z.string().optional(),
-    RUKASSA_WEBHOOK_URL: z.string().url().optional(),
-    RUKASSA_SUCCESS_URL: z.string().url().optional(),
-    RUKASSA_FAIL_URL: z.string().url().optional(),
     NOWPAYMENTS_WEBHOOK_URL: z.string().url().optional(),
     SMTP_FROM_NAME: z.string().optional(),
     KYC_MIN_AGE: z.coerce.number().int().positive().optional(),

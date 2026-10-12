@@ -221,7 +221,7 @@ jobs:
           E2E_API: '1'
           JWT_ACCESS_SECRET: e2e-access-secret-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           JWT_REFRESH_SECRET: e2e-refresh-secret-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-          RUKASSA_SECRET_KEY: e2e-rukassa-hmac-secret
+          RUKASSA_API_KEY: e2e-rukassa-api-token
           RUKASSA_SHOP_ID: e2e-shop
           RUKASSA_API_BASE: http://localhost:9
           # demo-провайдер для launch/Callbacks (envSchema: enum 'true'/'false')

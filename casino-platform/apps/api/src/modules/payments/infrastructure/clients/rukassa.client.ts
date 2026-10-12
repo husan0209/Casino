@@ -8,7 +8,11 @@ import { errorMessage } from '@/common/utils/error-message'
 import { AppError } from '@casino/shared-utils'
 
 import { PaymentProviderError } from '../../domain/errors'
-import { type IRukassaClient, type RukassaCreatePayment } from '../../domain/payments.ports'
+import {
+  isRukassaMethod,
+  type IRukassaClient,
+  type RukassaCreatePayment,
+} from '../../domain/payments.ports'
 
 export type { RukassaCreatePayment }
 
@@ -25,25 +29,21 @@ const TIMEOUT_MS = 30_000 // TZ part 3 §5.3
 /**
  * Rukassa HTTP client — TZ part 3 §5 (UC-PAY-01/02).
  *
- * База и ключи — env:
- *   RUKASSA_API_BASE   (default https://pay.rukassa.is)
- *   RUKASSA_SHOP_ID / RUKASSA_API_KEY  — обязательны в production (fail-closed)
- *   RUKASSA_SECRET_KEY — секрет подписи webhook (HMAC-SHA256 "shop_id:order_id:amount")
+ * Контракт — официальная страница «Разработчикам» (их документация API):
+ *   POST https://lk.rukassa.io/api/v1/create     shop_id, token, order_id, amount, data
+ *   POST https://lk.rukassa.io/api/v1/getPayInfo shop_id, token, id
+ * Оба принимают form-urlencoded; авторизация — полями `shop_id` + `token` в теле,
+ * НЕ заголовками. Ответ create: `{ id, hash, url }`, при отказе `{ error, message }`.
  *
- * Если у конкретного мерчанта эндпоинты отличаются — правится через RUKASSA_API_BASE,
- * код не меняется. Dev без ключей работает на лог-стабе (флоу проверяем без PSP).
+ * Env:
+ *   RUKASSA_SHOP_ID / RUKASSA_API_KEY — обязательны в production (fail-closed);
+ *     `token` из их настроек мерчанта, он же ключ подписи уведомлений.
+ *   RUKASSA_API_BASE — база (default https://lk.rukassa.io), если их хостинг сменится.
+ *
+ * URL коллбэка и редиректы в API НЕ передаются — их задают в кабинете мерчанта
+ * («URL оповещения»), поэтому RUKASSA_WEBHOOK_URL/SUCCESS_URL/FAIL_URL из кода убраны.
+ * Dev без ключей — лог-стаб, чтобы флоу проверялся без PSP.
  */
-/** Rukassa отдаёт разные имена полей в зависимости от версии API. */
-function pickPaymentFields(data: Record<string, unknown>): {
-  paymentId: string
-  paymentUrl: string
-} {
-  return {
-    paymentId: String(data.payment_id ?? data.id ?? data.order_id ?? ''),
-    paymentUrl: String(data.payment_url ?? data.url ?? data.location ?? ''),
-  }
-}
-
 @Injectable()
 export class RukassaClient implements IRukassaClient {
   private readonly logger = new Logger(RukassaClient.name)
@@ -53,126 +53,181 @@ export class RukassaClient implements IRukassaClient {
     return this.config.get<string>('NODE_ENV') === 'production'
   }
 
-  private assertConfigured(): { base: string; shopId: string; apiKey: string } {
-    const shopId = this.config.get<string>('RUKASSA_SHOP_ID')
-    const apiKey = this.config.get<string>('RUKASSA_API_KEY')
-    if (!shopId || !apiKey) {
+  private shopId(): string | undefined {
+    return this.config.get<string>('RUKASSA_SHOP_ID')
+  }
+
+  /** Их `token` — API-токен из настроек мерчанта; он же ключ подписи уведомлений. */
+  private apiToken(): string | undefined {
+    return this.config.get<string>('RUKASSA_API_KEY')
+  }
+
+  private assertConfigured(): { base: string; shopId: string; token: string } {
+    const shopId = this.shopId()
+    const token = this.apiToken()
+    if (!shopId || !token) {
       throw new PaymentProviderNotConfiguredError('Rukassa', 'RUKASSA_SHOP_ID, RUKASSA_API_KEY')
     }
     return {
-      base: this.config.get<string>('RUKASSA_API_BASE') || 'https://pay.rukassa.is',
+      base: this.config.get<string>('RUKASSA_API_BASE') || 'https://lk.rukassa.io',
       shopId,
-      apiKey,
+      token,
     }
   }
 
   async createPayment(
     params: RukassaCreatePayment,
   ): Promise<{ paymentId: string; paymentUrl: string }> {
-    if (!this.isProd() && !this.config.get<string>('RUKASSA_SHOP_ID')) {
-      this.logger.log(`Rukassa DEV-STUB create ${params.amount} RUB order=${params.orderId}`)
-      return {
-        paymentId: `rk_${params.orderId}`,
-        paymentUrl: `${params.successUrl}&stub=rukassa&order=${params.orderId}`,
-      }
+    if (!this.isProd() && !this.shopId()) {
+      return this.devStubPayment(params)
     }
-    const { base, shopId, apiKey } = this.assertConfigured()
-    try {
-      const res = await fetch(`${base}/api/v1/order/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', shop_id: shopId, api_key: apiKey },
-        body: JSON.stringify({
-          order_id: params.orderId,
-          amount: params.amount,
-          currency: 'RUB',
-          payment_method: params.method || undefined,
-          success_url: params.successUrl,
-          fail_url: params.failUrl,
-          webhook_url: params.webhookUrl,
-        }),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      })
-      if (!res.ok) {
-        throw new PaymentProviderError(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`)
-      }
-      // external PSP payload — defensive parsing неизвестной формы
-      const data = (await res.json()) as Record<string, unknown>
-      const { paymentId, paymentUrl } = pickPaymentFields(data)
-      if (!paymentId || !paymentUrl) {
-        throw new PaymentProviderError(
-          `unexpected response shape: ${JSON.stringify(data).slice(0, 200)}`,
-        )
-      }
-      this.logger.log(`Rukassa order created: ${paymentId}`)
-      return { paymentId, paymentUrl }
-    } catch (e) {
-      // TZ §5.4 UC-PAY-01 шаг 7: ошибка провайдера → PR остаётся/становится failed, наверх PAYMENT_PROVIDER_ERROR
-      this.logger.error(`Rukassa createPayment failed: ${errorMessage(e)}`)
-      throw e
+    const { base, shopId, token } = this.assertConfigured()
+    const form = new URLSearchParams({
+      shop_id: shopId,
+      token,
+      order_id: params.orderId,
+      amount: params.amount,
+      currency: params.currency || 'RUB',
+      data: params.data,
+    })
+    // Метод передаём только если он есть в их списке: наше `p2p` для Rukassa
+    // не существует, а неизвестный method они читают как «показать один метод».
+    if (isRukassaMethod(params.method)) {
+      form.set('method', params.method)
+    }
+    const payload = await this.postForm(`${base}/api/v1/create`, form)
+    // Сначала успешные поля: `error` у них бывает и `false`/`0` в успешном
+    // ответе, а отказ без id/url мы всё равно отдаём их текстом сообщения.
+    const paymentId = String(payload.id ?? '')
+    const paymentUrl = String(payload.url ?? '')
+    if (!paymentId || !paymentUrl) {
+      throw new PaymentProviderError(this.refusalMessage(payload))
+    }
+    this.logger.log(`Rukassa order created: ${paymentId}`)
+    return { paymentId, paymentUrl }
+  }
+
+  /** Локальный флоу-тест без PSP: платёжка «создана», ссылка ведёт на наш фронт. */
+  private devStubPayment(params: RukassaCreatePayment): {
+    paymentId: string
+    paymentUrl: string
+  } {
+    this.logger.log(`Rukassa DEV-STUB create ${params.amount} order=${params.orderId}`)
+    const webUrl = this.config.get<string>('APP_URL') || 'http://localhost:3000'
+    return {
+      paymentId: `rk_${params.orderId}`,
+      paymentUrl: `${webUrl}/wallet?deposit=pending`,
     }
   }
 
   async getPaymentStatus(paymentId: string): Promise<{ status: string; amount: string }> {
-    if (!this.config.get<string>('RUKASSA_SHOP_ID')) {
-      return { status: 'unknown', amount: '0' }
+    const { base, shopId, token } = this.assertConfigured()
+    const payload = await this.postForm(
+      `${base}/api/v1/getPayInfo`,
+      new URLSearchParams({ shop_id: shopId, token, id: paymentId }),
+    )
+    const status = String(payload.status ?? '')
+    if (!status) {
+      throw new PaymentProviderError(this.refusalMessage(payload))
     }
-    const { base, shopId, apiKey } = this.assertConfigured()
-    const res = await fetch(`${base}/api/v1/order/status/${encodeURIComponent(paymentId)}`, {
-      headers: { shop_id: shopId, api_key: apiKey },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    })
-    if (!res.ok) {
-      throw new PaymentProviderError(`HTTP ${res.status}`)
-    }
-    // external PSP payload — defensive parsing неизвестной формы
-    const d = (await res.json()) as Record<string, unknown>
     return {
-      status: String(d.status ?? d.payment_status ?? 'unknown'),
-      amount: String(d.amount ?? '0'),
+      status,
+      // `in_amount` — оплачено по факту, `amount` — заявлено. Для сверки нужен
+      // факт: недоплаченный платёж иначе выглядел бы оплаченным.
+      amount: String(payload.in_amount ?? payload.amount ?? '0'),
+    }
+  }
+
+  /** Отказ или неожиданная форма ответа: текст провайдера, но без токена внутри. */
+  private refusalMessage(payload: Record<string, unknown>): string {
+    const text = refusalText(payload) ?? `unexpected response shape: ${JSON.stringify(payload)}`
+    return this.redactSecret(text).slice(0, 200)
+  }
+
+  /**
+   * form-urlencoded POST: их пример на PHP использует http_build_query, JSON они
+   * не принимают. external PSP payload — defensive parsing неизвестной формы.
+   */
+  private async postForm(url: string, form: URLSearchParams): Promise<Record<string, unknown>> {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+        },
+        body: form.toString(),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      })
+      if (!response.ok) {
+        throw new PaymentProviderError(
+          this.redactSecret(`HTTP ${response.status}: ${(await response.text()).slice(0, 200)}`),
+        )
+      }
+      return (await response.json()) as Record<string, unknown>
+    } catch (e) {
+      // TZ §5.4 UC-PAY-01 шаг 7: ошибка провайдера → наружу PAYMENT_PROVIDER_ERROR
+      this.logger.error(`Rukassa ${url} failed: ${errorMessage(e)}`)
+      throw e
     }
   }
 
   /**
-   * Подпись вебхука: HMAC-SHA256(secret, "shop_id:order_id:amount"), заголовок x-signature (или body.sign).
-   * Fail-closed: в production без RUKASSA_SECRET_KEY — исключение (старт невозможен по env.validation).
+   * Текст ответа провайдера попадает и в лог, и в сообщение ошибки. PHP-панели
+   * иногда печатают `$_POST` эхом — а там `token`. Наружу он уходить не должен.
    */
-  verifyCallback(headers: Record<string, string>, rawBody: unknown): boolean {
-    const secret = this.config.get<string>('RUKASSA_SECRET_KEY')
-    if (!secret) {
-      return this.failWithoutSecret()
+  private redactSecret(text: string): string {
+    const token = this.apiToken()
+    if (!token || token.length < 4) {
+      return text
     }
-    // Signature MUST come from the header only. Reading `body.sign` would
-    // let an attacker bypass the signature check by simply including a
-    // pre-computed `sign` field in the payload.
-    const receivedSig: string = headers['x-signature'] || ''
-    if (!receivedSig) {
-      return false
-    }
-    const expected = this.expectedSignature(rawBody, secret)
-
-    try {
-      return timingSafeEqual(Buffer.from(receivedSig, 'hex'), Buffer.from(expected, 'hex'))
-    } catch {
-      return false
-    }
+    return text.split(token).join('[redacted]')
   }
 
-  /** Отбой без RUKASSA_SECRET_KEY: fail-closed и в dev (GAP-43: рантайм-приёмка). */
-  private failWithoutSecret(): boolean {
-    if (this.isProd()) {
-      throw new PaymentProviderNotConfiguredError('Rukassa', 'RUKASSA_SECRET_KEY')
+  /**
+   * Подпись уведомления: `hash_hmac('sha256', id|createdDateTime|amount, токен)`
+   * в заголовке `Signature`. Ключ — API-токен, отдельного webhook-секрета у
+   * Rukassa нет. Fail-closed и в dev: без токена подпись неотличима от подделки.
+   */
+  verifyCallback(headers: Record<string, string>, body: Record<string, unknown>): boolean {
+    const token = this.apiToken()
+    if (!token) {
+      if (this.isProd()) {
+        throw new PaymentProviderNotConfiguredError('Rukassa', 'RUKASSA_API_KEY')
+      }
+      this.logger.error('RUKASSA_API_KEY not set — rejecting callback (fail-closed dev)')
+      return false
     }
-    this.logger.error('RUKASSA_SECRET_KEY not set — rejecting callback (fail-closed dev)')
+    const received = headers['signature'] || ''
+    if (!received) {
+      return false
+    }
+    return hexSignaturesEqual(received, this.expectedSignature(body, token))
+  }
+
+  private expectedSignature(body: Record<string, unknown>, token: string): string {
+    const payload = [body.id, body.createdDateTime, body.amount]
+      .map((value) => String(value ?? ''))
+      .join('|')
+    return createHmac('sha256', token).update(payload).digest('hex')
+  }
+}
+
+/**
+ * Их отказ: `{ error, message }`. `error: false`/`0` отказом не считаем — такие
+ * значения всплывают в успешных ответах PHP-панелей.
+ */
+function refusalText(payload: Record<string, unknown>): string | null {
+  if (!payload.error) {
+    return null
+  }
+  return `error ${String(payload.error)}: ${String(payload.message ?? '')}`.slice(0, 200)
+}
+
+/** Сравнение с guard'ом по длине: timingSafeEqual бросает на разном размере буферов. */
+function hexSignaturesEqual(received: string, expected: string): boolean {
+  if (!/^[0-9a-fA-F]{64}$/.test(received) || received.length !== expected.length) {
     return false
   }
-
-  /** HMAC-SHA256 подпись для payload: shop_id:order_id:amount. */
-  private expectedSignature(rawBody: unknown, secret: string): string {
-    const shopId = this.config.get<string>('RUKASSA_SHOP_ID') || ''
-    const body = (rawBody ?? {}) as Record<string, unknown>
-    const orderId = String(body['order_id'] || body['merchant_order_id'] || '')
-    const amount = String(body['amount'] || '')
-    const payload = `${shopId}:${orderId}:${amount}`
-    return createHmac('sha256', secret).update(payload).digest('hex')
-  }
+  return timingSafeEqual(Buffer.from(received, 'hex'), Buffer.from(expected, 'hex'))
 }

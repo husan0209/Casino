@@ -64,12 +64,28 @@ describe('GAP-23 pino redact', () => {
     expect(raw).not.toContain(SECRET_BODY_TOKEN)
   })
 
+  it('вырезает подпись уведомления PSP (заголовок `signature`)', async () => {
+    const pspSignature = '0f1e2d3c4b5a69788796a5b4c3d2e1f0'.repeat(4).slice(0, 64)
+    const { raw, parsed } = await captureLog({
+      signature: pspSignature,
+      headers: { signature: pspSignature },
+      req: { headers: { signature: pspSignature, 'user-agent': 'RuKassa' } },
+    })
+
+    expect(parsed.signature).toBe(REDACT_CENSOR)
+    expect(parsed.headers.signature).toBe(REDACT_CENSOR)
+    expect(parsed.req.headers.signature).toBe(REDACT_CENSOR)
+    expect(parsed.req.headers['user-agent']).toBe('RuKassa')
+    expect(raw).not.toContain(pspSignature)
+  })
+
   it('buildPinoHttpOptions: redact-пути на месте, уровень по LOG_LEVEL', () => {
     const opts = buildPinoHttpOptions()
     // `redact` в типе pino — union `string[] | redactOptions` с необязательными полями.
     const redact = opts.redact as { censor: string; paths: string[] }
     expect(redact.censor).toBe(REDACT_CENSOR)
     expect(redact.paths).toContain('req.headers.authorization')
+    expect(redact.paths).toContain('req.headers.signature')
     expect(redact.paths).toContain('req.body.password')
     expect(redact.paths).toContain('req.body.init_data')
     expect(redact.paths).toContain('res.headers["set-cookie"]')

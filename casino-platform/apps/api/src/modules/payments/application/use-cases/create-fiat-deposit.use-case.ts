@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto'
 
 import { Inject, Injectable } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 
 import { errorMessage } from '@/common/utils/error-message'
 
@@ -32,12 +31,22 @@ export interface CreateFiatDepositResult {
   method: string
 }
 
+/**
+ * `order_id` у Rukassa — число (их пример: time() . mt_rand()), а наш id заявки —
+ * UUID. Счётчик внутри миллисекунды снимает коллизию двух депозитов одного момента;
+ * на поиски платёжки это не влияет — вебхук резолвится по `data` и external_id.
+ */
+let orderCounter = 0
+export function rukassaOrderId(now = Date.now()): string {
+  orderCounter = (orderCounter + 1) % 1000
+  return String(now * 1000 + orderCounter)
+}
+
 @Injectable()
 export class CreateFiatDepositUseCase {
   constructor(
     @Inject(PAYMENT_REQUEST_REPOSITORY) private readonly repo: IPaymentRequestRepository,
     @Inject(RUKASSA_CLIENT) private readonly rukassa: IRukassaClient,
-    @Inject(ConfigService) private config: ConfigService,
     @Inject(GeoFacade) private geo: GeoFacade,
     @Inject(UsersFacade) private users: UsersFacade,
   ) {}
@@ -76,11 +85,12 @@ export class CreateFiatDepositUseCase {
     try {
       const res = await this.rukassa.createPayment({
         amount,
-        orderId: pr.id,
+        orderId: rukassaOrderId(),
+        currency,
         method,
-        webhookUrl: this.webhookUrl(),
-        successUrl: this.successUrl(),
-        failUrl: this.failUrl(),
+        // Сквозной JSON: Rukassa возвращает его в уведомлении без изменений,
+        // поэтому платёжку находим по нашему id, а не по их номерам.
+        data: JSON.stringify({ payment_request_id: pr.id }),
       })
       await this.repo.updateStatus(pr.id, 'pending', {
         externalId: res.paymentId,
@@ -88,26 +98,10 @@ export class CreateFiatDepositUseCase {
       })
       return { payment_request_id: pr.id, payment_url: res.paymentUrl, currency, method }
     } catch (e) {
+      // Полный текст провайдера — только в БД (его читает админ) и в лог. В
+      // HTTP-ответ он уходить не должен: context AppError фильтр кладёт в details.
       await this.repo.updateStatus(pr.id, 'failed', { errorMessage: errorMessage(e) })
-      throw new PaymentProviderError('Rukassa error', { cause: errorMessage(e) })
+      throw new PaymentProviderError('Rukassa error')
     }
-  }
-
-  /** Адреса возврата/коллбэка Rukassa: env → дефолт локальной разработки. */
-  private webhookUrl(): string {
-    return (
-      this.config.get<string>('RUKASSA_WEBHOOK_URL') ||
-      'http://localhost:3001/api/v1/payments/webhooks/rukassa'
-    )
-  }
-
-  private successUrl(): string {
-    return (
-      this.config.get<string>('RUKASSA_SUCCESS_URL') || 'http://localhost:3000/?deposit=success'
-    )
-  }
-
-  private failUrl(): string {
-    return this.config.get<string>('RUKASSA_FAIL_URL') || 'http://localhost:3000/?deposit=failed'
   }
 }

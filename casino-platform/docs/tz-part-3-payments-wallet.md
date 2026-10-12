@@ -2,7 +2,7 @@
 part: 3
 total_parts: 7
 version: 1.0
-status: "frozen spec v1.0"
+status: 'frozen spec v1.0'
 ---
 
 # ТЗ — Часть 3. Wallet, Fiat/Crypto Payments, Transaction Ledger
@@ -502,10 +502,10 @@ INDEX(processed)
 
 **MVP — RUB (фиат):**
 
-| Операция | Мин | Макс |
-|---|---|---|
-| Депозит | 100 ₽ | 500 000 ₽ |
-| Вывод | 500 ₽ | 200 000 ₽ |
+| Операция | Мин   | Макс      |
+| -------- | ----- | --------- |
+| Депозит  | 100 ₽ | 500 000 ₽ |
+| Вывод    | 500 ₽ | 200 000 ₽ |
 
 **MVP — USDT_TRC20 / BTC:** мин/макс задаются в env/admin; для BTC сумма депозита = **факт** входящего платежа (без пресетов).
 
@@ -625,22 +625,39 @@ Rukassa — платёжный агрегатор для СНГ.
 
 Создать изолированный adapter/client для Rukassa.
 
+Контракт провайдера — их страница «Разработчикам» (`https://lk.rukassa.io/api/v1`),
+сверена с документацией 2026-10-12:
+
+| Операция              | Эндпоинт                               | Транспорт                                                                                                                        |
+| --------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| создание платежа      | `POST /api/v1/create`                  | form-urlencoded: `shop_id`, `token`, `order_id`, `amount`, `currency`, `data`, опционально `method`, `list`, `user_code`, `json` |
+| статус платежа        | `POST /api/v1/getPayInfo`              | form-urlencoded: `shop_id`, `token`, `id` / `order_id` / `status`                                                                |
+| отмена платежа        | `POST /api/v1/revoke`                  | form-urlencoded: `shop_id`, `token`, `id`                                                                                        |
+| уведомление об оплате | `POST` на «URL оповещения» из кабинета | form-поля `id`, `order_id`, `amount`, `in_amount`, `data`, `createdDateTime`, `status`                                           |
+
+Авторизация — полями `shop_id` + `token` в теле (не заголовками). Ответ create:
+`{ id, hash, url }`; отказ: `{ error, message }`. Статусы: `PAID` / `WAIT` / `CANCEL`.
+Подпись уведомления: `HMAC-SHA256(key=токен, msg="id|createdDateTime|amount")` в
+заголовке `Signature`, ответ обязателен текстом `OK` (иначе до 5 повторов).
+`order_id` — целое число, поэтому UUID заявки провайдеру не отправляется: он получает
+числовой id, а `payment_request.id` возвращается в `data`.
+
 ```typescript
 // Интерфейс
 interface RukassaClient {
   createPayment(params: {
-    amount: string        // сумма в RUB
-    orderId: string       // наш payment_request.id
-    method?: string       // способ оплаты
-    webhookUrl: string
-    successUrl: string
-    failUrl: string
+    amount: string // сумма в RUB
+    orderId: string // числовая строка: их order_id имеет тип Int
+    data: string // JSON, который провайдер вернёт в уведомлении
+    method?: string // card | sbp | sbp_qr | sbp_kyc | clever | crypta | skinpay | card_kzt | card_azn
+    currency?: string // RUB | USD (по умолчанию RUB)
   }): Promise<{
-    paymentId: string     // external_id
-    paymentUrl: string    // куда редиректить
+    paymentId: string // external_id (их id операции)
+    paymentUrl: string // куда редиректить (их url)
   }>
 
-  verifyCallback(headers: object, body: string): boolean
+  // подпись = HMAC-SHA256(apiToken, `${id}|${createdDateTime}|${amount})
+  verifyCallback(headers: Record<string, string>, body: Record<string, unknown>): boolean
 
   getPaymentStatus(paymentId: string): Promise<{
     status: string
@@ -654,7 +671,16 @@ interface RukassaClient {
 - все вызовы к Rukassa обёрнуты в try/catch с логированием;
 - timeout на HTTP вызовы: 30 секунд;
 - при ошибке API — `payment_request` остаётся в статусе `pending`;
-- webhook URL: `POST /api/v1/payments/webhooks/rukassa`.
+- webhook URL: `POST /api/v1/payments/webhooks/rukassa` — его задаёт мерчант в
+  кабинете («URL оповещения»), параметром в `create` он не передаётся;
+- зачисление только при `status=PAID` **и** `in_amount >= amount`; `CANCEL` —
+  отказ, `WAIT` — processing;
+- `method` отправляется, только если он есть в списке провайдера (нашего `p2p`
+  там нет), иначе поле не передаём и показываем включённые в кабинете способы;
+- `user_code` (идентификатор игрока: IP или Telegram id) обязателен по их докам
+  только для H2H и при включённом анти-фрод — при redirect-интеграции не шлём;
+  если мерчант включит анти-фрод, `create` начнёт отказывать, и поле придётся
+  добавить (это проверка на живом ключе, а не на стенде).
 
 ### 5.4. Rukassa Deposit Use Cases
 
@@ -698,7 +724,7 @@ Authorization: Bearer <token>
   "success": true,
   "data": {
     "payment_request_id": "...",
-    "payment_url": "https://pay.rukassa.is/..."
+    "payment_url": "https://lk.rukassa.io/..."
   }
 }
 ```
@@ -817,10 +843,10 @@ NOWPayments — крипто-платёжный процессор.
 ```typescript
 interface NOWPaymentsClient {
   createPayment(params: {
-    priceAmount: string       // сумма в оригинальной валюте
-    priceCurrency: string     // валюта цены (может быть USD/RUB)
-    payCurrency: string       // в чём платит пользователь (btc, trx, etc)
-    orderId: string           // наш payment_request.id
+    priceAmount: string // сумма в оригинальной валюте
+    priceCurrency: string // валюта цены (может быть USD/RUB)
+    payCurrency: string // в чём платит пользователь (btc, trx, etc)
+    orderId: string // наш payment_request.id
     ipnCallbackUrl: string
   }): Promise<{
     paymentId: string
@@ -831,16 +857,12 @@ interface NOWPaymentsClient {
   }>
 
   getPaymentStatus(paymentId: string): Promise<{
-    paymentStatus: string     // waiting, confirming, confirmed, sending, finished, failed, expired
+    paymentStatus: string // waiting, confirming, confirmed, sending, finished, failed, expired
     actuallyPaid: string
     outcomeAmount: string
   }>
 
-  getEstimatePrice(params: {
-    amount: string
-    currencyFrom: string
-    currencyTo: string
-  }): Promise<{
+  getEstimatePrice(params: { amount: string; currencyFrom: string; currencyTo: string }): Promise<{
     estimatedAmount: string
   }>
 
@@ -1580,14 +1602,14 @@ BullMQ cron job, каждый час:
 
 **Без auth** (гость) и **с auth** (свой игрок):
 
-| Поле | Правило |
-|---|---|
-| `defaultCurrency` | По IP / hostname; MVP для RU → `RUB` |
-| `enabledFiat` | Только валюты с живым PSP; MVP → `["RUB"]` |
-| `enabledCrypto` | `["USDT_TRC20", "BTC"]` — не на первом экране, только «Ещё способы» |
-| `paymentMethods` | Отфильтрованы по `legalCountry` + `defaultCurrency`; RU ≠ UA в одном ответе |
-| `depositPresets` | Массив сумм **в валюте ответа** (см. tz-part-5 §2.5) |
-| `depositMin` / `depositMax` | С символом валюты в metadata для UI |
+| Поле                        | Правило                                                                     |
+| --------------------------- | --------------------------------------------------------------------------- |
+| `defaultCurrency`           | По IP / hostname; MVP для RU → `RUB`                                        |
+| `enabledFiat`               | Только валюты с живым PSP; MVP → `["RUB"]`                                  |
+| `enabledCrypto`             | `["USDT_TRC20", "BTC"]` — не на первом экране, только «Ещё способы»         |
+| `paymentMethods`            | Отфильтрованы по `legalCountry` + `defaultCurrency`; RU ≠ UA в одном ответе |
+| `depositPresets`            | Массив сумм **в валюте ответа** (см. tz-part-5 §2.5)                        |
+| `depositMin` / `depositMax` | С символом валюты в metadata для UI                                         |
 
 Для залогиненного: если `currency_preference` задан — методы и пресеты **этой** валюты, даже в роуминге.
 
