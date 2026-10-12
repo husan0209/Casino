@@ -24,6 +24,10 @@ const FAILURE_STATUSES = new Set<string>([
   'failure',
   'canceled',
   'cancelled',
+  // Rukassa отдаёт 'CANCEL' (lk.rukassa.io/api/v1, getPayInfo: PAID|WAIT|CANCEL).
+  // Без точного матча статус классифицировался бы как unknown, и отменённая
+  // заявка вечно висела в processing с замороженным балансом.
+  'cancel',
   'expired',
   'rejected',
   'declined',

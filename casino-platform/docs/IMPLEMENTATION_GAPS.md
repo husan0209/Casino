@@ -581,9 +581,15 @@ Env: добавлены опциональные `SMTP_PORT/SMTP_USER/SMTP_PASS`
 
 ### GAP-06 / GAP-07. Rukassa и NOWPayments (P1) — 🟦 CODE_DONE
 
-- Rukassa: реальный HTTP `POST {RUKASSA_API_BASE}/api/v1/order/create` (заголовки `shop_id`/`api_key`, timeout 30 с),
-  `getPaymentStatus`; dev без ключей — лог-стаб; верификация вебхука HMAC-SHA256 активна в prod (раньше кидала
-  NOT_IMPLEMENTED).
+- Rukassa (2026-10-12 приведён к официальному контракту `lk.rukassa.io/api/v1`): `POST {RUKASSA_API_BASE}/api/v1/create`
+  form-urlencoded с `shop_id` + `token` в теле (не заголовками), ответ `{ id, hash, url }`, отказ `{ error, message }`;
+  статус — `/api/v1/getPayInfo`. `order_id` передаём числом (их тип Int), а нашу заявку провайдер возвращает полем
+  `data`, поэтому вебхук резолвится по `payment_request_id` из `data`, затем по `id` операции.
+  Подпись уведомления — HMAC-SHA256(`id|createdDateTime|amount`) на API-токене, заголовок `signature`; ответ —
+  текст `OK` (JSON-конверт провайдер не считал бы принятым и повторил бы доставку 5 раз). Dev без ключей — лог-стаб.
+  Прежняя реализация (`/api/v1/order/create`, заголовки `shop_id`/`api_key`, HMAC по `shop_id:order_id:amount` на
+  отдельном секрете, JSON-ответ) с их документацией не совпадала ни в одной точке: боевые вебхуки отбивались бы
+  как недействительная подпись, а депозиты не зачислялись бы.
 - NOWPayments: `POST /v1/payment` (x-api-key), `/estimate`, `/payment/{id}`; курсы не хардкод при наличии ключа;
   IPN HMAC-SHA512 активен в prod; env `NOWPAYMENTS_API_BASE`.
 - **Проверено живым контуром 2026-09-09** (первый внешний ключ, ключ предоставлен владельцем): `GET /v1/currencies` →
@@ -591,8 +597,10 @@ Env: добавлены опциональные `SMTP_PORT/SMTP_USER/SMTP_PASS`
   создан тестовый payment_id 5120213360 (12 USD → USDTTRC20, адрес TMr2…CH3, статус `waiting`, оплата не производилась);
   `/v1/payout` доступен (список пуст); IPN-секрет получен, эталонная канонизация (sorted keys → compact JSON →
   HMAC-SHA512) проходит нашим `verifyIPN`, подделанная отбивается; секрет только в env стенда, в репо не попадал.
-- **Не сделано:** реальная оплата + живой IPN на наш вебхук (нужен публичный URL вместо example.com), боевые ключи
-  Rukassa → GAP-46 п.1–2. Отдельный unresolved — TZ-02 (маппинг TON/TRX/LTC).
+- **Не сделано:** реальная оплата + живой IPN на наш вебхук (нужен публичный URL вместо example.com). По Rukassa —
+  живая оплата и боевые ключи `RUKASSA_SHOP_ID`/`RUKASSA_API_KEY` плюс «URL оповещения» и методы оплаты в кабинете
+  мерчанта (идентификация мерчанта не пройдена) → GAP-46 п.1–2. Выплат через Rukassa в коде нет: вывод по-прежнему
+  `provider: manual`, поле «URL ДЛЯ ВЫПЛАТ» в кабинете не заполняется. Отдельный unresolved — TZ-02 (маппинг TON/TRX/LTC).
 
 ### GAP-08. GitSlotPark вместо «только DemoProvider» (P1) — 🟦 CODE_DONE
 

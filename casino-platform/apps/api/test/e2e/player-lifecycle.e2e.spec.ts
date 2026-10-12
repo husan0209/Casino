@@ -28,8 +28,7 @@ const PLAYER_EMAIL = `e2e-player-${randomUUID().slice(0, 8)}@casino.test`
 const PLAYER_PASSWORD = 'e2e-PlayerPass1'
 const SUPERADMIN_EMAIL = 'e2e-superadmin@casino.test'
 const SUPERADMIN_PASSWORD = 'e2e-SuperPass1'
-const RUKASSA_SECRET = process.env['RUKASSA_SECRET_KEY'] ?? 'e2e-rukassa-hmac-secret'
-const RUKASSA_SHOP_ID = process.env['RUKASSA_SHOP_ID'] ?? 'e2e-shop'
+const RUKASSA_TOKEN = process.env['RUKASSA_API_KEY'] ?? 'e2e-rukassa-api-token'
 
 /** `BodyInit` здесь не глобал (lib без DOM), а fetch-тело ровно из этих трёх форм. */
 type HttpBody = string | FormData | null
@@ -53,7 +52,8 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     opts: {
       token?: string
       body?: unknown
-      raw?: { text: string; sign?: string }
+      /** form-urlencoded + подпись в `signature` — транспорт уведомления Rukassa. */
+      raw?: { fields: Record<string, string>; sign?: string }
       multipart?: { fields: Record<string, string>; file?: { name: string; bytes: Buffer } }
     } = {},
   ): Promise<{ status: number; json: T | null }> {
@@ -77,11 +77,11 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
       }
       body = form
     } else if (opts.raw) {
-      headers['content-type'] = 'application/json'
+      headers['content-type'] = 'application/x-www-form-urlencoded'
       if (opts.raw.sign) {
-        headers['x-signature'] = opts.raw.sign
+        headers['signature'] = opts.raw.sign
       }
-      body = opts.raw.text
+      body = new URLSearchParams(opts.raw.fields).toString()
     } else if (opts.body !== undefined) {
       headers['content-type'] = 'application/json'
       body = JSON.stringify(opts.body)
@@ -110,11 +110,32 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     return { status: res.status, json: json as T | null }
   }
 
-  /** Формула rukassa.client.ts: HMAC-SHA256(`${shopId}:${orderId}:${amount}`) по RAW-байтам. */
-  function rukassaSign(raw: string): string {
-    const parsed = JSON.parse(raw) as { order_id: string; amount: string }
-    const payload = `${RUKASSA_SHOP_ID}:${parsed.order_id}:${parsed.amount}`
-    return createHmac('sha256', RUKASSA_SECRET).update(payload).digest('hex')
+  /**
+   * Уведомление Rukassa: form-поля (id, order_id, amount, in_amount, data,
+   * createdDateTime, status) и подпись `signature` =
+   * HMAC-SHA256(`${id}|${createdDateTime}|${amount}`, API-токен) — их формула со
+   * страницы «Разработчикам».
+   */
+  function rukassaNotification(over: Record<string, string> = {}): {
+    fields: Record<string, string>
+    sign: string
+  } {
+    const fields: Record<string, string> = {
+      id: '4242',
+      order_id: '1750000000000001',
+      amount: '1000',
+      in_amount: '1000',
+      createdDateTime: '2026-10-12T10:00:00Z',
+      status: 'PAID',
+      data: JSON.stringify({ payment_request_id: depositPrId }),
+      ...over,
+    }
+    return {
+      fields,
+      sign: createHmac('sha256', RUKASSA_TOKEN)
+        .update(`${fields.id}|${fields.createdDateTime}|${fields.amount}`)
+        .digest('hex'),
+    }
   }
 
   beforeAll(async () => {
@@ -171,7 +192,10 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
       await prisma.walletAccount.deleteMany({ where: { userId: id } })
     }
     if (depositPrId) {
-      await prisma.paymentCallback.deleteMany({ where: { externalId: depositPrId } })
+      // payment_callback.external_id — ИХ id операции (уведомления 5/5c), а не наш pr.id
+      await prisma.paymentCallback.deleteMany({
+        where: { provider: 'rukassa', externalId: { in: ['4242', '4243'] } },
+      })
     }
     if (userIds.length) {
       await prisma.user.deleteMany({ where: { id: { in: userIds } } })
@@ -254,9 +278,9 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
     expect(profile?.status).toBe('approved')
   })
 
-  it('5. депозит: вебхук Rukassa с валидным HMAC зачисляет 1000 RUB', async () => {
+  it('5. депозит: вебхук Rukassa с валидной подписью зачисляет 1000 RUB', async () => {
     // Платёжка создаётся на стороне провайдера — в E2E фиксируем её в БД напрямую,
-    // вебхук — публичный контракт с HMAC по raw body
+    // вебхук — публичный контракт: form-поля + HMAC в заголовке signature.
     depositPrId = randomUUID()
     await prisma.paymentRequest.create({
       data: {
@@ -271,11 +295,12 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
         idempotencyKey: `e2e-dep-${depositPrId}`,
       },
     })
-    const raw = JSON.stringify({ order_id: depositPrId, amount: '1000', status: 'success' })
     const res = await api('POST', '/payments/webhooks/rukassa', {
-      raw: { text: raw, sign: rukassaSign(raw) },
+      raw: rukassaNotification(),
     })
     expect(res.status).toBe(200)
+    // Провайдер понимает только текст: 'OK' засчитывает доставку.
+    expect(res.json?.['raw']).toBe('OK')
     const bal = await api<WalletRow[]>('GET', '/wallet/balances', { token: playerToken })
     const rub = (bal.json ?? []).find((b) => b.currency === 'RUB')
     expect(rub?.balance).toBe('1000')
@@ -283,11 +308,48 @@ dE2E('E2E: полный жизненный цикл игрока (GAP-05)', () =
   })
 
   it('5b. вебхук с неверной подписью НЕ меняет баланс (fail-closed)', async () => {
-    const raw = JSON.stringify({ order_id: depositPrId, amount: '999999', status: 'success' })
     const res = await api('POST', '/payments/webhooks/rukassa', {
-      raw: { text: raw, sign: 'deadbeef'.repeat(8) },
+      raw: {
+        fields: rukassaNotification({ in_amount: '999999' }).fields,
+        sign: 'deadbeef'.repeat(8),
+      },
+    })
+    // Статус всегда 200 (правило 9), отказ — в теле: провайдер повторит доставку.
+    expect(res.status).toBe(200)
+    expect(res.json?.['raw']).toBe('FAIL')
+    const bal = await api<WalletRow[]>('GET', '/wallet/balances', { token: playerToken })
+    const rub = (bal.json ?? []).find((b) => b.currency === 'RUB')
+    expect(rub?.balance).toBe('1000')
+  })
+
+  it('5c. недоплата: in_amount < amount -> ERROR AMOUNT, баланс прежний', async () => {
+    // Отдельная pending-заявка: 5 уже закрыла свою, а дедуп по completed стоял бы до
+    // проверки суммы. external_id у неё не заполнен — платёжка находится по data.
+    const underpayPrId = randomUUID()
+    await prisma.paymentRequest.create({
+      data: {
+        id: underpayPrId,
+        userId: playerUserId,
+        type: 'deposit',
+        status: 'pending',
+        provider: 'rukassa',
+        method: 'card',
+        currency: 'RUB',
+        amount: '1000',
+        idempotencyKey: `e2e-dep-${underpayPrId}`,
+      },
+    })
+    const res = await api('POST', '/payments/webhooks/rukassa', {
+      raw: rukassaNotification({
+        id: '4243',
+        in_amount: '500',
+        data: JSON.stringify({ payment_request_id: underpayPrId }),
+      }),
     })
     expect(res.status).toBe(200)
+    expect(res.json?.['raw']).toBe('ERROR AMOUNT')
+    const pr = await prisma.paymentRequest.findUnique({ where: { id: underpayPrId } })
+    expect(pr?.status).toBe('pending')
     const bal = await api<WalletRow[]>('GET', '/wallet/balances', { token: playerToken })
     const rub = (bal.json ?? []).find((b) => b.currency === 'RUB')
     expect(rub?.balance).toBe('1000')

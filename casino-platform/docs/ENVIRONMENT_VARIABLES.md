@@ -188,19 +188,35 @@ openssl rand -hex 64
 
 ## 8. Rukassa (Fiat Payments)
 
-| Variable              | Type   | Required | Default                  | Description                                |
-| --------------------- | ------ | -------- | ------------------------ | ------------------------------------------ |
-| `RUKASSA_SHOP_ID`     | string | ✅       | —                        | Shop ID                                    |
-| `RUKASSA_API_KEY`     | string | ✅       | —                        | API key                                    |
-| `RUKASSA_SECRET_KEY`  | string | ✅       | —                        | HMAC secret                                |
-| `RUKASSA_API_BASE`    | URL    | ❌       | `https://pay.rukassa.is` | База API (клиент дописывает `/api/v1/...`) |
-| `RUKASSA_WEBHOOK_URL` | URL    | ✅       | —                        | Public URL для callback                    |
-| `RUKASSA_SUCCESS_URL` | URL    | ✅       | —                        | Redirect после успеха                      |
-| `RUKASSA_FAIL_URL`    | URL    | ✅       | —                        | Redirect после неудачи                     |
+Контракт — официальная страница «Разработчикам» (`https://lk.rukassa.io/api/v1`).
 
-**Webhook registration:**
+| Variable           | Type   | Required | Default                 | Description                                              |
+| ------------------ | ------ | -------- | ----------------------- | -------------------------------------------------------- |
+| `RUKASSA_SHOP_ID`  | string | ✅ (бой) | —                       | ID магазина из настроек мерчанта                         |
+| `RUKASSA_API_KEY`  | string | ✅ (бой) | —                       | `token` мерчанта: авторизация API и ключ подписи вебхука |
+| `RUKASSA_API_BASE` | URL    | ❌       | `https://lk.rukassa.io` | База API (клиент дописывает `/api/v1/create`)            |
 
-Зарегистрировать `RUKASSA_WEBHOOK_URL` в личном кабинете Rukassa.
+Обязательность «для боя», а не для старта: без `RUKASSA_SHOP_ID`/`RUKASSA_API_KEY`
+приложение поднимается, а `POST /payments/deposit/fiat` отвечает
+`PAYMENT_PROVIDER_NOT_CONFIGURED` (503) и уведомление не принимается. В dev/тестах
+без ключей работает лог-стаб (платёжка «создана», ссылка ведёт на `/wallet?deposit=pending`).
+
+Не путать с полем **CLEVER TOKEN** в кабинете мерчанта: это токен способа оплаты
+`clever`, а не API-ключ. В `RUKASSA_API_KEY` кладут «API токен из настроек мерчанта».
+
+**Настройка в кабинете мерчанта (не в env):**
+
+- «URL оповещения» — `https://<домен>/api/v1/payments/webhooks/rukassa`. Ответ
+  нашего сервера — текст `OK`; любой другой провайдер повторяет до 5 раз.
+- Ссылки возврата после оплаты: `https://<домен>/wallet?deposit=success` и
+  `https://<домен>/wallet?deposit=failed`. По ним экран кошелька узнаёт итог и
+  начинает опрос статуса депозита; без них игрок остаётся на странице оплаты.
+- Включённые методы оплаты: `card`, `sbp`, `sbp_qr`, `sbp_kyc`, `clever`,
+  `crypta`, `skinpay`, `card_kzt`, `card_azn`. Наш метод уходит им только если
+  есть в этом списке (наш `p2p` они не знают — форма покажет включённое в
+  кабинете).
+- `URL ДЛЯ ВЫПЛАТ` оставляют пустым: выплат через Rukassa в коде нет, вывод
+  исполняет оператор (`provider: manual`).
 
 ---
 
@@ -474,11 +490,7 @@ TELEGRAM_BOT_NAME=your_dev_bot
 # ── Rukassa ────────────────────────────────────────────────
 RUKASSA_SHOP_ID=dev_shop_id
 RUKASSA_API_KEY=dev_api_key
-RUKASSA_SECRET_KEY=dev_secret_key
-RUKASSA_WEBHOOK_URL=http://localhost:3001/api/v1/payments/webhooks/rukassa
-RUKASSA_SUCCESS_URL=http://localhost:3000/wallet?deposit=success
-RUKASSA_FAIL_URL=http://localhost:3000/wallet?deposit=failed
-# RUKASSA_API_BASE=https://pay.rukassa.is  # optional override, code default
+# RUKASSA_API_BASE=https://lk.rukassa.io  # optional override, code default
 
 # ── NOWPayments ────────────────────────────────────────────
 NOWPAYMENTS_API_KEY=dev_nowpayments_key

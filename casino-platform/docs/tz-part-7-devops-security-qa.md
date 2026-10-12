@@ -1,11 +1,11 @@
 ---
-title: "ТЗ — Часть 7. DevOps, Security, Logging, QA, Release Prep"
+title: 'ТЗ — Часть 7. DevOps, Security, Logging, QA, Release Prep'
 part: 7
 total_parts: 7
-status: "frozen spec v1.0"
-project: "Online Casino Platform"
-stack: "NestJS + TypeScript + Prisma + PostgreSQL + Redis + Next.js"
-created: "2026-06-19"
+status: 'frozen spec v1.0'
+project: 'Online Casino Platform'
+stack: 'NestJS + TypeScript + Prisma + PostgreSQL + Redis + Next.js'
+created: '2026-06-19'
 ---
 
 # ТЗ — Часть 7. DevOps, Security, Logging, QA, Release Prep
@@ -13,13 +13,14 @@ created: "2026-06-19"
 > **Прогресс ТЗ:** `7 / 7` ✅ — финальная часть
 >
 > **Все части ТЗ:**
+>
 > 1. [Foundation — monorepo, стек, архитектура](./tz-part-1-foundation.md)
 > 2. [Backend Core — Auth, Users, KYC, RBAC](./tz-part-2-auth-users-kyc-rbac.md)
 > 3. [Wallet, Fiat/Crypto Payments, Transaction Ledger](./tz-part-3-payments-wallet.md)
 > 4. [Casino Providers, Game Sessions, Seamless Wallet API](./tz-part-4-casino-providers.md)
 > 5. [Frontend Web — витрина, ЛК, кошелёк, история](./tz-part-5-frontend-web.md)
 > 6. [Admin Panel, Support, Referral System](./tz-part-6-admin-support-referrals.md)
-> 7. **DevOps, Security, Logging, QA, Release Prep** ← *вы здесь*
+> 7. **DevOps, Security, Logging, QA, Release Prep** ← _вы здесь_
 
 ---
 
@@ -370,7 +371,6 @@ volumes:
   logs-data:
 
 services:
-
   # ── PostgreSQL ──────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
@@ -384,7 +384,7 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER} -d ${DB_NAME}']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -406,7 +406,7 @@ services:
       --appendonly yes
       --appendfsync everysec
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -435,7 +435,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/v1/health"]
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3001/api/v1/health']
       interval: 30s
       timeout: 10s
       start_period: 40s
@@ -481,8 +481,8 @@ services:
     networks:
       - casino-network
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./infra/docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./infra/docker/nginx/sites:/etc/nginx/sites-enabled:ro
@@ -511,13 +511,12 @@ volumes:
   redis-dev-data:
 
 services:
-
   postgres:
     image: postgres:16-alpine
     networks:
       - casino-dev
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres-dev-data:/var/lib/postgresql/data
     environment:
@@ -525,7 +524,7 @@ services:
       POSTGRES_USER: casino
       POSTGRES_PASSWORD: casino_dev_password
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U casino"]
+      test: ['CMD-SHELL', 'pg_isready -U casino']
       interval: 5s
       timeout: 3s
       retries: 5
@@ -535,7 +534,7 @@ services:
     networks:
       - casino-dev
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - redis-dev-data:/data
     command: redis-server --appendonly yes
@@ -833,13 +832,11 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 TELEGRAM_BOT_NAME=your_casino_bot
 
 # ── Rukassa ────────────────────────────────────────────────
+# RUKASSA_API_KEY = их `token` из настроек мерчанта: авторизация API и ключ
+# подписи уведомлений. «URL оповещения» и редиректы — в кабинете мерчанта.
 RUKASSA_SHOP_ID=your_shop_id
 RUKASSA_API_KEY=your_api_key
-RUKASSA_SECRET_KEY=your_secret_key
-RUKASSA_API_BASE=https://pay.rukassa.is
-RUKASSA_WEBHOOK_URL=https://casino.example.com/api/v1/payments/webhooks/rukassa
-RUKASSA_SUCCESS_URL=https://casino.example.com/wallet?deposit=success
-RUKASSA_FAIL_URL=https://casino.example.com/wallet?deposit=failed
+RUKASSA_API_BASE=https://lk.rukassa.io
 
 # ── NOWPayments ────────────────────────────────────────────
 NOWPAYMENTS_API_KEY=your_nowpayments_api_key
@@ -1131,7 +1128,6 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-
   # ── Проверка кода ─────────────────────────────────────────
   lint-and-type-check:
     name: Lint & Type Check
@@ -1552,17 +1548,16 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule)
 
   // Helmet — security headers
-  app.use(helmet({
-    contentSecurityPolicy: false, // настроено в Nginx
-    crossOriginEmbedderPolicy: false,
-  }))
+  app.use(
+    helmet({
+      contentSecurityPolicy: false, // настроено в Nginx
+      crossOriginEmbedderPolicy: false,
+    }),
+  )
 
   // CORS
   app.enableCors({
-    origin: [
-      process.env.APP_URL,
-      process.env.ADMIN_URL,
-    ],
+    origin: [process.env.APP_URL, process.env.ADMIN_URL],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
@@ -1572,14 +1567,16 @@ async function bootstrap() {
   app.getHttpAdapter().getInstance().disable('x-powered-by')
 
   // Validation pipe
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,         // убирает лишние поля из DTO
-    forbidNonWhitelisted: true,
-    transform: true,
-    transformOptions: {
-      enableImplicitConversion: false,
-    },
-  }))
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // убирает лишние поля из DTO
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: false,
+      },
+    }),
+  )
 
   // Throttler (rate limiting)
   // настраивается через ThrottlerModule
@@ -1737,13 +1734,7 @@ export default defineConfig({
     environment: 'node',
     coverage: {
       reporter: ['text', 'json', 'html'],
-      exclude: [
-        'node_modules/',
-        'dist/',
-        '**/*.d.ts',
-        '**/*.config.*',
-        '**/migrations/**',
-      ],
+      exclude: ['node_modules/', 'dist/', '**/*.d.ts', '**/*.config.*', '**/migrations/**'],
     },
     setupFiles: ['./test/setup.ts'],
   },
@@ -2220,57 +2211,68 @@ max_connections = 100
 # Правила разработки для AI-агента
 
 ## Контекст проекта
+
 Online Casino Platform — СНГ рынок, русский язык.
 Стек: NestJS + TypeScript + Prisma + PostgreSQL + Redis + Next.js
 
 ## Критические правила
 
 ### 1. Деньги
+
 НИКОГДА не использовать number/float для денег.
 ВСЕГДА string в API, ВСЕГДА decimal.js в коде, ВСЕГДА DECIMAL(20,8) в БД.
 
 ### 2. Idempotency
+
 КАЖДАЯ финансовая операция ДОЛЖНА иметь idempotency_key.
 Проверяй дубликаты ДО выполнения операции.
 
 ### 3. Структура модуля
+
 Каждый модуль: domain/ → application/ → infrastructure/ → presentation/
 Бизнес-логика ТОЛЬКО в application/use-cases/.
 HTTP логика ТОЛЬКО в presentation/controllers/.
 DB логика ТОЛЬКО в infrastructure/repositories/.
 
 ### 4. Ответы API
+
 ВСЕГДА использовать:
-  successResponse(data)
-  successResponse(data, meta)
-  errorResponse(code, message)
+successResponse(data)
+successResponse(data, meta)
+errorResponse(code, message)
 Никогда не возвращать сырые объекты.
 
 ### 5. Ошибки
+
 ВСЕГДА создавать кастомные ошибки расширяющие AppError.
 НИКОГДА не делать res.json({ error: '...' }) в controller.
 
 ### 6. Безопасность
+
 НИКОГДА не логировать: пароли, токены, API keys, карты, документы.
 ВСЕГДА валидировать входные данные через Zod.
 ВСЕГДА проверять права доступа в Guard, не в Service.
 
 ### 7. Транзакции БД
+
 Все финансовые операции — в prisma.$transaction().
 При version conflict — retry до 3 раз с backoff.
 
 ### 8. Webhook обработка
+
 ВСЕГДА сохранять raw callback в БД ДО обработки.
 ВСЕГДА возвращать 200 OK провайдеру даже при ошибке.
 НИКОГДА не зачислять средства без валидной подписи.
 
 ### 9. Перед созданием нового модуля
+
 1. Прочитай docs/MODULE_BOUNDARIES.md
 2. Проверь packages/shared-types/ на существующие типы
 3. Проверь apps/api/src/queues/queue.types.ts на существующие типы очередей
 4. Следуй точной структуре модуля
 
 ### 10. Тесты
+
 Каждый Service должен иметь unit тесты.
 Mock repository в service tests, не реальную БД.
 Для integration тестов — отдельная тестовая БД.

@@ -116,11 +116,12 @@ describe('GAP-28: идемпотентность депозита по external_
     expect(calls).toHaveLength(0)
   })
 
-  it('Rukassa: ключ проводки от order_id, а не от id платёжки', async () => {
+  it('Rukassa: ключ проводки от id платежа провайдера, а не от id платёжки', async () => {
     const prs = [
       {
         id: 'pr_a',
-        externalId: 'ord-100',
+        provider: 'rukassa',
+        externalId: '4242',
         userId: 'u2',
         status: 'pending',
         currency: 'RUB',
@@ -129,7 +130,8 @@ describe('GAP-28: идемпотентность депозита по external_
       },
       {
         id: 'pr_b',
-        externalId: 'ord-100',
+        provider: 'rukassa',
+        externalId: '4242',
         userId: 'u2',
         status: 'pending',
         currency: 'RUB',
@@ -145,19 +147,35 @@ describe('GAP-28: идемпотентность депозита по external_
       fakeUsers as any,
       fakeKyc as any,
     )
-    const body = { order_id: 'ord-100', status: 'success' }
+    // Ключ берётся от id платежа провайдера: даже если уведомление смэпится на
+    // другую платёжку (повторное создание PR, рассинхрон маппинга), повторного
+    // зачисления не будет — его отсекает уникальный индекс ledger.
+    const notification = {
+      rawHeaders: { signature: 'a'.repeat(64) },
+      body: {
+        id: 4242,
+        order_id: '1750000000000500',
+        amount: '500',
+        in_amount: '500',
+        createdDateTime: '2026-10-12T10:00:00Z',
+        status: 'PAID',
+        data: 'битый data — поиск по external_id',
+      },
+      rawBody: '',
+      ip: '1.2.3.4',
+    }
 
-    await uc.execute({ rawHeaders: { 'x-signature': 'ok' }, body, rawBody: '{}', ip: '1.2.3.4' })
+    expect(await uc.execute(notification)).toBe('OK')
     expect(calls).toHaveLength(1)
-    expect(calls[0]!.idempotencyKey).toBe('deposit_rukassa_ord-100')
+    expect(calls[0]!.idempotencyKey).toBe('deposit_rukassa_4242')
     expect(calls[0]!.amount).toBe('500')
 
-    await uc.execute({ rawHeaders: { 'x-signature': 'ok' }, body, rawBody: '{}', ip: '1.2.3.4' })
+    expect(await uc.execute(notification)).toBe('OK')
     expect(calls).toHaveLength(2)
     expect(calls[1]!.idempotencyKey).toBe(calls[0]!.idempotencyKey)
   })
 
-  it('Rukassa: без external_id зачисления нет (guard no_external_id)', async () => {
+  it('Rukassa: без external_id зачисления нет (guard payment_request_not_found)', async () => {
     const calls: CreditCall[] = []
     const uc = new ProcessRukassaWebhookUseCase(
       fakeRepo([]) as any,
@@ -166,7 +184,12 @@ describe('GAP-28: идемпотентность депозита по external_
       fakeUsers as any,
       fakeKyc as any,
     )
-    await uc.execute({ rawHeaders: {}, body: { status: 'success' }, rawBody: '{}', ip: '1.2.3.4' })
+    await uc.execute({
+      rawHeaders: { signature: 'a'.repeat(64) },
+      body: { id: 999, amount: '500', in_amount: '500', status: 'PAID' },
+      rawBody: '{}',
+      ip: '1.2.3.4',
+    })
     expect(calls).toHaveLength(0)
   })
 })

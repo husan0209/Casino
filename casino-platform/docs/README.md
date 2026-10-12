@@ -1,9 +1,9 @@
 ---
-title: "Online Casino Platform — Technical Specification"
-description: "Полное ТЗ онлайн-казино платформы на стеке NestJS + Next.js + Prisma + PostgreSQL + Redis"
-status: "frozen spec v1.0"
-stack: ["NestJS", "TypeScript", "Prisma", "PostgreSQL", "Redis", "BullMQ", "Next.js", "Tailwind"]
-created: "2026-06-19"
+title: 'Online Casino Platform — Technical Specification'
+description: 'Полное ТЗ онлайн-казино платформы на стеке NestJS + Next.js + Prisma + PostgreSQL + Redis'
+status: 'frozen spec v1.0'
+stack: ['NestJS', 'TypeScript', 'Prisma', 'PostgreSQL', 'Redis', 'BullMQ', 'Next.js', 'Tailwind']
+created: '2026-06-19'
 total_parts: 7
 ---
 
@@ -17,15 +17,15 @@ total_parts: 7
 
 ## 📚 Содержание ТЗ
 
-| # | Часть | Файл | Описание |
-|---|------|------|---------|
-| 1 | **Foundation** | [tz-part-1-foundation.md](./tz-part-1-foundation.md) | Архитектура monorepo, стек, соглашения, структура пакетов, Prisma schema (все таблицы), общие правила |
-| 2 | **Backend Core** | [tz-part-2-auth-users-kyc-rbac.md](./tz-part-2-auth-users-kyc-rbac.md) | Auth (email/Google/Telegram), Users, KYC по лимиту 5000₽, RBAC (user/admin/superadmin), audit_logs, email queue |
-| 3 | **Wallet & Payments** | [tz-part-3-payments-wallet.md](./tz-part-3-payments-wallet.md) | Мультивалютный кошелёк, ledger с optimistic locking, Rukassa (фиат), NOWPayments (крипто), выводы, конвертация |
-| 4 | **Casino Providers** | [tz-part-4-casino-providers.md](./tz-part-4-casino-providers.md) | Seamless Wallet API, 22 use cases, Provider Adapter Layer, каталог игр, DemoProvider для разработки |
-| 5 | **Frontend Web** | [tz-part-5-frontend-web.md](./tz-part-5-frontend-web.md) | Next.js витрина, каталог игр, ЛК, кошелёк, KYC, поддержка, реферальный кабинет |
-| 6 | **Admin Panel** | [tz-part-6-admin-support-referrals.md](./tz-part-6-admin-support-referrals.md) | Admin-панель, тикеты поддержки, реферальная система (GGR-share), уведомления |
-| 7 | **DevOps & Release** | [tz-part-7-devops-security-qa.md](./tz-part-7-devops-security-qa.md) | VPS, Docker, Nginx, SSL, CI/CD, логирование, безопасность, QA, чеклист запуска |
+| #   | Часть                 | Файл                                                                           | Описание                                                                                                        |
+| --- | --------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| 1   | **Foundation**        | [tz-part-1-foundation.md](./tz-part-1-foundation.md)                           | Архитектура monorepo, стек, соглашения, структура пакетов, Prisma schema (все таблицы), общие правила           |
+| 2   | **Backend Core**      | [tz-part-2-auth-users-kyc-rbac.md](./tz-part-2-auth-users-kyc-rbac.md)         | Auth (email/Google/Telegram), Users, KYC по лимиту 5000₽, RBAC (user/admin/superadmin), audit_logs, email queue |
+| 3   | **Wallet & Payments** | [tz-part-3-payments-wallet.md](./tz-part-3-payments-wallet.md)                 | Мультивалютный кошелёк, ledger с optimistic locking, Rukassa (фиат), NOWPayments (крипто), выводы, конвертация  |
+| 4   | **Casino Providers**  | [tz-part-4-casino-providers.md](./tz-part-4-casino-providers.md)               | Seamless Wallet API, 22 use cases, Provider Adapter Layer, каталог игр, DemoProvider для разработки             |
+| 5   | **Frontend Web**      | [tz-part-5-frontend-web.md](./tz-part-5-frontend-web.md)                       | Next.js витрина, каталог игр, ЛК, кошелёк, KYC, поддержка, реферальный кабинет                                  |
+| 6   | **Admin Panel**       | [tz-part-6-admin-support-referrals.md](./tz-part-6-admin-support-referrals.md) | Admin-панель, тикеты поддержки, реферальная система (GGR-share), уведомления                                    |
+| 7   | **DevOps & Release**  | [tz-part-7-devops-security-qa.md](./tz-part-7-devops-security-qa.md)           | VPS, Docker, Nginx, SSL, CI/CD, логирование, безопасность, QA, чеклист запуска                                  |
 
 ---
 
@@ -33,19 +33,19 @@ total_parts: 7
 
 Полная **структурированная документация** — в этой же папке (`docs/`). Точка входа — [INDEX.md](./INDEX.md):
 
-| Документ | Назначение |
-|----------|------------|
-| 📖 [INDEX.md](./INDEX.md) | Навигация по всей документации (начните отсюда) |
-| 🚨 [**AI_DEVELOPMENT_RULES.md**](./AI_DEVELOPMENT_RULES.md) | **ОБЯЗАТЕЛЬНО ПЕРВЫМ ДЕЛОМ** — 13 критичных правил для AI |
-| 🏛️ [ARCHITECTURE.md](./ARCHITECTURE.md) | Архитектурные решения (Modular Monolith, слои) |
-| 📚 [STACK.md](./STACK.md) | Обоснование выбора каждой технологии |
-| 📐 [API_CONVENTIONS.md](./API_CONVENTIONS.md) | Стандарты REST API (URL, status codes, errors) |
-| ✍️ [CONVENTIONS.md](./CONVENTIONS.md) | Code conventions (TypeScript, naming, money) |
-| 🧩 [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md) | Ответственности модулей и зависимости |
-| 🔐 [SECURITY_BASELINE.md](./SECURITY_BASELINE.md) | Безопасность на всех уровнях |
-| 💳 [PAYMENT_OVERVIEW.md](./PAYMENT_OVERVIEW.md) | Платежи, идемпотентность, webhook'и |
-| 🎮 [PROVIDER_INTEGRATION_STRATEGY.md](./PROVIDER_INTEGRATION_STRATEGY.md) | Game-провайдеры, Seamless Wallet API |
-| ⚙️ [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md) | Все env-переменные с дефолтами и валидацией |
+| Документ                                                                  | Назначение                                                |
+| ------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 📖 [INDEX.md](./INDEX.md)                                                 | Навигация по всей документации (начните отсюда)           |
+| 🚨 [**AI_DEVELOPMENT_RULES.md**](./AI_DEVELOPMENT_RULES.md)               | **ОБЯЗАТЕЛЬНО ПЕРВЫМ ДЕЛОМ** — 13 критичных правил для AI |
+| 🏛️ [ARCHITECTURE.md](./ARCHITECTURE.md)                                   | Архитектурные решения (Modular Monolith, слои)            |
+| 📚 [STACK.md](./STACK.md)                                                 | Обоснование выбора каждой технологии                      |
+| 📐 [API_CONVENTIONS.md](./API_CONVENTIONS.md)                             | Стандарты REST API (URL, status codes, errors)            |
+| ✍️ [CONVENTIONS.md](./CONVENTIONS.md)                                     | Code conventions (TypeScript, naming, money)              |
+| 🧩 [MODULE_BOUNDARIES.md](./MODULE_BOUNDARIES.md)                         | Ответственности модулей и зависимости                     |
+| 🔐 [SECURITY_BASELINE.md](./SECURITY_BASELINE.md)                         | Безопасность на всех уровнях                              |
+| 💳 [PAYMENT_OVERVIEW.md](./PAYMENT_OVERVIEW.md)                           | Платежи, идемпотентность, webhook'и                       |
+| 🎮 [PROVIDER_INTEGRATION_STRATEGY.md](./PROVIDER_INTEGRATION_STRATEGY.md) | Game-провайдеры, Seamless Wallet API                      |
+| ⚙️ [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md)                 | Все env-переменные с дефолтами и валидацией               |
 
 ---
 
@@ -123,27 +123,27 @@ total_parts: 7
 
 ### Backend модули (NestJS)
 
-| Модуль | Часть ТЗ | Ключевые use cases | Основные таблицы |
-|--------|---------|-------------------|-----------------|
-| **auth** | 2 | UC-AUTH-01..09 (register, login, OAuth, sessions) | `users`, `auth_providers`, `sessions`, `email_verifications`, `password_resets` |
-| **users** | 2 | UC-USER-01..06 (profile, settings, avatar, sessions) | `user_profiles`, `user_settings` |
-| **kyc** | 2 | UC-KYC-01..07 (submit, documents, review) | `kyc_profiles`, `kyc_documents` |
-| **admin** | 2, 6 | Admin auth, users list, KYC review, audit | `admin_users`, `audit_logs` |
-| **wallet** | 3 | UC-WALLET-01..08 (balances, credit/debit/lock/unlock) | `wallet_accounts`, `ledger_entries` |
-| **payments** | 3 | UC-PAY-01..18 (deposit/withdrawal, fiat/crypto) | `payment_requests`, `payment_callbacks`, `exchange_rates` |
-| **casino** | 4 | Seamless Wallet API, каталог, launch, favorites | `game_providers`, `games`, `game_sessions`, `game_rounds`, `game_transactions`, `game_favorites` |
-| **support** | 6 | UC-SUPPORT-01..12 (tickets, messages, internal notes) | `support_tickets`, `support_messages` |
-| **referrals** | 6 | UC-REF-01..08 (GGR-share, daily cron) | `referral_rewards` |
-| **notifications** | 6 | UC-NOTIF-01..05 (email + internal) | `notifications` |
-| **email-worker** | 2 | BullMQ queue `email`, 5+ шаблонов | — |
-| **health** | 7 | UC-HEALTH-01..02 | — |
+| Модуль            | Часть ТЗ | Ключевые use cases                                    | Основные таблицы                                                                                 |
+| ----------------- | -------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **auth**          | 2        | UC-AUTH-01..09 (register, login, OAuth, sessions)     | `users`, `auth_providers`, `sessions`, `email_verifications`, `password_resets`                  |
+| **users**         | 2        | UC-USER-01..06 (profile, settings, avatar, sessions)  | `user_profiles`, `user_settings`                                                                 |
+| **kyc**           | 2        | UC-KYC-01..07 (submit, documents, review)             | `kyc_profiles`, `kyc_documents`                                                                  |
+| **admin**         | 2, 6     | Admin auth, users list, KYC review, audit             | `admin_users`, `audit_logs`                                                                      |
+| **wallet**        | 3        | UC-WALLET-01..08 (balances, credit/debit/lock/unlock) | `wallet_accounts`, `ledger_entries`                                                              |
+| **payments**      | 3        | UC-PAY-01..18 (deposit/withdrawal, fiat/crypto)       | `payment_requests`, `payment_callbacks`, `exchange_rates`                                        |
+| **casino**        | 4        | Seamless Wallet API, каталог, launch, favorites       | `game_providers`, `games`, `game_sessions`, `game_rounds`, `game_transactions`, `game_favorites` |
+| **support**       | 6        | UC-SUPPORT-01..12 (tickets, messages, internal notes) | `support_tickets`, `support_messages`                                                            |
+| **referrals**     | 6        | UC-REF-01..08 (GGR-share, daily cron)                 | `referral_rewards`                                                                               |
+| **notifications** | 6        | UC-NOTIF-01..05 (email + internal)                    | `notifications`                                                                                  |
+| **email-worker**  | 2        | BullMQ queue `email`, 5+ шаблонов                     | —                                                                                                |
+| **health**        | 7        | UC-HEALTH-01..02                                      | —                                                                                                |
 
 ### Frontend приложения (Next.js)
 
-| App | Часть ТЗ | Разделы |
-|-----|---------|---------|
-| **apps/web** | 5 | `/`, `/casino`, `/casino/[slug]`, `/profile`, `/wallet`, `/wallet/transactions`, `/wallet/deposit`, `/wallet/withdraw`, `/history`, `/kyc`, `/support`, `/referral`, `/login`, `/register`, `/verify-email`, `/forgot-password`, `/reset-password` |
-| **apps/admin** | 6 | `/login`, `/` (dashboard), `/users`, `/users/[id]`, `/transactions`, `/payments`, `/payments/[id]`, `/withdrawals`, `/kyc`, `/kyc/[id]`, `/games`, `/providers`, `/providers/[id]`, `/support`, `/support/[id]`, `/referrals`, `/audit`, `/admins`, `/settings` |
+| App            | Часть ТЗ | Разделы                                                                                                                                                                                                                                                         |
+| -------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **apps/web**   | 5        | `/`, `/casino`, `/casino/[slug]`, `/profile`, `/wallet`, `/wallet/transactions`, `/wallet/deposit`, `/wallet/withdraw`, `/history`, `/kyc`, `/support`, `/referral`, `/login`, `/register`, `/verify-email`, `/forgot-password`, `/reset-password`              |
+| **apps/admin** | 6        | `/login`, `/` (dashboard), `/users`, `/users/[id]`, `/transactions`, `/payments`, `/payments/[id]`, `/withdrawals`, `/kyc`, `/kyc/[id]`, `/games`, `/providers`, `/providers/[id]`, `/support`, `/support/[id]`, `/referrals`, `/audit`, `/admins`, `/settings` |
 
 ---
 
@@ -211,16 +211,16 @@ total_parts: 7
 
 ## ⏱️ Оценка сроков разработки
 
-| Этап | Недели | Содержание |
-|------|-------|-----------|
-| **Этап 1** | 1-2 | Foundation: monorepo, БД, shared packages, Docker dev setup |
-| **Этап 2** | 2-3 | Auth backend (email, Google, Telegram), Users, KYC, RBAC |
-| **Этап 3** | 3-4 | Wallet core + Ledger, Rukassa интеграция, NOWPayments интеграция |
-| **Этап 4** | 4-5 | Casino providers, Seamless Wallet API, DemoProvider |
-| **Этап 5** | 5-7 | Frontend Web полностью (все страницы + UI-kit + Stores) |
-| **Этап 6** | 7-9 | Admin Panel, Support, Referrals, Notifications |
-| **Этап 7** | 9-10 | DevOps настройка VPS, деплой, тестирование, Release |
-| **Итого** | **~10 недель** | MVP готов к запуску |
+| Этап       | Недели         | Содержание                                                       |
+| ---------- | -------------- | ---------------------------------------------------------------- |
+| **Этап 1** | 1-2            | Foundation: monorepo, БД, shared packages, Docker dev setup      |
+| **Этап 2** | 2-3            | Auth backend (email, Google, Telegram), Users, KYC, RBAC         |
+| **Этап 3** | 3-4            | Wallet core + Ledger, Rukassa интеграция, NOWPayments интеграция |
+| **Этап 4** | 4-5            | Casino providers, Seamless Wallet API, DemoProvider              |
+| **Этап 5** | 5-7            | Frontend Web полностью (все страницы + UI-kit + Stores)          |
+| **Этап 6** | 7-9            | Admin Panel, Support, Referrals, Notifications                   |
+| **Этап 7** | 9-10           | DevOps настройка VPS, деплой, тестирование, Release              |
+| **Итого**  | **~10 недель** | MVP готов к запуску                                              |
 
 ---
 
@@ -242,6 +242,7 @@ total_parts: 7
 10. `packages/database/prisma/schema.prisma`
 
 **Если работаем с Payments/Casino** — дополнительно:
+
 - [docs/PAYMENT_OVERVIEW.md](./PAYMENT_OVERVIEW.md)
 - [docs/PROVIDER_INTEGRATION_STRATEGY.md](./PROVIDER_INTEGRATION_STRATEGY.md)
 
@@ -330,7 +331,7 @@ Backend:
   [ ] Rate limiting включён
 
 Интеграции:
-  [ ] Rukassa sandbox депозит работает
+  [ ] Боевой депозит Rukassa проходит (у провайдера нет sandbox: тестовая сумма + «URL оповещения» в кабинете)
   [ ] NOWPayments тестовый депозит работает
   [ ] Google OAuth callback настроен
   [ ] Telegram bot работает
