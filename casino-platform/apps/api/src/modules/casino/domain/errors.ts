@@ -114,3 +114,17 @@ export class CasinoProviderNotConfiguredError extends AppError {
     super(`${provider}: отсутствуют обязательные ключи (${keys})`, { provider })
   }
 }
+export class OriginalsGameNotSupportedError extends AppError {
+  readonly code = 'ORIGINALS_GAME_NOT_SUPPORTED'
+  readonly httpStatus = 501
+  constructor(gameCode: string) {
+    super('ORIGINALS_GAME_NOT_SUPPORTED', { gameCode })
+  }
+}
+export class OriginalsActionNotSupportedError extends AppError {
+  readonly code = 'ORIGINALS_ACTION_NOT_SUPPORTED'
+  readonly httpStatus = 501
+  constructor(action: string) {
+    super(`Originals action ${action} is not implemented in pilot`, { action })
+  }
+}

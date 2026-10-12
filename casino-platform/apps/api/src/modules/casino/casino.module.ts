@@ -12,7 +12,13 @@ import { AdminUpdateGameUseCase } from './application/use-cases/admin-update-gam
 import { FavoritesUseCase } from './application/use-cases/favorites.use-case'
 import { LaunchGameUseCase } from './application/use-cases/launch-game.use-case'
 import { ListGamesUseCase } from './application/use-cases/list-games.use-case'
+import { OriginalsIconsUseCase } from './application/use-cases/originals-icons.use-case'
+import { OriginalsSessionLoader } from './application/use-cases/originals-session-loader'
+import { OriginalsSessionUseCase } from './application/use-cases/originals-session.use-case'
+import { OriginalsSpinUseCase } from './application/use-cases/originals-spin.use-case'
+import { PlinkoDropUseCase } from './application/use-cases/plinko-drop.use-case'
 import { PROVIDER_ADAPTER_FACTORY } from './domain/casino.ports'
+import { HOUSE_SLOT_GAMES } from './domain/house-slot-game'
 import {
   GAME_CATALOG_REPOSITORY,
   GAME_FAVORITES_REPOSITORY,
@@ -20,6 +26,7 @@ import {
   GAME_PROVIDER_REPOSITORY,
 } from './domain/repositories/casino.repository'
 import { DemoProviderAdapter } from './infrastructure/providers/demo/demo-provider.adapter'
+import { HouseSlotGamesRegistry } from './infrastructure/providers/house/house-slot-games.registry'
 import { ProviderAdapterFactory } from './infrastructure/providers/provider-adapter.factory'
 import {
   PrismaGameCatalogRepository,
@@ -29,11 +36,19 @@ import {
 } from './infrastructure/repositories/casino.prisma.repository'
 import { CasinoAdminController } from './presentation/controllers/casino-admin.controller'
 import { CasinoController } from './presentation/controllers/casino.controller'
+import { OriginalsController } from './presentation/controllers/originals.controller'
+import { PlinkoController } from './presentation/controllers/plinko.controller'
 import { ProviderCallbackController } from './presentation/controllers/provider-callback.controller'
 
 @Module({
   imports: [ConfigModule, AuthModule, WalletModule, AdminModule],
-  controllers: [CasinoController, ProviderCallbackController, CasinoAdminController],
+  controllers: [
+    CasinoController,
+    ProviderCallbackController,
+    CasinoAdminController,
+    OriginalsController,
+    PlinkoController,
+  ],
   providers: [
     // Класс-токен остаётся: presentation-контроллер provider-callback и
     // exports модуля пока внедряют фабрику напрямую (В3-остаток).
@@ -45,6 +60,7 @@ import { ProviderCallbackController } from './presentation/controllers/provider-
     // (DI-токены). useExisting — тот же экземпляр, что и у класс-токена
     // (образец: payments.module.ts).
     { provide: PROVIDER_ADAPTER_FACTORY, useExisting: ProviderAdapterFactory },
+    { provide: HOUSE_SLOT_GAMES, useClass: HouseSlotGamesRegistry },
     { provide: GAME_CATALOG_REPOSITORY, useClass: PrismaGameCatalogRepository },
     { provide: GAME_FAVORITES_REPOSITORY, useClass: PrismaGameFavoritesRepository },
     { provide: GAME_PLAY_REPOSITORY, useClass: PrismaGamePlayRepository },
@@ -54,6 +70,11 @@ import { ProviderCallbackController } from './presentation/controllers/provider-
     LaunchGameUseCase,
     ListGamesUseCase,
     FavoritesUseCase,
+    OriginalsSessionLoader,
+    OriginalsSessionUseCase,
+    OriginalsIconsUseCase,
+    OriginalsSpinUseCase,
+    PlinkoDropUseCase,
     AdminSetProviderEnabledUseCase,
     AdminSyncProviderGamesUseCase,
     AdminUpdateGameUseCase,
