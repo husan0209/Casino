@@ -10,15 +10,24 @@ import { type TigerSpinRow } from '../../domain/house-slot-game'
  *
  * Донор тасует таблицы ровно (см. REPORT пилота §5): отдача выходит 527% у
  * Tiger и зависит от числа линий клиента. Здесь распределение строится явно:
- * доля выигрышных спинов зафиксирована, а «наклон» весов win-строк
- * (weight ∝ payout^-tilt) решается бисекцией так, чтобы матожидание выплаты
- * дало ровно целевой RTP при данном числе линий.
+ * RTP = hitProbability * E[payout | win] / paylines, и решателей два.
  *
- * RTP = hitProbability * E[payout | win] / paylines — отсюда аналитическая
- * проверка достижимости: таблицы с узким рядом выплат (Ox: максимум 15x)
- * не могут отдать 96% при реалистичной частоте выигрышей.
+ * A (основной): доля выигрышных спинов зафиксирована, наклон весов win-строк
+ * (weight ∝ payout^-tilt) подбирается бисекцией. Даёт привычную игру.
+ * B (запасной): наклон фиксирован (1/payout), подбирается доля выигрышей — им
+ * закрываются таблицы, у которых даже минимальная выплата велика (Songkran
+ * Party: минимум 30x, при 30% выигрышей отдача не опускается ниже 180%).
+ *
+ * Если ни один решатель не попадает в диапазон — OriginalsRtpUnreachableError,
+ * а не молчаливая подмена цифры в поле rtp.
  */
 export const HOUSE_SLOT_HIT_PROBABILITY = 0.3
+
+/** Верхняя граница доли выигрышей в режиме B: выше — игра без проигрышей. */
+export const HOUSE_SLOT_MAX_HIT_PROBABILITY = 0.6
+
+/** Наклон весов в режиме B: крупные выплаты реже мелких. */
+const FALLBACK_TILT = 1
 
 /** Диапазон наклона: за границами распределение вырождается в одну строку. */
 const TILT_MIN = -8
@@ -51,39 +60,75 @@ function expectedWinPayout(payouts: readonly number[], tilt: number): number {
   return numerator / denominator
 }
 
+/** RTP, который даёт данное матожидание выплаты при данной доле выигрышей. */
+function rtpPercentOf(expectedPayout: number, hitProbability: number, paylines: number): Decimal {
+  return new Decimal(expectedPayout).times(hitProbability).div(paylines).times(100)
+}
+
+/** Веса payout^-tilt, нормированные на долю выигрышных спинов. */
+function lotteryFromTilt(
+  payouts: readonly number[],
+  tilt: number,
+  hitProbability: number,
+): HouseSlotLottery {
+  const weights = payouts.map((payout) => Math.pow(payout, -tilt))
+  const weightSum = weights.reduce((acc, weight) => acc + weight, 0)
+  return {
+    hitProbability,
+    winProbabilities: weights.map((weight) => (weight / weightSum) * hitProbability),
+  }
+}
+
 /**
- * Наклон, при котором E[payout | win] равен требуемому. Требование вне
- * диапазона таблиц — OriginalsRtpUnreachableError, а не молчаливая подмена RTP.
+ * Решатель A: доля выигрышей фиксирована, наклон подбирается.
+ * null — если целевое матожидание вне диапазона таблиц (упёрлось в min/max payout).
  */
-function solveTilt(args: {
-  gameCode: string
+function lotteryAtFixedHit(args: {
   targetRtp: string
   payouts: readonly number[]
-  requiredExpected: number
   paylines: number
-}): number {
-  const asPercent = (expected: number): string =>
-    new Decimal(expected).times(HOUSE_SLOT_HIT_PROBABILITY).div(args.paylines).times(100).toFixed(2)
+}): HouseSlotLottery | null {
+  const requiredExpected = new Decimal(args.targetRtp)
+    .div(100)
+    .times(args.paylines)
+    .div(HOUSE_SLOT_HIT_PROBABILITY)
+    .toNumber()
   const lowest = expectedWinPayout(args.payouts, TILT_MAX)
   const highest = expectedWinPayout(args.payouts, TILT_MIN)
-  if (args.requiredExpected < lowest || args.requiredExpected > highest) {
-    throw new OriginalsRtpUnreachableError(
-      args.gameCode,
-      args.targetRtp,
-      `${asPercent(lowest)}..${asPercent(highest)}`,
-    )
+  if (requiredExpected < lowest || requiredExpected > highest) {
+    return null
   }
   let low = TILT_MIN
   let high = TILT_MAX
   for (let step = 0; step < BISECTION_STEPS; step++) {
     const middle = (low + high) / 2
-    if (expectedWinPayout(args.payouts, middle) > args.requiredExpected) {
+    if (expectedWinPayout(args.payouts, middle) > requiredExpected) {
       low = middle
     } else {
       high = middle
     }
   }
-  return (low + high) / 2
+  return lotteryFromTilt(args.payouts, (low + high) / 2, HOUSE_SLOT_HIT_PROBABILITY)
+}
+
+/**
+ * Решатель B: наклон фиксирован (1/payout), подбирается доля выигрышей.
+ * null — если для целевого RTP нужно больше выигрышей, чем HOUSE_SLOT_MAX_HIT_PROBABILITY.
+ */
+function lotteryAtFixedTilt(args: {
+  targetRtp: string
+  payouts: readonly number[]
+  paylines: number
+}): HouseSlotLottery | null {
+  const expected = expectedWinPayout(args.payouts, FALLBACK_TILT)
+  const hitProbability = new Decimal(args.targetRtp)
+    .times(args.paylines)
+    .div(new Decimal(expected).times(100))
+    .toNumber()
+  if (hitProbability > HOUSE_SLOT_MAX_HIT_PROBABILITY) {
+    return null
+  }
+  return lotteryFromTilt(args.payouts, FALLBACK_TILT, hitProbability)
 }
 
 /** Win-строки должны нести положительный payout — иначе лотерея не определена. */
@@ -109,24 +154,25 @@ export function buildHouseSlotLottery(args: {
     return ZERO_LOTTERY(args.winPayouts.length)
   }
   assertPayouts(args.gameCode, args.winPayouts)
-  const requiredExpected = rtpPercent
-    .div(100)
-    .times(args.paylines)
-    .div(HOUSE_SLOT_HIT_PROBABILITY)
-    .toNumber()
-  const tilt = solveTilt({
-    gameCode: args.gameCode,
-    targetRtp: args.targetRtp,
-    payouts: args.winPayouts,
-    requiredExpected,
-    paylines: args.paylines,
-  })
-  const weights = args.winPayouts.map((payout) => Math.pow(payout, -tilt))
-  const weightSum = weights.reduce((acc, weight) => acc + weight, 0)
-  return {
-    hitProbability: HOUSE_SLOT_HIT_PROBABILITY,
-    winProbabilities: weights.map((weight) => (weight / weightSum) * HOUSE_SLOT_HIT_PROBABILITY),
+  const request = { targetRtp: args.targetRtp, payouts: args.winPayouts, paylines: args.paylines }
+  const lottery = lotteryAtFixedHit(request) ?? lotteryAtFixedTilt(request)
+  if (lottery) {
+    return lottery
   }
+  const fixedTiltExpected = expectedWinPayout(args.winPayouts, FALLBACK_TILT)
+  throw new OriginalsRtpUnreachableError(
+    args.gameCode,
+    args.targetRtp,
+    `${rtpPercentOf(
+      expectedWinPayout(args.winPayouts, TILT_MAX),
+      HOUSE_SLOT_HIT_PROBABILITY,
+      args.paylines,
+    ).toFixed(2)}..${rtpPercentOf(
+      fixedTiltExpected,
+      HOUSE_SLOT_MAX_HIT_PROBABILITY,
+      args.paylines,
+    ).toFixed(2)}`,
+  )
 }
 
 /**

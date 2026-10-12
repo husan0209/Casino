@@ -153,6 +153,58 @@ describe('buildHouseSlotLottery', () => {
   })
 })
 
+describe('режим B: наклон фиксирован, подбирается доля выигрышей', () => {
+  // Таблица вроде Songkran Party: минимум 30x — при 30% выигрышей отдача
+  // не опускается ниже 180%, поэтому долю выигрышей уменьшает решатель B.
+  const RARE_BIG_PAYOUTS = [30, 50, 100, 250]
+
+  function fakeRows(payouts: readonly number[]): TigerSpinRow[] {
+    return payouts.map((payout) => [['Symbol_1'], [1], [], [], 2, payout] as TigerSpinRow)
+  }
+
+  it('96% достигаются меньшей долей выигрышей, чем HOUSE_SLOT_HIT_PROBABILITY', () => {
+    const lottery = buildHouseSlotLottery({
+      gameCode: 'songkranparty',
+      winPayouts: RARE_BIG_PAYOUTS,
+      targetRtp: '96',
+      paylines: PAYLINES,
+    })
+    expect(lottery.hitProbability).toBeLessThan(HOUSE_SLOT_HIT_PROBABILITY)
+    expect(lottery.hitProbability).toBeGreaterThan(0)
+    const weightedPayout = lottery.winProbabilities.reduce(
+      (acc, probability, index) => acc + probability * (RARE_BIG_PAYOUTS[index] as number),
+      0,
+    )
+    const rtp = new Decimal(weightedPayout).div(PAYLINES).times(100)
+    expect(rtp.minus(96).abs().lt(new Decimal('0.000001'))).toBe(true)
+  })
+
+  it('симуляция режима B отдаёт целевые 96%', () => {
+    const { rtpPercent, hitRate } = simulateRtp({
+      winRows: fakeRows(RARE_BIG_PAYOUTS),
+      loseRows: fakeRows([0]),
+      targetRtp: '96',
+      spins: 500_000,
+      seed: 99,
+    })
+    // Дисперсия у редких крупных выплат выше, чем у Tiger: допуск шире,
+    // точность целевого значения доказан аналитическим тестом выше.
+    expect(rtpPercent.minus(96).abs().lt(new Decimal('2'))).toBe(true)
+    expect(hitRate).toBeLessThan(HOUSE_SLOT_HIT_PROBABILITY)
+  })
+
+  it('узкие таблицы (3..5x) не тянут 100% ни одним решателем', () => {
+    expect(() =>
+      buildHouseSlotLottery({
+        gameCode: 'narrow',
+        winPayouts: [3, 4, 5],
+        targetRtp: '100',
+        paylines: PAYLINES,
+      }),
+    ).toThrow(OriginalsRtpUnreachableError)
+  })
+})
+
 describe('drawHouseSlotOutcome', () => {
   it('проигрышный билет отдаёт lose-строку с payout 0', () => {
     const lottery = buildHouseSlotLottery({
