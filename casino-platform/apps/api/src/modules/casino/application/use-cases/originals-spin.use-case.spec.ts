@@ -75,6 +75,7 @@ function makeSession(externalGameId = 'fortunetiger'): GameSessionWithGame {
       isPopular: false,
       hasDemo: true,
       rtp: decimalValue('70'),
+      rtpDemo: null,
       volatility: null,
       maxWinMultiplier: null,
       minBet: null,
