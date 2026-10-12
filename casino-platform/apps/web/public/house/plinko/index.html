@@ -14,25 +14,42 @@
   }
   #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
 
-  /* TOPBAR */
+  /* TOPBAR
+     Логотип и баланс умеют сжиматься (min-width:0 + ellipsis), кнопки
+     справа — нет. Иначе на телефонах уже iPhone XR кнопка «честность»
+     выдавливается за правый край экрана. */
   #topbar {
     height: 56px; display: flex; align-items: center; justify-content: space-between;
-    padding: 0 20px; background: #1a2c38; border-bottom: 1px solid #2a3d4a;
+    background: #1a2c38; border-bottom: 1px solid #2a3d4a;
     flex-shrink: 0; gap: 12px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
   }
-  .logo { font-weight: 800; font-size: 18px; letter-spacing: 2px; color: #00e701; }
+  .logo {
+    font-weight: 800; font-size: 18px; letter-spacing: 2px; color: #00e701;
+    flex: 0 1 auto; min-width: 0; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
   .logo span { color: #fff; }
   .balance {
     display: flex; align-items: center; gap: 10px; background: #0f212e;
     padding: 8px 14px; border-radius: 6px;
+    flex: 0 1 auto; min-width: 0;
   }
-  .balance .label { color: #7f8fa0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .balance .value { font-weight: 700; color: #00e701; font-variant-numeric: tabular-nums; }
-  .top-btns { display: flex; gap: 8px; }
+  .balance .label {
+    color: #7f8fa0; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.5px; white-space: nowrap; flex: 0 0 auto;
+  }
+  .balance .value {
+    font-weight: 700; color: #00e701; font-variant-numeric: tabular-nums;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+  }
+  .top-btns { display: flex; gap: 8px; flex: 0 0 auto; }
   .icon-btn {
     background: #2a3d4a; border: none; color: #fff; width: 36px; height: 36px;
     border-radius: 6px; cursor: pointer; font-size: 16px; display: flex;
     align-items: center; justify-content: center; transition: background 0.15s;
+    flex: 0 0 auto; padding: 0;
   }
   .icon-btn:hover { background: #3a4d5a; }
 
@@ -146,6 +163,7 @@
   }
   .modal input:focus { border-color: #00e701; }
   .modal .hash { word-break: break-all; font-family: ui-monospace, monospace; font-size: 11px; color: #7f8fa0; background: #0f212e; padding: 8px; border-radius: 4px; margin-top: 4px; }
+  .modal .modal-note { font-size: 12px; line-height: 1.5; color: #b8c7d1; margin-bottom: 4px; }
   .modal-btns { display: flex; gap: 8px; margin-top: 20px; }
   .modal-btns button {
     flex: 1; padding: 12px; border: none; border-radius: 6px; cursor: pointer;
@@ -161,52 +179,75 @@
       width: 100%; max-height: 42vh; border-right: none;
       border-bottom: 1px solid #2a3d4a; padding: 12px;
     }
-    #topbar { padding: 0 12px; }
+    #topbar {
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+    }
     .logo { font-size: 15px; }
     .balance { padding: 6px 10px; }
+  }
+
+  /* Узкие телефоны (iPhone SE/8, Galaxy S-серия в 360px): топбар должен
+     целиком помещаться по ширине — кнопки справа не сжимаются и
+     не уезжают за край. */
+  @media (max-width: 480px) {
+    #topbar { height: 52px; gap: 8px; }
+    .logo { font-size: 14px; letter-spacing: 1px; }
+    .balance { gap: 6px; padding: 6px 8px; }
+    .balance .label { font-size: 10px; letter-spacing: 0.3px; }
+    .balance .value { font-size: 13px; }
+    .top-btns { gap: 6px; }
+    .icon-btn { width: 32px; height: 32px; font-size: 15px; }
+  }
+
+  @media (max-width: 380px) {
+    .logo { font-size: 13px; letter-spacing: 0.5px; }
+    .balance .label { display: none; }
+    .top-btns { gap: 4px; }
+    .icon-btn { width: 30px; height: 30px; font-size: 14px; }
   }
 </style>
 </head>
 <body>
 <div id="app">
   <header id="topbar">
-    <div class="logo">PLINKO<span>.GAME</span></div>
+    <div class="logo">Plinko</div>
     <div class="balance">
-      <span class="label">Balance</span>
-      <span class="value" id="balance">$1,000.00</span>
+      <span class="label">Баланс</span>
+      <span class="value" id="balance">—</span>
     </div>
     <div class="top-btns">
-      <button class="icon-btn" id="soundBtn" title="Sound">🔊</button>
-      <button class="icon-btn" id="fairBtn" title="Provably Fair">🛡</button>
+      <button class="icon-btn" id="soundBtn" title="Звук">🔊</button>
+      <button class="icon-btn" id="fairBtn" title="Как считается раунд">i</button>
     </div>
   </header>
 
   <div id="main">
     <aside id="controls">
       <div class="control-group">
-        <label>Bet Amount</label>
+        <label>Ставка</label>
         <div class="bet-input">
           <input type="number" id="betAmount" value="10.00" step="0.10" min="0.10">
-          <span class="currency">$</span>
+          <span class="currency">₽</span>
         </div>
         <div class="bet-buttons">
           <button data-bet-mult="0.5">½</button>
           <button data-bet-mult="2">2×</button>
-          <button data-bet-mult="max">Max</button>
+          <button data-bet-mult="max">Макс</button>
         </div>
       </div>
 
       <div class="control-group">
-        <label>Risk</label>
+        <label>Риск</label>
         <div class="segmented" id="riskGroup">
-          <button data-risk="low">Low</button>
-          <button data-risk="medium" class="active">Medium</button>
-          <button data-risk="high">High</button>
+          <button data-risk="low">Низкий</button>
+          <button data-risk="medium" class="active">Средний</button>
+          <button data-risk="high">Высокий</button>
         </div>
       </div>
 
       <div class="control-group">
-        <label>Rows</label>
+        <label>Ряды</label>
         <div class="rows-grid" id="rowsGroup">
           <button data-rows="8">8</button>
           <button data-rows="9">9</button>
@@ -220,11 +261,10 @@
         </div>
       </div>
 
-      <button class="bet-btn" id="betBtn">BET</button>
+      <button class="bet-btn" id="betBtn">Играть</button>
 
       <div class="info">
-        <div class="info-row"><span>Profit on win</span><span id="profitOnWin">$0.00</span></div>
-        <div class="info-row accent"><span>RTP</span><span>99.00%</span></div>
+        <div class="info-row"><span>Прибыль при макс.</span><span id="profitOnWin">—</span></div>
       </div>
     </aside>
 
@@ -234,26 +274,28 @@
   </div>
 
   <div id="historyPanel">
-    <div class="history-title">Recent</div>
+    <div class="history-title">Последние</div>
     <div id="history" style="display:contents"></div>
   </div>
 </div>
 
-<!-- Provably Fair Modal -->
+<!-- Как считается раунд -->
 <div class="modal-overlay" id="fairModal">
   <div class="modal">
-    <h3>🛡 Fairness</h3>
-    <label>Outcome hash (SHA-256, fixed before animation)</label>
-    <div class="hash" id="serverHash">—</div>
-    <label>Round ID</label>
+    <h3>Как считается раунд</h3>
+    <p class="modal-note">Путь шарика сервер определяет до начала анимации — доска только показывает уже готовый исход. Он же сохраняется в истории ставок.</p>
+    <label>Конфигурация</label>
+    <div class="hash" id="fairConfig">—</div>
+    <label>Множители лунок (слева направо)</label>
+    <div class="hash" id="fairTable">—</div>
+    <label>Номер раунда</label>
     <div class="hash" id="serverSeed">—</div>
-    <label>Last drop</label>
-    <input id="clientSeedInput" type="text" value="" readonly>
-    <label>Drop ID</label>
+    <label>Хеш исхода (SHA-256)</label>
     <div class="hash" id="nonceDisplay">—</div>
+    <input id="clientSeedInput" type="hidden">
     <div class="modal-btns">
-      <button class="secondary" id="rotateBtn">Sync Balance</button>
-      <button class="primary" id="closeFairBtn">Close</button>
+      <button class="secondary" id="rotateBtn">Обновить баланс</button>
+      <button class="primary" id="closeFairBtn">Закрыть</button>
     </div>
   </div>
 </div>
@@ -319,7 +361,17 @@ const BALL_COLORS = ['#ff5e5e', '#ffb84d', '#00e701', '#4dd0ff', '#b84dff', '#ff
    ============================================================ */
 const queryParams = new URLSearchParams(window.location.search);
 const SESSION_TOKEN = queryParams.get('token') || '';
-const CURRENCY_SYMBOLS = { RUB: '₽', USD: '$', EUR: '€', USDT_TRC20: '$' };
+
+/* Деньги — тем же форматом, что и платформа (apps/web/src/lib/format/currency.ts):
+   разделитель тысяч пробелом, обозначение ПОСЛЕ суммы, крипта — кодом (USDT/BTC),
+   а не знаком доллара. Валют у платформы шесть, «USD/EUR» в кошельке нет. */
+const FIAT_SYMBOLS = { RUB: '₽', UAH: '₴', BYN: 'Br', KZT: '₸', UZS: 'soʻm' };
+const CRYPTO_LABELS = { USDT_TRC20: 'USDT', BTC: 'BTC', TON: 'TON', TRX: 'TRX', LTC: 'LTC' };
+const CRYPTO_DECIMALS = { USDT_TRC20: 2, BTC: 8, TON: 4, TRX: 4, LTC: 4 };
+
+function currencyLabel(currency) {
+  return CRYPTO_LABELS[currency] ?? FIAT_SYMBOLS[currency] ?? currency;
+}
 
 const state = {
   balance: 0,
@@ -338,12 +390,17 @@ const state = {
   lastRound: null,
 };
 
-function currencySymbol() {
-  return CURRENCY_SYMBOLS[state.currency] || (state.currency + ' ');
+function formatMoney(value) {
+  const decimals = CRYPTO_DECIMALS[state.currency] ?? 2;
+  const fixed = Number(value).toFixed(decimals);
+  const parts = fixed.split('.');
+  const spaced = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return (parts[1] ? spaced + '.' + parts[1] : spaced) + ' ' + currencyLabel(state.currency);
 }
 
-function formatMoney(value) {
-  return currencySymbol() + Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function betStep() {
+  const crypto = state.currency !== 'USDT_TRC20' && CRYPTO_LABELS[state.currency];
+  return crypto ? '0.000001' : '0.1';
 }
 
 async function loadServerState() {
@@ -360,7 +417,13 @@ async function loadServerState() {
   state.minBet = Number(json.data.minBet);
   state.maxBet = Number(json.data.maxBet);
   state.serverReady = true;
-  document.querySelector('.bet-input .currency').textContent = currencySymbol();
+  const betInput = document.getElementById('betAmount');
+  document.querySelector('.bet-input .currency').textContent = currencyLabel(state.currency);
+  betInput.min = String(state.minBet);
+  betInput.step = betStep();
+  if (Number(betInput.value) < state.minBet) {
+    betInput.value = String(state.minBet);
+  }
   updateBalance();
 }
 
@@ -401,25 +464,34 @@ function computeBoard() {
   const R = state.rows;
   const padX = Math.max(20, W * 0.04);
   const padTop = Math.max(30, H * 0.06);
-  const padBottom = Math.max(70, H * 0.14);
 
-  // Horizontal spacing limited by width
+  // Шаг по X задаётся шириной (сколько лунок влезает). Место под блок
+  // лунок резервируем ДО расчёта шага по Y, иначе ряды занимают всю
+  // высоту и лунки вылезают за нижний край.
   const dxMax = (W - 2 * padX) / (R + 1);
+  const slotBlock = Math.max(28, dxMax * 2.2) + dxMax * 0.55;
   // Vertical spacing limited by height
-  const dyMax = (H - padTop - padBottom) / R;
-  // Keep aspect pleasant: dy ≈ dx * 0.9
+  const dyMax = (H - padTop - slotBlock) / R;
+  // Keep aspect pleasant: dy ≈ dx * 0.9. На высоких досках (планшет в
+  // портрете) ряды могут стать реже — доска растягивается по вертикали
+  // вместо того чтобы болтаться в пустоте. Потолок 1.2 держит ячейку
+  // визуально почти квадратной, чтобы треугольник не вытягивался.
   dx = Math.min(dxMax, dyMax / 0.9);
-  dy = dx * 0.9;
+  dy = Math.max(dx * 0.9, Math.min(dyMax, dx * 1.2));
 
-  // If vertical space is tight, scale down
-  if (dy * R > H - padTop - padBottom) {
-    dy = (H - padTop - padBottom) / R;
-    dx = dy / 0.9;
-  }
-
-  const boardWidth = R * dx;
   centerX = W / 2;
-  boardTop = padTop + Math.max(0, ((H - padTop - padBottom) - R * dy) / 2) * 0.5;
+
+  // Высота лунки задаётся шириной доски, а не остатком окна. Раньше
+  // лунка забирала всё свободное место по вертикали: на планшете в
+  // портрете она вытягивалась в колонну 15:1, а на десктопе и телефоне
+  // было 2:1 — игра выглядела по-разному на каждом экране.
+  const slotGap = dy * 0.55;
+  slotH = Math.max(28, Math.min(dx * 2.2, H - padTop - R * dy - slotGap));
+
+  // Что осталось по вертикали — поровну сверху и снизу: доска стоит по
+  // центру, а не прижимается к верху с гигантскими лунками внизу.
+  const usedH = R * dy + slotGap + slotH;
+  boardTop = Math.max(padTop, (H - usedH) / 2);
 
   ballRadius = Math.max(4, Math.min(9, dx * 0.18));
   pegRadius = Math.max(2, Math.min(5, dx * 0.09));
@@ -438,8 +510,7 @@ function computeBoard() {
   }
 
   // Build slots
-  slotY = boardTop + R * dy + dy * 0.55;
-  slotH = Math.max(28, H - slotY - 14);
+  slotY = boardTop + R * dy + slotGap;
   slots = [];
   for (let j = 0; j <= R; j++) {
     slots.push({
@@ -460,6 +531,65 @@ function computeBoard() {
     s.mult = multipliers[s.index];
     s.color = multiplierColor(s.mult, maxMult);
   }
+
+  // Подпись множителя: пишем один раз на весь ряд, а не в drawSlot —
+  // ширина лунки меняется только на resize/смене rows-risk.
+  for (const s of slots) s.label = formatSlotLabel(s.mult);
+  applySlotTypography(slots);
+}
+
+const SLOT_FONT = '-apple-system, BlinkMacSystemFont, sans-serif';
+/* Ниже этого кегля подпись на телефоне уже не читается, поэтому вместо
+   того чтобы ужимать её ещё сильнее, переворачиваем вертикально. */
+const SLOT_MIN_READABLE = 8;
+
+function measureSlotText(label, size) {
+  ctx.font = `800 ${size}px ${SLOT_FONT}`;
+  return ctx.measureText(label).width;
+}
+
+/* Кегль под горизонтальную подпись, вписанный в ширину лунки. */
+function horizontalSlotFont(label, slotW) {
+  const maxTextW = Math.max(8, slotW * 0.88);
+  const size = Math.min(14, Math.max(9, slotW * 0.55));
+  const measured = measureSlotText(label, size);
+  return measured <= maxTextW ? size : size * (maxTextW / measured);
+}
+
+/* Для повёрнутой подписи шириной лунки ограничен уже кегль (высота
+   букв), а длиной текста — высота лунки. */
+function verticalSlotFont(label, slotW, slotH) {
+  const maxTextH = slotH * 0.8;
+  let size = Math.min(12, slotW * 1.15, slotH * 0.28);
+  const measured = measureSlotText(label, size);
+  if (measured > maxTextH) size = size * (maxTextH / measured);
+  return size;
+}
+
+/* На узких лунках (16 рядов на телефоне — всего ~14px) подпись
+   горизонтально не помещается в читаемом кегле. Тогда весь ряд
+   разворачиваем вертикально: решение общее на доску, иначе часть
+   подписей стояла бы, а часть лежала. */
+function applySlotTypography(list) {
+  const slotW = list[0].w;
+  const slotH = list[0].h;
+  const vertical = list.some(s => horizontalSlotFont(s.label, slotW) < SLOT_MIN_READABLE);
+  for (const s of list) {
+    s.vertical = vertical;
+    const size = vertical ? verticalSlotFont(s.label, slotW, slotH) : horizontalSlotFont(s.label, slotW);
+    s.fontSize = Math.round(size * 10) / 10;
+  }
+}
+
+/* Компактная запись множителя: «1000×» → «1K×», «0.5×» → «.5×» —
+   на узкой лунке каждый символ стоит ширины всей подписи. */
+function formatSlotLabel(mult) {
+  const m = Number(mult) || 0;
+  if (m >= 1000) {
+    const k = m / 1000;
+    return (Number.isInteger(k) ? k : String(Math.round(k * 10) / 10)) + 'K×';
+  }
+  return String(m).replace(/^0\./, '.') + '×';
 }
 
 function multiplierColor(mult, maxM) {
@@ -690,15 +820,22 @@ function drawSlot(s) {
   roundRect(ctx, x, y, w, Math.min(6, h * 0.25), r);
   ctx.fill();
 
-  // Text
-  const fontSize = Math.max(9, Math.min(14, w * 0.42));
+  // Text: подпись вписана в лунку в applySlotTypography
   ctx.fillStyle = '#ffffff';
-  ctx.font = `800 ${fontSize}px -apple-system, sans-serif`;
+  ctx.font = `800 ${s.fontSize}px ${SLOT_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.shadowColor = 'rgba(0,0,0,0.5)';
   ctx.shadowBlur = 3;
-  ctx.fillText(s.mult + '×', s.x, y + h / 2);
+  if (s.vertical) {
+    ctx.save();
+    ctx.translate(s.x, y + h / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(s.label, 0, 0);
+    ctx.restore();
+  } else {
+    ctx.fillText(s.label, s.x, y + h / 2);
+  }
   ctx.shadowBlur = 0;
 }
 
@@ -765,13 +902,14 @@ async function placeBet() {
   }
 }
 
+const BET_BUTTON_LABEL = 'Играть';
+
 function showDropError(error) {
   const btn = document.getElementById('betBtn');
-  const original = 'BET';
-  btn.textContent = 'ERROR — RETRY';
+  btn.textContent = 'Ошибка — повторить';
   btn.disabled = true;
   setTimeout(() => {
-    btn.textContent = original;
+    btn.textContent = BET_BUTTON_LABEL;
     updateBetButton();
   }, 1500);
 }
@@ -815,14 +953,16 @@ function updateBetButton() {
     state.balls.some(b => !b.done && b.landed);
 }
 
+const RISK_LABELS = { low: 'низкий', medium: 'средний', high: 'высокий' };
+
 function updateFairnessUI() {
   const round = state.lastRound;
-  document.getElementById('serverHash').textContent = round ? round.outcomeHash : '—';
+  document.getElementById('fairConfig').textContent =
+    state.rows + ' рядов, ' + RISK_LABELS[state.risk] + ' риск';
+  document.getElementById('fairTable').textContent =
+    MULTIPLIERS[state.rows][state.risk].map((mult) => String(mult).replace('.', ',')).join(' · ');
   document.getElementById('serverSeed').textContent = round ? round.roundId || '—' : '—';
-  document.getElementById('clientSeedInput').value = round
-    ? 'mult ' + round.multiplier + '×, slot ' + round.slotIndex
-    : '';
-  document.getElementById('nonceDisplay').textContent = round ? round.dropId : '—';
+  document.getElementById('nonceDisplay').textContent = round ? round.outcomeHash : '—';
 }
 
 /* ============================================================
