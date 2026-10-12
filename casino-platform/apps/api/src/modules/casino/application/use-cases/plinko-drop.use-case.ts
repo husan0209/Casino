@@ -139,6 +139,31 @@ function toMoneyString(raw: string): string {
   return new Decimal(raw).toString()
 }
 
+/**
+ * Исход дропа целиком: путь шарика, лунка, множитель, выплата и хеш.
+ * Считается один раз и в демо, и в боевом пути.
+ */
+export interface PlinkoOutcome {
+  path: PlinkoPath
+  slotIndex: number
+  multiplier: string
+  win: string
+  outcomeHash: string
+}
+
+export function rollPlinkoOutcome(parsed: PlinkoDropInput): PlinkoOutcome {
+  const path = drawPlinkoPath(parsed.rows)
+  const slotIndex = path.reduce<number>((sum, step) => sum + step, 0)
+  const multiplier = plinkoMultiplier(parsed.rows, parsed.risk, slotIndex)
+  return {
+    path,
+    slotIndex,
+    multiplier,
+    win: money.multiply(parsed.bet, multiplier),
+    outcomeHash: hashPlinkoOutcome(path, parsed.dropId),
+  }
+}
+
 @Injectable()
 export class PlinkoDropUseCase {
   constructor(
@@ -161,24 +186,21 @@ export class PlinkoDropUseCase {
   }
 
   private executeDemoDrop(parsed: PlinkoDropInput): PlinkoDropData {
-    const path = drawPlinkoPath(parsed.rows)
-    const slotIndex = path.reduce<number>((sum, step) => sum + step, 0)
-    const multiplier = plinkoMultiplier(parsed.rows, parsed.risk, slotIndex)
-    const win = money.multiply(parsed.bet, multiplier)
-    const balance = money.add(money.subtract(TIGER_DEMO_START_CREDIT, parsed.bet), win)
+    const outcome = rollPlinkoOutcome(parsed)
+    const balance = money.add(money.subtract(TIGER_DEMO_START_CREDIT, parsed.bet), outcome.win)
     return {
       dropId: parsed.dropId,
       roundId: null,
       bet: toMoneyString(parsed.bet),
       risk: parsed.risk,
       rows: parsed.rows,
-      path,
-      slotIndex,
-      multiplier,
-      win: toMoneyString(win),
+      path: outcome.path,
+      slotIndex: outcome.slotIndex,
+      multiplier: outcome.multiplier,
+      win: toMoneyString(outcome.win),
       balance: toMoneyString(balance),
       currency: 'RUB',
-      outcomeHash: hashPlinkoOutcome(path, parsed.dropId),
+      outcomeHash: outcome.outcomeHash,
       duplicate: false,
     }
   }
@@ -229,23 +251,72 @@ export class PlinkoDropUseCase {
     if (raceDuplicate) {
       return this.rebuildDuplicateDrop(session, providerId, parsed.dropId)
     }
-    const path = drawPlinkoPath(parsed.rows)
-    const slotIndex = path.reduce<number>((sum, step) => sum + step, 0)
-    const multiplier = plinkoMultiplier(parsed.rows, parsed.risk, slotIndex)
-    const win = money.multiply(parsed.bet, multiplier)
-    const outcomeHash = hashPlinkoOutcome(path, parsed.dropId)
-    const round = await this.play.createRound(
+    const outcome = rollPlinkoOutcome(parsed)
+    const round = await this.openDropRound({
+      session,
+      providerId,
+      dropId: parsed.dropId,
+      transaction,
+    })
+    const balanceAfter = await this.settleDrop({
+      session,
+      providerId,
+      parsed,
+      betExternalId,
+      round,
+      transaction,
+      outcome,
+    })
+    return {
+      dropId: parsed.dropId,
+      roundId: round.id,
+      bet: toMoneyString(parsed.bet),
+      risk: parsed.risk,
+      rows: parsed.rows,
+      path: outcome.path,
+      slotIndex: outcome.slotIndex,
+      multiplier: outcome.multiplier,
+      win: toMoneyString(outcome.win),
+      balance: toMoneyString(balanceAfter),
+      currency: session.currency,
+      outcomeHash: outcome.outcomeHash,
+      duplicate: false,
+    }
+  }
+
+  /** Открытие раунда до проводок (вынос из applyDrop, лимит 60 строк). */
+  private async openDropRound(args: {
+    session: GameSessionWithGame
+    providerId: string
+    dropId: string
+    transaction: WalletTransaction
+  }): Promise<GameRow> {
+    const { session, providerId, dropId, transaction } = args
+    return this.play.createRound(
       {
         sessionId: session.id,
         userId: session.userId,
         gameId: session.gameId,
         providerId,
-        externalRoundId: `plinko_${parsed.dropId}`,
+        externalRoundId: `plinko_${dropId}`,
         currency: session.currency,
         status: 'open',
       },
       transaction,
     )
+  }
+
+  /** Проводки дропа: ставка, затем выигрыш либо закрытие проигрыша (вынос из applyDrop). */
+  private async settleDrop(args: {
+    session: GameSessionWithGame
+    providerId: string
+    parsed: PlinkoDropInput
+    betExternalId: string
+    round: GameRow
+    transaction: WalletTransaction
+    outcome: PlinkoOutcome
+  }): Promise<string> {
+    const { session, providerId, parsed, betExternalId, round, transaction, outcome } = args
     const settled = await this.settleBet({
       session,
       providerId,
@@ -253,40 +324,26 @@ export class PlinkoDropUseCase {
       betExternalId,
       round,
       transaction,
-      outcome: { path, slotIndex, multiplier, outcomeHash },
+      outcome,
     })
-    const balanceAfter = money.isPositive(win)
-      ? await this.settleWin({
-          session,
-          providerId,
-          parsed,
-          win,
-          round,
-          transaction,
-          outcome: { path, slotIndex, multiplier, outcomeHash },
-        })
-      : await this.closeLosingRound({
-          bet: parsed.bet,
-          win,
-          round,
-          transaction,
-          settledBalance: settled.balanceAfter,
-        })
-    return {
-      dropId: parsed.dropId,
-      roundId: round.id,
-      bet: toMoneyString(parsed.bet),
-      risk: parsed.risk,
-      rows: parsed.rows,
-      path,
-      slotIndex,
-      multiplier,
-      win: toMoneyString(win),
-      balance: toMoneyString(balanceAfter),
-      currency: session.currency,
-      outcomeHash,
-      duplicate: false,
+    if (!money.isPositive(outcome.win)) {
+      return this.closeLosingRound({
+        bet: parsed.bet,
+        win: outcome.win,
+        round,
+        transaction,
+        settledBalance: settled.balanceAfter,
+      })
     }
+    return this.settleWin({
+      session,
+      providerId,
+      parsed,
+      win: outcome.win,
+      round,
+      transaction,
+      outcome,
+    })
   }
 
   /** Списание ставки + bet-запись + счётчик сессии (вынос из applyDrop, лимит 60 строк). */
@@ -297,7 +354,7 @@ export class PlinkoDropUseCase {
     betExternalId: string
     round: GameRow
     transaction: WalletTransaction
-    outcome: { path: PlinkoPath; slotIndex: number; multiplier: string; outcomeHash: string }
+    outcome: PlinkoOutcome
   }): Promise<{ balanceAfter: string }> {
     const { session, providerId, parsed, betExternalId, round, transaction, outcome } = args
     const debitResult = await this.wallet.debit({
@@ -347,7 +404,7 @@ export class PlinkoDropUseCase {
     win: string
     round: GameRow
     transaction: WalletTransaction
-    outcome: { path: PlinkoPath; slotIndex: number; multiplier: string; outcomeHash: string }
+    outcome: PlinkoOutcome
   }): Promise<string> {
     const { session, providerId, parsed, win, round, transaction, outcome } = args
     const { path, slotIndex, multiplier, outcomeHash } = outcome
