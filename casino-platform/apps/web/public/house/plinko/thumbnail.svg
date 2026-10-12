@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#0f212e"/>
+  <g fill="#2a3d4a">
+    <circle cx="216" cy="120" r="7"/>
+    <circle cx="256" cy="120" r="7"/>
+    <circle cx="296" cy="120" r="7"/>
+    <circle cx="196" cy="160" r="7"/>
+    <circle cx="236" cy="160" r="7"/>
+    <circle cx="276" cy="160" r="7"/>
+    <circle cx="316" cy="160" r="7"/>
+    <circle cx="176" cy="200" r="7"/>
+    <circle cx="216" cy="200" r="7"/>
+    <circle cx="256" cy="200" r="7"/>
+    <circle cx="296" cy="200" r="7"/>
+    <circle cx="336" cy="200" r="7"/>
+  </g>
+  <circle cx="256" cy="76" r="14" fill="#00e701"/>
+  <g>
+    <rect x="96" y="280" width="56" height="64" rx="10" fill="#e74c3c"/>
+    <rect x="164" y="280" width="56" height="64" rx="10" fill="#e8a13c"/>
+    <rect x="232" y="280" width="48" height="64" rx="10" fill="#00e701"/>
+    <rect x="292" y="280" width="56" height="64" rx="10" fill="#e8a13c"/>
+    <rect x="360" y="280" width="56" height="64" rx="10" fill="#e74c3c"/>
+  </g>
+  <text x="256" y="420" font-family="sans-serif" font-size="72" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="6">PLINKO</text>
+</svg>
