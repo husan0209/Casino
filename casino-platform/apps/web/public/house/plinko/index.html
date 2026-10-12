@@ -893,9 +893,13 @@ function renderHistory() {
   for (const h of state.history) {
     const div = document.createElement('div');
     div.className = 'history-pill';
-    div.textContent = h.mult + 'x';
-    div.style.background = h.profit >= 0 ? '#00e701' : '#e74c3c';
-    div.style.color = h.profit >= 0 ? '#06281c' : '#fff';
+    // Цвет по величине множителя (зелёный → красный), как в доноре.
+    const mult = Number(h.mult);
+    const t = Math.pow(Math.max(0.0001, mult) / 1000, 0.3);
+    const hue = (1 - Math.min(1, t)) * 120;
+    div.style.background = `hsl(${hue}, 70%, 42%)`;
+    div.style.color = '#fff';
+    div.textContent = mult + '×';
     div.title = (h.profit >= 0 ? '+' : '') + h.profit.toFixed(2);
     el.appendChild(div);
   }
@@ -909,14 +913,59 @@ function loop(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000);
   lastT = now;
 
+  let ballFinished = false;
   for (let i = state.balls.length - 1; i >= 0; i--) {
     state.balls[i].update(dt);
-    if (state.balls[i].done) state.balls.splice(i, 1);
+    if (state.balls[i].done) {
+      state.balls.splice(i, 1);
+      ballFinished = true;
+    }
   }
-  requestAnimationFrame(loop);
+  // На приземлении кнопка гаснет (шарик landed, но ещё не done) и сама себя
+  // не включает: пересчитываем её в момент, когда шарик уходит с доски.
+  if (ballFinished) updateBetButton();
+
+  // Свечение колышка после удара: вспышка живёт в state.flashes,
+  // затухание переносим в peg.glow (без этого блока peg.glow всегда 0).
+  for (const p of pegs) {
+    if (p.glow > 0) p.glow = Math.max(0, p.glow - dt * 3);
+  }
+  for (let i = state.flashes.length - 1; i >= 0; i--) {
+    const f = state.flashes[i];
+    f.life -= dt * 2.5;
+    if (f.life <= 0) {
+      state.flashes.splice(i, 1);
+      continue;
+    }
+    if (!f.isSlot) {
+      let bestPeg = null;
+      let bestDist = 1e9;
+      for (const p of pegs) {
+        const d = (p.x - f.x) ** 2 + (p.y - f.y) ** 2;
+        if (d < bestDist) {
+          bestDist = d;
+          bestPeg = p;
+        }
+      }
+      if (bestPeg) bestPeg.glow = Math.max(bestPeg.glow, f.life);
+    }
+  }
+
   drawBoard();
 
+  // Белая вспышка лунки, в которую упал шарик.
+  for (const f of state.flashes) {
+    if (f.isSlot) {
+      const s = f.slot;
+      ctx.fillStyle = `rgba(255,255,255,${f.life * 0.5})`;
+      roundRect(ctx, s.x - s.w / 2, s.y, s.w, s.h, 8);
+      ctx.fill();
+    }
+  }
+
   for (const b of state.balls) b.draw(ctx);
+
+  requestAnimationFrame(loop);
 }
 
 /* ============================================================
@@ -927,9 +976,31 @@ document.getElementById('betBtn').addEventListener('click', () => {
   placeBet();
 });
 
+document.getElementById('betAmount').addEventListener('input', () => {
+  updateProfitDisplay();
+  updateBetButton();
+});
+
+document.querySelectorAll('[data-bet-mult]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById('betAmount');
+    const current = parseFloat(input.value) || 0;
+    const cap = Math.min(state.balance, state.maxBet);
+    let value = btn.dataset.betMult === 'max' ? cap : current * parseFloat(btn.dataset.betMult);
+    value = Math.max(state.minBet, Math.min(cap, value));
+    input.value = value.toFixed(2);
+    updateProfitDisplay();
+    updateBetButton();
+  });
+});
+
 document.getElementById('soundBtn').addEventListener('click', (e) => {
   state.soundOn = !state.soundOn;
   e.currentTarget.textContent = state.soundOn ? '🔊' : '🔇';
+  if (state.soundOn) {
+    ensureAudio();
+    playTone(700, 0.08, 'sine', 0.04);
+  }
 });
 
 document.getElementById('fairBtn').addEventListener('click', () => {
@@ -970,7 +1041,13 @@ document.querySelectorAll('#rowsGroup button').forEach(btn => {
   });
 });
 
-window.addEventListener('resize', resize);
+window.addEventListener('resize', () => {
+  resize();
+  updateProfitDisplay();
+});
+if (window.ResizeObserver) {
+  new ResizeObserver(() => resize()).observe(canvas.parentElement);
+}
 
 /* ============================================================
    BOOT
