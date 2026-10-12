@@ -10,8 +10,7 @@ import { OriginalsSessionLoader } from './originals-session-loader'
 import {
   OriginalsSpinSchema,
   OriginalsSpinUseCase,
-  drawSlotOutcome,
-  parseRtpPercent,
+  resolveTargetRtpPercent,
 } from './originals-spin.use-case'
 import {
   type GameSessionWithGame,
@@ -99,6 +98,7 @@ function makeSlotGames(): IHouseSlotGames {
   const tigerConfig: HouseSlotGameConfig = {
     externalGameId: 'fortunetiger',
     displayName: 'Fortune Tiger',
+    paylines: 5,
     winRows: FORTUNE_TIGER_WIN_ROWS as HouseSlotGameConfig['winRows'],
     loseRows: FORTUNE_TIGER_LOSE_ROWS as HouseSlotGameConfig['loseRows'],
     icons: {
@@ -216,33 +216,23 @@ function makeWalletFacade(startBalance: string): {
   return { facade, calls, currentBalance: () => balance }
 }
 
-describe('parseRtpPercent', () => {
-  it('clamps to 0..100 and defaults to 70', () => {
-    expect(parseRtpPercent('70')).toBe(70)
-    expect(parseRtpPercent(null)).toBe(70)
-    expect(parseRtpPercent('garbage')).toBe(70)
-    expect(parseRtpPercent('140')).toBe(100)
-    expect(parseRtpPercent('-5')).toBe(0)
-    expect(parseRtpPercent('96.9')).toBe(96)
+describe('resolveTargetRtpPercent', () => {
+  it('берёт процент из записи игры, по умолчанию витринные 96', () => {
+    expect(resolveTargetRtpPercent('70')).toBe('70')
+    expect(resolveTargetRtpPercent('96.5')).toBe('96.5')
+    expect(resolveTargetRtpPercent(null)).toBe('96')
+    expect(resolveTargetRtpPercent('0')).toBe('0')
+  })
+
+  it('обрезает до 0..100 и не падает на мусор', () => {
+    expect(resolveTargetRtpPercent('140')).toBe('100')
+    expect(resolveTargetRtpPercent('-5')).toBe('0')
+    expect(resolveTargetRtpPercent('garbage')).toBe('96')
   })
 })
 
-describe('drawSlotOutcome', () => {
-  it('returns only win rows at rtp 100', () => {
-    for (let spin = 0; spin < 20; spin++) {
-      const outcome = drawSlotOutcome(FORTUNE_TIGER_WIN_ROWS, FORTUNE_TIGER_LOSE_ROWS, 100)
-      expect(outcome[5]).toBeGreaterThan(0)
-    }
-  })
-
-  it('returns only lose rows at rtp 0', () => {
-    for (let spin = 0; spin < 20; spin++) {
-      const outcome = drawSlotOutcome(FORTUNE_TIGER_WIN_ROWS, FORTUNE_TIGER_LOSE_ROWS, 0)
-      expect(outcome[5]).toBe(0)
-    }
-  })
-
-  it('every table row keeps the 6-column donor shape', () => {
+describe('донорская форма таблицы', () => {
+  it('каждая строка хранит 6 колонок донора', () => {
     const allRows: TigerSpinRow[] = [...FORTUNE_TIGER_WIN_ROWS, ...FORTUNE_TIGER_LOSE_ROWS]
     expect(allRows.length).toBe(32)
     for (const row of allRows) {
@@ -272,13 +262,22 @@ describe('OriginalsSpinSchema', () => {
 })
 
 describe('OriginalsSpinUseCase demo', () => {
-  it('spins without touching the wallet', async () => {
-    const session = makeSession()
-    const play = makePlayRepository(session)
+  function makeDemoUseCase(): {
+    useCase: OriginalsSpinUseCase
+    wallet: ReturnType<typeof makeWalletFacade>
+  } {
+    const play = makePlayRepository(makeSession())
     const wallet = makeWalletFacade('1000.00')
     const slotGames = makeSlotGames()
     const loader = new OriginalsSessionLoader(play.repository, slotGames)
-    const useCase = new OriginalsSpinUseCase(loader, wallet.facade, play.repository, slotGames)
+    return {
+      useCase: new OriginalsSpinUseCase(loader, wallet.facade, play.repository, slotGames),
+      wallet,
+    }
+  }
+
+  it('spins without touching the wallet', async () => {
+    const { useCase, wallet } = makeDemoUseCase()
     const debitSpy = vi.spyOn(wallet.facade, 'debit')
     const creditSpy = vi.spyOn(wallet.facade, 'credit')
 
@@ -295,6 +294,13 @@ describe('OriginalsSpinUseCase demo', () => {
     expect(result.pull.SlotIcons.length).toBe(9)
     const expectedCredit = 1000 - result.bet_amount + result.pull.WinAmount
     expect(result.credit).toBeCloseTo(expectedCredit, 8)
+  })
+
+  it('демо с чужим числом линий отказывает', async () => {
+    const { useCase } = makeDemoUseCase()
+    await expect(
+      useCase.execute({ sessionToken: 'demo_pilot_token', betamount: '2', numline: '3', cpl: '1' }),
+    ).rejects.toThrow()
   })
 })
 
@@ -339,6 +345,14 @@ describe('OriginalsSpinUseCase real', () => {
     for (const winRow of winRows) {
       expect(money.isGreaterThan(String(winRow.amount), '0')).toBe(true)
     }
+  })
+
+  it('отказывает другому числу линий: ставка меньше линий иначе завышает RTP', async () => {
+    await expect(
+      useCase.execute({ sessionToken: SESSION_TOKEN, betamount: '2', numline: '1', cpl: '1' }),
+    ).rejects.toThrow()
+    expect(wallet.calls.debits).toBe(0)
+    expect(play.transactions.length).toBe(0)
   })
 
   it('rejects spins on a closed session', async () => {

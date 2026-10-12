@@ -128,3 +128,19 @@ export class OriginalsActionNotSupportedError extends AppError {
     super(`Originals action ${action} is not implemented in pilot`, { action })
   }
 }
+/**
+ * Целевой RTP недостижим таблицами игры: выплаты win-строк не покрывают
+ * матожидание при заданной частоте выигрышей. Ошибку видно админу, игроку —
+ * 503 (в controller'е message не наружу, только код).
+ */
+export class OriginalsRtpUnreachableError extends AppError {
+  readonly code = 'ORIGINALS_RTP_UNREACHABLE'
+  readonly httpStatus = 503
+  constructor(gameCode: string, rtp: string, reachableRange?: string) {
+    super(`House slot ${gameCode} cannot pay rtp ${rtp} with its outcome tables`, {
+      gameCode,
+      rtp,
+      reachableRange,
+    })
+  }
+}

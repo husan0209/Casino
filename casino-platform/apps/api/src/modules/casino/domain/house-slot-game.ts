@@ -55,6 +55,12 @@ export interface TigerIconDoc {
 export interface HouseSlotGameConfig {
   externalGameId: string
   displayName: string
+  /**
+   * Число линий игры донора: ставка = betamount * cpl * paylines, выплата =
+   * betamount * cpl * payout. RTP = E[payout] / paylines, поэтому клиентское
+   * numline обязано совпадать с этим числом — иначе игрок подбирает отдачу.
+   */
+  paylines: number
   winRows: TigerSpinRow[]
   loseRows: TigerSpinRow[]
   icons: TigerIconDoc

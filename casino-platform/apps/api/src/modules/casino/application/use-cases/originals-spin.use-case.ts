@@ -9,7 +9,12 @@ import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 import { type Currency } from '@casino/shared-types'
 import { money } from '@casino/shared-utils'
 
-import { DEMO_TOKEN_PREFIX, OriginalsSessionLoader } from './originals-session-loader'
+import { buildHouseSlotLottery, cryptoRandom, drawHouseSlotOutcome } from './house-slot-lottery'
+import {
+  DEMO_TOKEN_PREFIX,
+  OriginalsSessionLoader,
+  TIGER_EXTERNAL_GAME_ID,
+} from './originals-session-loader'
 import { TIGER_DEMO_START_CREDIT } from './originals-session.use-case'
 import { InvalidBetRequestError } from '../../domain/errors'
 import {
@@ -91,47 +96,21 @@ export interface TigerSpinData {
 type WalletTransaction = Parameters<Parameters<WalletFacade['runInTransaction']>[1]>[0]
 
 /**
- * Лотерея исхода: зеркало SpinStructure донора. Таблицы игры тасуются,
- * от win берут первые rtpPercent строк, от lose — первые (100 - rtpPercent),
- * общий пул тасуется и берётся первый элемент.
- * Чистая функция: randomSource инжектится для тестов.
+ * RTP записи игры (Decimal из БД) в проценты для калибровки лотереи.
+ * Значение по умолчанию — витринные 96: поле rtp у house-игр означает
+ * фактическую отдачу, а не «долю win-строк в нарезке», как у донора.
  */
-export function drawSlotOutcome(
-  winRows: TigerSpinRow[],
-  loseRows: TigerSpinRow[],
-  rtpPercent: number,
-  randomSource: () => number = Math.random,
-): TigerSpinRow {
-  const winQuota = Math.max(0, Math.min(100, Math.floor(rtpPercent)))
-  const loseQuota = 100 - winQuota
-  const winPool = shuffleCopy(winRows, randomSource).slice(0, winQuota)
-  const losePool = shuffleCopy(loseRows, randomSource).slice(0, loseQuota)
-  const pool = shuffleCopy([...winPool, ...losePool], randomSource)
-  const outcome = pool[0]
-  if (!outcome) {
-    throw new InvalidBetRequestError()
-  }
-  return outcome
-}
+export const DEFAULT_GAME_RTP_PERCENT = '96'
 
-export function shuffleCopy<T>(rows: T[], randomSource: () => number): T[] {
-  const copy = [...rows]
-  for (let index = copy.length - 1; index > 0; index--) {
-    const swapIndex = Math.floor(randomSource() * (index + 1))
-    const current = copy[index] as T
-    copy[index] = copy[swapIndex] as T
-    copy[swapIndex] = current
-  }
-  return copy
-}
+/** Демо-котёл пилота крутится на витринном RTP (сессии и её rtp в демо нет). */
+export const HOUSE_SLOT_DEMO_RTP_PERCENT = DEFAULT_GAME_RTP_PERCENT
 
-/** RTP записи игры (Decimal из БД) в целые проценты донора, 0..100. */
-export function parseRtpPercent(rawRtp: unknown): number {
-  const parsed = Number(String(rawRtp ?? 70))
+export function resolveTargetRtpPercent(rawRtp: unknown): string {
+  const parsed = Number(String(rawRtp ?? DEFAULT_GAME_RTP_PERCENT))
   if (!Number.isFinite(parsed)) {
-    return 70
+    return DEFAULT_GAME_RTP_PERCENT
   }
-  return Math.max(0, Math.min(100, Math.floor(parsed)))
+  return String(Math.min(100, Math.max(0, parsed)))
 }
 
 function toFrontMoney(amount: string): number {
@@ -160,12 +139,38 @@ export class OriginalsSpinUseCase {
     return this.executeRealSpin(request.sessionToken, parsed, betTotal)
   }
 
+  /**
+   * Клиент обязан играть ровно линиями игры: ставка = bet*cpl*numline, а
+   * выплата от numline не зависит, поэтому меньше линий = выше отдача.
+   */
+  private assertPaylines(numline: string, game: HouseSlotGameConfig): void {
+    if (Number(numline) !== game.paylines) {
+      throw new InvalidBetRequestError()
+    }
+  }
+
+  private drawOutcome(game: HouseSlotGameConfig, targetRtpPercent: string): TigerSpinRow {
+    const lottery = buildHouseSlotLottery({
+      gameCode: game.externalGameId,
+      winPayouts: game.winRows.map((row) => row[TIGER_ROW_INDEX.payout]),
+      targetRtp: targetRtpPercent,
+      paylines: game.paylines,
+    })
+    return drawHouseSlotOutcome({
+      lottery,
+      winRows: game.winRows,
+      loseRows: game.loseRows,
+      random: cryptoRandom,
+    })
+  }
+
   private executeDemoSpin(parsed: OriginalsSpinInput, betTotal: string): TigerSpinData {
-    const game = this.slotGames.getGameConfig('fortunetiger')
+    const game = this.slotGames.getGameConfig(TIGER_EXTERNAL_GAME_ID)
     if (!game) {
       throw new InvalidBetRequestError()
     }
-    const outcome = drawSlotOutcome(game.winRows, game.loseRows, 90)
+    this.assertPaylines(parsed.numline, game)
+    const outcome = this.drawOutcome(game, HOUSE_SLOT_DEMO_RTP_PERCENT)
     const winTotal = money.multiply(
       money.multiply(parsed.betamount, parsed.cpl),
       String(outcome[TIGER_ROW_INDEX.payout]),
@@ -186,6 +191,7 @@ export class OriginalsSpinUseCase {
     betTotal: string,
   ): Promise<TigerSpinData> {
     const { session, game } = await this.sessionLoader.loadActiveSlotSession(sessionToken)
+    this.assertPaylines(parsed.numline, game)
     const providerId = session.providerId
     const roundExternalId = `${game.externalGameId}_${randomBytes(8).toString('hex')}`
     const betExternalId = `${roundExternalId}_bet`
@@ -227,23 +233,12 @@ export class OriginalsSpinUseCase {
     if (raceDuplicate) {
       return this.buildDuplicateSpinData(session, game, parsed, betTotal)
     }
-    const outcome = drawSlotOutcome(game.winRows, game.loseRows, parseRtpPercent(session.game.rtp))
+    const outcome = this.drawOutcome(game, resolveTargetRtpPercent(session.game.rtp))
     const winTotal = money.multiply(
       money.multiply(parsed.betamount, parsed.cpl),
       String(outcome[TIGER_ROW_INDEX.payout]),
     )
-    const round = await this.play.createRound(
-      {
-        sessionId: session.id,
-        userId: session.userId,
-        gameId: session.gameId,
-        providerId,
-        externalRoundId: roundExternalId,
-        currency: session.currency,
-        status: 'open',
-      },
-      transaction,
-    )
+    const round = await this.openRound({ session, providerId, roundExternalId, transaction })
     const settled = await this.settleBet({
       session,
       game,
@@ -277,6 +272,28 @@ export class OriginalsSpinUseCase {
       winTotal,
       outcome,
     })
+  }
+
+  /** Открытие раунда до проводок (вынос из applySpin, лимит 60 строк). */
+  private async openRound(args: {
+    session: GameSessionWithGame
+    providerId: string
+    roundExternalId: string
+    transaction: WalletTransaction
+  }): Promise<GameRow> {
+    const { session, providerId, roundExternalId, transaction } = args
+    return this.play.createRound(
+      {
+        sessionId: session.id,
+        userId: session.userId,
+        gameId: session.gameId,
+        providerId,
+        externalRoundId: roundExternalId,
+        currency: session.currency,
+        status: 'open',
+      },
+      transaction,
+    )
   }
 
   /** Списание ставки + bet-запись + счётчик сессии (вынос из applySpin, лимит 60 строк). */
