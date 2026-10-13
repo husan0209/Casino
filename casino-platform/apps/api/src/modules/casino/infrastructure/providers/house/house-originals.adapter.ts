@@ -25,7 +25,7 @@ const HOUSE_PLINKO_GAME_ROW: ProviderGameRow = {
   name: 'Plinko',
   type: 'other',
   category: 'instant_games',
-  thumbnailUrl: '/house/plinko/thumbnail.svg',
+  thumbnailUrl: '/house/plinko/cover.jpg',
   hasDemo: true,
   rtp: 99,
 }
