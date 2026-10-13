@@ -602,9 +602,11 @@ function formatSlotLabel(mult) {
 }
 
 function multiplierColor(mult, maxM) {
-  // t in [0, 1]: 0 = low mult (green), 1 = high mult (red)
-  const t = Math.pow(Math.max(0, mult) / maxM, 0.3);
-  const hue = (1 - t) * 120;
+  // t in [0, 1]: 0 = низкий множитель (красный), 1 = высокий (зелёный).
+  // Так раскрашен ряд лунок на обложке игры и так же делает в оригинале:
+  // центр доски (множители меньше 1 ×) — красный, края — зелёные.
+  const t = Math.min(1, Math.pow(Math.max(0, mult) / maxM, 0.3));
+  const hue = t * 120;
   const sat = 72;
   const light = 48;
   return `hsl(${hue}, ${sat}%, ${light}%)`;
@@ -1060,13 +1062,11 @@ function renderHistory() {
   for (const h of state.history) {
     const div = document.createElement('div');
     div.className = 'history-pill';
-    // Цвет по величине множителя (зелёный → красный), как в доноре.
-    const mult = Number(h.mult);
-    const t = Math.pow(Math.max(0.0001, mult) / 1000, 0.3);
-    const hue = (1 - Math.min(1, t)) * 120;
-    div.style.background = `hsl(${hue}, 70%, 42%)`;
+    // Тот же ramp, что и на лунках: одна и та же цифра на экране обязана
+    // выглядеть одинаково в ряду выплат и в истории.
+    div.style.background = multiplierColor(Number(h.mult), maxMult);
     div.style.color = '#fff';
-    div.textContent = mult + '×';
+    div.textContent = Number(h.mult) + '×';
     div.title = (h.profit >= 0 ? '+' : '-') + formatMoney(Math.abs(h.profit));
     el.appendChild(div);
   }
