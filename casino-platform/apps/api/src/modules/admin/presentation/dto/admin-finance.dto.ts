@@ -5,6 +5,9 @@ import { type Currency, ZERO } from '@casino/shared-types'
 
 const amountField = z.string().regex(/^\d+(\.\d{1,8})?$/, 'Invalid amount format')
 
+/** Ключи ZERO = Record<Currency, MoneyAmount> ⇒ набор валют синхронен с типом. */
+const CURRENCIES = Object.keys(ZERO) as [Currency, ...Currency[]]
+
 // GAP-21: финансовые операции админки (money-sensitive).
 export const RejectWithdrawalSchema = z.object({
   reason: z.string().min(1).max(500),
@@ -22,7 +25,7 @@ export const BatchRejectSchema = z.object({
 // POST /admin/finance/wallet/:user_id/credit и /debit
 export const WalletAdjustSchema = z.object({
   amount: amountField,
-  currency: z.string().min(3).max(8),
+  currency: z.enum(CURRENCIES),
   reason: z.string().min(1).max(500),
 })
 
@@ -48,8 +51,6 @@ const LEDGER_TYPES = Object.values(LedgerEntryType) as [LedgerEntryType, ...Ledg
 const PAYMENT_TYPES = Object.values(PaymentType) as [PaymentType, ...PaymentType[]]
 const PAYMENT_STATUSES = Object.values(PaymentStatus) as [PaymentStatus, ...PaymentStatus[]]
 const PAYMENT_PROVIDERS = Object.values(PaymentProvider) as [PaymentProvider, ...PaymentProvider[]]
-/** Ключи ZERO = Record<Currency, MoneyAmount> ⇒ набор валют синхронен с типом. */
-const CURRENCIES = Object.keys(ZERO) as [Currency, ...Currency[]]
 
 const userIdField = z.string().trim().min(1).max(64)
 
