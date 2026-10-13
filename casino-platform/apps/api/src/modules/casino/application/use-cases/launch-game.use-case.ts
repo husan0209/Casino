@@ -7,6 +7,7 @@ import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import { type Currency } from '@casino/shared-types'
 
+import { buildDemoSessionToken } from './originals-session-loader'
 import { type IProviderAdapterFactory, PROVIDER_ADAPTER_FACTORY } from '../../domain/casino.ports'
 import {
   CurrencyNotSupportedError,
@@ -72,7 +73,7 @@ export class LaunchGameUseCase {
     const adapter = this.adapters.getAdapter(game.provider.slug)
     const launch = await adapter.getLaunchUrl({
       gameExternalId: game.externalGameId,
-      sessionToken: session?.sessionToken || 'demo_' + randomBytes(16).toString('hex'),
+      sessionToken: session?.sessionToken || buildDemoSessionToken(game.externalGameId),
       playerToken: session?.sessionToken || '',
       currency: input.currency,
       language: 'ru',

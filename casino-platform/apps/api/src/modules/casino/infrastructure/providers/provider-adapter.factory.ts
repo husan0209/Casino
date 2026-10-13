@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 
 import { DemoProviderAdapter } from './demo/demo-provider.adapter'
 import { GitslotparkProviderAdapter } from './gitslotpark/gitslotpark.adapter'
+import { HouseOriginalsAdapter } from './house/house-originals.adapter'
 import { type IProviderAdapterFactory } from '../../domain/casino.ports'
 import { DemoProviderDisabledError, ProviderNotSupportedError } from '../../domain/errors'
 import { type GameProviderAdapter } from '../../domain/provider-adapter.interface'
@@ -40,6 +41,9 @@ export class ProviderAdapterFactory implements IProviderAdapterFactory {
       case 'amatic':
       case 'amusnet':
         return new GitslotparkProviderAdapter(this.config)
+      // Пилот house-оригиналов (Fortune Tiger): сервер — наш API, деньги — ledger.
+      case 'house':
+        return new HouseOriginalsAdapter(this.config)
       default:
         throw new ProviderNotSupportedError(slug)
     }
