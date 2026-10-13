@@ -442,6 +442,9 @@ model Game {
   isPopular         Boolean         @default(false) @map("is_popular")
   hasDemo           Boolean         @default(true) @map("has_demo")
   rtp               Decimal?        @db.Decimal(5, 2)
+  /// Возврат демо-режима: своя цель, потому что демо не выплачивает деньги
+  /// и подбирается по конверсии, а не по марже.
+  rtpDemo           Decimal?        @map("rtp_demo") @db.Decimal(5, 2)
   volatility        GameVolatility?
   maxWinMultiplier  Decimal?        @map("max_win_multiplier") @db.Decimal(10, 2)
   minBet            Decimal?        @map("min_bet") @db.Decimal(20, 8)

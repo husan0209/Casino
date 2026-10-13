@@ -18,6 +18,8 @@ export interface AdminGameUpdateInput {
   isPopular?: boolean | undefined
   sort_order?: number | undefined
   tags?: string[] | undefined
+  rtp?: number | null | undefined
+  rtp_demo?: number | null | undefined
 }
 
 /**
@@ -52,6 +54,12 @@ export class AdminUpdateGameUseCase {
     }
     if (input.tags !== undefined) {
       data.tags = input.tags
+    }
+    if (input.rtp !== undefined) {
+      data.rtp = input.rtp
+    }
+    if (input.rtp_demo !== undefined) {
+      data.rtpDemo = input.rtp_demo
     }
     return data
   }

@@ -1,4 +1,4 @@
-import { type Prisma } from '@prisma/client'
+import { type Game, type Prisma } from '@prisma/client'
 import { Decimal } from 'decimal.js'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -19,6 +19,7 @@ import {
   type GameSessionWithGame,
   type GameTransactionRow,
   type GameRow,
+  type IGameCatalogRepository,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
 import {
@@ -44,7 +45,7 @@ function decimalValue(raw: string | number | object): Prisma.Decimal {
   return new Decimal(String(raw)) as unknown as Prisma.Decimal
 }
 
-function makeSession(): GameSessionWithGame {
+function makeSession(rtpOverride?: string): GameSessionWithGame {
   return {
     id: SESSION_ID,
     userId: USER_ID,
@@ -80,7 +81,8 @@ function makeSession(): GameSessionWithGame {
       isNew: false,
       isPopular: false,
       hasDemo: true,
-      rtp: decimalValue('99'),
+      rtp: decimalValue(rtpOverride ?? '99'),
+      rtpDemo: decimalValue('99'),
       volatility: null,
       maxWinMultiplier: null,
       minBet: decimalValue('1'),
@@ -206,6 +208,25 @@ function makeSlotGames(): IHouseSlotGames {
   }
 }
 
+/** Карточка plinko из каталога — нужна только для rtp_demo в демо-пути. */
+function makeCatalog(rtpDemo: string | null): IGameCatalogRepository {
+  const findByExternalGameId = async (): Promise<Game | null> =>
+    rtpDemo === null ? null : ({ rtpDemo: decimalValue(rtpDemo) } as unknown as Game)
+  return { findByExternalGameId } as unknown as IGameCatalogRepository
+}
+
+function makeUseCase(args: { rtpDemo?: string | null; sessionRtp?: string }): PlinkoDropUseCase {
+  const play = makePlayRepository(makeSession(args.sessionRtp))
+  const wallet = makeWalletFacade('500.00')
+  const loader = new OriginalsSessionLoader(play.repository, makeSlotGames())
+  return new PlinkoDropUseCase(
+    loader,
+    wallet.facade,
+    play.repository,
+    makeCatalog(args.rtpDemo ?? null),
+  )
+}
+
 describe('plinko payout tables calibration', () => {
   it('every table has rows+1 bins', () => {
     for (const rows of PLINKO_ROWS_VALUES) {
@@ -235,7 +256,7 @@ describe('drawPlinkoPath', () => {
     expect(path.every((step) => step === 1)).toBe(true)
     const slotIndex = path.reduce<number>((sum, step) => sum + step, 0)
     expect(slotIndex).toBe(16)
-    expect(plinkoMultiplier(16, 'medium', slotIndex)).toBe('110')
+    expect(plinkoMultiplier(16, 'medium', slotIndex, PLINKO_MULTIPLIERS)).toBe('110')
   })
 
   it('outcome hash is stable for the same drop', () => {
@@ -268,7 +289,7 @@ describe('PlinkoDropUseCase demo', () => {
     const play = makePlayRepository(makeSession())
     const wallet = makeWalletFacade('1000.00')
     const loader = new OriginalsSessionLoader(play.repository, makeSlotGames())
-    const useCase = new PlinkoDropUseCase(loader, wallet.facade, play.repository)
+    const useCase = new PlinkoDropUseCase(loader, wallet.facade, play.repository, makeCatalog(null))
     const debitSpy = vi.spyOn(wallet.facade, 'debit')
     const creditSpy = vi.spyOn(wallet.facade, 'credit')
 
@@ -297,7 +318,7 @@ describe('PlinkoDropUseCase real', () => {
     play = makePlayRepository(makeSession())
     wallet = makeWalletFacade('500.00')
     const loader = new OriginalsSessionLoader(play.repository, makeSlotGames())
-    useCase = new PlinkoDropUseCase(loader, wallet.facade, play.repository)
+    useCase = new PlinkoDropUseCase(loader, wallet.facade, play.repository, makeCatalog(null))
   })
 
   it('debits once, credits on win, keeps money consistent', async () => {
@@ -360,5 +381,31 @@ describe('PlinkoDropUseCase real', () => {
         rows: 8,
       }),
     ).rejects.toThrow()
+  })
+})
+
+describe('PlinkoDropUseCase resolvePack — RTP из карточки игры', () => {
+  it('демо играет по rtp_demo', async () => {
+    const useCase = makeUseCase({ rtpDemo: '120' })
+    const pack = await useCase.resolvePack('demo_plinko_token')
+    expect(plinkoExpectedRtp(16, 'medium', pack)).toBeCloseTo(1.2, 2)
+  })
+
+  it('игра на деньги — по rtp сессии', async () => {
+    const useCase = makeUseCase({ sessionRtp: '90' })
+    const pack = await useCase.resolvePack(SESSION_TOKEN)
+    expect(plinkoExpectedRtp(16, 'medium', pack)).toBeCloseTo(0.9, 2)
+  })
+
+  it('без значения в карточке — донорский профиль', async () => {
+    const useCase = makeUseCase({ rtpDemo: null })
+    const pack = await useCase.resolvePack('demo_plinko_token')
+    expect(pack).toBe(PLINKO_MULTIPLIERS)
+  })
+
+  it('демо и деньги на одной цели дают один и тот же комплект', async () => {
+    const demo = await makeUseCase({ rtpDemo: '95' }).resolvePack('demo_plinko_token')
+    const real = await makeUseCase({ rtpDemo: '95', sessionRtp: '95' }).resolvePack(SESSION_TOKEN)
+    expect(demo).toBe(real)
   })
 })
