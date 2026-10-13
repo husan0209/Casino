@@ -100,6 +100,28 @@ async function seedDemoGames(): Promise<void> {
   log('Seeded demo games')
 }
 
+/**
+ * Провайдер house-оригиналов. Строки игр здесь НЕ заводим: каталог живёт
+ * в реестре API (`HOUSE_SLOT_CATALOG`), витрина наполняется штатной
+ * синхронизацией провайдера в админке — иначе у сСида и у реестра было бы
+ * по своей копии списка игр.
+ */
+async function seedHouseProvider(): Promise<void> {
+  await prisma.gameProvider.upsert({
+    where: { slug: 'house' },
+    update: {},
+    create: {
+      slug: 'house',
+      name: 'House Originals',
+      type: 'slots',
+      isEnabled: true,
+      sortOrder: 10,
+      config: { supported_currencies: ['RUB'] },
+    },
+  })
+  log('Seeded house provider (каталог игр — через синхронизацию в админке)')
+}
+
 type SettingSeed = {
   key: string
   value: string
@@ -159,6 +181,7 @@ async function main(): Promise<void> {
   assertSafeToSeed()
   await seedAdmin()
   await seedDemoGames()
+  await seedHouseProvider()
   await seedSettings()
 }
 
