@@ -15,20 +15,25 @@ const hosts = (process.env['NEXT_PUBLIC_IMAGE_HOSTS'] ?? '')
   .filter((host) => host.length > 0)
 
 /**
+ * Origin API — из NEXT_PUBLIC_API_URL (тот же источник, что у lib/api-base.ts),
+ * дефолт совпадает с его dev-фолбэком. Хардкода хоста в конфиге нет.
+ */
+function apiOrigin() {
+  const apiUrl = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001/api/v1'
+  return new URL(apiUrl).origin
+}
+
+/**
  * Dev-прокси /uploads на API: аватары и KYC-документы раздаёт API из своего
  * ./uploads (в проде этот префикс закрывает nginx same-origin, и здесь rewrite
  * не нужен). Браузер при этом ходит за файлами со своего origin (:3000) —
  * относительный /uploads/… с карточек и профиля работает без абсолютных URL.
- * Origin берётся из NEXT_PUBLIC_API_URL (тот же источник, что у lib/api-base.ts),
- * дефолт совпадает с его dev-фоллбеком.
  */
 function uploadsRewrites() {
   if (process.env['NODE_ENV'] === 'production') {
     return []
   }
-  const apiUrl = process.env['NEXT_PUBLIC_API_URL'] ?? 'http://localhost:3001/api/v1'
-  const apiOrigin = new URL(apiUrl).origin
-  return [{ source: '/uploads/:path*', destination: `${apiOrigin}/uploads/:path*` }]
+  return [{ source: '/uploads/:path*', destination: `${apiOrigin()}/uploads/:path*` }]
 }
 
 /** @type {import('next').NextConfig} */
@@ -42,7 +47,20 @@ const nextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../../'),
   reactStrictMode: true,
   async rewrites() {
-    return uploadsRewrites()
+    // Фронт Construct 3 ходит относительным /api/vgames (apiURL зашит в
+    // data.json донора), а API отдаёт /api/v1/vgames. Пилот Plinko — тем же
+    // приёмом за /api/plinko.
+    return [
+      {
+        source: '/api/vgames/:path*',
+        destination: `${apiOrigin()}/api/v1/vgames/:path*`,
+      },
+      {
+        source: '/api/plinko/:path*',
+        destination: `${apiOrigin()}/api/v1/plinko/:path*`,
+      },
+      ...uploadsRewrites(),
+    ]
   },
   images: {
     // AVIF отключён до миграции на Next 15: GHSA-2xp9-vwfh-vxw4 (critical) — RCE в
