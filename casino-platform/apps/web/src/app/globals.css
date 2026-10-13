@@ -103,6 +103,30 @@ body {
   animation: sheet-up 320ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* Карточка игры (ТЗ ч.5 §4.5): пол-экрана, а не лист на 90vh. За шторкой должен
+   читаться каталог. Колонка из трёх частей: обложка, прокручиваемое содержимое,
+   кнопки. `sticky` для кнопок не годится: когда они выше остатка контейнера,
+   прилипание перестаёт работать и кнопка уезжает за нижний край листа. */
+.sheet-panel--preview {
+  display: flex;
+  flex-direction: column;
+  max-height: min(60dvh, 560px);
+  padding-bottom: 0;
+  overflow: hidden;
+}
+
+.sheet-panel--preview .sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet-panel--preview .sheet-actions {
+  flex: 0 0 auto;
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
 /* Закрытие: лист уезжает вниз и гаснет (closing-фаза стора вешает класс) */
 .sheet-panel-out {
   animation: sheet-down 200ms ease-in forwards;

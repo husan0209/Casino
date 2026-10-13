@@ -20,6 +20,14 @@ import type { Metadata, Viewport } from 'next'
 /** ТЗ ч.5.1: единая фирменная типографика; cyrillic — обязательный сабсет. */
 
 export const metadata: Metadata = {
+  // Фирменный значок во вкладке. `public/favicon.svg` сам по себе ничего не
+  // подключает: браузер попросил /favicon.ico, которого нет, и вкладка
+  // оставалась без иконки. Apple-вариант — PNG: iOS не читает svg с домашнего
+  // экрана, а на Android и вкладки достаточно svg.
+  icons: {
+    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
+  },
   title: {
     default: 'Casino — слоты онлайн',
     template: '%s | Casino',

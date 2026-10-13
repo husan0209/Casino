@@ -2,7 +2,7 @@
 part: 2
 total_parts: 7
 version: 1.0
-status: "frozen spec v1.0"
+status: 'frozen spec v1.0'
 ---
 
 # ТЗ — Часть 2. Backend Core: Auth, Users, KYC, RBAC
@@ -330,6 +330,35 @@ created_at          TIMESTAMPTZ
 - `password_hash` = null для таких пользователей;
 - сохранять `provider_data` с raw profile для логов;
 - сохранять Google email в `provider_email`.
+
+---
+
+#### UC-AUTH-08.1: Google One Tap (credential-поток, добавлено 2026-10-13)
+
+Тот же аккаунт и тот же `sub`, но без редиректа: Google отдаёт браузеру подписанный
+ID-токен, фронт присылает его на наш API.
+
+```
+1. Фронт (гость, после гидрации сессии) просит GET /auth/google/one-tap/nonce
+   → nonce возвращается клиенту и кладётся в httpOnly-cookie g_one_tap (подписан, TTL 10 мин)
+2. google.accounts.id.initialize({ client_id, nonce }) + prompt() → карточка «Продолжить как …»
+3. Тап игрока → callback с credential (ID-токен)
+4. POST /auth/google/credential { credential, referral_code? }
+5. Backend: подпись RS256 по JWKS (kid, ротация), iss/aud/exp, iat не старше 10 мин,
+   email_verified, и nonce токена === nonce из куки
+6. Шаги 4–8 UC-AUTH-08 (тот же OAuthUserProvisioningService, что и в code-flow)
+7. Кука nonce снимается (одноразовость), refresh — в httpOnly-cookie
+```
+
+**Правила:**
+
+- `auto_select` не включать: вход без действия игрока запрещён (тап по карточке и есть
+  действие, которое отличает «войти» от «молча подменить сессию»);
+- не показывать подсказку залогиненному;
+- отказ любого шага проверки = `OAUTH_TOKEN_INVALID`/`OAUTH_STATE_INVALID` и тихий возврат
+  к обычному экрану входа, без тоста;
+- `aud` сверяется с `GOOGLE_CLIENT_ID` сервера, поэтому он обязан совпадать с
+  `NEXT_PUBLIC_GOOGLE_CLIENT_ID` веба.
 
 ---
 

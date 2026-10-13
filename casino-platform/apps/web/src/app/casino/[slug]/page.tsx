@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Heart, Play, Sparkles } from 'lucide-react'
+import { Heart, Play } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
@@ -9,12 +9,13 @@ import { useEffect, useRef, useState } from 'react'
 import { GameCard } from '@/components/casino/GameCard'
 import { GameThumb } from '@/components/casino/GameThumb'
 import { LaunchErrorScreen } from '@/components/game/LaunchErrorScreen'
+import { useDemoLaunch } from '@/hooks/useDemoLaunch'
 import { useFavorites } from '@/hooks/useFavorites'
 import { apiGet, apiPost, errCode, errIsNetwork, errStatus } from '@/lib/api'
 import { fetchGamesPage } from '@/lib/api/casino.api'
-import { openDemoGame } from '@/lib/open-game'
 import { EMPTY_FILTERS } from '@/lib/ui/catalog-filters'
-import { gameDisplayName, gameHasDemo } from '@/lib/ui/game'
+import { gameDisplayName, gameHasDemo, gameMinBetLabel, gameVolatilityLabel } from '@/lib/ui/game'
+import { realMoneyStep } from '@/lib/ui/game-launch'
 import {
   describeLaunchError,
   type LaunchErrorAction,
@@ -60,20 +61,96 @@ function SimilarGamesSection({
   )
 }
 
-function GameSpecs(): React.JSX.Element {
+/**
+ * Плитки характеристик только из данных каталога. Пустое поле не показываем:
+ * выдуманную «Волатильность: Высокая» игрок читает как факт об игре, а фактов
+ * о чужих слотах у нас нет — как и с RTP, витрина не имеет права обещать то,
+ * чего сервер не считает.
+ */
+function GameSpecs({
+  minBet,
+  volatility,
+  currency,
+}: {
+  minBet: GameDto['minBet']
+  volatility: string | null | undefined
+  currency: string
+}): React.JSX.Element | null {
+  const specs = [
+    { label: 'Мин. ставка', value: gameMinBetLabel(minBet, currency) },
+    { label: 'Волатильность', value: gameVolatilityLabel(volatility) },
+  ].filter((spec): spec is { label: string; value: string } => spec.value !== null)
+
+  if (specs.length === 0) {
+    return null
+  }
+
   return (
     <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-      <div className="rounded-xl bg-white/[0.03] p-3 border border-[#2A2A4A]/40">
-        <div className="text-[11px] font-medium text-muted">Волатильность</div>
-        <div className="mt-0.5 text-base font-bold text-white">Высокая</div>
-      </div>
-      <div className="rounded-xl bg-white/[0.03] p-3 border border-[#2A2A4A]/40 col-span-2 sm:col-span-1">
-        <div className="text-[11px] font-medium text-muted">Лицензия</div>
-        <div className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-white/90">
-          <Sparkles size={14} className="text-[#FFB300]" />
-          Оригинал
+      {specs.map((spec) => (
+        <div key={spec.label} className="rounded-xl bg-white/[0.03] p-3 border border-[#2A2A4A]/40">
+          <div className="text-[11px] font-medium text-muted">{spec.label}</div>
+          <div className="mt-0.5 text-base font-bold text-white">{spec.value}</div>
         </div>
-      </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Кнопки запуска страницы игры (§8.1): «Играть на деньги» / «Войти, чтобы играть»
+ * и «Демо-режим». Наружу — потому что внутри GamePage они занимали треть бюджета
+ * строк функции, а разметка здесь декларативная и своей логики не имеет.
+ */
+function GameActions({
+  signedIn,
+  launching,
+  demoLoading,
+  hasDemo,
+  onPlay,
+  onDemo,
+  onLogin,
+}: {
+  signedIn: boolean
+  launching: boolean
+  demoLoading: boolean
+  hasDemo: boolean
+  onPlay: () => void
+  onDemo: () => void
+  onLogin: () => void
+}): React.JSX.Element {
+  return (
+    <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+      {signedIn ? (
+        <button
+          type="button"
+          disabled={launching}
+          onClick={onPlay}
+          className="btn-money flex-1 py-3.5 text-base font-bold"
+        >
+          <Play size={18} className="fill-current" />
+          {launching ? 'Запуск игры…' : 'Играть на деньги'}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="btn-money flex-1 py-3.5 text-base font-bold"
+          onClick={onLogin}
+        >
+          Войти, чтобы играть
+        </button>
+      )}
+
+      {hasDemo && (
+        <button
+          type="button"
+          className="btn-ghost py-3.5 px-6 font-semibold"
+          disabled={demoLoading}
+          onClick={onDemo}
+        >
+          {demoLoading ? 'Запуск демо…' : 'Демо-режим'}
+        </button>
+      )}
     </div>
   )
 }
@@ -85,7 +162,8 @@ export default function GamePage(): React.JSX.Element {
   const shouldLaunch = search.get('launch') === '1'
   const { user } = useAuth()
   const { openLogin, openDeposit, openWalletSwitcher } = useUIStore()
-  const { activeCurrency, fetchWallets, getActiveWallet, setLastPlayed } = useWalletStore()
+  const { activeCurrency, fetchWallets, getActiveWallet, getLaunchBalance, setLastPlayed } =
+    useWalletStore()
   const { load } = useGeoStore()
   const { favoriteSlugs, toggleFavorite } = useFavorites()
   const [failure, setFailure] = useState<{ view: LaunchErrorView; code?: string } | null>(null)
@@ -120,7 +198,7 @@ export default function GamePage(): React.JSX.Element {
     onError: (e: unknown) => {
       const code = errCode(e)
       if (code === 'INSUFFICIENT_FUNDS') {
-        openDeposit(currency)
+        openDeposit(currency, slug)
         return
       }
       setFailure({
@@ -137,26 +215,54 @@ export default function GamePage(): React.JSX.Element {
     }
   }, [user, load, fetchWallets])
 
+  const { startDemo, isRunning: demoLoading } = useDemoLaunch()
+
+  // Пустой кошелёк — касса сразу, без попытки запуска: тот же `realMoneyStep`,
+  // что в шторке витрины и в колоде (§8.2). Серверная ветка `INSUFFICIENT_FUNDS`
+  // остаётся запасным путём (возврат из депозита, гонка балансов).
+  const playReal = (): void => {
+    const step = realMoneyStep({ signedIn: true, balance: getLaunchBalance() })
+    if (step === 'deposit') {
+      openDeposit(currency, slug)
+      return
+    }
+    launch.mutate()
+  }
+
   useEffect(() => {
     setFailure(null)
     launchedKeyRef.current = null
   }, [slug, currency])
 
+  /**
+   * Авто-запуск по `?launch=1`. Два стража, и оба нужны:
+   * - `launching`/`launched`/`launchMutate` вынуты из объекта мутации: сам он
+   *   создаётся заново на каждый рендер, и как зависимость эффекта превращал
+   *   эффект в бесконечный цикл (React: «Maximum update depth exceeded»);
+   * - `loginAskedRef` — гостю лист входа предлагается один раз на игру, а не на
+   *   каждый рендер.
+   */
+  const launching = launch.isPending
+  const launched = launch.isSuccess
+  const launchMutate = launch.mutate
+  const loginAskedRef = useRef<string | null>(null)
+
   useEffect(() => {
     if (!user) {
-      if (shouldLaunch) {
+      if (shouldLaunch && loginAskedRef.current !== slug) {
+        loginAskedRef.current = slug
         openLogin(slug)
       }
       return
     }
-    if (shouldLaunch && game && !launch.isPending && !launch.isSuccess) {
+    if (shouldLaunch && game && !launching && !launched) {
       const key = `${slug}:${currency}`
       if (launchedKeyRef.current !== key) {
         launchedKeyRef.current = key
-        launch.mutate()
+        launchMutate()
       }
     }
-  }, [user, shouldLaunch, game, slug, currency, openLogin, launch])
+  }, [user, shouldLaunch, game, slug, currency, openLogin, launching, launched, launchMutate])
 
   if (!game) {
     return <div className="container-1 py-12 text-center text-muted">Загрузка игры…</div>
@@ -217,46 +323,18 @@ export default function GamePage(): React.JSX.Element {
                 </button>
               </div>
 
-              <GameSpecs />
+              <GameSpecs minBet={game.minBet} volatility={game.volatility} currency={currency} />
             </div>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              {user ? (
-                <button
-                  disabled={launch.isPending}
-                  onClick={() => launch.mutate()}
-                  className="btn-money flex-1 py-3.5 text-base font-bold"
-                >
-                  <Play size={18} className="fill-current" />
-                  {launch.isPending ? 'Запуск игры…' : 'Играть на деньги'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn-money flex-1 py-3.5 text-base font-bold"
-                  onClick={() => openLogin(slug)}
-                >
-                  Войти, чтобы играть
-                </button>
-              )}
-
-              {hasDemo && (
-                <button
-                  type="button"
-                  className="btn-ghost py-3.5 px-6 font-semibold"
-                  onClick={async () => {
-                    const res = await apiPost<GameLaunchDto>(`/casino/games/${slug}/demo`, {
-                      currency,
-                    })
-                    if (res.launch_url) {
-                      openDemoGame(slug, res.launch_url)
-                    }
-                  }}
-                >
-                  Демо-режим
-                </button>
-              )}
-            </div>
+            <GameActions
+              signedIn={user !== null}
+              launching={launch.isPending}
+              demoLoading={demoLoading}
+              hasDemo={hasDemo}
+              onPlay={playReal}
+              onDemo={() => void startDemo(slug, currency)}
+              onLogin={() => openLogin(slug)}
+            />
           </div>
         </div>
       </div>
@@ -273,7 +351,7 @@ export default function GamePage(): React.JSX.Element {
                 return
               }
               if (action === 'deposit') {
-                openDeposit(currency)
+                openDeposit(currency, slug)
                 return
               }
               if (action === 'switch_currency') {

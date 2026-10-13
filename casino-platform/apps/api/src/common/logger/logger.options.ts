@@ -88,6 +88,9 @@ export const LOG_REDACT_PATHS = [
   'req.body.refresh_token',
   'req.body.secret',
   'req.body.init_data',
+  // ID-токен Google One Tap — тот же класс, что init_data: предъявительный
+  // артефакт, по которому можно войти, пока он не истёк.
+  'req.body.credential',
 ] as const
 
 /**
