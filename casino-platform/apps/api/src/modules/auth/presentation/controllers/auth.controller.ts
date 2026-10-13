@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Inject,
   Post,
   Query,
@@ -13,6 +14,11 @@ import {
 import { Throttle } from '@nestjs/throttler'
 import { type Request, type Response } from 'express'
 
+import {
+  GOOGLE_NONCE_COOKIE,
+  clearGoogleNonceCookie,
+  setGoogleNonceCookie,
+} from '@/common/cookies/google-nonce-cookie'
 import {
   OAUTH_STATE_COOKIE,
   clearOAuthStateCookie,
@@ -38,6 +44,7 @@ import {
 import { LoginUseCase } from '../../application/use-cases/login.use-case'
 import { LogoutUseCase } from '../../application/use-cases/logout.use-case'
 import { GoogleOAuthUseCase } from '../../application/use-cases/oauth/google-oauth.use-case'
+import { GoogleOneTapUseCase } from '../../application/use-cases/oauth/google-one-tap.use-case'
 import {
   TelegramLoginUseCase,
   type TelegramPreviewResult,
@@ -51,6 +58,7 @@ import { VerifyEmailUseCase } from '../../application/use-cases/verify-email.use
 import { type LoginDto, LoginSchema } from '../dto/login.dto'
 import {
   GoogleLoginSchema,
+  GoogleOneTapLoginSchema,
   TelegramLoginSchema,
   TelegramWebAppLoginSchema,
   type TelegramWebAppLoginDto,
@@ -92,6 +100,7 @@ export class AuthController {
     @Inject(ResetPasswordUseCase) private readonly resetUc: ResetPasswordUseCase,
     @Inject(ChangePasswordUseCase) private readonly changePasswordUc: ChangePasswordUseCase,
     @Inject(GoogleOAuthUseCase) private readonly googleUc: GoogleOAuthUseCase,
+    @Inject(GoogleOneTapUseCase) private readonly googleOneTapUc: GoogleOneTapUseCase,
     @Inject(TelegramLoginUseCase) private readonly telegramUc: TelegramLoginUseCase,
     @Inject(TelegramWebAppLoginUseCase)
     private readonly telegramWebAppUc: TelegramWebAppLoginUseCase,
@@ -316,6 +325,50 @@ export class AuthController {
     })
     // state одноразовый: пара (code, state) больше не переиспользуется.
     clearOAuthStateCookie(res)
+    setRefreshTokenCookie(res, result.refreshToken)
+    return { accessToken: result.accessToken, user: result.user }
+  }
+
+  /**
+   * Nonce для Google One Tap. Клиент получает его ДО показа подсказки и передаёт
+   * в `google.accounts.id.initialize({ nonce })`; Google кладёт это значение в
+   * ID-токен. Нам оно нужно, чтобы отличить «токен выпущен для начала входа в этом
+   * браузере» от «токен принёс кто-то»: ожидаемое значение лежит в подписанной
+   * httpOnly-куке, страница его не читает и не может выбрать сама.
+   *
+   * Лимит свой, не классовый: nonce дёргают все вкладки по очереди, и на 10/мин/IP
+   * (GAP-19, брутфорс login/register) игрок упёрся бы в 429 раньше, чем увидел бы
+   * карточку. Запрос дешёвый — HMAC и кука, обращений к Google нет. POST credential
+   * остаётся под классовым лимитом: он и есть чувствительная точка.
+   */
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Get('google/one-tap/nonce')
+  googleOneTapNonce(@Res({ passthrough: true }) res: Response): { nonce: string } {
+    const issued = this.googleOneTapUc.issueNonce()
+    // В куку — подписанный конверт (значение + возраст), в тело — только значение,
+    // которое Google положит в ID-токен. Конверт наружу не уходит.
+    setGoogleNonceCookie(res, issued.cookie)
+    return { nonce: issued.value }
+  }
+
+  @Post('google/credential')
+  @HttpCode(200)
+  @UsePipes(new ZodValidationPipe(GoogleOneTapLoginSchema))
+  async googleCredential(
+    @Body() body: { credential: string; referral_code?: string },
+    @Req() req: RequestWithCookies & Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ accessToken: string; user: { id: string; email: string | null; role: string } }> {
+    const { cookies } = req as RequestWithCookies
+    const result = await this.googleOneTapUc.execute({
+      credential: body.credential,
+      nonceCookie: cookies[GOOGLE_NONCE_COOKIE],
+      referralCode: body.referral_code,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    })
+    // Одноразовость: этот credential больше не принимается даже в окне TTL.
+    clearGoogleNonceCookie(res)
     setRefreshTokenCookie(res, result.refreshToken)
     return { accessToken: result.accessToken, user: result.user }
   }

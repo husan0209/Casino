@@ -2,8 +2,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
+import { toast } from '@/components/ui/toaster'
 import { errStatus } from '@/lib/api'
 import { setupApiInterceptors } from '@/lib/api-interceptors'
+import { startGoogleOneTap } from '@/lib/google-one-tap'
 import { handshakeTelegramWebApp } from '@/lib/telegram-webapp-auth'
 import { useAuthStore } from '@/stores/auth'
 
@@ -44,14 +46,24 @@ export function Providers({ children }: { children: React.ReactNode }): React.JS
   // с ботом. Провал (не Telegram, отказ сервера) = обычная гидрация, то есть
   // привычный экран входа: путь Telegram ничего не ломает в браузере.
   useEffect((): void => {
-    void handshakeTelegramWebApp().then((signedIn): void => {
-      if (!signedIn) {
-        void useAuthStore.getState().hydrate()
-      }
-    })
-    // Только при монтировании: повторный запуск после очистки URL от initData
-    // дал бы вторую попытку входа без данных (тот же класс ошибки, что был на
-    // колбэк-странице виджета).
+    void handshakeTelegramWebApp()
+      .then(async (signedIn): Promise<void> => {
+        if (!signedIn) {
+          await useAuthStore.getState().hydrate()
+        }
+        // One Tap — после гидрации и только гостю: игроку с рабочей сессией
+        // подсказка «войти ещё и через Google» не нужна, а гостю она даёт вход в
+        // один тап. Любая неудача (нет сессии Google, скрипт не доехал, сервер
+        // отказал) молча оставляет обычный экран входа.
+        if (await startGoogleOneTap()) {
+          toast.success('Вы вошли через Google')
+        }
+      })
+      .catch((): void => {
+        // Исключение здесь не показываем тостом: путь Google — дополнительный.
+      })
+    // Только при монтировании: повторный запуск дал бы второй запрос nonce и
+    // вторую попытку подсказки на той же странице.
   }, [])
 
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>

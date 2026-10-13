@@ -133,6 +133,19 @@ export class OAuthStateError extends AppError {
   }
 }
 
+/**
+ * ID-токен провайдера (credential-поток, Google One Tap) не прошёл проверку:
+ * структура, подпись, claims или nonce. Причина — служебная метка, в ней нет ни
+ * sub, ни почты: ответ уходит клиенту, а полная диагностика — в логе.
+ */
+export class OAuthTokenInvalidError extends AppError {
+  readonly code = 'OAUTH_TOKEN_INVALID'
+  readonly httpStatus = 401
+  constructor(reason: string) {
+    super(`Токен провайдера не прошёл проверку: ${reason}`)
+  }
+}
+
 export class OAuthExchangeError extends AppError {
   readonly code = 'OAUTH_EXCHANGE_FAILED'
   readonly httpStatus = 401

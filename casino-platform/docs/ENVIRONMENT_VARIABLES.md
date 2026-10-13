@@ -167,6 +167,13 @@ openssl rand -hex 64
 | `GOOGLE_CLIENT_SECRET` | string | ✅       | —       | From Google Cloud Console                                |
 | `GOOGLE_CALLBACK_URL`  | URL    | ✅       | —       | `https://casino.example.com/api/v1/auth/google/callback` |
 
+One Tap (вход по ID-токену, `docs/GOOGLE_ONE_TAP.md`) новых переменных не вводит:
+`GOOGLE_CLIENT_ID` на API и `NEXT_PUBLIC_GOOGLE_CLIENT_ID` на вебе обязаны быть одним и
+тем же client id — сервер сверяет `aud` токена с серверным значением, при разнобое вход
+отбивается с `OAUTH_TOKEN_INVALID`. Отдельно в Google Cloud Console нужен
+**Authorized JavaScript origins** (публичный origin сайта): без него карточка One Tap не
+показывается, и никакая переменная это не заменит.
+
 ---
 
 ## 7. Telegram Login

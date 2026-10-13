@@ -11,7 +11,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { AuthController } from '../src/modules/auth/presentation/controllers/auth.controller'
 import { TelegramWebAppLoginSchema } from '../src/modules/auth/presentation/dto/oauth.dto'
 
-const CONTROLLER_ARITY = 13
+// Параметров в конструкторе AuthController: +1 на GoogleOneTapUseCase (#228, One Tap).
+const CONTROLLER_ARITY = 14
 
 function makeController(): {
   controller: AuthController

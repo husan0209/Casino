@@ -8,6 +8,7 @@ import { ListTermsAcceptancesUseCase } from './application/use-cases/list-terms-
 import { LoginUseCase } from './application/use-cases/login.use-case'
 import { LogoutUseCase } from './application/use-cases/logout.use-case'
 import { GoogleOAuthUseCase } from './application/use-cases/oauth/google-oauth.use-case'
+import { GoogleOneTapUseCase } from './application/use-cases/oauth/google-one-tap.use-case'
 import { OAuthUserProvisioningService } from './application/use-cases/oauth/oauth-user-provisioning.service'
 import { TelegramLoginUseCase } from './application/use-cases/oauth/telegram-login.use-case'
 import { TelegramWebAppLoginUseCase } from './application/use-cases/oauth/telegram-webapp-login.use-case'
@@ -18,6 +19,7 @@ import { VerifyEmailUseCase } from './application/use-cases/verify-email.use-cas
 import {
   CAPTCHA_SERVICE,
   EMAIL_QUEUE_SERVICE,
+  GOOGLE_ID_TOKEN_VERIFIER,
   JWT_TOKEN_SERVICE,
   PASSWORD_HASHER,
 } from './domain/auth.ports'
@@ -41,6 +43,7 @@ import {
 } from './infrastructure/repositories/verification.repository.prisma'
 import { CaptchaService } from './infrastructure/services/captcha.service'
 import { EmailQueueService } from './infrastructure/services/email-queue.service'
+import { GoogleIdTokenVerifierService } from './infrastructure/services/google-id-token.verifier.service'
 import { JwtTokenService } from './infrastructure/services/jwt.service'
 import { PasswordHasher } from './infrastructure/services/password-hasher.service'
 import { AuthController } from './presentation/controllers/auth.controller'
@@ -67,6 +70,10 @@ import { RolesGuard } from './presentation/guards/roles.guard'
     { provide: JWT_TOKEN_SERVICE, useExisting: JwtTokenService },
     { provide: CAPTCHA_SERVICE, useExisting: CaptchaService },
     { provide: EMAIL_QUEUE_SERVICE, useExisting: EmailQueueService },
+    // Проверка ID-токена Google — infrastructure-клиент, application получает его
+    // портом (В5), как PASSWORD_HASHER/CAPTCHA_SERVICE выше.
+    GoogleIdTokenVerifierService,
+    { provide: GOOGLE_ID_TOKEN_VERIFIER, useExisting: GoogleIdTokenVerifierService },
     { provide: USER_REPOSITORY, useClass: PrismaUserRepository },
     { provide: AUTH_PROVIDER_REPOSITORY, useClass: PrismaAuthProviderRepository },
     { provide: SESSION_REPOSITORY, useClass: PrismaSessionRepository },
@@ -85,6 +92,7 @@ import { RolesGuard } from './presentation/guards/roles.guard'
     ResetPasswordUseCase,
     ChangePasswordUseCase,
     GoogleOAuthUseCase,
+    GoogleOneTapUseCase,
     TelegramLoginUseCase,
     TelegramWebAppLoginUseCase,
     // NB: инжектится GoogleOAuthUseCase/TelegramLoginUseCase; был забыт в providers —

@@ -39,6 +39,7 @@ describe('GAP-23 pino redact', () => {
         body: {
           password: SECRET_PASSWORD,
           init_data: SECRET_BODY_TOKEN,
+          credential: SECRET_BODY_TOKEN,
           email: 'user@example.com',
         },
       },
@@ -54,6 +55,8 @@ describe('GAP-23 pino redact', () => {
     expect(parsed.req.body.password).toBe(REDACT_CENSOR)
     // GAP-75: init_data Mini App — предъявительский токен входа, годный минуты
     expect(parsed.req.body.init_data).toBe(REDACT_CENSOR)
+    // One Tap: ID-токен Google — тот же класс предъявительного артефакта
+    expect(parsed.req.body.credential).toBe(REDACT_CENSOR)
     // не задетые поля остаются
     expect(parsed.req.body.email).toBe('user@example.com')
 
@@ -88,6 +91,7 @@ describe('GAP-23 pino redact', () => {
     expect(redact.paths).toContain('req.headers.signature')
     expect(redact.paths).toContain('req.body.password')
     expect(redact.paths).toContain('req.body.init_data')
+    expect(redact.paths).toContain('req.body.credential')
     expect(redact.paths).toContain('res.headers["set-cookie"]')
     expect(opts.level).toBe(process.env['LOG_LEVEL'] ?? 'info')
   })
