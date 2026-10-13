@@ -10,15 +10,20 @@ import {
 } from '@modules/casino/domain/provider-adapter.interface'
 
 import { HOUSE_SLOT_CATALOG } from './house-slot-games.registry'
+import { AZTEC_TARGET_RTP } from '../../../domain/aztec-game'
 
 /**
  * House-провайдер оригинальных игр (пилот: Fortune Tiger).
  *
- * Фронтенд игры — статика Construct 3 из донора ViperPro-Casino
+ * Фронтенд слотов — статика Construct 3 из донора ViperPro-Casino
  * (apps/web/public/house/fortunetiger), серверный протокол — 4 эндпоинта
  * vgames (session/icons/spin/freenum), деньги — через ledger платформы.
  * Внешних HTTP-вызовов адаптер не делает: это seamless-провайдер,
  * у которого «провайдер» — наш собственный API.
+ *
+ * Plinko и Aztec — исключения: самописный клиент и свой протокол
+ * (/api/plinko, /api/aztec). Математику Aztec пришлось писать заново:
+ * донорские таблицы описывают доску в 15 ячеек, а игра играет на 34.
  */
 const HOUSE_PLINKO_GAME_ROW: ProviderGameRow = {
   externalGameId: 'plinko',
@@ -28,6 +33,16 @@ const HOUSE_PLINKO_GAME_ROW: ProviderGameRow = {
   thumbnailUrl: '/house/plinko/cover.jpg',
   hasDemo: true,
   rtp: 99,
+}
+
+const HOUSE_AZTEC_GAME_ROW: ProviderGameRow = {
+  externalGameId: 'treasuresofaztec',
+  name: 'Treasures of Aztec',
+  type: 'other',
+  category: 'instant_games',
+  thumbnailUrl: '/house/treasuresofaztec/cover.jpg',
+  hasDemo: true,
+  rtp: AZTEC_TARGET_RTP,
 }
 
 @Injectable()
@@ -56,6 +71,7 @@ export class HouseOriginalsAdapter implements GameProviderAdapter {
         rtp: Number(config.defaultRtp),
       })),
       HOUSE_PLINKO_GAME_ROW,
+      HOUSE_AZTEC_GAME_ROW,
     ]
   }
 
