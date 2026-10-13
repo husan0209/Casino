@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Treasures of Aztec</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2324425e'/%3E%3Ctext x='16' y='23' font-family='sans-serif' font-size='20' font-weight='700' text-anchor='middle' fill='%23f6b93b'%3EA%3C/text%3E%3C/svg%3E">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f212e; color: #fff; font-size: 14px;
+    user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+
+  /* TOPBAR — сжимаются логотип и баланс, кнопки справа нет (иначе на
+     телефоне «честность» уезжает за правый край, как было в Plinko). */
+  #topbar {
+    height: 56px; display: flex; align-items: center; justify-content: space-between;
+    background: #1a2c38; border-bottom: 1px solid #2a3d4a;
+    flex-shrink: 0; gap: 12px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+  .logo {
+    font-weight: 800; font-size: 17px; letter-spacing: 1px; color: #f6b93b;
+    flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .logo span { color: #fff; }
+  .balance {
+    display: flex; align-items: center; gap: 10px; background: #0f212e;
+    padding: 8px 14px; border-radius: 6px; flex: 0 1 auto; min-width: 0;
+  }
+  .balance .label {
+    color: #7f8fa0; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.5px; white-space: nowrap; flex: 0 0 auto;
+  }
+  .balance .value {
+    font-weight: 700; color: #00e701; font-variant-numeric: tabular-nums;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+  }
+  .top-btns { display: flex; gap: 8px; flex: 0 0 auto; }
+  .icon-btn {
+    background: #2a3d4a; border: none; color: #fff; width: 36px; height: 36px;
+    border-radius: 6px; cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s; flex: 0 0 auto; padding: 0;
+  }
+  .icon-btn:hover { background: #3a4d5a; }
+
+  #main { flex: 1; display: flex; min-height: 0; }
+
+  /* CONTROLS */
+  #controls {
+    width: 264px; background: #1a2c38; padding: 16px; overflow-y: auto;
+    border-right: 1px solid #2a3d4a; flex-shrink: 0;
+  }
+  #controls::-webkit-scrollbar { width: 6px; }
+  #controls::-webkit-scrollbar-thumb { background: #2a3d4a; border-radius: 3px; }
+  .control-group { margin-bottom: 14px; }
+  .control-group > label {
+    display: block; font-size: 11px; color: #7f8fa0; margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+  }
+  .bet-input {
+    position: relative; display: flex; align-items: center; background: #0f212e;
+    border: 1px solid #2a3d4a; border-radius: 6px; overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .bet-input:focus-within { border-color: #f6b93b; }
+  .bet-input input {
+    flex: 1; background: transparent; border: none; color: #fff;
+    font-size: 16px; font-weight: 600; padding: 10px 12px; outline: none;
+    width: 100%; font-variant-numeric: tabular-nums;
+  }
+  .bet-input input::-webkit-outer-spin-button,
+  .bet-input input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .bet-input .currency { padding: 0 12px; color: #f6b93b; font-weight: 700; }
+  .bet-buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-top: 6px; }
+  .bet-buttons button {
+    background: #2a3d4a; border: none; color: #fff; padding: 7px;
+    border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;
+    transition: background 0.15s;
+  }
+  .bet-buttons button:hover { background: #3a4d5a; }
+
+  .spin-btn {
+    width: 100%; padding: 15px; background: #00e701; color: #0f212e;
+    border: none; border-radius: 6px; font-size: 15px; font-weight: 800;
+    cursor: pointer; letter-spacing: 1px; margin-top: 6px;
+    transition: all 0.15s; text-transform: uppercase;
+  }
+  .spin-btn:hover:not(:disabled) { background: #00ff1a; transform: translateY(-1px); }
+  .spin-btn:active:not(:disabled) { transform: translateY(0); }
+  .spin-btn:disabled { background: #2a3d4a; color: #4a5d6a; cursor: not-allowed; }
+
+  .info { margin-top: 14px; padding-top: 14px; border-top: 1px solid #2a3d4a; font-size: 12px; }
+  .info-row { display: flex; justify-content: space-between; margin-bottom: 7px; color: #7f8fa0; }
+  .info-row span:last-child { color: #fff; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .info-row.accent span:last-child { color: #00e701; }
+
+  /* BOARD */
+  #boardWrap { flex: 1; position: relative; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 46px 12px 12px; overflow: hidden; }
+  #board {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+    width: 100%; height: 100%; max-width: 520px;
+    background: #14293a; border: 1px solid #24405a; border-radius: 10px; padding: 8px;
+  }
+  .reel { display: flex; flex-direction: column; gap: 6px; justify-content: flex-end; min-width: 0; }
+  .reel .spacer { flex: 1 1 0; min-height: 0; }
+  .cell {
+    flex: 1 1 0; min-height: 0; display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; font-weight: 800; color: #eaf3fa; position: relative;
+    background: #24425e; transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  /* Каждый символ — свой цвет буквы: на одинаковых плитках игрок отличает
+     связку по форме символа, а не по фону. */
+  .cell.sym-J { color: #9fd0ff; }
+  .cell.sym-Q { color: #cdb8ff; }
+  .cell.sym-K { color: #ffd9a8; }
+  .cell.sym-A { color: #a8ffcf; }
+  .cell.sym-F { color: #fff0a8; }
+  .cell.sym-B { color: #ffb8a8; }
+  .cell.sym-G { color: #d9a8ff; }
+  .cell.sym-M { color: #ffc857; }
+  .cell.fresh { animation: drop 0.3s cubic-bezier(0.2, 0.8, 0.3, 1); }
+  @keyframes drop {
+    from { transform: translateY(calc(var(--drop) * -108%)); opacity: 0.35; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .cell.hit { transform: scale(1.06); box-shadow: 0 0 0 2px #00e701, 0 0 14px rgba(0, 231, 1, 0.45); z-index: 2; }
+  .cell.wild { background: linear-gradient(160deg, #f6b93b, #e58e26); }
+  .cell.scatter { background: linear-gradient(160deg, #b3336c, #7c1f4a); color: #fff; }
+
+  /* Плашка шага живёт в отступе над доской: вися поверх верхнего ряда, она
+     закрывала бы клетки именно в тот момент, когда их надо видеть. */
+  #stepTag {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    background: rgba(15, 33, 46, 0.92); border: 1px solid #2a3d4a; border-radius: 6px;
+    padding: 6px 12px; font-size: 12px; font-weight: 700; white-space: nowrap;
+    opacity: 0; transition: opacity 0.15s; pointer-events: none;
+  }
+  #stepTag.show { opacity: 1; }
+  #stepTag b { color: #00e701; }
+
+  #banner {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(15, 33, 46, 0.82); z-index: 5; text-align: center;
+  }
+  #banner.show { display: flex; }
+  #banner .text { font-size: 22px; font-weight: 800; letter-spacing: 1px; color: #f6b93b; }
+  #banner .sub { font-size: 13px; color: #b8c7d1; margin-top: 6px; }
+
+  #winTag {
+    position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%) scale(0.9);
+    background: #00e701; color: #0f212e; border-radius: 8px; padding: 10px 20px;
+    font-weight: 800; font-size: 17px; opacity: 0; transition: all 0.2s; pointer-events: none;
+    font-variant-numeric: tabular-nums; z-index: 6;
+  }
+  #winTag.show { opacity: 1; transform: translateX(-50%) scale(1); }
+
+  /* HISTORY */
+  #historyPanel {
+    height: 62px; background: #1a2c38; border-top: 1px solid #2a3d4a;
+    display: flex; align-items: center; padding: 0 16px; gap: 8px; overflow-x: auto; flex-shrink: 0;
+  }
+  #historyPanel::-webkit-scrollbar { height: 4px; }
+  #historyPanel::-webkit-scrollbar-thumb { background: #2a3d4a; border-radius: 2px; }
+  .history-title { font-size: 11px; color: #7f8fa0; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; margin-right: 4px; }
+  .history-pill {
+    padding: 5px 11px; border-radius: 4px; font-size: 12px; font-weight: 700;
+    white-space: nowrap; animation: slideIn 0.3s ease; flex-shrink: 0; font-variant-numeric: tabular-nums;
+  }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); display: none;
+    align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px);
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: #1a2c38; border-radius: 10px; padding: 22px; width: 92%; max-width: 560px;
+    max-height: 84vh; overflow-y: auto; border: 1px solid #2a3d4a;
+  }
+  .modal h3 { margin-bottom: 12px; font-size: 18px; }
+  .modal-note { font-size: 12px; line-height: 1.55; color: #b8c7d1; margin-bottom: 10px; }
+  .modal label {
+    display: block; font-size: 11px; color: #7f8fa0; margin: 14px 0 4px;
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+  }
+  .modal .hash { word-break: break-all; font-family: ui-monospace, monospace; font-size: 11px; color: #7f8fa0; background: #0f212e; padding: 8px; border-radius: 4px; }
+  table.pay { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+  table.pay th, table.pay td { padding: 4px 2px; text-align: center; border-bottom: 1px solid #24405a; }
+  table.pay th { color: #7f8fa0; font-weight: 600; font-size: 10px; }
+  table.pay td.sym { font-weight: 800; color: #f6b93b; }
+  .modal-btns { display: flex; gap: 8px; margin-top: 20px; }
+  .modal-btns button {
+    flex: 1; padding: 12px; border: none; border-radius: 6px; cursor: pointer;
+    font-weight: 700; font-size: 13px; transition: all 0.15s;
+  }
+  .modal-btns .primary { background: #00e701; color: #0f212e; }
+  .modal-btns .secondary { background: #2a3d4a; color: #fff; }
+  .modal-btns button:hover { filter: brightness(1.1); }
+
+  @media (max-width: 760px) {
+    #main { flex-direction: column; }
+    #controls {
+      width: 100%; max-height: 40vh; border-right: none;
+      border-bottom: 1px solid #2a3d4a; padding: 12px;
+    }
+    #boardWrap { order: -1; padding: 46px 10px 10px; }
+    #topbar { height: 52px; gap: 8px; padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+    .logo { font-size: 14px; letter-spacing: 1px; }
+    .balance { padding: 6px 10px; gap: 6px; }
+    .balance .label { font-size: 10px; }
+    .balance .value { font-size: 13px; }
+    .icon-btn { width: 32px; height: 32px; font-size: 15px; }
+  }
+  /* Узкий телефон: на 390 px баланс резался многоточием, поэтому подпись
+     «Баланс» уходит, логотип сжимается, а сумма остаётся целиком. */
+  @media (max-width: 430px) {
+    .balance .label { display: none; }
+    .logo { font-size: 13px; letter-spacing: 0.5px; }
+    .balance { padding: 6px 8px; }
+    .balance .value { font-size: 14px; }
+    .top-btns { gap: 4px; }
+    .icon-btn { width: 30px; height: 30px; font-size: 14px; }
+    #board { gap: 4px; padding: 6px; }
+    .reel { gap: 4px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="logo">TREASURES <span>OF AZTEC</span></div>
+    <div class="balance">
+      <span class="label">Баланс</span>
+      <span class="value" id="balance">—</span>
+    </div>
+    <div class="top-btns">
+      <button class="icon-btn" id="soundBtn" title="Звук">🔊</button>
+      <button class="icon-btn" id="rulesBtn" title="Как считается раунд">i</button>
+    </div>
+  </header>
+
+  <div id="main">
+    <aside id="controls">
+      <div class="control-group">
+        <label>Ставка</label>
+        <div class="bet-input">
+          <input type="number" id="betAmount" value="10.00" step="0.10" min="1">
+          <span class="currency">₽</span>
+        </div>
+        <div class="bet-buttons">
+          <button data-bet-mult="0.5">½</button>
+          <button data-bet-mult="2">2×</button>
+          <button data-bet-mult="max">Макс</button>
+        </div>
+      </div>
+
+      <button class="spin-btn" id="spinBtn">Крутить</button>
+
+      <div class="info">
+        <div class="info-row"><span>Выигрыш</span><span id="lastWin">—</span></div>
+        <div class="info-row"><span>Множитель</span><span id="lastMult">—</span></div>
+        <div class="info-row"><span>Фриспинов</span><span id="lastFree">—</span></div>
+        <div class="info-row accent"><span>Макс. выигрыш</span><span id="maxWin">—</span></div>
+      </div>
+    </aside>
+
+    <main id="boardWrap">
+      <div id="board"></div>
+      <div id="stepTag"></div>
+      <div id="banner"><div><div class="text" id="bannerText"></div><div class="sub" id="bannerSub"></div></div></div>
+      <div id="winTag"></div>
+    </main>
+  </div>
+
+  <div id="historyPanel">
+    <div class="history-title">Последние</div>
+    <div id="history" style="display:contents"></div>
+  </div>
+</div>
+
+<!-- Как считается раунд + правила доски -->
+<div class="modal-overlay" id="rulesModal">
+  <div class="modal">
+    <h3>Как считается раунд</h3>
+    <p class="modal-note">
+      Доску и всю цепочку каскадов сервер определяет до начала анимации и записывает
+      в историю ставок. Фронт только показывает готовый исход: добавить или «дорисовать»
+      выплате клетку нельзя — цепочка уже зафиксирована хешем.
+    </p>
+    <p class="modal-note">
+      Шесть барабанов: крайние по пять клеток, средние по шесть. Связка собирается из
+      одинаковых символов на соседних барабанах слева направо, минимум с трёх барабанов;
+      дикий подходит под любой платёжный символ. Платит одна лучшая группа, порог
+      выплаты считается по числу собранных символов. Каскад множит выплату: в базовой
+      игре до ×<span id="ruleBaseMult"></span>, во фриспинах до ×<span id="ruleFreeMult"></span>.
+    </p>
+
+    <label>Таблица выплат (× ставка)</label>
+    <table class="pay" id="payTable"></table>
+
+    <label>Скаттер <span style="color:#b3336c">T</span></label>
+    <div class="modal-note" id="ruleScatter"></div>
+
+    <label>Фриспины</label>
+    <div class="modal-note" id="ruleFree"></div>
+
+    <label>Номер раунда</label>
+    <div class="hash" id="fairRound">—</div>
+    <label>Хеш исхода (SHA-256)</label>
+    <div class="hash" id="fairHash">—</div>
+
+    <div class="modal-btns">
+      <button class="secondary" id="reloadBtn">Обновить баланс</button>
+      <button class="primary" id="closeRulesBtn">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   КОНТРАКТ: сервер — источник денег и исходов, клиент рисует.
+   Доска, подсвеченные клетки, множители и правила приходят из
+   /state и /spin, поэтому фронт физически не может показать
+   одни числа, а заплатить другие.
+   ============================================================ */
+const queryParams = new URLSearchParams(window.location.search);
+const SESSION_TOKEN = queryParams.get('token') || '';
+const API = '/api/aztec/' + encodeURIComponent(SESSION_TOKEN);
+
+const SYMBOL_NAMES = {
+  J: 'J', Q: 'Q', K: 'K', A: 'A',
+  F: 'Тотем', B: 'Барабан', G: 'Амулет', M: 'Маска',
+  W: 'Дикий', T: 'Скаттер',
+};
+
+/* Деньги — форматом платформы (apps/web/src/lib/format/currency.ts):
+   разделитель тысяч пробелом, обозначение ПОСЛЕ суммы, крипта — кодом.
+   Валют у платформы шесть, «USD/EUR» в кошельке нет. */
+const FIAT_SYMBOLS = { RUB: '₽', UAH: '₴', BYN: 'Br', KZT: '₸', UZS: 'soʻm' };
+const CRYPTO_LABELS = { USDT_TRC20: 'USDT', BTC: 'BTC', TON: 'TON', TRX: 'TRX', LTC: 'LTC' };
+const CRYPTO_DECIMALS = { USDT_TRC20: 2, BTC: 8, TON: 4, TRX: 4, LTC: 4 };
+
+function currencyLabel(currency) {
+  return CRYPTO_LABELS[currency] || FIAT_SYMBOLS[currency] || currency;
+}
+
+const state = {
+  balance: 0,
+  pendingWin: 0,
+  currency: queryParams.get('currency') || 'RUB',
+  minBet: 1,
+  maxBet: 10000,
+  reelRows: [5, 6, 6, 6, 6, 5],
+  maxWinMultiplier: 1000,
+  rules: null,
+  serverReady: false,
+  soundOn: true,
+  lastRound: null,
+  history: [],
+};
+
+function formatMoney(value) {
+  const decimals = CRYPTO_DECIMALS[state.currency] === undefined ? 2 : CRYPTO_DECIMALS[state.currency];
+  const fixed = Number(value).toFixed(decimals);
+  const parts = fixed.split('.');
+  const spaced = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return (parts[1] ? spaced + '.' + parts[1] : spaced) + ' ' + currencyLabel(state.currency);
+}
+
+function betDecimals() {
+  return CRYPTO_DECIMALS[state.currency] === undefined ? 2 : CRYPTO_DECIMALS[state.currency];
+}
+
+function betStep() {
+  return CRYPTO_LABELS[state.currency] && state.currency !== 'USDT_TRC20' ? '0.000001' : '0.1';
+}
+
+/* ============================================================
+   СЕТЬ
+   ============================================================ */
+async function request(path, body) {
+  const res = await fetch(API + path, body === undefined ? undefined : {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok || !json || !json.success) {
+    const code = json && json.error ? json.error.code : 'NETWORK_' + res.status;
+    const error = new Error(code);
+    error.retryable = !res.ok && res.status >= 500;
+    throw error;
+  }
+  return json.data;
+}
+
+async function loadServerState() {
+  const data = await request('/state');
+  state.balance = Number(data.balance);
+  state.currency = data.currency || state.currency;
+  state.minBet = Number(data.minBet);
+  state.maxBet = Number(data.maxBet);
+  state.reelRows = data.reelRows || state.reelRows;
+  state.maxWinMultiplier = data.maxWinMultiplier || 1000;
+  state.rules = data.rules || null;
+  state.serverReady = true;
+
+  const input = document.getElementById('betAmount');
+  document.querySelector('.bet-input .currency').textContent = currencyLabel(state.currency);
+  input.min = String(state.minBet);
+  input.step = betStep();
+  if (Number(input.value) < state.minBet) input.value = state.minBet.toFixed(betDecimals());
+  if (state.rules) renderRules();
+  updateBoardRows();
+  /* Пустая доска до первого спина выглядит как сломанная игра: символы
+     приходят с сервера же, просто декоративные. */
+  if (data.grid) drawGrid(data.grid, null);
+  updateAll();
+}
+
+/* ============================================================
+   ДОСКА
+   ============================================================ */
+const board = document.getElementById('board');
+let cellsByReel = [];
+
+function updateBoardRows() {
+  board.innerHTML = '';
+  cellsByReel = [];
+  const tallest = state.reelRows.reduce(function (max, rows) { return Math.max(max, rows); }, 0);
+  state.reelRows.forEach(function (rows, reel) {
+    const column = document.createElement('div');
+    column.className = 'reel';
+    /* У крайних барабанов на клетку меньше: сверху пустая полоска той же
+       высоты, иначе столбцы разъедутся по размеру ячеек. */
+    for (let missing = tallest - rows; missing > 0; missing -= 1) {
+      const spacer = document.createElement('div');
+      spacer.className = 'spacer';
+      column.appendChild(spacer);
+    }
+    const cells = [];
+    for (let position = 0; position < rows; position += 1) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      column.appendChild(cell);
+      cells.push(cell);
+    }
+    board.appendChild(column);
+    cellsByReel.push(cells);
+  });
+  fitFont();
+}
+
+function fitFont() {
+  const first = cellsByReel[0] && cellsByReel[0][0];
+  if (!first) return;
+  const size = Math.max(13, Math.floor(first.clientHeight * 0.5));
+  board.style.fontSize = size + 'px';
+}
+
+/* Клетки столбца сверху вниз: у крайних барабанов пять клеток, у средних
+   шесть, поэтому крайние прижаты к низу (spacer'ом сверху). */
+function drawGrid(grid, dropFrom) {
+  grid.forEach(function (column, reel) {
+    const cells = cellsByReel[reel] || [];
+    column.forEach(function (symbol, position) {
+      const cell = cells[position];
+      if (!cell) return;
+      cell.textContent = symbol;
+      cell.className = 'cell sym-' + symbol;
+      if (symbol === 'W') cell.className = 'cell wild';
+      if (symbol === 'T') cell.className = 'cell scatter';
+      const dropped = dropFrom ? dropFrom[reel] || 0 : 0;
+      if (dropped > 0 && position < dropped) {
+        cell.style.setProperty('--drop', String(dropped));
+        cell.classList.add('fresh');
+      }
+    });
+    for (let extra = column.length; extra < cells.length; extra += 1) {
+      cells[extra].textContent = '';
+      cells[extra].className = 'cell';
+    }
+  });
+}
+
+function highlight(cells) {
+  cells.forEach(function (pair) {
+    const cell = (cellsByReel[pair[0]] || [])[pair[1]];
+    if (cell) cell.classList.add('hit');
+  });
+}
+
+function clearHighlight() {
+  board.querySelectorAll('.hit').forEach(function (cell) { cell.classList.remove('hit'); });
+}
+
+function stepTag(text) {
+  const tag = document.getElementById('stepTag');
+  tag.innerHTML = text;
+  tag.classList.add('show');
+}
+
+/* Плашка шага. Для связки — символ, число клеток и множитель каскада; для
+   шага без связки платят скаттеры, и их число считаем прямо по доске. */
+function stepLabel(step) {
+  if (step.symbol) {
+    const name = SYMBOL_NAMES[step.symbol] || step.symbol;
+    return name + ' · ' + step.match + ' симв. · ×' + step.multiplier;
+  }
+  let scatters = 0;
+  step.grid.forEach(function (column) {
+    column.forEach(function (symbol) {
+      if (symbol === 'T') scatters += 1;
+    });
+  });
+  return 'Скаттеров ' + scatters + ' · ' + step.scatter + '× ставки';
+}
+
+function hideStepTag() {
+  document.getElementById('stepTag').classList.remove('show');
+}
+
+function showBanner(text, sub) {
+  document.getElementById('bannerText').textContent = text;
+  document.getElementById('bannerSub').textContent = sub || '';
+  document.getElementById('banner').classList.add('show');
+}
+
+function hideBanner() {
+  document.getElementById('banner').classList.remove('show');
+}
+
+/* ============================================================
+   АНИМАЦИЯ РАУНДА: заход за заходом, каскад за каскадом
+   ============================================================ */
+let inFlight = false;
+/* Ставка, ушедшая в сеть, но не подтверждённая ответом: повтор обязан пойти
+   тем же spinId, иначе оборванный ответ превратится в вторую ставку. */
+let pendingAttempt = null;
+/* Весь раунд вписываем в бюджет: ретриггер даёт до 60 заходов, и без
+   ускорения кнопка «Крутить» была бы недоступна полминуты. Тап по доске
+   доигрывает остаток мгновенно. */
+const ROUND_BUDGET_MS = 7000;
+let skipRound = false;
+
+function pause(ms) {
+  return new Promise(function (resolve) { setTimeout(resolve, skipRound ? 0 : ms); });
+}
+
+/* Сколько клеток барабана прилетело сверху: это число удалённых в прошлом
+   шаге клеток — движок досыпает их именно в начало столбца. */
+function droppedCounts(previousStep) {
+  if (!previousStep) return null;
+  const counts = [];
+  previousStep.cells.forEach(function (pair) {
+    counts[pair[0]] = (counts[pair[0]] || 0) + 1;
+  });
+  return counts;
+}
+
+async function playRound(data) {
+  const plays = data.plays || [];
+  /* Баннер на каждый заход имеет смысл в коротком раунде. В длинном (до 60
+     заходов с ретриггером) он и съел бы весь бюджет — там счётчик в плашке. */
+  const bannerEachPlay = plays.length <= 8;
+  /* Бюджет делим на фактическую работу показа: посадка доски (0.8), пустой
+     заход ещё 0.6, шаг каскада с подсветкой и падением 1.7, баннер захода
+     1.4. Без точного счёта раунд из 11 заходов шёл 14 с вместо обещанных 7. */
+  let beats = 0.5;
+  plays.forEach(function (play) {
+    beats += 0.8 + (play.spin > 0 && bannerEachPlay ? 1.4 : 0);
+    beats += play.steps.length > 0 ? play.steps.length * 1.7 : 0.6;
+  });
+  const stepMs = Math.max(40, Math.min(520, ROUND_BUDGET_MS / beats));
+
+  for (let index = 0; index < plays.length; index += 1) {
+    const play = plays[index];
+    if (play.spin > 0 && bannerEachPlay) {
+      showBanner('ФРИСПИН ' + play.spin, 'из ' + data.freeSpinsPlayed + ' заходов');
+      await pause(stepMs * 1.4);
+      hideBanner();
+    }
+    drawGrid(play.grid, null);
+    if (play.spin > 0 && !bannerEachPlay) {
+      stepTag('фриспин ' + play.spin + ' из ' + data.freeSpinsPlayed);
+    }
+    await pause(stepMs * 0.8);
+
+    for (let step = 0; step < play.steps.length; step += 1) {
+      const current = play.steps[step];
+      highlight(current.cells);
+      stepTag(stepLabel(current));
+      playTone(420 + step * 90, 0.06, 'triangle', 0.05);
+      await pause(stepMs);
+
+      const next = play.steps[step + 1];
+      clearHighlight();
+      hideStepTag();
+      if (next) {
+        drawGrid(next.grid, droppedCounts(current));
+        await pause(stepMs * 0.7);
+      }
+    }
+    if (play.steps.length === 0) await pause(stepMs * 0.6);
+  }
+  hideBanner();
+}
+
+/* ============================================================
+   СПИН
+   ============================================================ */
+async function spin() {
+  if (inFlight || !state.serverReady) return;
+  const bet = readBet();
+  if (bet === null) return;
+
+  inFlight = true;
+  /* Сброс до запроса: тап, сделанный пока идёт сетевой спин, тоже должен
+     считаться — иначе он проглатывается и длинный раунд доигрывается целиком. */
+  skipRound = false;
+  let failed = null;
+  updateAll();
+  /* Повтор после сетевого сбоя идёт тем же spinId и той же ставкой: сервер на
+      дубле деньги не двигает, а отвечает проведённым раундом. Новый uuid здесь
+      означал бы вторую ставку при потерянном ответе. */
+  const attempt = pendingAttempt || { spinId: crypto.randomUUID(), bet: bet.toFixed(betDecimals()) };
+  pendingAttempt = attempt;
+  try {
+    const data = await request('/spin', { spinId: attempt.spinId, bet: attempt.bet });
+    pendingAttempt = null;
+    /* Сервер уже провёл и списание, и начисление. Показываем списанную
+       ставку сразу, а выигрыш — когда доиграла анимация. */
+    state.balance = Number(data.balance);
+    state.pendingWin = Number(data.win);
+    updateAll();
+
+    await playRound(data);
+
+    /* Панель «Выигрыш/Множитель» заполняем только после анимации: иначе
+       цифры раскрывают исход раньше, чем долетела последняя клетка. */
+    state.pendingWin = 0;
+    state.lastRound = data;
+    addHistory(data);
+    if (Number(data.win) > 0) {
+      showWin(data);
+      playWinSound();
+    }
+    updateAll();
+  } catch (error) {
+    failed = error;
+    showError(error);
+  } finally {
+    inFlight = false;
+    hideBanner();
+    clearHighlight();
+    if (!failed) hideStepTag();
+    updateAll();
+  }
+}
+
+/* Связь оборвалась после проводки: раунд мог пройти. Тянем баланс и ждём
+   нажатия — следующий спин отдаст тот же spinId, и сервер вернёт дубль. */
+function showError(error) {
+  stepTag('нет связи: ' + error.message + ' — повтор отправит тот же спин');
+  request('/state')
+    .then(function (balance) {
+      state.balance = Number(balance.balance);
+      updateBalance();
+    })
+    .catch(function () { /* баланс переснимется при следующем открытии */ });
+}
+
+function showWin(data) {
+  const tag = document.getElementById('winTag');
+  const suffix = data.capped ? ' · потолок ×' + state.maxWinMultiplier : '';
+  tag.textContent = '+' + formatMoney(data.win) + ' (' + Number(data.multiplier).toFixed(2) + '×)' + suffix;
+  tag.classList.add('show');
+  setTimeout(function () { tag.classList.remove('show'); }, 2600);
+}
+
+function addHistory(data) {
+  const multiplier = Number(data.multiplier);
+  state.history.unshift(multiplier);
+  if (state.history.length > 30) state.history.pop();
+  const panel = document.getElementById('history');
+  const pill = document.createElement('div');
+  pill.className = 'history-pill';
+  pill.textContent = multiplier > 0 ? multiplier.toFixed(2) + '×' : '—';
+  pill.style.background = multiplier >= 5 ? '#00e701' : multiplier >= 1 ? '#2a3d4a' : '#22303c';
+  pill.style.color = multiplier >= 5 ? '#0f212e' : '#b8c7d1';
+  panel.insertBefore(pill, panel.firstChild);
+  while (panel.children.length > 30) panel.removeChild(panel.lastChild);
+}
+
+function readBet() {
+  const raw = parseFloat(document.getElementById('betAmount').value);
+  if (isNaN(raw) || raw < state.minBet || raw > state.maxBet) return null;
+  if (raw > state.balance + 1e-9) return null;
+  return raw;
+}
+
+/* ============================================================
+   UI
+   ============================================================ */
+function updateBalance() {
+  document.getElementById('balance').textContent = formatMoney(state.balance - state.pendingWin);
+}
+
+function updateInfo() {
+  const round = state.lastRound;
+  document.getElementById('lastWin').textContent = round ? formatMoney(round.win) : '—';
+  document.getElementById('lastMult').textContent = round ? Number(round.multiplier).toFixed(2) + '×' : '—';
+  document.getElementById('lastFree').textContent = round && round.freeSpinsPlayed ? round.freeSpinsPlayed : '—';
+  document.getElementById('maxWin').textContent = '×' + state.maxWinMultiplier;
+}
+
+function updateSpinButton() {
+  const btn = document.getElementById('spinBtn');
+  const bet = readBet();
+  btn.disabled = !state.serverReady || inFlight || bet === null;
+  if (inFlight) {
+    btn.textContent = 'Тап по доске — пропустить';
+  } else if (btn.textContent !== 'Крутить') {
+    btn.textContent = 'Крутить';
+  }
+}
+
+function updateAll() {
+  updateBalance();
+  updateInfo();
+  updateSpinButton();
+}
+
+function renderRules() {
+  const rules = state.rules;
+  const symbols = Object.keys(rules.paytable);
+  let html = '<tr><th>Символ</th>';
+  rules.tiers.forEach(function (tier) { html += '<th>' + tier + '+</th>'; });
+  html += '</tr>';
+  symbols.forEach(function (symbol) {
+    html += '<tr><td class="sym">' + (SYMBOL_NAMES[symbol] || symbol) + '</td>';
+    rules.paytable[symbol].forEach(function (value) { html += '<td>' + value + '×</td>'; });
+    html += '</tr>';
+  });
+  document.getElementById('payTable').innerHTML = html;
+
+  document.getElementById('ruleBaseMult').textContent = rules.maxMultiplierBase;
+  document.getElementById('ruleFreeMult').textContent = rules.maxMultiplierFree;
+  document.getElementById('ruleScatter').textContent =
+    rules.scatterMin + ' и более символов T платят ' +
+    rules.scatterPay.map(function (value) { return value + '× ставка'; }).join(', ') +
+    ' и запускают фриспины. Скаттеры платят только на первом каскаде захода.';
+  document.getElementById('ruleFree').textContent =
+    'Фриспинов ' + rules.freeSpins + ', множитель стартует с ×3 и растёт до ×' +
+    rules.maxMultiplierFree + '. Ещё ' + rules.freeRetriggerMin + ' скаттеров внутри фриспинов ' +
+    'добавляют ' + rules.freeRetriggerSpins + ' заходов, всего не больше ' +
+    rules.freeSpinsHardLimit + '. Связка считается минимум с ' + rules.minReels + ' барабанов.';
+}
+
+function updateFairness() {
+  const round = state.lastRound;
+  document.getElementById('fairRound').textContent =
+    round ? (round.roundId || (round.demo ? 'демо-запуск' : '—')) : '—';
+  document.getElementById('fairHash').textContent = round ? round.outcomeHash : '—';
+}
+
+/* ============================================================
+   ЗВУК
+   ============================================================ */
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) {
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return null;
+    audioCtx = new Ctor();
+  }
+  return audioCtx;
+}
+
+function playTone(freq, duration, type, gain) {
+  if (!state.soundOn) return;
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const vol = ctx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  vol.gain.value = gain || 0.04;
+  osc.connect(vol);
+  vol.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + (duration || 0.08));
+}
+
+function playWinSound() {
+  playTone(660, 0.1, 'sine', 0.05);
+  setTimeout(function () { playTone(880, 0.14, 'sine', 0.05); }, 90);
+}
+
+/* ============================================================
+   СОБЫТИЯ
+   ============================================================ */
+document.getElementById('spinBtn').addEventListener('click', spin);
+
+document.getElementById('betAmount').addEventListener('input', updateAll);
+
+/* Проводка к этому моменту уже в ledger — задержка остаётся только в показе,
+   поэтому доску можно «докрутить» тапом. */
+document.getElementById('boardWrap').addEventListener('click', function () {
+  if (inFlight) skipRound = true;
+});
+
+document.querySelectorAll('[data-bet-mult]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    const input = document.getElementById('betAmount');
+    const current = parseFloat(input.value) || 0;
+    const cap = Math.min(state.balance, state.maxBet);
+    let value = btn.dataset.betMult === 'max' ? cap : current * parseFloat(btn.dataset.betMult);
+    value = Math.max(state.minBet, Math.min(cap, value));
+    input.value = value.toFixed(betDecimals());
+    updateAll();
+  });
+});
+
+document.getElementById('soundBtn').addEventListener('click', function (event) {
+  state.soundOn = !state.soundOn;
+  event.currentTarget.textContent = state.soundOn ? '🔊' : '🔇';
+  if (state.soundOn) {
+    ensureAudio();
+    playTone(700, 0.08, 'sine', 0.04);
+  }
+});
+
+document.getElementById('rulesBtn').addEventListener('click', function () {
+  updateFairness();
+  document.getElementById('rulesModal').classList.add('show');
+});
+
+document.getElementById('closeRulesBtn').addEventListener('click', function () {
+  document.getElementById('rulesModal').classList.remove('show');
+});
+
+document.getElementById('reloadBtn').addEventListener('click', async function () {
+  try {
+    await loadServerState();
+  } catch (error) {
+    document.getElementById('spinBtn').textContent = 'Нет связи';
+  }
+  updateFairness();
+});
+
+window.addEventListener('resize', function () {
+  fitFont();
+});
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+updateBoardRows();
+updateAll();
+loadServerState().catch(function () {
+  document.getElementById('spinBtn').textContent = 'Нет связи';
+});
+</script>
+</body>
+</html>

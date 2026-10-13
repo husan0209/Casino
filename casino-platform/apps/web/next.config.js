@@ -48,8 +48,8 @@ const nextConfig = {
   reactStrictMode: true,
   async rewrites() {
     // Фронт Construct 3 ходит относительным /api/vgames (apiURL зашит в
-    // data.json донора), а API отдаёт /api/v1/vgames. Пилот Plinko — тем же
-    // приёмом за /api/plinko.
+    // data.json донора), а API отдаёт /api/v1/vgames. Самописные клиенты
+    // Plinko и Aztec — тем же приёмом за /api/plinko и /api/aztec.
     return [
       {
         source: '/api/vgames/:path*',
@@ -58,6 +58,10 @@ const nextConfig = {
       {
         source: '/api/plinko/:path*',
         destination: `${apiOrigin()}/api/v1/plinko/:path*`,
+      },
+      {
+        source: '/api/aztec/:path*',
+        destination: `${apiOrigin()}/api/v1/aztec/:path*`,
       },
       ...uploadsRewrites(),
     ]
