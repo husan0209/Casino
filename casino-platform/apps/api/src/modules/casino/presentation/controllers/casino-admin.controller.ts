@@ -13,8 +13,7 @@ import {
 
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
-import { AuthGuard } from '@modules/auth/presentation/guards/auth.guard'
-import { Roles, RolesGuard } from '@modules/auth/presentation/guards/roles.guard'
+import { AdminAuthGuard } from '@modules/admin/presentation/admin-auth.guard'
 
 import {
   type GameCategory,
@@ -72,6 +71,7 @@ type AdminGamesPage = {
     isPopular: boolean
     hasDemo: boolean
     rtp: Prisma.Decimal | null
+    rtpDemo: Prisma.Decimal | null
     volatility: GameVolatility | null
     maxWinMultiplier: Prisma.Decimal | null
     minBet: Prisma.Decimal | null
@@ -84,8 +84,10 @@ type AdminGamesPage = {
   meta: { page: number; perPage: number; total: number }
 }
 
-@UseGuards(AuthGuard, RolesGuard)
-@Roles('admin', 'superadmin')
+// Контур админки: пускать только токен админ-аудитории (aud='admin').
+// Раньше здесь стоял игровой AuthGuard+Roles('admin','superadmin') — токен
+// админ-панели проходил как чужой, и страница «Игры» получала 401.
+@UseGuards(AdminAuthGuard)
 @Controller('admin')
 export class CasinoAdminController {
   // В3: записи в таблицы каталога (gameProvider.update, game.update/create)
@@ -179,6 +181,8 @@ export class CasinoAdminController {
       isPopular?: boolean
       sort_order?: number
       tags?: string[]
+      rtp?: number | null
+      rtp_demo?: number | null
     },
   ): Promise<{ ok: boolean }> {
     return this.updateGameUc.execute(gameId, body)
