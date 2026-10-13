@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { LoginSheet } from '@/components/auth/LoginSheet'
+import { GamePreviewSheet } from '@/components/casino/GamePreviewSheet'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { BottomNav } from '@/components/layout/BottomNav'
 import { DesktopNav } from '@/components/layout/DesktopNav'
@@ -84,6 +85,9 @@ export function MainShell({ children }: { children: React.ReactNode }): React.JS
       <WithdrawSheet />
       <WalletSwitcher />
       <LaunchCurrencySheet />
+      {/* Карточка игры по тапу на телефоне (§4.5): витрина и колода открывают её
+          через useUIStore().gamePreview, поэтому лист живёт здесь, а не в секции. */}
+      <GamePreviewSheet />
       <DepositReturnHandler />
       {/* GAP-73: гейт повторного акцепта живёт в оболочке, а не в LoginSheet —
           срабатывает и после гидрации сессии, и после OAuth-входа. */}

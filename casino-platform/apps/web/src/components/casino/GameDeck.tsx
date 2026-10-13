@@ -10,6 +10,7 @@ import { apiPost } from '@/lib/api'
 import { playersCountLabel } from '@/lib/format/plural'
 import { openDemoGame } from '@/lib/open-game'
 import { gameBadge, gameDisplayName } from '@/lib/ui/game'
+import { realMoneyStep } from '@/lib/ui/game-launch'
 import { bigWinLabel, playersOnline } from '@/lib/ui/vitrine-stats'
 import { useAuth, type WebUser } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
@@ -324,6 +325,44 @@ function volatilityLabel(value: string | null | undefined): string {
     return '—'
   }
   return VOLATILITY_LABELS[value] ?? value
+}
+
+interface DeckPlayInput {
+  frontElement: { current: HTMLDivElement | null }
+  reducedMotion: boolean
+}
+
+/**
+ * Запуск на деньги из колоды (§4.5): тот же `realMoneyStep`, что у шторки
+ * витрины и страницы игры — гостя в вход, пустой кошелёк в кассу с памятью об
+ * игре, иначе переход. Раньше здесь был только логин-гейт, и игрок без денег
+ * вместо карточки получал пополнение.
+ */
+function useDeckPlay({ frontElement, reducedMotion }: DeckPlayInput): (slug: string) => void {
+  const { user } = useAuth()
+  const { openLogin, openDeposit } = useUIStore()
+  const { activeCurrency, getActiveWallet, getLaunchBalance } = useWalletStore()
+  const router = useRouter()
+
+  return (slug: string): void => {
+    const wallet = getActiveWallet()
+    const step = realMoneyStep({ signedIn: user !== null, balance: getLaunchBalance() })
+    if (step === 'login') {
+      openLogin(slug)
+      return
+    }
+    if (step === 'deposit') {
+      openDeposit(wallet?.currency ?? activeCurrency, slug)
+      return
+    }
+    if (!reducedMotion && frontElement.current !== null) {
+      void animateLaunch(frontElement.current).then(() => {
+        router.push(`/casino/${slug}?launch=1`)
+      })
+      return
+    }
+    router.push(`/casino/${slug}?launch=1`)
+  }
 }
 
 /**
@@ -1302,7 +1341,6 @@ export function GameDeck({
   onToggleFavorite,
 }: GameDeckProps): React.JSX.Element | null {
   const { user } = useAuth()
-  const { openLogin } = useUIStore()
   const router = useRouter()
   const reducedMotion = usePrefersReducedMotion()
 
@@ -1336,25 +1374,26 @@ export function GameDeck({
     handleJump,
   } = swipeDeck
 
-  // Запуск фронта: гость — логин-гейт, свой — launch-переход и страница игры.
-  const launchFront = (): void => {
+  const playSlug = useDeckPlay({ frontElement: frontRef, reducedMotion })
+
+  // Превью «i»: карта + демо + портал. Кнопка «Играть» в нём ведёт тот же путь,
+  // что и страница игры: гостя — в вход, пустой кошелёк — в кассу, иначе запуск.
+  const preview = useDeckPreview((): void => {
+    const frontCard = deck[position]
+    if (frontCard) {
+      playSlug(frontCard.game.slug)
+    }
+  })
+
+  // Тап по карте, «Играть» под ней и Enter = карточка игры (§4.5), а не запуск:
+  // до запуска игрок видит обложку, характеристики и выбор демо/деньги.
+  const openFrontPreview = (): void => {
     const frontCard = deck[position]
     if (!frontCard) {
       openCatalog()
       return
     }
-    if (!user) {
-      openLogin(frontCard.game.slug)
-      return
-    }
-    const frontElement = frontRef.current
-    if (!reducedMotion && frontElement) {
-      void animateLaunch(frontElement).then(() => {
-        router.push(`/casino/${frontCard.game.slug}?launch=1`)
-      })
-      return
-    }
-    router.push(`/casino/${frontCard.game.slug}?launch=1`)
+    preview.openPreview(frontCard)
   }
 
   // Двойной тап — в избранное с heart-burst (§4.4).
@@ -1374,9 +1413,6 @@ export function GameDeck({
     }, 500)
   }
 
-  // Превью «i»: карта + демо + портал; launchFront нужен для кнопки «Играть».
-  const preview = useDeckPreview(launchFront)
-
   // Превью открыто — жесты и клавиатура колоды спят (модал живёт своей жизнью).
   const isDeckBusy = (): boolean => swipeDeck.flyingLockRef.current || preview.previewCard !== null
 
@@ -1388,7 +1424,7 @@ export function GameDeck({
     canSwipePrev: (): boolean => position > 0,
     onSwipeNext: flyOutNext,
     onSwipePrev: goPrev,
-    onTapLaunch: launchFront,
+    onTapLaunch: openFrontPreview,
     onDoubleTap: handleDoubleTap,
   })
 
@@ -1404,7 +1440,7 @@ export function GameDeck({
     isBlocked: isDeckBusy,
     onSwipeNext: (): void => flyOutNext(PROGRAMMATIC_KICK_TRANSFORM),
     onSwipePrev: (): void => goPrev(),
-    onLaunch: launchFront,
+    onLaunch: openFrontPreview,
   })
 
   if (deck.length === 0) {
@@ -1464,7 +1500,7 @@ export function GameDeck({
                   favoriteSlugs={favoriteSlugs}
                   heartBurst={heartBurst}
                   onToggleFavorite={(game: GameDto): void => onToggleFavorite?.(game)}
-                  onPlay={launchFront}
+                  onPlay={openFrontPreview}
                   onPreview={preview.openPreview}
                 />
               </div>
@@ -1494,7 +1530,7 @@ export function GameDeck({
                   favoriteSlugs={favoriteSlugs}
                   heartBurst={false}
                   onToggleFavorite={(game: GameDto): void => onToggleFavorite?.(game)}
-                  onPlay={launchFront}
+                  onPlay={openFrontPreview}
                   onPreview={preview.openPreview}
                 />
               </div>

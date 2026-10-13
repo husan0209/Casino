@@ -3,10 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * ТЗ ч.5.1 §4.5/§4.7: «i» на карточке открывает шторку превью. Тест держит то,
- * чего не видят типы: характеристики берутся из полей API (раньше страница игры
- * показывала «Высокая» и «Оригинал» всем слотам подряд), а гостю предлагается
- * вход, а не кнопка «Играть на деньги».
+ * ТЗ ч.5 §4.5/§4.7/§8.2: карточка игры шторкой. Тест держит то, чего не видят
+ * типы: характеристики берутся из полей API (раньше страница игры показывала
+ * «Высокая» и «Оригинал» всем слотам подряд), гостю предлагается вход, а не
+ * кнопка «Играть на деньги», и «Играть на деньги» при пустом кошельке ведёт в
+ * кассу, а не в попытку запуска.
  */
 
 const game = {
@@ -22,10 +23,13 @@ const game = {
 const detailsMock = vi.hoisted(() => vi.fn())
 const closeMock = vi.hoisted(() => vi.fn())
 const openLoginMock = vi.hoisted(() => vi.fn())
+const openDepositMock = vi.hoisted(() => vi.fn())
+const pushMock = vi.hoisted(() => vi.fn())
 const authMock = vi.hoisted(() => ({ user: null as { email: string } | null }))
+const walletMock = vi.hoisted(() => ({ available: '1240.00', active: true }))
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push: pushMock, replace: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
 }))
 
 vi.mock('@/lib/api/casino.api', () => ({
@@ -38,6 +42,7 @@ vi.mock('@/stores/ui', () => ({
     gamePreview: { game, isFavorite: false, onToggleFavorite: undefined },
     closeGamePreview: closeMock,
     openLogin: openLoginMock,
+    openDeposit: openDepositMock,
   }),
 }))
 
@@ -48,7 +53,11 @@ vi.mock('@/stores/auth', () => ({
 vi.mock('@/stores/wallet', () => ({
   useWalletStore: () => ({
     activeCurrency: 'RUB',
-    getActiveWallet: () => ({ currency: 'RUB', available: '1240.00' }),
+    getActiveWallet: (): { currency: string; available: string } | undefined =>
+      walletMock.active ? { currency: 'RUB', available: walletMock.available } : undefined,
+    // Как `stores/wallet.getLaunchBalance`: нет активного кошелька, но балансы
+    // уже приходили — это «0», а не «неизвестно».
+    getLaunchBalance: (): string => (walletMock.active ? walletMock.available : '0'),
   }),
 }))
 
@@ -65,12 +74,16 @@ function renderSheet(): void {
 
 beforeEach(() => {
   detailsMock.mockResolvedValue({ ...game, minBet: '10.00000000', bannerUrl: null })
+  walletMock.available = '1240.00'
+  walletMock.active = true
 })
 
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
   authMock.user = null
+  walletMock.available = '1240.00'
+  walletMock.active = true
 })
 
 describe('шторка превью игры (§4.5)', () => {
@@ -108,5 +121,39 @@ describe('шторка превью игры (§4.5)', () => {
     expect(screen.getByText(/Активный баланс/)).toBeTruthy()
     expect(screen.getByText('1 240 ₽')).toBeTruthy()
     expect(screen.queryByText('Войти, чтобы играть')).toBeNull()
+  })
+
+  it('своему без денег: касса с адресом игры, без попытки запуска', async () => {
+    authMock.user = { email: 'player@example.com' }
+    walletMock.available = '0.00'
+    renderSheet()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Играть на деньги/ }))
+
+    expect(closeMock).toHaveBeenCalled()
+    expect(openDepositMock).toHaveBeenCalledWith('RUB', 'neon-fruits')
+    expect(pushMock).not.toHaveBeenCalled()
+  })
+
+  it('новый игрок без кошельков: то же — касса, а не лишний переход на страницу', async () => {
+    authMock.user = { email: 'fresh@example.com' }
+    walletMock.active = false
+    renderSheet()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Играть на деньги/ }))
+
+    expect(openDepositMock).toHaveBeenCalledWith('RUB', 'neon-fruits')
+    expect(pushMock).not.toHaveBeenCalled()
+  })
+
+  it('своему с деньгами: запуск через страницу игры', async () => {
+    authMock.user = { email: 'player@example.com' }
+    renderSheet()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Играть на деньги/ }))
+
+    expect(closeMock).toHaveBeenCalled()
+    expect(openDepositMock).not.toHaveBeenCalled()
+    expect(pushMock).toHaveBeenCalledWith('/casino/neon-fruits?launch=1')
   })
 })

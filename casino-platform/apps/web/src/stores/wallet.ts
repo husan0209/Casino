@@ -11,10 +11,13 @@ interface WalletState {
   lastPlayedCurrency: string | null
   lastPlayedSlug: string | null
   isLoading: boolean
+  /** Был ли хотя бы один успешный ответ по балансам (см. `getLaunchBalance`). */
+  loaded: boolean
   fetchWallets: () => Promise<void>
   setActiveCurrency: (currency: string) => Promise<void>
   setLastPlayed: (slug: string, currency: string) => void
   getActiveWallet: () => WalletBalance | undefined
+  getLaunchBalance: () => string | null
   refreshActive: () => Promise<void>
 }
 
@@ -26,6 +29,7 @@ export const useWalletStore = create<WalletState>()(
       lastPlayedCurrency: null,
       lastPlayedSlug: null,
       isLoading: false,
+      loaded: false,
       fetchWallets: async () => {
         set({ isLoading: true })
         try {
@@ -34,6 +38,7 @@ export const useWalletStore = create<WalletState>()(
           set({
             wallets,
             isLoading: false,
+            loaded: true,
             activeCurrency: active || wallets[0]?.currency || 'RUB',
           })
         } catch {
@@ -53,6 +58,20 @@ export const useWalletStore = create<WalletState>()(
       getActiveWallet: () => {
         const { wallets, activeCurrency } = get()
         return wallets.find((w) => w.currency === activeCurrency)
+      },
+      /**
+       * Баланс для развилки «запуск или касса» (`realMoneyStep`). `null` —
+       * балансы ещё не пришли, выдумывать нечем. «0» — пришли, а активного
+       * кошелька нет: у нового игрока бэк отдаёт `[]`, и без этого случая тап
+       * «Играть на деньги» уходил на страницу игры и возвращался кассой через
+       * серверный `INSUFFICIENT_FUNDS` — лишний прыжок вместо кассы сразу.
+       */
+      getLaunchBalance: (): string | null => {
+        const wallet = get().getActiveWallet()
+        if (wallet) {
+          return wallet.available
+        }
+        return get().loaded ? '0' : null
       },
       refreshActive: async () => get().fetchWallets(),
     }),

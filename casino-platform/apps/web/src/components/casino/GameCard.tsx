@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { GameThumb } from '@/components/casino/GameThumb'
+import { useOpenGameCard } from '@/hooks/useOpenGameCard'
 import { gameBadge, gameDisplayName, gameHasDemo } from '@/lib/ui/game'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
@@ -19,7 +20,10 @@ interface GameCardProps {
 
 /**
  * GAP-52 + ТЗ ч.5 §6.4 + ч.5.1 §4.5: карточка витрины.
- * - Телефон: тап по обложке = запуск; кнопка «i» = превью с провайдером и избранным;
+ * - Тап по обложке = карточка игры, а не запуск: на телефоне это шторка на
+ *   пол-экрана, на планшете и десктопе — страница игры. Режим (демо/на деньги)
+ *   игрок выбирает там, и только при пустом кошельке открывается касса;
+ * - кнопка «i» — короткие сведения об игре поверх карточки (провайдер, избранное);
  * - Десктоп: при hover плавный оверлей с кнопкой «Играть» и «Демо»;
  * - Один бейдж: NEW или HOT;
  * - Имя и провайдер под обложкой, один раз.
@@ -27,6 +31,7 @@ interface GameCardProps {
 export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps): React.JSX.Element {
   const { user } = useAuth()
   const { openLogin } = useUIStore()
+  const openGameCard = useOpenGameCard()
   const router = useRouter()
   const [preview, setPreview] = useState(false)
 
@@ -35,11 +40,7 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
   const hasDemo = gameHasDemo(game.hasDemo)
 
   const play = (): void => {
-    if (!user) {
-      openLogin(game.slug)
-      return
-    }
-    router.push(`/casino/${game.slug}?launch=1`)
+    openGameCard({ game, isFavorite: isFavorite === true, onToggleFavorite })
   }
 
   const prefetch = (): void => {
