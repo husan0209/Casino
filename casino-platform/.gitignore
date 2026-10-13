@@ -30,3 +30,11 @@ uploads/*
 apps/api/uploads/
 
 *.tsbuildinfo
+
+# Клиенты Construct house-оригиналов (~320 МБ) в гите не живут: их кладёт копия
+# из донора, лицензия на ассеты не проверена (pilot/REPORT.md, открытые вопросы).
+# Наружу из папки игры — только обложка; у Plinko клиент самописный, он в индексе.
+apps/web/public/house/**
+!apps/web/public/house/*/
+!apps/web/public/house/*/cover.jpg
+!apps/web/public/house/plinko/index.html
