@@ -189,7 +189,12 @@ describe('TelegramWebAppLoginUseCase.verify', () => {
     const { useCase, signIn } = makeUseCase()
     await expect(
       useCase.execute({
-        initData: buildWebAppInitData({ tamperHash: (expected) => `${expected.slice(0, -1)}0` }),
+        initData: buildWebAppInitData({
+          // Последний символ меняется на заведомо другой: хэш зависит от auth_date
+          // (текущая секунда), и «tamper» вида `…0` совпадал бы с оригиналом
+          // примерно в 1 случае из 16 — тест краснел сам по себе.
+          tamperHash: (expected) => `${expected.slice(0, -1)}${expected.endsWith('0') ? '1' : '0'}`,
+        }),
       }),
     ).rejects.toBeInstanceOf(OAuthExchangeError)
     expect(signIn).not.toHaveBeenCalled()
