@@ -216,21 +216,35 @@ export default function GamePage(): React.JSX.Element {
     launchedKeyRef.current = null
   }, [slug, currency])
 
+  /**
+   * Авто-запуск по `?launch=1`. Два стража, и оба нужны:
+   * - `launching`/`launched`/`launchMutate` вынуты из объекта мутации: сам он
+   *   создаётся заново на каждый рендер, и как зависимость эффекта превращал
+   *   эффект в бесконечный цикл (React: «Maximum update depth exceeded»);
+   * - `loginAskedRef` — гостю лист входа предлагается один раз на игру, а не на
+   *   каждый рендер.
+   */
+  const launching = launch.isPending
+  const launched = launch.isSuccess
+  const launchMutate = launch.mutate
+  const loginAskedRef = useRef<string | null>(null)
+
   useEffect(() => {
     if (!user) {
-      if (shouldLaunch) {
+      if (shouldLaunch && loginAskedRef.current !== slug) {
+        loginAskedRef.current = slug
         openLogin(slug)
       }
       return
     }
-    if (shouldLaunch && game && !launch.isPending && !launch.isSuccess) {
+    if (shouldLaunch && game && !launching && !launched) {
       const key = `${slug}:${currency}`
       if (launchedKeyRef.current !== key) {
         launchedKeyRef.current = key
-        launch.mutate()
+        launchMutate()
       }
     }
-  }, [user, shouldLaunch, game, slug, currency, openLogin, launch])
+  }, [user, shouldLaunch, game, slug, currency, openLogin, launching, launched, launchMutate])
 
   if (!game) {
     return <div className="container-1 py-12 text-center text-muted">Загрузка игры…</div>
