@@ -61,8 +61,30 @@ export interface ICaptchaService {
   verify(token: string | undefined): Promise<void>
 }
 
+/**
+ * Проверенные claims ID-токена Google (credential-поток: Google One Tap).
+ * `nonce` возвращаем опциональным: у токена без nonce claims-проверка не проходит
+ * (см. `GoogleOneTapUseCase`), но контракт claims это поле всё равно описывает.
+ */
+export interface GoogleIdClaims {
+  subject: string
+  email: string
+  name?: string | undefined
+  nonce?: string | undefined
+}
+
+/**
+ * Отдача claims только после успешной криптографической проверки: подпись по JWKS
+ * Google, `iss`/`aud`/`exp`/свежесть `iat`. Некорректный токен — исключение, а не
+ * `null`, чтобы use-case не мог «забыть» обработать отказ.
+ */
+export interface IGoogleIdTokenVerifier {
+  verify(idToken: string): Promise<GoogleIdClaims>
+}
+
 /** DI-токены портов auth для Nest-DI. */
 export const PASSWORD_HASHER = Symbol('PASSWORD_HASHER')
+export const GOOGLE_ID_TOKEN_VERIFIER = Symbol('GOOGLE_ID_TOKEN_VERIFIER')
 export const JWT_TOKEN_SERVICE = Symbol('JWT_TOKEN_SERVICE')
 export const EMAIL_QUEUE_SERVICE = Symbol('EMAIL_QUEUE_SERVICE')
 export const CAPTCHA_SERVICE = Symbol('CAPTCHA_SERVICE')

@@ -90,6 +90,7 @@ last_updated: 2026-08-28
 
 - [SECURITY_BASELINE.md](./SECURITY_BASELINE.md) — security rules
 - [TELEGRAM_MINI_APP.md](./TELEGRAM_MINI_APP.md) — вход по initData и настройка Mini App в BotFather
+- [GOOGLE_ONE_TAP.md](./GOOGLE_ONE_TAP.md) — вход в один тап по ID-токену Google: nonce, JWKS, настройка origin
 - [ENVIRONMENT_VARIABLES.md](./ENVIRONMENT_VARIABLES.md) — env vars и secrets
 
 ### Процессы

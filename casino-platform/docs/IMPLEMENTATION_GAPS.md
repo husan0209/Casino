@@ -139,7 +139,7 @@ casino-platform/apps/api/src/modules/affiliate | wc -l`, ранее в этом 
 | ------ | ----------- | --- | ------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------- |
 | GAP-01 | CLOSED      | P0  | auth          | Модуль auth был неполным — достроен по контрактам use-case              | `apps/api/src/modules/auth/application/use-cases/register.use-case.ts`                                                                                                                                                                                                                                              | тест:player-lifecycle.e2e                                                                            | 2026-10-02 (код+тест) |
 | GAP-02 | CLOSED      | P1  | infra         | BullMQ-очередь email, SMTP-мейлер, rich HTML, воркер в своём процессе   | `apps/api/src/queues/infrastructure/smtp.mailer.ts:94`, `apps/api/src/worker.ts`                                                                                                                                                                                                                                    | тест:email-html-templates                                                                            | 2026-10-02 (код+тест) |
-| GAP-03 | CODE_DONE   | P1  | auth          | Google OAuth code-flow: код и тесты есть, live-обмен не проверялся      | `apps/api/src/modules/auth/application/use-cases/oauth/google-oauth.use-case.ts`                                                                                                                                                                                                                                    | тест:oauth-verify                                                                                    | 2026-10-02 (код+тест) |
+| GAP-03 | CODE_DONE   | P1  | auth          | Google OAuth code-flow + One Tap: код и тесты, live не проверялся       | `apps/api/src/modules/auth/application/use-cases/oauth/google-oauth.use-case.ts`, `google-one-tap.use-case.ts`, `docs/GOOGLE_ONE_TAP.md`                                                                                                                                                                            | тест:oauth-verify                                                                                    | 2026-10-13 (код+тест) |
 | GAP-04 | CODE_DONE   | P1  | auth          | Telegram Login: верификация хэша, живой логин не проверялся             | `apps/api/src/modules/auth/application/use-cases/oauth/telegram-login.use-case.ts`                                                                                                                                                                                                                                  | тест:oauth-verify                                                                                    | 2026-10-02 (код+тест) |
 | GAP-05 | CLOSED      | P1  | infra         | Email-отправка: очередь + мейлер + fail-closed без SMTP_HOST            | `apps/api/src/queues/infrastructure/smtp.mailer.ts:67-70`                                                                                                                                                                                                                                                           | тест:smtp-mailer                                                                                     | 2026-10-02 (код+тест) |
 | GAP-06 | CODE_DONE   | P1  | payments      | Rukassa: реальный HTTP + HMAC вебхука; боевых ключей не было            | `apps/api/src/modules/payments/infrastructure/clients/rukassa.client.ts`                                                                                                                                                                                                                                            | тест:deposit-idempotency                                                                             | 2026-10-02 (код+тест) |
@@ -564,14 +564,23 @@ Env: добавлены опциональные `SMTP_PORT/SMTP_USER/SMTP_PASS`
 - Google: authorization-code flow — `GET /auth/google/url` (state = HMAC, 10 мин), `POST /auth/google` (обмен кода,
   userinfo, провижининг через `OAuthUserProvisioningService`, сессия + refresh-cookie). Требует
   `GOOGLE_CLIENT_ID/SECRET`.
+- Google One Tap (2026-10-13): `GET /auth/google/one-tap/nonce` + `POST /auth/google/credential` — ID-токен
+  проверяется по JWKS Google (`google-id-token.verifier.service.ts`: RS256, `kid` с ротацией и паузой после
+  сбоя, `iss`/`aud`/`exp`/`nbf`, `iat` ≤ 10 мин, `email_verified`), привязка к браузеру — подписанный nonce в
+  httpOnly-куке `g_one_tap` (браузеру отдаётся значение, конверт остаётся в куке), после обмена кука снимается.
+  Клиент `apps/web/src/lib/google-one-tap.ts`, запуск гостю после гидрации. Документация и настройка origin:
+  `docs/GOOGLE_ONE_TAP.md`. Тесты: `google-id-token-verifier.spec.ts` (16), `google-one-tap.spec.ts` (13),
+  `auth-google-one-tap-http.spec.ts` (7), `apps/web/test/google-one-tap.spec.tsx` (17).
+  Живого обмена не было: нужен Authorized JavaScript origins → GAP-46.
 - Telegram: `POST /auth/telegram` — верификация виджета (secret = SHA256(bot_token), HMAC по data-check-string,
   `timingSafeEqual`, `auth_date` ≤ 24 ч), пользователь без email (schema nullable), сессия. Требует `TELEGRAM_BOT_TOKEN`.
   `POST /auth/telegram/preview` — та же верификация, но БЕЗ сессии и без cookies: возвращает проверенный профиль и
   `accountExists`, чтобы колбэк-страница спросила игрока («Вход» / «Регистрация») до того, как вход совершён.
 - Контракт подписей закрыт спеком `oauth-verify.spec.ts` (17 кейсов: GAP-42 + preview); Telegram-хэш дополнительно проверен
   2026-09-09 на payload, подписанном РЕАЛЬНЫМ токеном (наш `verify` принимает, подделка отбивается).
-- **Не сделано:** `GET /auth/google` против настоящего `redirect_uri` и живой логин виджетом на публичном домене
-  (нужен BotFather `/setdomain`) → пункт 5 критерия GAP-46.
+- **Не сделано:** `GET /auth/google` против настоящего `redirect_uri`, живой логин виджетом на публичном домене
+  (нужен BotFather `/setdomain`) и живой One Tap (нужен Authorized JavaScript origins в Google Cloud Console —
+  без него карточка не показывается, а причина молча глотается клиентом) → пункт 5 критерия GAP-46.
 
 ### GAP-05. Email-отправка (P1) — ✅ CLOSED (вместе с GAP-02)
 

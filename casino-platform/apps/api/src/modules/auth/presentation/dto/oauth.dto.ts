@@ -32,6 +32,17 @@ export const TelegramWebAppLoginSchema = z
   })
   .strict()
 
+// Google One Tap (credential-поток): клиент присылает ТОЛЬКО строку ID-токена,
+// которую ему выдал Google. Ожидаемый nonce берётся из httpOnly-куки, а не из
+// тела: иначе атакующий сам выбрал бы nonce и подсунул чужой токен. .strict() —
+// лишние ключи здесь не «вариант провайдера», а признак подделки.
+export const GoogleOneTapLoginSchema = z
+  .object({
+    credential: z.string().min(32).max(16384),
+    referral_code: z.string().max(32).optional(),
+  })
+  .strict()
+
 export type GoogleLoginDto = z.infer<typeof GoogleLoginSchema>
 export type TelegramLoginDto = z.infer<typeof TelegramLoginSchema>
 export type TelegramWebAppLoginDto = z.infer<typeof TelegramWebAppLoginSchema>
