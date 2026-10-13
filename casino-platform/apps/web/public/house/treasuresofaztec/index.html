@@ -29,6 +29,12 @@
     flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .logo span { color: #fff; }
+  /* Демо и реальные деньги выглядят одинаково, пока игрок не увидит метку:
+     без неё «1000.00 ₽» на экране читается как настоящий остаток. */
+  .demo-badge {
+    background: #f6b93b; color: #0f212e; font-size: 10px; font-weight: 800;
+    letter-spacing: 0.5px; padding: 3px 6px; border-radius: 4px; flex: 0 0 auto;
+  }
   .balance {
     display: flex; align-items: center; gap: 10px; background: #0f212e;
     padding: 8px 14px; border-radius: 6px; flex: 0 1 auto; min-width: 0;
@@ -131,7 +137,7 @@
     to { transform: translateY(0); opacity: 1; }
   }
   .cell.hit { transform: scale(1.06); box-shadow: 0 0 0 2px #00e701, 0 0 14px rgba(0, 231, 1, 0.45); z-index: 2; }
-  .cell.wild { background: linear-gradient(160deg, #f6b93b, #e58e26); }
+  .cell.wild { background: linear-gradient(160deg, #f6b93b, #e58e26); color: #0f212e; }
   .cell.scatter { background: linear-gradient(160deg, #b3336c, #7c1f4a); color: #fff; }
 
   /* Плашка шага живёт в отступе над доской: вися поверх верхнего ряда, она
@@ -139,11 +145,11 @@
   #stepTag {
     position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
     background: rgba(15, 33, 46, 0.92); border: 1px solid #2a3d4a; border-radius: 6px;
-    padding: 6px 12px; font-size: 12px; font-weight: 700; white-space: nowrap;
+    padding: 6px 12px; font-size: 12px; font-weight: 700;
+    max-width: 92%; text-align: center;
     opacity: 0; transition: opacity 0.15s; pointer-events: none;
   }
   #stepTag.show { opacity: 1; }
-  #stepTag b { color: #00e701; }
 
   #banner {
     position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
@@ -223,13 +229,25 @@
      «Баланс» уходит, логотип сжимается, а сумма остаётся целиком. */
   @media (max-width: 430px) {
     .balance .label { display: none; }
-    .logo { font-size: 13px; letter-spacing: 0.5px; }
-    .balance { padding: 6px 8px; }
+    .logo { font-size: 13px; letter-spacing: 0; max-width: 46vw; }
+    /* Баланс не сжимается: многоточие на сумме денег — это врать игроку.
+       Терпит логотип, у него есть ellipsis. */
+    .balance { padding: 6px 8px; flex: 0 0 auto; }
     .balance .value { font-size: 14px; }
     .top-btns { gap: 4px; }
     .icon-btn { width: 30px; height: 30px; font-size: 14px; }
     #board { gap: 4px; padding: 6px; }
     .reel { gap: 4px; }
+  }
+  /* Низкие экраны (320x568, старые Android): панель и история отдают высоту
+     доске, иначе клетка сплющивается до 23 px и символы не читаются. */
+  @media (max-height: 620px) {
+    #topbar { height: 44px; }
+    #controls { max-height: 34vh; }
+    #historyPanel { height: 44px; }
+    #boardWrap { padding-top: 38px; }
+    .spin-btn { padding: 11px; margin-top: 4px; }
+    .control-group { margin-bottom: 8px; }
   }
 </style>
 </head>
@@ -237,6 +255,7 @@
 <div id="app">
   <header id="topbar">
     <div class="logo">TREASURES <span>OF AZTEC</span></div>
+    <span class="demo-badge" id="demoBadge" hidden>ДЕМО</span>
     <div class="balance">
       <span class="label">Баланс</span>
       <span class="value" id="balance">—</span>
@@ -295,12 +314,14 @@
       в историю ставок. Фронт только показывает готовый исход: добавить или «дорисовать»
       выплате клетку нельзя — цепочка уже зафиксирована хешем.
     </p>
+    <p class="modal-note" id="ruleGeometry">—</p>
     <p class="modal-note">
-      Шесть барабанов: крайние по пять клеток, средние по шесть. Связка собирается из
-      одинаковых символов на соседних барабанах слева направо, минимум с трёх барабанов;
-      дикий подходит под любой платёжный символ. Платит одна лучшая группа, порог
-      выплаты считается по числу собранных символов. Каскад множит выплату: в базовой
-      игре до ×<span id="ruleBaseMult"></span>, во фриспинах до ×<span id="ruleFreeMult"></span>.
+      Связка собирается из одинаковых символов на соседних барабанах слева направо,
+      минимум с <span id="ruleMinReels"></span> барабанов; дикий подходит под любой
+      платёжный символ. Платит одна лучшая группа, порог выплаты считается по числу
+      собранных символов. Каскад множит выплату: в базовой игре до
+      ×<span id="ruleBaseMult"></span>, во фриспинах — от ×<span id="ruleFreeStart"></span>
+      и до ×<span id="ruleFreeMult"></span>.
     </p>
 
     <label>Таблица выплат (× ставка)</label>
@@ -363,10 +384,10 @@ const state = {
   reelRows: [5, 6, 6, 6, 6, 5],
   maxWinMultiplier: 1000,
   rules: null,
+  demo: false,
   serverReady: false,
   soundOn: true,
   lastRound: null,
-  history: [],
 };
 
 function formatMoney(value) {
@@ -385,19 +406,37 @@ function betStep() {
   return CRYPTO_LABELS[state.currency] && state.currency !== 'USDT_TRC20' ? '0.000001' : '0.1';
 }
 
+/* Ставка усекается вниз, а не округляется: toFixed(2) от 10.005 даёт «10.01»,
+   и сервер отвечает INSUFFICIENT_FUNDS или отказом по maxBet карточки.
+   toPrecision(12) снимает двоичный шум (0.29*100 = 28.999999999999996). */
+function floorBet(value) {
+  const decimals = betDecimals();
+  const scale = Math.pow(10, decimals);
+  const floored = Math.floor(Number((value * scale).toPrecision(12))) / scale;
+  return floored.toFixed(decimals);
+}
+
 /* ============================================================
    СЕТЬ
    ============================================================ */
 async function request(path, body) {
-  const res = await fetch(API + path, body === undefined ? undefined : {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(API + path, body === undefined ? undefined : {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (networkError) {
+    const error = new Error('СВЯЗЬ');
+    error.retryable = true;
+    throw error;
+  }
   const json = await res.json().catch(() => null);
   if (!res.ok || !json || !json.success) {
-    const code = json && json.error ? json.error.code : 'NETWORK_' + res.status;
-    const error = new Error(code);
+    const error = new Error((json && json.error && json.error.code) || 'HTTP_' + res.status);
+    /* 5xx и обрыв связи: раунд мог пройти, повтор обязан пойти тем же spinId.
+       4xx: сервер отказал до проводки, деньги на месте — спин будет новый. */
     error.retryable = !res.ok && res.status >= 500;
     throw error;
   }
@@ -412,6 +451,8 @@ async function loadServerState() {
   state.maxBet = Number(data.maxBet);
   state.reelRows = data.reelRows || state.reelRows;
   state.maxWinMultiplier = data.maxWinMultiplier || 1000;
+  state.demo = data.demo === true;
+  document.getElementById('demoBadge').hidden = !state.demo;
   state.rules = data.rules || null;
   state.serverReady = true;
 
@@ -463,7 +504,8 @@ function updateBoardRows() {
 
 function fitFont() {
   const first = cellsByReel[0] && cellsByReel[0][0];
-  if (!first) return;
+  /* До раскладки высоты нет: без проверки шрифт залипает на минимуме. */
+  if (!first || !first.clientHeight) return;
   const size = Math.max(13, Math.floor(first.clientHeight * 0.5));
   board.style.fontSize = size + 'px';
 }
@@ -506,7 +548,8 @@ function clearHighlight() {
 
 function stepTag(text) {
   const tag = document.getElementById('stepTag');
-  tag.innerHTML = text;
+  /* textContent, не innerHTML: сюда попадает текст ошибки с сервера. */
+  tag.textContent = text;
   tag.classList.add('show');
 }
 
@@ -624,17 +667,16 @@ async function spin() {
   const bet = readBet();
   if (bet === null) return;
 
+  /* Ставка округляется ВНИЗ до разрядов валюты: toFixed округляет кверху и
+     может послать сумму больше баланса или больше maxBet карточки. */
+  const attempt = pendingAttempt || { spinId: crypto.randomUUID(), bet: floorBet(bet) };
+  pendingAttempt = attempt;
   inFlight = true;
   /* Сброс до запроса: тап, сделанный пока идёт сетевой спин, тоже должен
      считаться — иначе он проглатывается и длинный раунд доигрывается целиком. */
   skipRound = false;
   let failed = null;
   updateAll();
-  /* Повтор после сетевого сбоя идёт тем же spinId и той же ставкой: сервер на
-      дубле деньги не двигает, а отвечает проведённым раундом. Новый uuid здесь
-      означал бы вторую ставку при потерянном ответе. */
-  const attempt = pendingAttempt || { spinId: crypto.randomUUID(), bet: bet.toFixed(betDecimals()) };
-  pendingAttempt = attempt;
   try {
     const data = await request('/spin', { spinId: attempt.spinId, bet: attempt.bet });
     pendingAttempt = null;
@@ -658,6 +700,9 @@ async function spin() {
     updateAll();
   } catch (error) {
     failed = error;
+    /* Отказ до проводки: замораживать spinId больше незачем, иначе следующий
+       клик уйдёт со ставкой, которую игрок уже поменял в поле. */
+    if (!error.retryable) pendingAttempt = null;
     showError(error);
   } finally {
     inFlight = false;
@@ -668,10 +713,12 @@ async function spin() {
   }
 }
 
-/* Связь оборвалась после проводки: раунд мог пройти. Тянем баланс и ждём
-   нажатия — следующий спин отдаст тот же spinId, и сервер вернёт дубль. */
+/* Связь оборвалась или сервер отказал до проводки. В первом случае следующий
+   спин пойдёт тем же spinId (дубль деньги не двинет), во втором — новым. */
 function showError(error) {
-  stepTag('нет связи: ' + error.message + ' — повтор отправит тот же спин');
+  stepTag(error.retryable
+    ? 'нет связи — следующий спин повторит этот же раунд'
+    : 'сервер отказал: ' + error.message);
   request('/state')
     .then(function (balance) {
       state.balance = Number(balance.balance);
@@ -680,18 +727,22 @@ function showError(error) {
     .catch(function () { /* баланс переснимется при следующем открытии */ });
 }
 
+let winTagTimer = null;
+
 function showWin(data) {
   const tag = document.getElementById('winTag');
   const suffix = data.capped ? ' · потолок ×' + state.maxWinMultiplier : '';
   tag.textContent = '+' + formatMoney(data.win) + ' (' + Number(data.multiplier).toFixed(2) + '×)' + suffix;
   tag.classList.add('show');
-  setTimeout(function () { tag.classList.remove('show'); }, 2600);
+  /* Старый таймер гасил бы новую плашку: выигрыши подряд идут быстрее 2,6 с. */
+  if (winTagTimer) clearTimeout(winTagTimer);
+  winTagTimer = setTimeout(function () { tag.classList.remove('show'); }, 2600);
 }
 
 function addHistory(data) {
+  /* Дубль доставки — тот же раунд, а не новый: в историю он кладётся один раз. */
+  if (data.duplicate) return;
   const multiplier = Number(data.multiplier);
-  state.history.unshift(multiplier);
-  if (state.history.length > 30) state.history.pop();
   const panel = document.getElementById('history');
   const pill = document.createElement('div');
   pill.className = 'history-pill';
@@ -743,6 +794,14 @@ function updateAll() {
 
 function renderRules() {
   const rules = state.rules;
+  const cells = state.reelRows.reduce(function (acc, rows) { return acc + rows; }, 0);
+  const shortest = state.reelRows.reduce(function (min, rows) { return Math.min(min, rows); }, state.reelRows[0]);
+  const tallest = state.reelRows.reduce(function (max, rows) { return Math.max(max, rows); }, state.reelRows[0]);
+  document.getElementById('ruleGeometry').textContent =
+    'Барабанов ' + state.reelRows.length + ', клеток в столбцах от ' + shortest + ' до ' +
+    tallest + ', всего ' + cells + ' на доске.';
+  document.getElementById('ruleMinReels').textContent = rules.minReels;
+  document.getElementById('ruleFreeStart').textContent = rules.freeMultiplierStart;
   const symbols = Object.keys(rules.paytable);
   let html = '<tr><th>Символ</th>';
   rules.tiers.forEach(function (tier) { html += '<th>' + tier + '+</th>'; });
@@ -761,8 +820,8 @@ function renderRules() {
     rules.scatterPay.map(function (value) { return value + '× ставка'; }).join(', ') +
     ' и запускают фриспины. Скаттеры платят только на первом каскаде захода.';
   document.getElementById('ruleFree').textContent =
-    'Фриспинов ' + rules.freeSpins + ', множитель стартует с ×3 и растёт до ×' +
-    rules.maxMultiplierFree + '. Ещё ' + rules.freeRetriggerMin + ' скаттеров внутри фриспинов ' +
+    'Фриспинов ' + rules.freeSpins + ', множитель стартует с ×' + rules.freeMultiplierStart +
+    ' и растёт до ×' + rules.maxMultiplierFree + '. Ещё ' + rules.freeRetriggerMin + ' скаттеров внутри фриспинов ' +
     'добавляют ' + rules.freeRetriggerSpins + ' заходов, всего не больше ' +
     rules.freeSpinsHardLimit + '. Связка считается минимум с ' + rules.minReels + ' барабанов.';
 }
@@ -770,7 +829,7 @@ function renderRules() {
 function updateFairness() {
   const round = state.lastRound;
   document.getElementById('fairRound').textContent =
-    round ? (round.roundId || (round.demo ? 'демо-запуск' : '—')) : '—';
+    round ? (round.roundId || (state.demo ? 'демо-запуск' : '—')) : '—';
   document.getElementById('fairHash').textContent = round ? round.outcomeHash : '—';
 }
 
@@ -812,7 +871,11 @@ function playWinSound() {
    ============================================================ */
 document.getElementById('spinBtn').addEventListener('click', spin);
 
-document.getElementById('betAmount').addEventListener('input', updateAll);
+document.getElementById('betAmount').addEventListener('input', function () {
+  /* Игрок поменял сумму: прежний spinId замораживать незачем, он нёс другую ставку. */
+  pendingAttempt = null;
+  updateAll();
+});
 
 /* Проводка к этому моменту уже в ledger — задержка остаётся только в показе,
    поэтому доску можно «докрутить» тапом. */
@@ -828,6 +891,7 @@ document.querySelectorAll('[data-bet-mult]').forEach(function (btn) {
     let value = btn.dataset.betMult === 'max' ? cap : current * parseFloat(btn.dataset.betMult);
     value = Math.max(state.minBet, Math.min(cap, value));
     input.value = value.toFixed(betDecimals());
+    pendingAttempt = null;
     updateAll();
   });
 });
@@ -862,6 +926,12 @@ document.getElementById('reloadBtn').addEventListener('click', async function ()
 window.addEventListener('resize', function () {
   fitFont();
 });
+
+/* В iframe платформы высота доски меняется не только от resize окна: панель
+   управления и история перетекают раньше. */
+if (window.ResizeObserver) {
+  new ResizeObserver(function () { fitFont(); }).observe(document.getElementById('boardWrap'));
+}
 
 /* ============================================================
    BOOT

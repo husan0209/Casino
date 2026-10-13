@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   AZTEC_FREE_SPINS,
+  AZTEC_FREE_SPINS_HARD_LIMIT,
   AZTEC_MAX_WIN_MULTIPLIER,
   AZTEC_PAYTABLE,
   AZTEC_REEL_ROWS,
@@ -275,6 +276,17 @@ describe('азтек: заходы для клиента', () => {
 
     expect(idle.length).toBeGreaterThan(0)
     expect(emptyBoards).toBe(0)
+  })
+  it('ретриггер добавляет заходы, а жёсткий потолок их обрезает', () => {
+    const retriggered = sampleSpins(SAMPLE, 20261013).filter(
+      (spin) => spin.freeSpinsPlayed > AZTEC_FREE_SPINS,
+    )
+
+    expect(retriggered.length).toBeGreaterThan(0)
+    for (const spin of retriggered) {
+      expect(spin.plays.length).toBe(1 + spin.freeSpinsPlayed)
+      expect(spin.freeSpinsPlayed).toBeLessThanOrEqual(AZTEC_FREE_SPINS_HARD_LIMIT)
+    }
   })
 })
 

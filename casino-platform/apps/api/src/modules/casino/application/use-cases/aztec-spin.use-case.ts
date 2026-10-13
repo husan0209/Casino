@@ -13,6 +13,7 @@ import { cryptoRandom } from './house-slot-lottery'
 import { AZTEC_EXTERNAL_GAME_ID, OriginalsSessionLoader } from './originals-session-loader'
 import { TIGER_DEMO_START_CREDIT } from './originals-session.use-case'
 import {
+  AZTEC_FREE_MULTIPLIER_START,
   AZTEC_FREE_RETRIGGER,
   AZTEC_FREE_RETRIGGER_MIN,
   AZTEC_FREE_SPINS,
@@ -89,6 +90,7 @@ export interface AztecRulesData {
   scatterPay: readonly number[]
   scatterMin: number
   freeSpins: number
+  freeMultiplierStart: number
   freeRetriggerMin: number
   freeRetriggerSpins: number
   freeSpinsHardLimit: number
@@ -117,6 +119,7 @@ const AZTEC_RULES: AztecRulesData = {
   scatterPay: AZTEC_SCATTER_PAY,
   scatterMin: AZTEC_SCATTER_MIN,
   freeSpins: AZTEC_FREE_SPINS,
+  freeMultiplierStart: AZTEC_FREE_MULTIPLIER_START,
   freeRetriggerMin: AZTEC_FREE_RETRIGGER_MIN,
   freeRetriggerSpins: AZTEC_FREE_RETRIGGER,
   freeSpinsHardLimit: AZTEC_FREE_SPINS_HARD_LIMIT,

@@ -174,6 +174,32 @@ describe('AztecSpinUseCase: демо', () => {
     expect(data.roundId).toBeNull()
     expect(data.duplicate).toBe(false)
   })
+
+  it('идемпотентности в демо нет: повтор того же spinId перерозыгрывает исход', async () => {
+    const useCase = new AztecSpinUseCase(
+      makeLoader(null),
+      makeWallet('0').facade,
+      makePlay(null).repository,
+    )
+    const spinId = spinInput().spinId
+
+    const first = await useCase.execute({
+      sessionToken: 'demo_treasuresofaztec_token',
+      spinId,
+      bet: '10',
+    })
+    const again = await useCase.execute({
+      sessionToken: 'demo_treasuresofaztec_token',
+      spinId,
+      bet: '10',
+    })
+
+    /* Фиксируем намеренно: клиент обещает «тот же раунд» только на боевых
+       деньгах, в демо дубль не ищется (кошелька нет). */
+    expect(first.duplicate).toBe(false)
+    expect(again.duplicate).toBe(false)
+    expect(again.roundId).toBeNull()
+  })
 })
 
 describe('AztecSpinUseCase: бой', () => {

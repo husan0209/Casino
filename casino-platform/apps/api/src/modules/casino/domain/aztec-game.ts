@@ -74,6 +74,8 @@ export const AZTEC_FREE_SPINS_HARD_LIMIT = 60
 export const AZTEC_MAX_CASCADES = 12
 export const AZTEC_MAX_MULTIPLIER_BASE = 5
 export const AZTEC_MAX_MULTIPLIER_FREE = 15
+/** Множитель первого каскада фриспина: клиент показывает его в правилах. */
+export const AZTEC_FREE_MULTIPLIER_START = 3
 export const AZTEC_MAX_WIN_MULTIPLIER = 1000
 /** Дикий может прилететь в досыпку на крайнем барабане. */
 export const AZTEC_REFILL_WILD_CHANCE = 0.35
@@ -148,7 +150,7 @@ const BASE_MULTIPLIER: MultiplierPolicy = {
 
 /** Политика фриспинов: номер захода кладётся в AztecPlay, а не в шаг. */
 const FREE_MULTIPLIER: MultiplierPolicy = {
-  start: 3,
+  start: AZTEC_FREE_MULTIPLIER_START,
   step: 2,
   cap: AZTEC_MAX_MULTIPLIER_FREE,
 }
