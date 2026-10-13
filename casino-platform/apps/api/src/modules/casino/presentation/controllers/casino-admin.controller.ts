@@ -72,6 +72,7 @@ type AdminGamesPage = {
     isPopular: boolean
     hasDemo: boolean
     rtp: Prisma.Decimal | null
+    rtpDemo: Prisma.Decimal | null
     volatility: GameVolatility | null
     maxWinMultiplier: Prisma.Decimal | null
     minBet: Prisma.Decimal | null
@@ -186,6 +187,8 @@ export class CasinoAdminController {
       isPopular?: boolean
       sort_order?: number
       tags?: string[]
+      rtp?: number | null
+      rtp_demo?: number | null
     },
   ): Promise<{ ok: boolean }> {
     return this.updateGameUc.execute(gameId, body)

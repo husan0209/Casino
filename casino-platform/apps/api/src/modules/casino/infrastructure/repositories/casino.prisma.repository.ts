@@ -32,6 +32,10 @@ export class PrismaGameCatalogRepository implements IGameCatalogRepository {
     return prisma.game.findUnique({ where: { slug }, include: { provider: true } })
   }
 
+  findByExternalGameId(externalGameId: string): Promise<Game | null> {
+    return prisma.game.findFirst({ where: { externalGameId, isEnabled: true } })
+  }
+
   findMany<S extends Prisma.GameSelect>(
     query: GameCatalogQuery & { select: S },
   ): Promise<Prisma.GameGetPayload<{ select: S }>[]> {

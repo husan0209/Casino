@@ -33,6 +33,12 @@ export interface GameCatalogQuery {
 /** Каталог игр: листинг, поиск по slug, счётчик запусков. */
 export interface IGameCatalogRepository {
   findBySlug(slug: string): Promise<GameWithProvider | null>
+  /**
+   * House-демо: токен несёт только externalGameId, сессии (а значит и строки
+   * игры) у демо нет — карточку берём по этому признаку, чтобы демо-режим
+   * играл по своему rtp_demo, а не по деньгам.
+   */
+  findByExternalGameId(externalGameId: string): Promise<Game | null>
   findMany<S extends Prisma.GameSelect>(
     query: GameCatalogQuery & { select: S },
   ): Promise<Prisma.GameGetPayload<{ select: S }>[]>

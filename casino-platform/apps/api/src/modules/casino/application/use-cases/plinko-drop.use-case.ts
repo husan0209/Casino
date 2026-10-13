@@ -17,18 +17,22 @@ import {
 import { TIGER_DEMO_START_CREDIT } from './originals-session.use-case'
 import { InvalidBetRequestError } from '../../domain/errors'
 import {
+  GAME_CATALOG_REPOSITORY,
   GAME_PLAY_REPOSITORY,
   type GameRow,
   type GameSessionWithGame,
+  type IGameCatalogRepository,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
 import {
   PlinkoRiskSchema,
   PlinkoRowsSchema,
+  type PlinkoMultipliers,
   type PlinkoPath,
   type PlinkoRisk,
   type PlinkoRows,
 } from '../../infrastructure/providers/house/spin-data/plinko-row'
+import { plinkoPackFor } from '../../infrastructure/providers/house/spin-data/plinko.rtp-pack'
 import { PLINKO_MULTIPLIERS } from '../../infrastructure/providers/house/spin-data/plinko.tables'
 
 /**
@@ -100,9 +104,14 @@ export function hashPlinkoOutcome(path: PlinkoPath, dropId: string): string {
     .digest('hex')
 }
 
-/** Множитель лунки по конфигу доски. */
-export function plinkoMultiplier(rows: PlinkoRows, risk: PlinkoRisk, slotIndex: number): string {
-  const table = PLINKO_MULTIPLIERS[rows]?.[risk]
+/** Множитель лунки по конфигу доски и активному комплекту. */
+export function plinkoMultiplier(
+  rows: PlinkoRows,
+  risk: PlinkoRisk,
+  slotIndex: number,
+  pack: PlinkoMultipliers,
+): string {
+  const table = pack[String(rows)]?.[risk]
   const multiplier = table?.[slotIndex]
   if (multiplier === undefined) {
     throw new InvalidBetRequestError()
@@ -114,8 +123,12 @@ export function plinkoMultiplier(rows: PlinkoRows, risk: PlinkoRisk, slotIndex: 
  * Матожидание отдачи конфига при честной монете: сумма C(n,k)/2^n * mult[k].
  * Чистая функция для тестов калибровки таблиц.
  */
-export function plinkoExpectedRtp(rows: PlinkoRows, risk: PlinkoRisk): number {
-  const table = PLINKO_MULTIPLIERS[rows]?.[risk]
+export function plinkoExpectedRtp(
+  rows: PlinkoRows,
+  risk: PlinkoRisk,
+  pack: PlinkoMultipliers = PLINKO_MULTIPLIERS,
+): number {
+  const table = pack[String(rows)]?.[risk]
   if (!table) {
     throw new InvalidBetRequestError()
   }
@@ -139,6 +152,15 @@ function toMoneyString(raw: string): string {
   return new Decimal(raw).toString()
 }
 
+/** RTP в каталоге — Decimal(5,2); генератору нужны проценты числом или null. */
+function toRtpPercent(rtp: Decimal | number | string | null | undefined): number | null {
+  if (rtp === null || rtp === undefined) {
+    return null
+  }
+  const value = Number(String(rtp))
+  return Number.isFinite(value) ? value : null
+}
+
 /**
  * Исход дропа целиком: путь шарика, лунка, множитель, выплата и хеш.
  * Считается один раз и в демо, и в боевом пути.
@@ -151,10 +173,10 @@ export interface PlinkoOutcome {
   outcomeHash: string
 }
 
-export function rollPlinkoOutcome(parsed: PlinkoDropInput): PlinkoOutcome {
+export function rollPlinkoOutcome(parsed: PlinkoDropInput, pack: PlinkoMultipliers): PlinkoOutcome {
   const path = drawPlinkoPath(parsed.rows)
   const slotIndex = path.reduce<number>((sum, step) => sum + step, 0)
-  const multiplier = plinkoMultiplier(parsed.rows, parsed.risk, slotIndex)
+  const multiplier = plinkoMultiplier(parsed.rows, parsed.risk, slotIndex, pack)
   return {
     path,
     slotIndex,
@@ -170,7 +192,23 @@ export class PlinkoDropUseCase {
     @Inject(OriginalsSessionLoader) private readonly sessionLoader: OriginalsSessionLoader,
     @Inject(WalletFacade) private readonly wallet: WalletFacade,
     @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
+    @Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository,
   ) {}
+
+  /**
+   * Комплект множителей для токена: его же отдаёт /state, чтобы доска
+   * показывала ровно те числа, по которым сервер платит.
+   */
+  async resolvePack(sessionToken: string): Promise<PlinkoMultipliers> {
+    if (this.sessionLoader.isDemoToken(sessionToken)) {
+      return plinkoPackFor(await this.demoTargetRtp())
+    }
+    const session = await this.sessionLoader.loadActiveHouseSession(
+      sessionToken,
+      PLINKO_EXTERNAL_GAME_ID,
+    )
+    return plinkoPackFor(toRtpPercent(session.game.rtp))
+  }
 
   async execute(request: PlinkoDropRequest): Promise<PlinkoDropData> {
     const parsed = PlinkoDropSchema.parse({
@@ -180,13 +218,19 @@ export class PlinkoDropUseCase {
       rows: request.rows,
     })
     if (request.sessionToken.startsWith(DEMO_TOKEN_PREFIX)) {
-      return this.executeDemoDrop(parsed)
+      return this.executeDemoDrop(parsed, plinkoPackFor(await this.demoTargetRtp()))
     }
     return this.executeRealDrop(request.sessionToken, parsed)
   }
 
-  private executeDemoDrop(parsed: PlinkoDropInput): PlinkoDropData {
-    const outcome = rollPlinkoOutcome(parsed)
+  /** Цель демо берётся из карточки игры; без значения — донорский профиль. */
+  private async demoTargetRtp(): Promise<number | null> {
+    const game = await this.catalog.findByExternalGameId(PLINKO_EXTERNAL_GAME_ID)
+    return toRtpPercent(game?.rtpDemo)
+  }
+
+  private executeDemoDrop(parsed: PlinkoDropInput, pack: PlinkoMultipliers): PlinkoDropData {
+    const outcome = rollPlinkoOutcome(parsed, pack)
     const balance = money.add(money.subtract(TIGER_DEMO_START_CREDIT, parsed.bet), outcome.win)
     return {
       dropId: parsed.dropId,
@@ -214,6 +258,7 @@ export class PlinkoDropUseCase {
       PLINKO_EXTERNAL_GAME_ID,
     )
     this.assertBetLimits(session, parsed.bet)
+    const pack = plinkoPackFor(toRtpPercent(session.game.rtp))
     const providerId = session.providerId
     const betExternalId = `plinko_${parsed.dropId}_bet`
     const stored = await this.play.findTransactionByExternal(providerId, betExternalId)
@@ -222,7 +267,8 @@ export class PlinkoDropUseCase {
     }
     return this.wallet.runInTransaction(
       { userId: session.userId, currency: session.currency as Currency },
-      (transaction) => this.applyDrop({ session, providerId, parsed, betExternalId, transaction }),
+      (transaction) =>
+        this.applyDrop({ session, providerId, parsed, betExternalId, transaction, pack }),
     )
   }
 
@@ -241,8 +287,9 @@ export class PlinkoDropUseCase {
     parsed: PlinkoDropInput
     betExternalId: string
     transaction: WalletTransaction
+    pack: PlinkoMultipliers
   }): Promise<PlinkoDropData> {
-    const { session, providerId, parsed, betExternalId, transaction } = args
+    const { session, providerId, parsed, betExternalId, transaction, pack } = args
     const raceDuplicate = await this.play.findTransactionByExternal(
       providerId,
       betExternalId,
@@ -251,7 +298,7 @@ export class PlinkoDropUseCase {
     if (raceDuplicate) {
       return this.rebuildDuplicateDrop(session, providerId, parsed.dropId)
     }
-    const outcome = rollPlinkoOutcome(parsed)
+    const outcome = rollPlinkoOutcome(parsed, pack)
     const round = await this.openDropRound({
       session,
       providerId,

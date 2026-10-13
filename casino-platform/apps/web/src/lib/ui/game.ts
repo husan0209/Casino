@@ -37,18 +37,6 @@ export function gameBadge(game: GameBadgeFields): GameBadge {
   return null
 }
 
-/** RTP приходит Decimal'ом (строка в JSON) — показываем число без хвостовых нулей. */
-export function gameRtpLabel(rtp: number | string | null | undefined): string | null {
-  if (rtp === null || rtp === undefined || rtp === '') {
-    return null
-  }
-  const normalized = Number(String(rtp))
-  if (!Number.isFinite(normalized) || normalized <= 0) {
-    return null
-  }
-  return `${String(Number(normalized.toFixed(2)))}%`
-}
-
 /** Демо-кнопка только когда провайдер реально отдаёт демо (§8.4). */
 export function gameHasDemo(hasDemo: boolean | undefined): boolean {
   return hasDemo === true

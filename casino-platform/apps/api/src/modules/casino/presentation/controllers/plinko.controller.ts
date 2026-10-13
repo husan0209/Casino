@@ -56,6 +56,9 @@ export class PlinkoController {
   @Get(':token/state')
   async state(@Param('token') sessionToken: string, @Res() response: Response): Promise<Response> {
     try {
+      // Комплект множителей отдаёт сервер: доска обязана показывать те же
+      // числа, по которым идёт расчёт выплаты после смены RTP в админке.
+      const tables = await this.dropUseCase.resolvePack(sessionToken)
       if (this.sessionLoader.isDemoToken(sessionToken)) {
         return response.json({
           success: true,
@@ -66,6 +69,7 @@ export class PlinkoController {
             maxBet: '10000',
             risks: PLINKO_RISK_VALUES,
             rowsOptions: PLINKO_ROWS_VALUES,
+            tables,
             demo: true,
           },
         })
@@ -84,6 +88,7 @@ export class PlinkoController {
           maxBet: session.game.maxBet ? String(session.game.maxBet) : '10000',
           risks: PLINKO_RISK_VALUES,
           rowsOptions: PLINKO_ROWS_VALUES,
+          tables,
           demo: false,
         },
       })
