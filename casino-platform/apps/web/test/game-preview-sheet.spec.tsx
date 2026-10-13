@@ -80,8 +80,10 @@ describe('шторка превью игры (§4.5)', () => {
     expect(screen.getByText('Playson')).toBeTruthy()
     await waitFor(() => expect(detailsMock).toHaveBeenCalledWith('neon-fruits'))
 
-    expect(screen.getByText('RTP')).toBeTruthy()
-    expect(screen.getByText('96.5%')).toBeTruthy()
+    // Возврат игроку не показываем: это внутренний параметр админки, и он
+    // не обязан совпадать с тем, что игрок увидит на конкретной доске.
+    expect(screen.queryByText('RTP')).toBeNull()
+    expect(screen.queryByText('96.5%')).toBeNull()
     expect(screen.getByText('Волатильность')).toBeTruthy()
     expect(screen.getByText('Средняя')).toBeTruthy()
     expect(screen.getByText('Мин. ставка')).toBeTruthy()

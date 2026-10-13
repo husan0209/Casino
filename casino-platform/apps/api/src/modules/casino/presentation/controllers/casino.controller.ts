@@ -38,6 +38,44 @@ import { ListGamesUseCase } from '../../application/use-cases/list-games.use-cas
 import { ListHistorySchema, type ListHistoryDto } from '../dto/history-query.dto'
 import { LaunchGameSchema } from '../dto/launch.dto'
 
+/**
+ * Публичные поля карточки игры. RTP наружу не отдаём: он стал внутренней
+ * величиной админки, а игрок не должен видеть цель, по которой сервер
+ * собирает таблицы множителей.
+ */
+const publicGameSelect = {
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  name: true,
+  type: true,
+  metadata: true,
+  category: true,
+  providerId: true,
+  externalGameId: true,
+  slug: true,
+  nameRu: true,
+  subcategory: true,
+  thumbnailUrl: true,
+  bannerUrl: true,
+  isEnabled: true,
+  isFeatured: true,
+  isNew: true,
+  isPopular: true,
+  hasDemo: true,
+  volatility: true,
+  maxWinMultiplier: true,
+  minBet: true,
+  maxBet: true,
+  supportedCurrencies: true,
+  tags: true,
+  sortOrder: true,
+  launchCount: true,
+  provider: { select: { slug: true, name: true } },
+} satisfies Prisma.GameSelect
+
+type PublicGamePayload = Prisma.GameGetPayload<{ select: typeof publicGameSelect }>
+
 @Controller('casino')
 export class CasinoController {
   constructor(
@@ -47,9 +85,7 @@ export class CasinoController {
   ) {}
 
   @Get('games')
-  async games(
-    @Query() queryParams: Record<string, string | undefined>,
-  ): Promise<{
+  async games(@Query() queryParams: Record<string, string | undefined>): Promise<{
     data: {
       id: string
       name: string
@@ -63,7 +99,6 @@ export class CasinoController {
       isNew: boolean
       isPopular: boolean
       hasDemo: boolean
-      rtp: Prisma.Decimal | null
       volatility: GameVolatility | null
     }[]
     meta: {
@@ -83,50 +118,8 @@ export class CasinoController {
   }
 
   @Get('games/:slug')
-  async game(
-    @Param('slug') slug: string,
-  ): Promise<
-    | ({ provider: { name: string; slug: string } } & {
-        id: string
-        createdAt: Date
-        updatedAt: Date
-        name: string
-        type: GameType
-        metadata: Prisma.JsonValue
-        category: GameCategory
-        providerId: string
-        externalGameId: string
-        slug: string
-        nameRu: string | null
-        subcategory: string | null
-        thumbnailUrl: string | null
-        bannerUrl: string | null
-        isEnabled: boolean
-        isFeatured: boolean
-        isNew: boolean
-        isPopular: boolean
-        hasDemo: boolean
-        rtp: Prisma.Decimal | null
-        volatility: GameVolatility | null
-        maxWinMultiplier: Prisma.Decimal | null
-        minBet: Prisma.Decimal | null
-        maxBet: Prisma.Decimal | null
-        supportedCurrencies: Prisma.JsonValue
-        tags: Prisma.JsonValue
-        sortOrder: number
-        launchCount: number
-      })
-    | null
-  > {
-    const gameRecord = await prisma.game.findUnique({
-      where: { slug },
-      include: {
-        provider: {
-          select: { slug: true, name: true },
-        },
-      },
-    })
-    return gameRecord
+  async game(@Param('slug') slug: string): Promise<PublicGamePayload | null> {
+    return prisma.game.findUnique({ where: { slug }, select: publicGameSelect })
   }
 
   @Get('providers')
@@ -258,7 +251,6 @@ export class CasinoController {
       isNew: boolean
       isPopular: boolean
       hasDemo: boolean
-      rtp: Prisma.Decimal | null
       volatility: GameVolatility | null
       maxWinMultiplier: Prisma.Decimal | null
       minBet: Prisma.Decimal | null
@@ -295,9 +287,7 @@ export class CasinoController {
 
   @Get('recent')
   @UseGuards(AuthGuard)
-  async recent(
-    @CurrentUser() currentUser: { id: string },
-  ): Promise<{
+  async recent(@CurrentUser() currentUser: { id: string }): Promise<{
     data: ({
       id: string
       createdAt: Date
@@ -318,7 +308,6 @@ export class CasinoController {
       isNew: boolean
       isPopular: boolean
       hasDemo: boolean
-      rtp: Prisma.Decimal | null
       volatility: GameVolatility | null
       maxWinMultiplier: Prisma.Decimal | null
       minBet: Prisma.Decimal | null

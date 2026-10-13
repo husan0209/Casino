@@ -27,7 +27,7 @@ export interface ProviderDto {
  *
  * GAP-55: раньше DTO был описан в snake_case (name_ru / is_new / has_demo), но API
  * таких ключей не отдаёт — из-за этого бейджи NEW/HOT и кнопка «Демо» не рендерились.
- * rtp на бэке — Prisma.Decimal, в JSON приходит строкой.
+ * RTP в публичном контракте отсутствует: он остаётся внутренней величиной админки.
  */
 export interface GameDto {
   id: string
@@ -38,7 +38,6 @@ export interface GameDto {
   /** Широкая обложка для превью (§8.1); в листинге её нет, только в деталях. */
   bannerUrl?: string | null
   category?: string | null
-  rtp?: number | string | null
   /** Мин. ставка провайдера, Decimal → строка в JSON. Только в деталях игры. */
   minBet?: number | string | null
   isFeatured?: boolean

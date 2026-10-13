@@ -33,11 +33,11 @@ export async function generateMetadata({
   params: { slug: string }
 }): Promise<Metadata> {
   const game = await fetchGameMeta(params.slug)
-  const title = game ? (game.nameRu || game.name) : 'Игра'
+  const title = game ? game.nameRu || game.name : 'Игра'
   const provider = game?.provider?.name ? ` — ${game.provider.name}` : ''
   return {
     title: `${title}${provider} — играть онлайн | Casino`,
-    description: `${title}${provider}: RTP, демо и игра на реальные деньги.`,
+    description: `${title}${provider}: демо и игра на реальные деньги.`,
     openGraph: {
       title: `${title} — играть онлайн | Casino`,
       description: game?.provider?.name ? `Провайдер: ${game.provider.name}` : 'Онлайн слот',

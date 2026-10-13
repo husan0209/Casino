@@ -8,18 +8,12 @@ import { GameThumb } from '@/components/casino/GameThumb'
 import { useDemoLaunch } from '@/hooks/useDemoLaunch'
 import { fetchGameDetails } from '@/lib/api/casino.api'
 import { formatBalance } from '@/lib/format/currency'
-import {
-  gameDisplayName,
-  gameHasDemo,
-  gameMinBetLabel,
-  gameRtpLabel,
-  gameVolatilityLabel,
-} from '@/lib/ui/game'
+import { gameDisplayName, gameHasDemo, gameMinBetLabel, gameVolatilityLabel } from '@/lib/ui/game'
 import { useAuth } from '@/stores/auth'
 import { useUIStore, type GamePreviewOptions } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
-/** Строка «RTP / Волатильность / Мин. ставка» (ТЗ ч.5 §8.1) — три колонки, одна рамка. */
+/** Строка «Волатильность / Мин. ставка» (ТЗ ч.5 §8.1) — колонки в одной рамке. */
 function SpecTable({
   specs,
 }: {
@@ -170,7 +164,6 @@ function GamePreviewBody({
 
           <SpecTable
             specs={[
-              { label: 'RTP', value: gameRtpLabel(game.rtp) },
               { label: 'Волатильность', value: gameVolatilityLabel(game.volatility) },
               { label: 'Мин. ставка', value: gameMinBetLabel(details?.minBet, currency) },
             ]}

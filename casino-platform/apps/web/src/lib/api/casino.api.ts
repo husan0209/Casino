@@ -43,7 +43,7 @@ export function fetchProviders(): Promise<ProviderDto[]> {
 
 /**
  * Детали игры (GET /casino/games/:slug). Листинг каталога отдаёт только
- * `rtp`/`volatility`; широкая обложка и мин. ставка есть лишь здесь (§8.1).
+ * `volatility`; широкая обложка и мин. ставка есть лишь здесь (§8.1).
  */
 export function fetchGameDetails(slug: string): Promise<GameDetailsDto> {
   return apiGet<GameDetailsDto>(`/casino/games/${slug}`)

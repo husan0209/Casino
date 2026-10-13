@@ -9,7 +9,7 @@ import { GameThumb } from '@/components/casino/GameThumb'
 import { apiPost } from '@/lib/api'
 import { playersCountLabel } from '@/lib/format/plural'
 import { openDemoGame } from '@/lib/open-game'
-import { gameBadge, gameDisplayName, gameRtpLabel } from '@/lib/ui/game'
+import { gameBadge, gameDisplayName } from '@/lib/ui/game'
 import { bigWinLabel, playersOnline } from '@/lib/ui/vitrine-stats'
 import { useAuth, type WebUser } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
@@ -385,7 +385,7 @@ interface DeckPreviewProps {
 }
 
 /**
- * Превью по «i» (§4.7): RTP, волатильность, «Играть» и «Демо» без ухода со
+ * Превью по «i» (§4.7): волатильность, «Играть» и «Демо» без ухода со
  * страницы. Портал в body: секция колоды изолирована (isolate против шапки),
  * из её stacking context z-50 поверх sticky-хедера не поднять.
  */
@@ -393,7 +393,6 @@ function DeckPreview({ card, onClose, onPlay, onDemo }: DeckPreviewProps): React
   const dialogRef = useRef<HTMLDivElement>(null)
   const [demoLoading, setDemoLoading] = useState(false)
   const displayName = gameDisplayName(card.game)
-  const rtp = gameRtpLabel(card.game.rtp)
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -451,10 +450,6 @@ function DeckPreview({ card, onClose, onPlay, onDemo }: DeckPreviewProps): React
           <h3 className="mb-3 truncate text-xl font-black text-white">{displayName}</h3>
 
           <dl className="mb-4 grid grid-cols-2 gap-2 text-sm">
-            <div className="rounded-xl bg-black/30 px-3 py-2">
-              <dt className="text-[10px] uppercase tracking-[0.14em] text-white/45">RTP</dt>
-              <dd className="font-bold text-money">{rtp ?? '—'}</dd>
-            </div>
             <div className="rounded-xl bg-black/30 px-3 py-2">
               <dt className="text-[10px] uppercase tracking-[0.14em] text-white/45">
                 Волатильность

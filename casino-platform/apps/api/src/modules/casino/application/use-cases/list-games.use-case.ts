@@ -37,7 +37,6 @@ export interface CatalogGameItem {
   isNew: boolean
   isPopular: boolean
   hasDemo: boolean
-  rtp: Prisma.Decimal | null
   volatility: GameVolatility | null
 }
 
@@ -81,7 +80,6 @@ export class ListGamesUseCase {
           isNew: true,
           isPopular: true,
           hasDemo: true,
-          rtp: true,
           volatility: true,
           provider: { select: { slug: true, name: true } },
         },
