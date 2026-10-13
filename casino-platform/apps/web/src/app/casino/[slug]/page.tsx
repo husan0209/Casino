@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Heart, Play, Sparkles } from 'lucide-react'
+import { Heart, Play } from 'lucide-react'
 import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
@@ -14,7 +14,7 @@ import { useFavorites } from '@/hooks/useFavorites'
 import { apiGet, apiPost, errCode, errIsNetwork, errStatus } from '@/lib/api'
 import { fetchGamesPage } from '@/lib/api/casino.api'
 import { EMPTY_FILTERS } from '@/lib/ui/catalog-filters'
-import { gameDisplayName, gameHasDemo } from '@/lib/ui/game'
+import { gameDisplayName, gameHasDemo, gameMinBetLabel, gameVolatilityLabel } from '@/lib/ui/game'
 import { realMoneyStep } from '@/lib/ui/game-launch'
 import {
   describeLaunchError,
@@ -61,20 +61,38 @@ function SimilarGamesSection({
   )
 }
 
-function GameSpecs(): React.JSX.Element {
+/**
+ * Плитки характеристик только из данных каталога. Пустое поле не показываем:
+ * выдуманную «Волатильность: Высокая» игрок читает как факт об игре, а фактов
+ * о чужих слотах у нас нет — как и с RTP, витрина не имеет права обещать то,
+ * чего сервер не считает.
+ */
+function GameSpecs({
+  minBet,
+  volatility,
+  currency,
+}: {
+  minBet: GameDto['minBet']
+  volatility: string | null | undefined
+  currency: string
+}): React.JSX.Element | null {
+  const specs = [
+    { label: 'Мин. ставка', value: gameMinBetLabel(minBet, currency) },
+    { label: 'Волатильность', value: gameVolatilityLabel(volatility) },
+  ].filter((spec): spec is { label: string; value: string } => spec.value !== null)
+
+  if (specs.length === 0) {
+    return null
+  }
+
   return (
     <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-      <div className="rounded-xl bg-white/[0.03] p-3 border border-[#2A2A4A]/40">
-        <div className="text-[11px] font-medium text-muted">Волатильность</div>
-        <div className="mt-0.5 text-base font-bold text-white">Высокая</div>
-      </div>
-      <div className="rounded-xl bg-white/[0.03] p-3 border border-[#2A2A4A]/40 col-span-2 sm:col-span-1">
-        <div className="text-[11px] font-medium text-muted">Лицензия</div>
-        <div className="mt-0.5 flex items-center gap-1 text-xs font-semibold text-white/90">
-          <Sparkles size={14} className="text-[#FFB300]" />
-          Оригинал
+      {specs.map((spec) => (
+        <div key={spec.label} className="rounded-xl bg-white/[0.03] p-3 border border-[#2A2A4A]/40">
+          <div className="text-[11px] font-medium text-muted">{spec.label}</div>
+          <div className="mt-0.5 text-base font-bold text-white">{spec.value}</div>
         </div>
-      </div>
+      ))}
     </div>
   )
 }
@@ -305,7 +323,7 @@ export default function GamePage(): React.JSX.Element {
                 </button>
               </div>
 
-              <GameSpecs />
+              <GameSpecs minBet={game.minBet} volatility={game.volatility} currency={currency} />
             </div>
 
             <GameActions
