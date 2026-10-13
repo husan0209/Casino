@@ -5,9 +5,11 @@ import {
   AZTEC_MAX_WIN_MULTIPLIER,
   AZTEC_PAYTABLE,
   AZTEC_REEL_ROWS,
+  AZTEC_TARGET_RTP,
   AZTEC_TIERS,
   buildAztecGrid,
   evaluateAztecGrid,
+  flattenAztecPlays,
   playAztecSpin,
   type AztecSpin,
   type AztecSymbol,
@@ -174,7 +176,7 @@ describe('азтек: оценка связки', () => {
 
 describe('азтек: деньги и инварианты спина', () => {
   it(
-    'выплата не выходит за потолок и равна сумме шагов цепочки',
+    'выплата не выходит за потолок и равна сумме шагов всех заходов',
     () => {
       const rng = mulberry32(4242)
       for (let spin = 0; spin < 20000; spin += 1) {
@@ -185,10 +187,7 @@ describe('азтек: деньги и инварианты спина', () => {
         if (result.capped) {
           continue
         }
-        const parts = [...result.steps, ...result.freeSteps].reduce(
-          (acc, step) => acc + step.payout,
-          0,
-        )
+        const parts = flattenAztecPlays(result.plays).reduce((acc, step) => acc + step.payout, 0)
         expect(Math.abs(parts - result.payout)).toBeLessThan(1e-6)
       }
     },
@@ -200,21 +199,95 @@ describe('азтек: деньги и инварианты спина', () => {
     () => {
       const withFree = sampleSpins(SAMPLE, 20261013).filter((spin) => spin.freeSpinsPlayed > 0)
       const first = withFree[0]
+      const paying = first?.plays.find((play) => play.spin > 0 && play.steps.length > 0)
 
       expect(first).toBeDefined()
       expect(first?.freeSpinsPlayed).toBeGreaterThanOrEqual(AZTEC_FREE_SPINS)
-      expect(first?.freeSteps[0]?.multiplier).toBe(3)
+      expect(paying?.steps[0]?.multiplier).toBe(3)
     },
     SAMPLE_TIMEOUT,
   )
 })
 
+describe('азтек: заходы для клиента', () => {
+  const spins = sampleSpins(5000, 20261013)
+  const ROWS = [...AZTEC_REEL_ROWS]
+
+  it('заходов ровно 1 + сыгранных фриспинов, каждый со своей доской', () => {
+    for (const spin of spins) {
+      expect(spin.plays.length).toBe(1 + spin.freeSpinsPlayed)
+      spin.plays.forEach((play, index) => {
+        expect(play.spin).toBe(index)
+        expect(play.grid.map((cells) => cells.length)).toEqual(ROWS)
+      })
+    }
+  })
+
+  it('подсветка указывает на клетки собранного символа и равна match', () => {
+    let marked = 0
+    let mismatches = 0
+    let wrongCount = 0
+    for (const spin of spins) {
+      for (const step of flattenAztecPlays(spin.plays)) {
+        marked += step.cells.length
+        if (step.cells.length !== step.match) {
+          wrongCount += 1
+        }
+        for (const [reel, position] of step.cells) {
+          const cell = step.grid[reel]?.[position]
+          if (cell !== step.symbol && cell !== 'W') {
+            mismatches += 1
+          }
+        }
+      }
+    }
+
+    expect(marked).toBeGreaterThan(0)
+    expect(mismatches).toBe(0)
+    expect(wrongCount).toBe(0)
+  })
+
+  it('скаттеры платят только на первом шаге захода', () => {
+    let violations = 0
+    for (const spin of spins) {
+      for (const play of spin.plays) {
+        play.steps.forEach((step, index) => {
+          if (index > 0 && step.scatter !== 0) {
+            violations += 1
+          }
+        })
+      }
+    }
+
+    expect(violations).toBe(0)
+  })
+
+  it('на проигрыше заход всё равно показывает долетевшую доску', () => {
+    const idle = spins.filter((spin) => spin.payout === 0)
+    let emptyBoards = 0
+    for (const spin of idle) {
+      for (const play of spin.plays) {
+        if (play.steps.length === 0 && play.grid.length === 0) {
+          emptyBoards += 1
+        }
+      }
+    }
+
+    expect(idle.length).toBeGreaterThan(0)
+    expect(emptyBoards).toBe(0)
+  })
+})
+
 describe('азтек: RTP калибровки', () => {
   const measured = stats(sampleSpins(SAMPLE, 20261013))
 
-  it('отдача держится у заявленных 96%', () => {
+  /* Выборка 300k при тяжёлом хвосте (σ ≈ 2.9 множителя) даёт разброс ±3.3 п.п.,
+     поэтому здесь она только грубая страховка от перекоса таблицы. Точное число
+     для витрины замерено на 8M спинов и живёт в AZTEC_TARGET_RTP. */
+  it('отдача держится у витринного значения', () => {
     expect(measured.rtp).toBeGreaterThan(93)
     expect(measured.rtp).toBeLessThan(97.5)
+    expect(Math.abs(measured.rtp - AZTEC_TARGET_RTP)).toBeLessThan(3.5)
   })
 
   it('доля выигрышных спинов и частота фриспинов — в норме жанра', () => {

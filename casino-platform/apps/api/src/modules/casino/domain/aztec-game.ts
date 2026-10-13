@@ -10,13 +10,21 @@
  * Деньги: движок оперирует МНОЖИТЕЛЯМИ ставки (`payout` — во сколько раз ставка).
  * Ставка и выплата считаются money/Decimal в use-case, здесь арифметики денег нет.
  *
- * Параметры откалиброваны прогоном Монте-Карло (aztec-game.spec.ts): RTP 96.0%,
- * доля выигрышных спинов 23.0%, фриспины 1 из ~292, максимальный выигрыш
- * наблюдения 160× при потолке ×1000.
+ * Параметры откалиброваны прогоном Монте-Карло (aztec-game.spec.ts). Замер на
+ * 8 000 000 спинов (4 сида): RTP 95,90 % (95 % ДИ ±0,20), доля выигрышных
+ * спинов 22,96 %, фриспины 1 из 293, максимальное наблюдение 182,8× при
+ * потолке ×1000 (потолок за всю выборку не сработал ни разу).
  */
 
 export type AztecPaySymbol = 'J' | 'Q' | 'K' | 'A' | 'F' | 'B' | 'G' | 'M'
 export type AztecSymbol = AztecPaySymbol | 'W' | 'T'
+
+/**
+ * Витринный RTP игры: то же число, что видит игрок на плитке каталога.
+ * Занижено относительно круглых 96 намеренно — таблица платит 95,9 %, а
+ * завышать отдачу перед игроком нельзя.
+ */
+export const AZTEC_TARGET_RTP = 95.9
 
 /** Позиции барабана сверху вниз; барабаны 1 и 6 по пять ячеек, 2–5 по шесть. */
 export const AZTEC_REEL_ROWS: readonly number[] = [5, 6, 6, 6, 6, 5]
@@ -80,6 +88,22 @@ export type AztecChainStep = {
   reels: number
   multiplier: number
   payout: number
+  /** Подсвеченные клетки как [барабан, позиция]: клиент рисует ровно то, что посчитал движок. */
+  cells: [number, number][]
+  /** Вклад скаттеров в этот шаг до множителя: платят они только на первом шаге захода. */
+  scatter: number
+}
+
+/**
+ * Один заход: долетевшая доска и её каскады. `spin` — 0 у базы, 1..N у
+ * фриспинов. Проигравший заход остаётся видимым: без него клиент не может
+ * показать фриспин, сыгранное «в никуда», и счётчик заходов расходится с
+ * анимацией.
+ */
+export type AztecPlay = {
+  spin: number
+  grid: AztecSymbol[][]
+  steps: AztecChainStep[]
 }
 
 export interface AztecEvaluation {
@@ -97,11 +121,16 @@ export interface AztecChainResult {
 }
 
 export interface AztecSpin {
-  steps: AztecChainStep[]
-  freeSteps: AztecChainStep[]
+  /** Заходы по порядку: база (spin 0) и фриспины (1..N). У проигравшего захода steps пуст, но доска есть. */
+  plays: AztecPlay[]
   freeSpinsPlayed: number
   payout: number
   capped: boolean
+}
+
+/** Плоский список шагов всех заходов — тот же порядок, по которому считается хеш исхода. */
+export function flattenAztecPlays(plays: readonly AztecPlay[]): AztecChainStep[] {
+  return plays.reduce<AztecChainStep[]>((acc, play) => [...acc, ...play.steps], [])
 }
 
 /** Множитель каскадов: старт, шаг прироста и потолок. */
@@ -117,6 +146,7 @@ const BASE_MULTIPLIER: MultiplierPolicy = {
   cap: AZTEC_MAX_MULTIPLIER_BASE,
 }
 
+/** Политика фриспинов: номер захода кладётся в AztecPlay, а не в шаг. */
 const FREE_MULTIPLIER: MultiplierPolicy = {
   start: 3,
   step: 2,
@@ -280,6 +310,19 @@ function collapseGrid(
   })
 }
 
+/** Координаты подсвеченных клеток: движок уже знает их, клиенту остаётся нарисовать. */
+function winCells(removed: boolean[][]): [number, number][] {
+  const cells: [number, number][] = []
+  removed.forEach((reelMarks, reel) => {
+    reelMarks.forEach((marked, position) => {
+      if (marked) {
+        cells.push([reel, position])
+      }
+    })
+  })
+  return cells
+}
+
 /**
  * Цепочка каскадов одной игры — базовой или одного фриспина.
  *
@@ -299,7 +342,8 @@ function runChain(
 
   for (let cascade = 0; cascade < AZTEC_MAX_CASCADES; cascade += 1) {
     const evaluated = evaluateAztecGrid(current)
-    const win = evaluated.payout + (cascade === 0 ? scatterPayout(countScatters(current)) : 0)
+    const scatter = cascade === 0 ? scatterPayout(countScatters(current)) : 0
+    const win = evaluated.payout + scatter
     if (win <= 0) {
       break
     }
@@ -312,6 +356,8 @@ function runChain(
       reels: evaluated.reels,
       multiplier,
       payout: stepPayout,
+      cells: winCells(evaluated.removed),
+      scatter,
     })
     if (payout >= AZTEC_MAX_WIN_MULTIPLIER) {
       return { steps, payout: AZTEC_MAX_WIN_MULTIPLIER, capped: true }
@@ -323,8 +369,13 @@ function runChain(
   return { steps, payout, capped: false }
 }
 
-function playFreeSpins(rng: () => number): AztecChainResult & { spinsPlayed: number } {
-  const merged: AztecChainStep[] = []
+function playFreeSpins(rng: () => number): {
+  plays: AztecPlay[]
+  payout: number
+  capped: boolean
+  spinsPlayed: number
+} {
+  const plays: AztecPlay[] = []
   let payout = 0
   let capped = false
   let budget = AZTEC_FREE_SPINS
@@ -333,10 +384,10 @@ function playFreeSpins(rng: () => number): AztecChainResult & { spinsPlayed: num
   while (budget > 0 && spinsPlayed < AZTEC_FREE_SPINS_HARD_LIMIT) {
     const grid = buildAztecGrid(rng)
     const chain = runChain(grid, rng, FREE_MULTIPLIER)
-    merged.push(...chain.steps)
+    spinsPlayed += 1
+    plays.push({ spin: spinsPlayed, grid, steps: chain.steps })
     payout += chain.payout
     budget -= 1
-    spinsPlayed += 1
     if (countScatters(grid) >= AZTEC_FREE_RETRIGGER_MIN) {
       budget += AZTEC_FREE_RETRIGGER
     }
@@ -346,27 +397,29 @@ function playFreeSpins(rng: () => number): AztecChainResult & { spinsPlayed: num
     }
   }
 
-  return { steps: merged, payout, capped, spinsPlayed }
+  return { plays, payout, capped, spinsPlayed }
 }
 
-/** Один спин целиком: база с каскадами и фриспины, если они триггернулись. */
+/**
+ * Один спин целиком: база с каскадами и фриспины, если они триггернулись.
+ * Каждый заход — отдельный элемент `plays`, включая пустой: игрок обязан
+ * видеть все сыгранные фриспины, а не только те, что дали связку.
+ */
 export function playAztecSpin(rng: () => number): AztecSpin {
   const grid = buildAztecGrid(rng)
   const triggered = countScatters(grid) >= AZTEC_SCATTER_MIN
   const base = runChain(grid, rng, BASE_MULTIPLIER)
-  const idle: AztecChainResult & { spinsPlayed: number } = {
-    steps: [],
-    payout: 0,
-    capped: false,
-    spinsPlayed: 0,
-  }
-  const free = triggered ? playFreeSpins(rng) : idle
+  const plays: AztecPlay[] = [{ spin: 0, grid, steps: base.steps }]
+  const free = triggered ? playFreeSpins(rng) : null
 
-  const total = base.payout + free.payout
+  const total = base.payout + (free ? free.payout : 0)
+  if (free) {
+    plays.push(...free.plays)
+  }
+
   return {
-    steps: base.steps,
-    freeSteps: free.steps,
-    freeSpinsPlayed: free.spinsPlayed,
+    plays,
+    freeSpinsPlayed: free ? free.spinsPlayed : 0,
     payout: Math.min(total, AZTEC_MAX_WIN_MULTIPLIER),
     capped: total >= AZTEC_MAX_WIN_MULTIPLIER,
   }

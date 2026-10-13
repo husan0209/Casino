@@ -13,6 +13,7 @@ import {
   type AztecSpinInput,
 } from './aztec-spin.use-case'
 import { type OriginalsSessionLoader } from './originals-session-loader'
+import { flattenAztecPlays } from '../../domain/aztec-game'
 import { InvalidBetRequestError } from '../../domain/errors'
 import {
   type GameSessionWithGame,
@@ -150,7 +151,7 @@ describe('rollAztecOutcome', () => {
     const parsed = spinInput()
     const first = rollAztecOutcome(parsed, mulberry32(1))
     const second = rollAztecOutcome(parsed, mulberry32(2))
-    const steps = [...first.steps, ...first.freeSteps]
+    const steps = flattenAztecPlays(first.plays)
 
     expect(hashAztecOutcome(parsed.spinId, steps)).toBe(first.outcomeHash)
     expect(second.outcomeHash).not.toBe(first.outcomeHash)
@@ -225,6 +226,26 @@ describe('AztecSpinUseCase: бой', () => {
     expect(wallet.calls.debits).toBe(debitsAfterFirst)
   })
 
+  it('ответ и ledger несут одни заходы, повтор доставки рисует ту же анимацию', async () => {
+    const spinId = spinInput().spinId
+
+    const first = await useCase.execute({ sessionToken: SESSION_TOKEN, spinId, bet: '10' })
+    const betRow = play.transactions.find(
+      (row) => row.externalTransactionId === `aztec_${spinId}_bet`,
+    )
+    const meta = (betRow?.metadata ?? {}) as Record<string, unknown>
+
+    expect(first.plays.length).toBe(1 + first.freeSpinsPlayed)
+    expect(flattenAztecPlays(first.plays).length).toBeGreaterThanOrEqual(0)
+    expect(Array.isArray(meta.plays)).toBe(true)
+
+    const again = await useCase.execute({ sessionToken: SESSION_TOKEN, spinId, bet: '10' })
+
+    expect(again.duplicate).toBe(true)
+    expect(again.plays).toEqual(first.plays)
+    expect(again.outcomeHash).toBe(first.outcomeHash)
+  })
+
   it('ставка вне лимитов карточки отбивается до проводок', async () => {
     await expect(
       useCase.execute({ sessionToken: SESSION_TOKEN, spinId: spinInput().spinId, bet: '0.5' }),
@@ -257,6 +278,11 @@ describe('AztecSpinUseCase: state', () => {
     expect(state.balance).toBe('1000.00')
     expect(state.reelRows).toEqual([5, 6, 6, 6, 6, 5])
     expect(state.maxWinMultiplier).toBe(1000)
+    /* Клиент рисует правила по этим числам, а не по своему хардкоду. */
+    expect(state.rules.tiers).toEqual([12, 15, 20, 25, 30, 34, 40])
+    expect(state.rules.maxMultiplierBase).toBe(5)
+    expect(state.rules.maxMultiplierFree).toBe(15)
+    expect(Object.keys(state.rules.paytable)).toHaveLength(8)
   })
 
   it('бой: лимиты ставки берутся из карточки игры', async () => {

@@ -13,9 +13,25 @@ import { cryptoRandom } from './house-slot-lottery'
 import { AZTEC_EXTERNAL_GAME_ID, OriginalsSessionLoader } from './originals-session-loader'
 import { TIGER_DEMO_START_CREDIT } from './originals-session.use-case'
 import {
+  AZTEC_FREE_RETRIGGER,
+  AZTEC_FREE_RETRIGGER_MIN,
+  AZTEC_FREE_SPINS,
+  AZTEC_FREE_SPINS_HARD_LIMIT,
+  AZTEC_MAX_MULTIPLIER_BASE,
+  AZTEC_MAX_MULTIPLIER_FREE,
   AZTEC_MAX_WIN_MULTIPLIER,
+  AZTEC_MIN_REELS,
+  AZTEC_PAYTABLE,
   AZTEC_REEL_ROWS,
+  AZTEC_SCATTER_MIN,
+  AZTEC_SCATTER_PAY,
+  AZTEC_TIERS,
   type AztecChainStep,
+  type AztecPaySymbol,
+  type AztecPlay,
+  type AztecSymbol,
+  buildAztecGrid,
+  flattenAztecPlays,
   playAztecSpin,
 } from '../../domain/aztec-game'
 import { InvalidBetRequestError } from '../../domain/errors'
@@ -54,11 +70,31 @@ export interface AztecSpinData {
   win: string
   balance: string
   currency: string
-  steps: AztecChainStep[]
+  /** Заходы в порядке розыгрыша: база (spin 0) и фриспины. Каждый — со своей долетевшей доской. */
+  plays: AztecPlay[]
   freeSpinsPlayed: number
   capped: boolean
   outcomeHash: string
   duplicate: boolean
+}
+
+/**
+ * Правила доски. Клиент обязан показать те же числа, по которым платит сервер:
+ * панель «как считается раунд» из хардкода на фронте врёт после любой
+ * перекалибровки таблицы.
+ */
+export interface AztecRulesData {
+  paytable: Record<AztecPaySymbol, readonly number[]>
+  tiers: readonly number[]
+  scatterPay: readonly number[]
+  scatterMin: number
+  freeSpins: number
+  freeRetriggerMin: number
+  freeRetriggerSpins: number
+  freeSpinsHardLimit: number
+  minReels: number
+  maxMultiplierBase: number
+  maxMultiplierFree: number
 }
 
 /** Профиль игры для /state: клиент рисует доску и таблицу по этим данным. */
@@ -69,7 +105,24 @@ export interface AztecStateData {
   maxBet: string
   reelRows: readonly number[]
   maxWinMultiplier: number
+  /** Декоративная доска до первого спина: символы всегда с сервера, фронт их не выдумывает. */
+  grid: AztecSymbol[][]
+  rules: AztecRulesData
   demo: boolean
+}
+
+const AZTEC_RULES: AztecRulesData = {
+  paytable: AZTEC_PAYTABLE,
+  tiers: AZTEC_TIERS,
+  scatterPay: AZTEC_SCATTER_PAY,
+  scatterMin: AZTEC_SCATTER_MIN,
+  freeSpins: AZTEC_FREE_SPINS,
+  freeRetriggerMin: AZTEC_FREE_RETRIGGER_MIN,
+  freeRetriggerSpins: AZTEC_FREE_RETRIGGER,
+  freeSpinsHardLimit: AZTEC_FREE_SPINS_HARD_LIMIT,
+  minReels: AZTEC_MIN_REELS,
+  maxMultiplierBase: AZTEC_MAX_MULTIPLIER_BASE,
+  maxMultiplierFree: AZTEC_MAX_MULTIPLIER_FREE,
 }
 
 /** Тип Prisma-транзакции из фасада кошелька (прямой импорт prisma в application запрещён). */
@@ -84,8 +137,7 @@ const DEFAULT_MIN_BET = '1'
 const DEFAULT_MAX_BET = '10000'
 
 export interface AztecOutcome {
-  steps: AztecChainStep[]
-  freeSteps: AztecChainStep[]
+  plays: AztecPlay[]
   freeSpinsPlayed: number
   multiplier: string
   win: string
@@ -108,15 +160,13 @@ export function rollAztecOutcome(
   randomSource: () => number = cryptoRandom,
 ): AztecOutcome {
   const spin = playAztecSpin(randomSource)
-  const steps = [...spin.steps, ...spin.freeSteps]
   return {
-    steps: spin.steps,
-    freeSteps: spin.freeSteps,
+    plays: spin.plays,
     freeSpinsPlayed: spin.freeSpinsPlayed,
     multiplier: String(spin.payout),
     win: money.multiply(parsed.bet, String(spin.payout)),
     capped: spin.capped,
-    outcomeHash: hashAztecOutcome(parsed.spinId, steps),
+    outcomeHash: hashAztecOutcome(parsed.spinId, flattenAztecPlays(spin.plays)),
   }
 }
 
@@ -150,6 +200,8 @@ export class AztecSpinUseCase {
         maxBet: DEFAULT_MAX_BET,
         reelRows: AZTEC_REEL_ROWS,
         maxWinMultiplier: AZTEC_MAX_WIN_MULTIPLIER,
+        grid: buildAztecGrid(cryptoRandom),
+        rules: AZTEC_RULES,
         demo: true,
       }
     }
@@ -165,6 +217,8 @@ export class AztecSpinUseCase {
       maxBet: session.game.maxBet === null ? DEFAULT_MAX_BET : String(session.game.maxBet),
       reelRows: AZTEC_REEL_ROWS,
       maxWinMultiplier: AZTEC_MAX_WIN_MULTIPLIER,
+      grid: buildAztecGrid(cryptoRandom),
+      rules: AZTEC_RULES,
       demo: false,
     }
   }
@@ -402,7 +456,9 @@ export class AztecSpinUseCase {
       win: toMoneyString(winRow ? String(winRow.amount) : '0'),
       balance: toMoneyString(balance),
       currency: session.currency,
-      steps: (meta.steps ?? []) as AztecChainStep[],
+      /* В ledger лежат те же заходы, что получил клиент в первом ответе:
+         повтор доставки обязан нарисовать ровно ту же анимацию. */
+      plays: (meta.plays ?? []) as AztecPlay[],
       freeSpinsPlayed: Number(meta.free_spins_played ?? 0),
       capped: meta.capped === true,
       outcomeHash: String(meta.outcome_hash ?? ''),
@@ -415,7 +471,7 @@ export class AztecSpinUseCase {
       game: AZTEC_EXTERNAL_GAME_ID,
       spin_id: parsed.spinId,
       multiplier: outcome.multiplier,
-      steps: [...outcome.steps, ...outcome.freeSteps],
+      plays: outcome.plays,
       free_spins_played: outcome.freeSpinsPlayed,
       capped: outcome.capped,
       outcome_hash: outcome.outcomeHash,
@@ -439,7 +495,7 @@ export class AztecSpinUseCase {
       win: toMoneyString(outcome.win),
       balance: toMoneyString(balance),
       currency,
-      steps: outcome.steps,
+      plays: outcome.plays,
       freeSpinsPlayed: outcome.freeSpinsPlayed,
       capped: outcome.capped,
       outcomeHash: outcome.outcomeHash,
