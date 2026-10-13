@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { gameBadge, gameDisplayName, gameHasDemo, gameRtpLabel } from '../src/lib/ui/game'
+import { gameBadge, gameDisplayName, gameHasDemo } from '../src/lib/ui/game'
 
 describe('GAP-55 имя игры (§6.4)', () => {
   it('русское название приоритетно', () => {
@@ -37,22 +37,6 @@ describe('GAP-55 бейдж: один на карточку, NEW или HOT (§6
   it('без флагов — никакого бейджа', () => {
     expect(gameBadge({})).toBeNull()
     expect(gameBadge({ isNew: false, isPopular: false })).toBeNull()
-  })
-})
-
-describe('GAP-55 RTP: Decimal из API приходит строкой', () => {
-  it('строка и число форматируются одинаково, хвостовые нули убираются', () => {
-    expect(gameRtpLabel('96.50')).toBe('96.5%')
-    expect(gameRtpLabel(96)).toBe('96%')
-    expect(gameRtpLabel('96.555')).toBe('96.56%')
-  })
-
-  it('null/пусто/0/мусор — не показываем (в превью нет «RTP NaN%»)', () => {
-    expect(gameRtpLabel(null)).toBeNull()
-    expect(gameRtpLabel(undefined)).toBeNull()
-    expect(gameRtpLabel('')).toBeNull()
-    expect(gameRtpLabel('0')).toBeNull()
-    expect(gameRtpLabel('abc')).toBeNull()
   })
 })
 

@@ -11,6 +11,17 @@ import {
   type RoundHistoryFilter,
 } from '../../domain/repositories/casino.repository'
 
+/**
+ * Публичная строка игры: RTP остаётся внутренней величиной (админка и
+ * калибровка), игроку он не показываем ни в одном канале.
+ */
+type PublicGameRow = Omit<FavoriteWithGame['game'], 'rtp'>
+
+function publicGame(game: FavoriteWithGame['game']): PublicGameRow {
+  const { rtp: _internalRtp, ...rest } = game
+  return rest
+}
+
 export interface GameHistoryRow {
   round_id: string
   game: { slug: string; name: string; provider: string }
@@ -73,17 +84,17 @@ export class FavoritesUseCase {
     userId: string,
     page = 1,
     perPage = 24,
-  ): Promise<{ items: FavoriteWithGame['game'][]; total: number }> {
+  ): Promise<{ items: PublicGameRow[]; total: number }> {
     const [rows, total] = await Promise.all([
       this.favorites.findFavorites(userId, (page - 1) * perPage, perPage),
       this.favorites.countFavorites(userId),
     ])
-    return { items: rows.map((r) => r.game), total }
+    return { items: rows.map((r) => publicGame(r.game)), total }
   }
 
-  async recent(userId: string): Promise<FavoriteWithGame['game'][]> {
+  async recent(userId: string): Promise<PublicGameRow[]> {
     const sessions = await this.favorites.findRecentSessions(userId, 20)
-    return sessions.map((s) => s.game)
+    return sessions.map((s) => publicGame(s.game))
   }
 
   async history(args: HistoryArgs): Promise<{

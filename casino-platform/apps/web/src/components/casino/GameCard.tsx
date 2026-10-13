@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 import { GameThumb } from '@/components/casino/GameThumb'
-import { gameBadge, gameDisplayName, gameHasDemo, gameRtpLabel } from '@/lib/ui/game'
+import { gameBadge, gameDisplayName, gameHasDemo } from '@/lib/ui/game'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import type { GameDto } from '@/types/casino'
@@ -19,7 +19,7 @@ interface GameCardProps {
 
 /**
  * GAP-52 + ТЗ ч.5 §6.4 + ч.5.1 §4.5: карточка витрины.
- * - Телефон: тап по обложке = запуск; кнопка «i» = превью с RTP и избранным;
+ * - Телефон: тап по обложке = запуск; кнопка «i» = превью с провайдером и избранным;
  * - Десктоп: при hover плавный оверлей с кнопкой «Играть» и «Демо»;
  * - Один бейдж: NEW или HOT;
  * - Имя и провайдер под обложкой, один раз.
@@ -32,7 +32,6 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
 
   const displayName = gameDisplayName(game)
   const badge = gameBadge(game)
-  const rtp = gameRtpLabel(game.rtp)
   const hasDemo = gameHasDemo(game.hasDemo)
 
   const play = (): void => {
@@ -139,12 +138,6 @@ export function GameCard({ game, isFavorite, onToggleFavorite }: GameCardProps):
             <span className="text-muted">Провайдер:</span>
             <span className="font-medium text-white">{game.provider?.name || 'Demo'}</span>
           </div>
-          {rtp && (
-            <div className="flex items-center justify-between">
-              <span className="text-muted">RTP:</span>
-              <span className="font-medium text-[#00E676]">{rtp}</span>
-            </div>
-          )}
           <div className="flex gap-2 pt-1">
             <button
               type="button"
