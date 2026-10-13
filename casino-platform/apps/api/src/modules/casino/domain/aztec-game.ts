@@ -71,7 +71,9 @@ export const AZTEC_MAX_WIN_MULTIPLIER = 1000
 export const AZTEC_REFILL_WILD_CHANCE = 0.35
 
 /** Один шаг цепочки: доска ДО розыгрыша и то, что на ней дало выплату. */
-export interface AztecChainStep {
+// type, а не interface: значение кладётся в prisma metadata, а индексы у
+// interface TS не считает совместимыми с InputJsonObject.
+export type AztecChainStep = {
   grid: AztecSymbol[][]
   symbol: AztecPaySymbol | null
   match: number
