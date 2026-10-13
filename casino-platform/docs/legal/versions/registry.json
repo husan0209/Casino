@@ -34,5 +34,12 @@
       "sha256": "bc0fcc7746411a6e31b04d3d4187f0e939210b2641f2895d10cb32bd19de4400",
       "publishedAt": "2026-10-07"
     }
+  },
+  "1.3": {
+    "terms": {
+      "file": "1.3/terms.md",
+      "sha256": "37e55cbb880a570bca6e46f470c6fd35a1b0c06441b53a02411042b8aac980ac",
+      "publishedAt": "2026-10-13"
+    }
   }
 }
