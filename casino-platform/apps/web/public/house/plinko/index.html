@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Plinko</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f212e; color: #fff; font-size: 14px;
+    user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+
+  /* TOPBAR
+     Логотип и баланс умеют сжиматься (min-width:0 + ellipsis), кнопки
+     справа — нет. Иначе на телефонах уже iPhone XR кнопка «честность»
+     выдавливается за правый край экрана. */
+  #topbar {
+    height: 56px; display: flex; align-items: center; justify-content: space-between;
+    background: #1a2c38; border-bottom: 1px solid #2a3d4a;
+    flex-shrink: 0; gap: 12px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+  .logo {
+    font-weight: 800; font-size: 18px; letter-spacing: 2px; color: #00e701;
+    flex: 0 1 auto; min-width: 0; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .logo span { color: #fff; }
+  .balance {
+    display: flex; align-items: center; gap: 10px; background: #0f212e;
+    padding: 8px 14px; border-radius: 6px;
+    flex: 0 1 auto; min-width: 0;
+  }
+  .balance .label {
+    color: #7f8fa0; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.5px; white-space: nowrap; flex: 0 0 auto;
+  }
+  .balance .value {
+    font-weight: 700; color: #00e701; font-variant-numeric: tabular-nums;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+  }
+  .top-btns { display: flex; gap: 8px; flex: 0 0 auto; }
+  .icon-btn {
+    background: #2a3d4a; border: none; color: #fff; width: 36px; height: 36px;
+    border-radius: 6px; cursor: pointer; font-size: 16px; display: flex;
+    align-items: center; justify-content: center; transition: background 0.15s;
+    flex: 0 0 auto; padding: 0;
+  }
+  .icon-btn:hover { background: #3a4d5a; }
+
+  /* MAIN */
+  #main { flex: 1; display: flex; min-height: 0; }
+
+  /* CONTROLS */
+  #controls {
+    width: 270px; background: #1a2c38; padding: 16px; overflow-y: auto;
+    border-right: 1px solid #2a3d4a; flex-shrink: 0;
+  }
+  #controls::-webkit-scrollbar { width: 6px; }
+  #controls::-webkit-scrollbar-thumb { background: #2a3d4a; border-radius: 3px; }
+  .control-group { margin-bottom: 16px; }
+  .control-group > label {
+    display: block; font-size: 11px; color: #7f8fa0; margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+  }
+  .bet-input {
+    position: relative; display: flex; align-items: center; background: #0f212e;
+    border: 1px solid #2a3d4a; border-radius: 6px; overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  .bet-input:focus-within { border-color: #00e701; }
+  .bet-input input {
+    flex: 1; background: transparent; border: none; color: #fff;
+    font-size: 16px; font-weight: 600; padding: 10px 12px; outline: none;
+    width: 100%; font-variant-numeric: tabular-nums;
+  }
+  .bet-input input::-webkit-outer-spin-button,
+  .bet-input input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .bet-input .currency { padding: 0 12px; color: #00e701; font-weight: 700; }
+  .bet-buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-top: 6px; }
+  .bet-buttons button, .rows-grid button {
+    background: #2a3d4a; border: none; color: #fff; padding: 7px;
+    border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;
+    transition: background 0.15s;
+  }
+  .bet-buttons button:hover, .rows-grid button:hover { background: #3a4d5a; }
+  .segmented {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px;
+    background: #0f212e; padding: 4px; border-radius: 6px;
+  }
+  .segmented button {
+    background: transparent; border: none; color: #7f8fa0; padding: 8px;
+    border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600;
+    transition: all 0.15s;
+  }
+  .segmented button.active { background: #2a3d4a; color: #fff; }
+  .segmented button:hover:not(.active) { color: #fff; }
+  .rows-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+  .rows-grid button { padding: 8px 0; }
+  .rows-grid button.active { background: #00e701; color: #0f212e; }
+
+  .bet-btn {
+    width: 100%; padding: 15px; background: #00e701; color: #0f212e;
+    border: none; border-radius: 6px; font-size: 15px; font-weight: 800;
+    cursor: pointer; letter-spacing: 1px; margin-top: 8px;
+    transition: all 0.15s; text-transform: uppercase;
+  }
+  .bet-btn:hover:not(:disabled) { background: #00ff1a; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,231,1,0.3); }
+  .bet-btn:active:not(:disabled) { transform: translateY(0); }
+  .bet-btn:disabled { background: #2a3d4a; color: #4a5d6a; cursor: not-allowed; }
+
+  .info { margin-top: 16px; padding-top: 16px; border-top: 1px solid #2a3d4a; font-size: 12px; }
+  .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; color: #7f8fa0; }
+  .info-row span:last-child { color: #fff; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .info-row.accent span:last-child { color: #00e701; }
+
+  /* BOARD */
+  #boardContainer { flex: 1; position: relative; min-width: 0; background: #0f212e; overflow: hidden; }
+  #board { display: block; width: 100%; height: 100%; }
+
+  /* HISTORY */
+  #historyPanel {
+    height: 62px; background: #1a2c38; border-top: 1px solid #2a3d4a;
+    display: flex; align-items: center; padding: 0 16px; gap: 8px;
+    overflow-x: auto; flex-shrink: 0;
+  }
+  #historyPanel::-webkit-scrollbar { height: 4px; }
+  #historyPanel::-webkit-scrollbar-thumb { background: #2a3d4a; border-radius: 2px; }
+  .history-title { font-size: 11px; color: #7f8fa0; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; margin-right: 4px; }
+  .history-pill {
+    padding: 5px 11px; border-radius: 4px; font-size: 12px; font-weight: 700;
+    white-space: nowrap; animation: slideIn 0.3s ease; flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none;
+    align-items: center; justify-content: center; z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: #1a2c38; border-radius: 10px; padding: 24px; width: 90%;
+    max-width: 520px; max-height: 80vh; overflow-y: auto;
+    border: 1px solid #2a3d4a;
+  }
+  .modal h3 { margin-bottom: 16px; font-size: 18px; }
+  .modal label { display: block; font-size: 11px; color: #7f8fa0; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-top: 12px; }
+  .modal input {
+    width: 100%; background: #0f212e; border: 1px solid #2a3d4a; color: #fff;
+    padding: 10px 12px; border-radius: 6px; font-size: 13px; outline: none;
+    font-family: ui-monospace, monospace;
+  }
+  .modal input:focus { border-color: #00e701; }
+  .modal .hash { word-break: break-all; font-family: ui-monospace, monospace; font-size: 11px; color: #7f8fa0; background: #0f212e; padding: 8px; border-radius: 4px; margin-top: 4px; }
+  .modal .modal-note { font-size: 12px; line-height: 1.5; color: #b8c7d1; margin-bottom: 4px; }
+  .modal-btns { display: flex; gap: 8px; margin-top: 20px; }
+  .modal-btns button {
+    flex: 1; padding: 12px; border: none; border-radius: 6px; cursor: pointer;
+    font-weight: 700; font-size: 13px; transition: all 0.15s;
+  }
+  .modal-btns .primary { background: #00e701; color: #0f212e; }
+  .modal-btns .secondary { background: #2a3d4a; color: #fff; }
+  .modal-btns button:hover { filter: brightness(1.1); }
+
+  @media (max-width: 760px) {
+    #main { flex-direction: column; }
+    #controls {
+      width: 100%; max-height: 42vh; border-right: none;
+      border-bottom: 1px solid #2a3d4a; padding: 12px;
+    }
+    #topbar {
+      padding-left: max(12px, env(safe-area-inset-left));
+      padding-right: max(12px, env(safe-area-inset-right));
+    }
+    .logo { font-size: 15px; }
+    .balance { padding: 6px 10px; }
+  }
+
+  /* Узкие телефоны (iPhone SE/8, Galaxy S-серия в 360px): топбар должен
+     целиком помещаться по ширине — кнопки справа не сжимаются и
+     не уезжают за край. */
+  @media (max-width: 480px) {
+    #topbar { height: 52px; gap: 8px; }
+    .logo { font-size: 14px; letter-spacing: 1px; }
+    .balance { gap: 6px; padding: 6px 8px; }
+    .balance .label { font-size: 10px; letter-spacing: 0.3px; }
+    .balance .value { font-size: 13px; }
+    .top-btns { gap: 6px; }
+    .icon-btn { width: 32px; height: 32px; font-size: 15px; }
+  }
+
+  @media (max-width: 380px) {
+    .logo { font-size: 13px; letter-spacing: 0.5px; }
+    .balance .label { display: none; }
+    .top-btns { gap: 4px; }
+    .icon-btn { width: 30px; height: 30px; font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="logo">Plinko</div>
+    <div class="balance">
+      <span class="label">Баланс</span>
+      <span class="value" id="balance">—</span>
+    </div>
+    <div class="top-btns">
+      <button class="icon-btn" id="soundBtn" title="Звук">🔊</button>
+      <button class="icon-btn" id="fairBtn" title="Как считается раунд">i</button>
+    </div>
+  </header>
+
+  <div id="main">
+    <aside id="controls">
+      <div class="control-group">
+        <label>Ставка</label>
+        <div class="bet-input">
+          <input type="number" id="betAmount" value="10.00" step="0.10" min="0.10">
+          <span class="currency">₽</span>
+        </div>
+        <div class="bet-buttons">
+          <button data-bet-mult="0.5">½</button>
+          <button data-bet-mult="2">2×</button>
+          <button data-bet-mult="max">Макс</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>Риск</label>
+        <div class="segmented" id="riskGroup">
+          <button data-risk="low">Низкий</button>
+          <button data-risk="medium" class="active">Средний</button>
+          <button data-risk="high">Высокий</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>Ряды</label>
+        <div class="rows-grid" id="rowsGroup">
+          <button data-rows="8">8</button>
+          <button data-rows="9">9</button>
+          <button data-rows="10">10</button>
+          <button data-rows="11">11</button>
+          <button data-rows="12">12</button>
+          <button data-rows="13">13</button>
+          <button data-rows="14">14</button>
+          <button data-rows="15">15</button>
+          <button data-rows="16" class="active">16</button>
+        </div>
+      </div>
+
+      <button class="bet-btn" id="betBtn">Играть</button>
+
+      <div class="info">
+        <div class="info-row"><span>Прибыль при макс.</span><span id="profitOnWin">—</span></div>
+      </div>
+    </aside>
+
+    <main id="boardContainer">
+      <canvas id="board"></canvas>
+    </main>
+  </div>
+
+  <div id="historyPanel">
+    <div class="history-title">Последние</div>
+    <div id="history" style="display:contents"></div>
+  </div>
+</div>
+
+<!-- Как считается раунд -->
+<div class="modal-overlay" id="fairModal">
+  <div class="modal">
+    <h3>Как считается раунд</h3>
+    <p class="modal-note">Путь шарика сервер определяет до начала анимации — доска только показывает уже готовый исход. Он же сохраняется в истории ставок.</p>
+    <label>Конфигурация</label>
+    <div class="hash" id="fairConfig">—</div>
+    <label>Множители лунок (слева направо)</label>
+    <div class="hash" id="fairTable">—</div>
+    <label>Номер раунда</label>
+    <div class="hash" id="serverSeed">—</div>
+    <label>Хеш исхода (SHA-256)</label>
+    <div class="hash" id="nonceDisplay">—</div>
+    <input id="clientSeedInput" type="hidden">
+    <div class="modal-btns">
+      <button class="secondary" id="rotateBtn">Обновить баланс</button>
+      <button class="primary" id="closeFairBtn">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   CONSTANTS: Stake's payout tables (verified RTP ≈ 99%)
+   ============================================================ */
+const MULTIPLIERS = {
+  8: {
+    low:    [5.6, 2.1, 1.1, 1, 0.5, 1, 1.1, 2.1, 5.6],
+    medium: [13, 3, 1.3, 0.7, 0.4, 0.7, 1.3, 3, 13],
+    high:   [29, 4, 1.5, 0.3, 0.2, 0.3, 1.5, 4, 29],
+  },
+  9: {
+    low:    [5.6, 2, 1.6, 1, 0.7, 0.7, 1, 1.6, 2, 5.6],
+    medium: [18, 4, 1.7, 0.9, 0.5, 0.5, 0.9, 1.7, 4, 18],
+    high:   [43, 7, 2, 0.6, 0.2, 0.2, 0.6, 2, 7, 43],
+  },
+  10: {
+    low:    [8.9, 3, 1.4, 1.1, 1, 0.5, 1, 1.1, 1.4, 3, 8.9],
+    medium: [22, 5, 2, 1.4, 0.6, 0.4, 0.6, 1.4, 2, 5, 22],
+    high:   [76, 10, 3, 0.9, 0.3, 0.2, 0.3, 0.9, 3, 10, 76],
+  },
+  11: {
+    low:    [8.4, 3, 1.9, 1.3, 1, 0.7, 0.7, 1, 1.3, 1.9, 3, 8.4],
+    medium: [24, 6, 3, 1.8, 0.7, 0.5, 0.5, 0.7, 1.8, 3, 6, 24],
+    high:   [120, 14, 5.2, 1.4, 0.4, 0.2, 0.2, 0.4, 1.4, 5.2, 14, 120],
+  },
+  12: {
+    low:    [10, 3, 1.6, 1.4, 1.1, 1, 0.5, 1, 1.1, 1.4, 1.6, 3, 10],
+    medium: [33, 11, 4, 2, 1.1, 0.6, 0.3, 0.6, 1.1, 2, 4, 11, 33],
+    high:   [170, 24, 8.1, 2, 0.7, 0.2, 0.2, 0.2, 0.7, 2, 8.1, 24, 170],
+  },
+  13: {
+    low:    [8.1, 4, 3, 1.9, 1.2, 0.9, 0.7, 0.7, 0.9, 1.2, 1.9, 3, 4, 8.1],
+    medium: [43, 13, 6, 3, 1.3, 0.7, 0.4, 0.4, 0.7, 1.3, 3, 6, 13, 43],
+    high:   [260, 37, 11, 4, 1, 0.2, 0.2, 0.2, 0.2, 1, 4, 11, 37, 260],
+  },
+  14: {
+    low:    [7.1, 4, 1.9, 1.4, 1.3, 1.1, 1, 0.5, 1, 1.1, 1.3, 1.4, 1.9, 4, 7.1],
+    medium: [58, 15, 7, 4, 1.9, 1, 0.5, 0.2, 0.5, 1, 1.9, 4, 7, 15, 58],
+    high:   [420, 56, 18, 5, 1.9, 0.3, 0.2, 0.2, 0.2, 0.3, 1.9, 5, 18, 56, 420],
+  },
+  15: {
+    low:    [15, 8, 3, 2, 1.5, 1.1, 1, 0.7, 0.7, 1, 1.1, 1.5, 2, 3, 8, 15],
+    medium: [88, 18, 11, 5, 3, 1.3, 0.5, 0.3, 0.3, 0.5, 1.3, 3, 5, 11, 18, 88],
+    high:   [620, 83, 27, 8, 3, 0.5, 0.2, 0.2, 0.2, 0.2, 0.5, 3, 8, 27, 83, 620],
+  },
+  16: {
+    low:    [16, 9, 2, 1.4, 1.4, 1.2, 1.1, 1, 0.5, 1, 1.1, 1.2, 1.4, 1.4, 2, 9, 16],
+    medium: [110, 41, 10, 5, 3, 1.5, 1, 0.5, 0.3, 0.5, 1, 1.5, 3, 5, 10, 41, 110],
+    high:   [1000, 130, 26, 9, 4, 2, 0.2, 0.2, 0.2, 0.2, 0.2, 2, 4, 9, 26, 130, 1000],
+  },
+};
+
+const BALL_COLORS = ['#ff5e5e', '#ffb84d', '#00e701', '#4dd0ff', '#b84dff', '#ff4d9d'];
+
+/* ============================================================
+   STATE (сервер — источник денег и исходов, клиент только рисует)
+   ============================================================ */
+const queryParams = new URLSearchParams(window.location.search);
+const SESSION_TOKEN = queryParams.get('token') || '';
+
+/* Деньги — тем же форматом, что и платформа (apps/web/src/lib/format/currency.ts):
+   разделитель тысяч пробелом, обозначение ПОСЛЕ суммы, крипта — кодом (USDT/BTC),
+   а не знаком доллара. Валют у платформы шесть, «USD/EUR» в кошельке нет. */
+const FIAT_SYMBOLS = { RUB: '₽', UAH: '₴', BYN: 'Br', KZT: '₸', UZS: 'soʻm' };
+const CRYPTO_LABELS = { USDT_TRC20: 'USDT', BTC: 'BTC', TON: 'TON', TRX: 'TRX', LTC: 'LTC' };
+const CRYPTO_DECIMALS = { USDT_TRC20: 2, BTC: 8, TON: 4, TRX: 4, LTC: 4 };
+
+function currencyLabel(currency) {
+  return CRYPTO_LABELS[currency] ?? FIAT_SYMBOLS[currency] ?? currency;
+}
+
+const state = {
+  balance: 0,
+  currency: queryParams.get('currency') || 'RUB',
+  minBet: 1,
+  maxBet: 10000,
+  serverReady: false,
+  bet: 10,
+  risk: 'medium',
+  rows: 16,
+  balls: [],
+  history: [],
+  soundOn: true,
+  lastPegs: [],
+  flashes: [],
+  lastRound: null,
+};
+
+function formatMoney(value) {
+  const decimals = CRYPTO_DECIMALS[state.currency] ?? 2;
+  const fixed = Number(value).toFixed(decimals);
+  const parts = fixed.split('.');
+  const spaced = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return (parts[1] ? spaced + '.' + parts[1] : spaced) + ' ' + currencyLabel(state.currency);
+}
+
+function betStep() {
+  const crypto = state.currency !== 'USDT_TRC20' && CRYPTO_LABELS[state.currency];
+  return crypto ? '0.000001' : '0.1';
+}
+
+async function loadServerState() {
+  const res = await fetch('/api/plinko/' + encodeURIComponent(SESSION_TOKEN) + '/state');
+  if (!res.ok) {
+    throw new Error('state failed: ' + res.status);
+  }
+  const json = await res.json();
+  if (!json.success) {
+    throw new Error((json.error && json.error.code) || 'STATE_FAILED');
+  }
+  state.balance = Number(json.data.balance);
+  state.currency = json.data.currency || state.currency;
+  state.minBet = Number(json.data.minBet);
+  state.maxBet = Number(json.data.maxBet);
+  state.serverReady = true;
+  const betInput = document.getElementById('betAmount');
+  document.querySelector('.bet-input .currency').textContent = currencyLabel(state.currency);
+  betInput.min = String(state.minBet);
+  betInput.step = betStep();
+  if (Number(betInput.value) < state.minBet) {
+    betInput.value = String(state.minBet);
+  }
+  updateBalance();
+}
+
+/* ============================================================
+   FAIRNESS (исход фиксирует сервер: SHA-256 пути отдаётся вместе
+   с дропом и пишется в game_transactions; анимация лишь показывает
+   готовый path. Полная схема коммитмента с сидами — follow-up.)
+   ============================================================ */
+
+/* ============================================================
+   CANVAS & BOARD
+   ============================================================ */
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, dpr = 1;
+let dx = 0, dy = 0, boardTop = 0, centerX = 0, slotY = 0, slotH = 0;
+let pegs = [];
+let slots = [];
+let multipliers = [];
+let maxMult = 1;
+let ballRadius = 6;
+let pegRadius = 3;
+
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  W = rect.width;
+  H = rect.height;
+  canvas.width = Math.floor(W * dpr);
+  canvas.height = Math.floor(H * dpr);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  computeBoard();
+}
+
+function computeBoard() {
+  const R = state.rows;
+  const padX = Math.max(20, W * 0.04);
+  const padTop = Math.max(30, H * 0.06);
+
+  // Шаг по X задаётся шириной (сколько лунок влезает). Место под блок
+  // лунок резервируем ДО расчёта шага по Y, иначе ряды занимают всю
+  // высоту и лунки вылезают за нижний край.
+  const dxMax = (W - 2 * padX) / (R + 1);
+  const slotBlock = Math.max(28, dxMax * 2.2) + dxMax * 0.55;
+  // Vertical spacing limited by height
+  const dyMax = (H - padTop - slotBlock) / R;
+  // Keep aspect pleasant: dy ≈ dx * 0.9. На высоких досках (планшет в
+  // портрете) ряды могут стать реже — доска растягивается по вертикали
+  // вместо того чтобы болтаться в пустоте. Потолок 1.2 держит ячейку
+  // визуально почти квадратной, чтобы треугольник не вытягивался.
+  dx = Math.min(dxMax, dyMax / 0.9);
+  dy = Math.max(dx * 0.9, Math.min(dyMax, dx * 1.2));
+
+  centerX = W / 2;
+
+  // Высота лунки задаётся шириной доски, а не остатком окна. Раньше
+  // лунка забирала всё свободное место по вертикали: на планшете в
+  // портрете она вытягивалась в колонну 15:1, а на десктопе и телефоне
+  // было 2:1 — игра выглядела по-разному на каждом экране.
+  const slotGap = dy * 0.55;
+  slotH = Math.max(28, Math.min(dx * 2.2, H - padTop - R * dy - slotGap));
+
+  // Что осталось по вертикали — поровну сверху и снизу: доска стоит по
+  // центру, а не прижимается к верху с гигантскими лунками внизу.
+  const usedH = R * dy + slotGap + slotH;
+  boardTop = Math.max(padTop, (H - usedH) / 2);
+
+  ballRadius = Math.max(4, Math.min(9, dx * 0.18));
+  pegRadius = Math.max(2, Math.min(5, dx * 0.09));
+
+  // Build pegs (classic Galton board: row r has r+1 pegs)
+  pegs = [];
+  for (let r = 0; r < R; r++) {
+    for (let i = 0; i <= r; i++) {
+      pegs.push({
+        x: centerX + (i - r / 2) * dx,
+        y: boardTop + r * dy,
+        r: pegRadius,
+        glow: 0,
+      });
+    }
+  }
+
+  // Build slots
+  slotY = boardTop + R * dy + slotGap;
+  slots = [];
+  for (let j = 0; j <= R; j++) {
+    slots.push({
+      x: centerX + (j - R / 2) * dx,
+      y: slotY,
+      w: dx * 0.86,
+      h: slotH,
+      index: j,
+    });
+  }
+
+  // Update multipliers
+  multipliers = MULTIPLIERS[R][state.risk].slice();
+  maxMult = Math.max(...multipliers);
+
+  // Pre-compute colors
+  for (const s of slots) {
+    s.mult = multipliers[s.index];
+    s.color = multiplierColor(s.mult, maxMult);
+  }
+
+  // Подпись множителя: пишем один раз на весь ряд, а не в drawSlot —
+  // ширина лунки меняется только на resize/смене rows-risk.
+  for (const s of slots) s.label = formatSlotLabel(s.mult);
+  applySlotTypography(slots);
+}
+
+const SLOT_FONT = '-apple-system, BlinkMacSystemFont, sans-serif';
+/* Ниже этого кегля подпись на телефоне уже не читается, поэтому вместо
+   того чтобы ужимать её ещё сильнее, переворачиваем вертикально. */
+const SLOT_MIN_READABLE = 8;
+
+function measureSlotText(label, size) {
+  ctx.font = `800 ${size}px ${SLOT_FONT}`;
+  return ctx.measureText(label).width;
+}
+
+/* Кегль под горизонтальную подпись, вписанный в ширину лунки. */
+function horizontalSlotFont(label, slotW) {
+  const maxTextW = Math.max(8, slotW * 0.88);
+  const size = Math.min(14, Math.max(9, slotW * 0.55));
+  const measured = measureSlotText(label, size);
+  return measured <= maxTextW ? size : size * (maxTextW / measured);
+}
+
+/* Для повёрнутой подписи шириной лунки ограничен уже кегль (высота
+   букв), а длиной текста — высота лунки. */
+function verticalSlotFont(label, slotW, slotH) {
+  const maxTextH = slotH * 0.8;
+  let size = Math.min(12, slotW * 1.15, slotH * 0.28);
+  const measured = measureSlotText(label, size);
+  if (measured > maxTextH) size = size * (maxTextH / measured);
+  return size;
+}
+
+/* На узких лунках (16 рядов на телефоне — всего ~14px) подпись
+   горизонтально не помещается в читаемом кегле. Тогда весь ряд
+   разворачиваем вертикально: решение общее на доску, иначе часть
+   подписей стояла бы, а часть лежала. */
+function applySlotTypography(list) {
+  const slotW = list[0].w;
+  const slotH = list[0].h;
+  const vertical = list.some(s => horizontalSlotFont(s.label, slotW) < SLOT_MIN_READABLE);
+  for (const s of list) {
+    s.vertical = vertical;
+    const size = vertical ? verticalSlotFont(s.label, slotW, slotH) : horizontalSlotFont(s.label, slotW);
+    s.fontSize = Math.round(size * 10) / 10;
+  }
+}
+
+/* Компактная запись множителя: «1000×» → «1K×», «0.5×» → «.5×» —
+   на узкой лунке каждый символ стоит ширины всей подписи. */
+function formatSlotLabel(mult) {
+  const m = Number(mult) || 0;
+  if (m >= 1000) {
+    const k = m / 1000;
+    return (Number.isInteger(k) ? k : String(Math.round(k * 10) / 10)) + 'K×';
+  }
+  return String(m).replace(/^0\./, '.') + '×';
+}
+
+function multiplierColor(mult, maxM) {
+  // t in [0, 1]: 0 = low mult (green), 1 = high mult (red)
+  const t = Math.pow(Math.max(0, mult) / maxM, 0.3);
+  const hue = (1 - t) * 120;
+  const sat = 72;
+  const light = 48;
+  return `hsl(${hue}, ${sat}%, ${light}%)`;
+}
+
+/* ============================================================
+   WAYPOINTS & BALL
+   ============================================================ */
+function computeWaypoints(path) {
+  const R = state.rows;
+  const wp = [];
+  // Start above row 0
+  wp.push({ x: centerX, y: boardTop - dy * 0.9 });
+  let g = 0;
+  for (let r = 0; r < R; r++) {
+    // Ball is at peg g of row r (before making the decision for this row)
+    wp.push({ x: centerX + (g - r / 2) * dx, y: boardTop + r * dy });
+    g += path[r];
+  }
+  // Final slot
+  wp.push({ x: centerX + (g - R / 2) * dx, y: slotY + slotH * 0.35 });
+  return wp;
+}
+
+class Ball {
+  constructor(waypoints, color, slotIndex, onLanded) {
+    this.waypoints = waypoints;
+    this.color = color;
+    this.slotIndex = slotIndex;
+    this.onLanded = onLanded;
+    this.segment = 0;
+    this.t = 0;
+    this.x = waypoints[0].x;
+    this.y = waypoints[0].y;
+    this.scale = 1;
+    this.done = false;
+    this.trail = [];
+    this.landed = false;
+    this.landProgress = 0;
+    this.landY = 0;
+  }
+
+  update(dt) {
+    if (this.done) return;
+
+    if (this.landed) {
+      // Sink into slot
+      this.landProgress += dt * 4;
+      this.y = this.landY + this.landProgress * 20;
+      this.scale = Math.max(0, 1 - this.landProgress);
+      if (this.landProgress >= 1) {
+        this.done = true;
+      }
+      return;
+    }
+
+    const from = this.waypoints[this.segment];
+    const to = this.waypoints[this.segment + 1];
+
+    const fallTime = 0.16; // seconds per row
+    this.t += dt / fallTime;
+
+    if (this.t >= 1) {
+      this.x = to.x;
+      this.y = to.y;
+      this.segment++;
+      this.t = 0;
+      this.scale = 0.55;
+
+      // Flash nearest peg
+      if (this.segment < this.waypoints.length - 1) {
+        state.flashes.push({ x: to.x, y: to.y, life: 1, max: 1 });
+        playPegSound();
+      }
+
+      if (this.segment >= this.waypoints.length - 1) {
+        this.landed = true;
+        this.landY = to.y;
+        this.landProgress = 0;
+        if (this.onLanded) this.onLanded();
+      }
+    } else {
+      const p = this.t;
+      // x: linear, y: accelerating (p^2) — projectile motion
+      this.x = from.x + (to.x - from.x) * p;
+      this.y = from.y + (to.y - from.y) * (p * p);
+    }
+
+    // Restore scale (squash effect)
+    this.scale += (1 - this.scale) * Math.min(1, dt * 16);
+
+    // Trail
+    this.trail.push({ x: this.x, y: this.y });
+    if (this.trail.length > 7) this.trail.shift();
+  }
+
+  draw(ctx) {
+    if (this.done) return;
+    const r = ballRadius * this.scale;
+    if (r <= 0.1) return;
+
+    // Trail
+    for (let i = 0; i < this.trail.length; i++) {
+      const t = this.trail[i];
+      const a = (i / this.trail.length) * 0.35;
+      const rr = r * (i / this.trail.length) * 0.85;
+      ctx.fillStyle = hexWithAlpha(this.color, a);
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, rr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Glow
+    const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, r * 2.2);
+    grad.addColorStop(0, hexWithAlpha(this.color, 0.7));
+    grad.addColorStop(1, hexWithAlpha(this.color, 0));
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, r * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    const bodyGrad = ctx.createRadialGradient(
+      this.x - r * 0.35, this.y - r * 0.35, 0,
+      this.x, this.y, r
+    );
+    bodyGrad.addColorStop(0, '#ffffff');
+    bodyGrad.addColorStop(0.5, this.color);
+    bodyGrad.addColorStop(1, shadeColor(this.color, -30));
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath();
+    ctx.arc(this.x - r * 0.3, this.y - r * 0.35, r * 0.32, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function hexWithAlpha(hex, a) {
+  if (hex.startsWith('hsl')) {
+    return hex.replace('hsl(', 'hsla(').replace(')', `, ${a})`);
+  }
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function shadeColor(hex, amt) {
+  if (hex.startsWith('hsl')) return hex;
+  const n = parseInt(hex.slice(1), 16);
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  r = Math.max(0, Math.min(255, r + amt));
+  g = Math.max(0, Math.min(255, g + amt));
+  b = Math.max(0, Math.min(255, b + amt));
+  return `rgb(${r},${g},${b})`;
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function drawBoard() {
+  // Background gradient
+  const bg = ctx.createRadialGradient(W / 2, H * 0.3, 0, W / 2, H * 0.5, Math.max(W, H) * 0.8);
+  bg.addColorStop(0, '#122a3a');
+  bg.addColorStop(1, '#0f212e');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Pegs
+  for (const peg of pegs) {
+    // Glow flash
+    if (peg.glow > 0) {
+      const g = ctx.createRadialGradient(peg.x, peg.y, 0, peg.x, peg.y, peg.r * 4);
+      g.addColorStop(0, `rgba(0,231,1,${peg.glow * 0.6})`);
+      g.addColorStop(1, 'rgba(0,231,1,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(peg.x, peg.y, peg.r * 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const grad = ctx.createRadialGradient(
+      peg.x - peg.r * 0.4, peg.y - peg.r * 0.4, 0,
+      peg.x, peg.y, peg.r
+    );
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(1, '#6b8090');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(peg.x, peg.y, peg.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Slots
+  for (const s of slots) {
+    drawSlot(s);
+  }
+}
+
+function drawSlot(s) {
+  const x = s.x - s.w / 2;
+  const y = s.y;
+  const w = s.w;
+  const h = s.h;
+  const r = Math.min(8, w * 0.2);
+
+  // Body with gradient
+  const grad = ctx.createLinearGradient(0, y, 0, y + h);
+  grad.addColorStop(0, shadeColor(s.color, 15));
+  grad.addColorStop(1, shadeColor(s.color, -25));
+
+  ctx.fillStyle = grad;
+  roundRect(ctx, x, y, w, h, r);
+  ctx.fill();
+
+  // Top highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  roundRect(ctx, x, y, w, Math.min(6, h * 0.25), r);
+  ctx.fill();
+
+  // Text: подпись вписана в лунку в applySlotTypography
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `800 ${s.fontSize}px ${SLOT_FONT}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = 3;
+  if (s.vertical) {
+    ctx.save();
+    ctx.translate(s.x, y + h / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(s.label, 0, 0);
+    ctx.restore();
+  } else {
+    ctx.fillText(s.label, s.x, y + h / 2);
+  }
+  ctx.shadowBlur = 0;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+/* ============================================================
+   GAME FLOW — исход решает сервер, анимация его визуализирует
+   ============================================================ */
+let dropInFlight = false;
+
+async function placeBet() {
+  if (dropInFlight || !state.serverReady) {
+    return;
+  }
+  const bet = parseFloat(document.getElementById('betAmount').value);
+  if (isNaN(bet) || bet <= 0) {
+    return;
+  }
+  if (bet > state.balance + 1e-9) {
+    return;
+  }
+  dropInFlight = true;
+  updateBetButton();
+  try {
+    const res = await fetch('/api/plinko/' + encodeURIComponent(SESSION_TOKEN) + '/drop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dropId: crypto.randomUUID(),
+        bet: bet.toFixed(2),
+        risk: state.risk,
+        rows: state.rows,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error('drop failed: ' + res.status);
+    }
+    const json = await res.json();
+    if (!json.success) {
+      throw new Error((json.error && json.error.code) || 'DROP_FAILED');
+    }
+    const drop = json.data;
+    state.balance = Number(drop.balance);
+    updateBalance();
+    spawnServerBall(drop);
+    updateProfitDisplay();
+  } catch (error) {
+    showDropError(error);
+  } finally {
+    dropInFlight = false;
+    updateBetButton();
+  }
+}
+
+const BET_BUTTON_LABEL = 'Играть';
+
+function showDropError(error) {
+  const btn = document.getElementById('betBtn');
+  btn.textContent = 'Ошибка — повторить';
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.textContent = BET_BUTTON_LABEL;
+    updateBetButton();
+  }, 1500);
+}
+
+function spawnServerBall(drop) {
+  const waypoints = computeWaypoints(drop.path);
+  const color = BALL_COLORS[Math.floor(Math.random() * BALL_COLORS.length)];
+  const ball = new Ball(waypoints, color, drop.slotIndex, () => {
+    state.balance = Number(drop.balance);
+    updateBalance();
+    addHistory(drop.multiplier, Number(drop.win) - Number(drop.bet));
+    playWinSound(Number(drop.multiplier));
+    flashSlot(drop.slotIndex);
+    state.lastRound = drop;
+  });
+  state.balls.push(ball);
+}
+
+/* ============================================================
+   UI UPDATES
+   ============================================================ */
+function updateBalance() {
+  document.getElementById('balance').textContent = formatMoney(state.balance);
+  updateBetButton();
+}
+
+function updateProfitDisplay() {
+  const bet = parseFloat(document.getElementById('betAmount').value) || 0;
+  const maxWin = bet * maxMult;
+  document.getElementById('profitOnWin').textContent = formatMoney(Math.max(0, maxWin - bet));
+}
+
+function updateBetButton() {
+  const btn = document.getElementById('betBtn');
+  const bet = parseFloat(document.getElementById('betAmount').value) || 0;
+  btn.disabled =
+    !state.serverReady ||
+    dropInFlight ||
+    bet <= 0 ||
+    bet > state.balance + 1e-9 ||
+    state.balls.some(b => !b.done && b.landed);
+}
+
+const RISK_LABELS = { low: 'низкий', medium: 'средний', high: 'высокий' };
+
+function updateFairnessUI() {
+  const round = state.lastRound;
+  document.getElementById('fairConfig').textContent =
+    state.rows + ' рядов, ' + RISK_LABELS[state.risk] + ' риск';
+  document.getElementById('fairTable').textContent =
+    MULTIPLIERS[state.rows][state.risk].map((mult) => String(mult).replace('.', ',')).join(' · ');
+  document.getElementById('serverSeed').textContent = round ? round.roundId || '—' : '—';
+  document.getElementById('nonceDisplay').textContent = round ? round.outcomeHash : '—';
+}
+
+/* ============================================================
+   SOUND (Web Audio API)
+   ============================================================ */
+let audioCtx = null;
+function ensureAudio() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch (e) { audioCtx = null; }
+  }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function playTone(freq, dur, type = 'sine', vol = 0.04, delay = 0) {
+  if (!state.soundOn || !audioCtx) return;
+  const t0 = audioCtx.currentTime + delay;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(vol, t0 + 0.005);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.02);
+}
+
+function playPegSound() {
+  if (!state.soundOn) return;
+  const f = 500 + Math.random() * 400;
+  playTone(f, 0.06, 'sine', 0.05, 0);
+}
+
+function playWinSound(mult) {
+  if (!state.soundOn) return;
+  if (mult >= 10) {
+    playTone(523, 0.12, 'triangle', 0.06, 0);
+    playTone(659, 0.12, 'triangle', 0.06, 0.08);
+    playTone(784, 0.18, 'triangle', 0.06, 0.16);
+    playTone(1047, 0.25, 'triangle', 0.07, 0.24);
+  } else if (mult >= 1) {
+    playTone(600, 0.08, 'sine', 0.05, 0);
+    playTone(800, 0.12, 'sine', 0.05, 0.06);
+  } else {
+    playTone(300, 0.1, 'sine', 0.04, 0);
+    playTone(220, 0.15, 'sine', 0.04, 0.07);
+  }
+}
+
+function flashSlot(index) {
+  const s = slots[index];
+  if (!s) return;
+  state.flashes.push({ slot: s, life: 1, max: 0.9, isSlot: true });
+}
+
+function addHistory(mult, profit) {
+  state.history.unshift({ mult, profit });
+  if (state.history.length > 30) state.history.pop();
+  renderHistory();
+}
+
+function renderHistory() {
+  const el = document.getElementById('history');
+  el.innerHTML = '';
+  for (const h of state.history) {
+    const div = document.createElement('div');
+    div.className = 'history-pill';
+    // Цвет по величине множителя (зелёный → красный), как в доноре.
+    const mult = Number(h.mult);
+    const t = Math.pow(Math.max(0.0001, mult) / 1000, 0.3);
+    const hue = (1 - Math.min(1, t)) * 120;
+    div.style.background = `hsl(${hue}, 70%, 42%)`;
+    div.style.color = '#fff';
+    div.textContent = mult + '×';
+    div.title = (h.profit >= 0 ? '+' : '') + h.profit.toFixed(2);
+    el.appendChild(div);
+  }
+}
+
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+let lastT = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - lastT) / 1000);
+  lastT = now;
+
+  let ballFinished = false;
+  for (let i = state.balls.length - 1; i >= 0; i--) {
+    state.balls[i].update(dt);
+    if (state.balls[i].done) {
+      state.balls.splice(i, 1);
+      ballFinished = true;
+    }
+  }
+  // На приземлении кнопка гаснет (шарик landed, но ещё не done) и сама себя
+  // не включает: пересчитываем её в момент, когда шарик уходит с доски.
+  if (ballFinished) updateBetButton();
+
+  // Свечение колышка после удара: вспышка живёт в state.flashes,
+  // затухание переносим в peg.glow (без этого блока peg.glow всегда 0).
+  for (const p of pegs) {
+    if (p.glow > 0) p.glow = Math.max(0, p.glow - dt * 3);
+  }
+  for (let i = state.flashes.length - 1; i >= 0; i--) {
+    const f = state.flashes[i];
+    f.life -= dt * 2.5;
+    if (f.life <= 0) {
+      state.flashes.splice(i, 1);
+      continue;
+    }
+    if (!f.isSlot) {
+      let bestPeg = null;
+      let bestDist = 1e9;
+      for (const p of pegs) {
+        const d = (p.x - f.x) ** 2 + (p.y - f.y) ** 2;
+        if (d < bestDist) {
+          bestDist = d;
+          bestPeg = p;
+        }
+      }
+      if (bestPeg) bestPeg.glow = Math.max(bestPeg.glow, f.life);
+    }
+  }
+
+  drawBoard();
+
+  // Белая вспышка лунки, в которую упал шарик.
+  for (const f of state.flashes) {
+    if (f.isSlot) {
+      const s = f.slot;
+      ctx.fillStyle = `rgba(255,255,255,${f.life * 0.5})`;
+      roundRect(ctx, s.x - s.w / 2, s.y, s.w, s.h, 8);
+      ctx.fill();
+    }
+  }
+
+  for (const b of state.balls) b.draw(ctx);
+
+  requestAnimationFrame(loop);
+}
+
+/* ============================================================
+   EVENT HANDLERS
+   ============================================================ */
+document.getElementById('betBtn').addEventListener('click', () => {
+  ensureAudio();
+  placeBet();
+});
+
+document.getElementById('betAmount').addEventListener('input', () => {
+  updateProfitDisplay();
+  updateBetButton();
+});
+
+document.querySelectorAll('[data-bet-mult]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById('betAmount');
+    const current = parseFloat(input.value) || 0;
+    const cap = Math.min(state.balance, state.maxBet);
+    let value = btn.dataset.betMult === 'max' ? cap : current * parseFloat(btn.dataset.betMult);
+    value = Math.max(state.minBet, Math.min(cap, value));
+    input.value = value.toFixed(2);
+    updateProfitDisplay();
+    updateBetButton();
+  });
+});
+
+document.getElementById('soundBtn').addEventListener('click', (e) => {
+  state.soundOn = !state.soundOn;
+  e.currentTarget.textContent = state.soundOn ? '🔊' : '🔇';
+  if (state.soundOn) {
+    ensureAudio();
+    playTone(700, 0.08, 'sine', 0.04);
+  }
+});
+
+document.getElementById('fairBtn').addEventListener('click', () => {
+  updateFairnessUI();
+  document.getElementById('fairModal').classList.add('show');
+});
+
+document.getElementById('closeFairBtn').addEventListener('click', () => {
+  document.getElementById('fairModal').classList.remove('show');
+});
+
+document.getElementById('rotateBtn').addEventListener('click', async () => {
+  try {
+    await loadServerState();
+  } catch (error) {
+    showDropError(error);
+  }
+  updateFairnessUI();
+});
+
+document.querySelectorAll('#riskGroup button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#riskGroup button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.risk = btn.dataset.risk;
+    computeBoard();
+    updateProfitDisplay();
+  });
+});
+
+document.querySelectorAll('#rowsGroup button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#rowsGroup button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.rows = parseInt(btn.dataset.rows);
+    computeBoard();
+    updateProfitDisplay();
+  });
+});
+
+window.addEventListener('resize', () => {
+  resize();
+  updateProfitDisplay();
+});
+if (window.ResizeObserver) {
+  new ResizeObserver(() => resize()).observe(canvas.parentElement);
+}
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+resize();
+updateBetButton();
+loadServerState()
+  .catch(() => showDropError(new Error('state failed')))
+  .finally(() => {
+    updateBalance();
+    updateProfitDisplay();
+    updateFairnessUI();
+  });
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

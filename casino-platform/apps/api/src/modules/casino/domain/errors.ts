@@ -136,3 +136,45 @@ export class InsufficientFundsError extends AppError {
     })
   }
 }
+export class OriginalsGameNotSupportedError extends AppError {
+  readonly code = 'ORIGINALS_GAME_NOT_SUPPORTED'
+  readonly httpStatus = 501
+  constructor(gameCode: string) {
+    super('ORIGINALS_GAME_NOT_SUPPORTED', { gameCode })
+  }
+}
+export class OriginalsActionNotSupportedError extends AppError {
+  readonly code = 'ORIGINALS_ACTION_NOT_SUPPORTED'
+  readonly httpStatus = 501
+  constructor(action: string) {
+    super(`Originals action ${action} is not implemented in pilot`, { action })
+  }
+}
+/**
+ * Целевой RTP недостижим таблицами игры: выплаты win-строк не покрывают
+ * матожидание при заданной частоте выигрышей. Ошибку видно админу, игроку —
+ * 503 (в controller'е message не наружу, только код).
+ */
+export class OriginalsRtpUnreachableError extends AppError {
+  readonly code = 'ORIGINALS_RTP_UNREACHABLE'
+  readonly httpStatus = 503
+  constructor(gameCode: string, rtp: string, reachableRange?: string) {
+    super(`House slot ${gameCode} cannot pay rtp ${rtp} with its outcome tables`, {
+      gameCode,
+      rtp,
+      reachableRange,
+    })
+  }
+}
+/**
+ * Конфиг house-слота противоречит инвариантам реестра. Бросается в конструкторе
+ * реестра, то есть на старте процесса: битые таблицы не должны доезжать до
+ * спинов, где они выглядели бы как ошибка игрока.
+ */
+export class HouseSlotConfigError extends AppError {
+  readonly code = 'HOUSE_SLOT_CONFIG_INVALID'
+  readonly httpStatus = 503
+  constructor(gameCode: string, reason: string) {
+    super(`House slot ${gameCode}: ${reason}`, { gameCode, reason })
+  }
+}
