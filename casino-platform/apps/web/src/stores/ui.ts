@@ -55,7 +55,7 @@ interface UIState {
   depositCurrency?: string | undefined
   openLogin: (gameSlug?: string, mode?: LoginSheetMode) => void
   closeLogin: () => void
-  openDeposit: (currency?: string) => void
+  openDeposit: (currency?: string, gameSlug?: string) => void
   closeDeposit: () => void
   openWithdraw: (currency?: string) => void
   closeWithdraw: () => void
@@ -113,8 +113,17 @@ export const useUIStore = create<UIState>((set, get) => ({
       pendingGameSlug: gameSlug ?? null,
     }),
   closeLogin: () => deferredHide(set, get, 'loginSheet'),
-  openDeposit: (currency) =>
-    set({ depositSheet: true, depositSheetClosing: false, depositCurrency: currency }),
+  // `gameSlug` — игра, из которой открыли кассу (тап «Играть на деньги» при пустом
+  // балансе). По нему DepositSheet обещает «после оплаты вернётесь в игру», а
+  // DepositReturnHandler продолжает запуск. Вне игровой точки обещания нет:
+  // поэтому без slug намерение сбрасывается, а не доедает чужое.
+  openDeposit: (currency, gameSlug) =>
+    set({
+      depositSheet: true,
+      depositSheetClosing: false,
+      depositCurrency: currency,
+      pendingGameSlug: gameSlug ?? null,
+    }),
   closeDeposit: () => deferredHide(set, get, 'depositSheet'),
   openWithdraw: (currency) =>
     set({ withdrawSheet: true, withdrawSheetClosing: false, withdrawCurrency: currency }),
@@ -122,7 +131,11 @@ export const useUIStore = create<UIState>((set, get) => ({
   openWalletSwitcher: () => set({ walletSwitcher: true, walletSwitcherClosing: false }),
   closeWalletSwitcher: () => deferredHide(set, get, 'walletSwitcher'),
   openLaunchCurrency: (opts) =>
-    set({ launchCurrencySheet: true, launchCurrencySheetClosing: false, launchCurrencyOptions: opts }),
+    set({
+      launchCurrencySheet: true,
+      launchCurrencySheetClosing: false,
+      launchCurrencyOptions: opts,
+    }),
   closeLaunchCurrency: () => deferredHide(set, get, 'launchCurrencySheet'),
   openGamePreview: (opts) => set({ gamePreview: opts, gamePreviewClosing: false }),
   closeGamePreview: () => deferredHide(set, get, 'gamePreview'),

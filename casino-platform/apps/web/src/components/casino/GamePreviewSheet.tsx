@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { Heart, Play, X } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { GameThumb } from '@/components/casino/GameThumb'
@@ -9,19 +10,26 @@ import { useDemoLaunch } from '@/hooks/useDemoLaunch'
 import { fetchGameDetails } from '@/lib/api/casino.api'
 import { formatBalance } from '@/lib/format/currency'
 import { gameDisplayName, gameHasDemo, gameMinBetLabel, gameVolatilityLabel } from '@/lib/ui/game'
+import { realMoneyStep } from '@/lib/ui/game-launch'
 import { useAuth } from '@/stores/auth'
-import { useUIStore, type GamePreviewOptions } from '@/stores/ui'
+import { type GamePreviewOptions, useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
-/** Строка «Волатильность / Мин. ставка» (ТЗ ч.5 §8.1) — колонки в одной рамке. */
+/**
+ * Строка «Волатильность / Мин. ставка» (ТЗ ч.5 §8.1) — колонки в одной рамке.
+ * Сетка по числу строк: жёсткие `grid-cols-3` оставляли пустую треть рамки, когда
+ * характеристик две.
+ */
 function SpecTable({
   specs,
 }: {
   specs: { label: string; value: string | null }[]
 }): React.JSX.Element {
+  const columns = { gridTemplateColumns: `repeat(${String(specs.length)}, minmax(0, 1fr))` }
+
   return (
     <div className="mt-5 overflow-hidden rounded-xl border border-[#2A2A4A]">
-      <div className="grid grid-cols-3">
+      <div className="grid" style={columns}>
         {specs.map((spec) => (
           <div
             key={spec.label}
@@ -31,7 +39,7 @@ function SpecTable({
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-3">
+      <div className="grid" style={columns}>
         {specs.map((spec) => (
           <div
             key={spec.label}
@@ -46,11 +54,16 @@ function SpecTable({
 }
 
 /**
- * Превью игры шторкой (ТЗ ч.5.1 §4.5, §4.7): «i» на карточке открывает этот
- * лист, а не инлайн-плашку поверх соседних карточек. Обложка — в край в край,
- * под ней провайдер, название, характеристики и обе кнопки запуска.
- * Волна 5.1 (остаток): листается из `useUIStore().gamePreview`; вызов из
- * GameCard/GameDeck не подключён — это отдельный шаг (см. PR #133).
+ * Карточка игры шторкой (ТЗ ч.5.1 §4.5): тап по обложке на телефоне открывает
+ * этот лист, а не запускает игру. Обложка — в край в край, под ней провайдер,
+ * название, характеристики и обе кнопки запуска; кнопки лежат на липкой подложке,
+ * поэтому не уезжают за край, если список характеристик вырос.
+ *
+ * До этого лист был написан, но не отрисован: витрина пушила
+ * `/casino/<slug>?launch=1`, страница сама дёргала запуск, получала
+ * `INSUFFICIENT_FUNDS` и показывала кассу — то есть игрок вместо карточки игры
+ * видел пополнение. Планшет и десктоп получают ту же информацию страницей
+ * (`useOpenGameCard`), потому что описание и похожие слоты в пол-экрана не влезают.
  */
 export function GamePreviewSheet(): React.JSX.Element | null {
   const { gamePreview, gamePreviewClosing } = useUIStore()
@@ -73,8 +86,8 @@ function GamePreviewBody({
 }): React.JSX.Element {
   const { game, isFavorite, onToggleFavorite } = options
   const { user } = useAuth()
-  const { closeGamePreview, openLogin } = useUIStore()
-  const { activeCurrency, getActiveWallet } = useWalletStore()
+  const { closeGamePreview, openLogin, openDeposit } = useUIStore()
+  const { activeCurrency, getActiveWallet, getLaunchBalance } = useWalletStore()
   const router = useRouter()
   const { startDemo, isRunning: demoLoading } = useDemoLaunch()
 
@@ -93,13 +106,21 @@ function GamePreviewBody({
   // фиатный `config.activeCurrency` (иначе USDT подписывались ₽).
   const currency = getActiveWallet()?.currency ?? activeCurrency
   const hasDemo = gameHasDemo(game.hasDemo)
-  const balance = getActiveWallet()?.available ?? '0'
+  const activeWallet = getActiveWallet()
+  const balance = activeWallet?.available ?? '0'
 
   const play = (): void => {
     closeGamePreview()
-    if (!user) {
+    const step = realMoneyStep({ signedIn: user !== null, balance: getLaunchBalance() })
+    if (step === 'login') {
       // §8.2: гостя не разворачиваем — LoginSheet с продолжением launch.
       openLogin(game.slug)
+      return
+    }
+    if (step === 'deposit') {
+      // Пустой кошелёк: касса вместо попытки запуска. Slug игра передаёт, чтобы
+      // после оплаты «Вернуться в игру» вело именно в неё.
+      openDeposit(currency, game.slug)
       return
     }
     router.push(`/casino/${game.slug}?launch=1`)
@@ -114,11 +135,11 @@ function GamePreviewBody({
         onClick={closeGamePreview}
       />
       <div
-        className={`sheet-panel p-0${closing ? ' sheet-panel-out' : ''}`}
+        className={`sheet-panel sheet-panel--preview p-0${closing ? ' sheet-panel-out' : ''}`}
         role="dialog"
         aria-label={displayName}
       >
-        <div className="relative aspect-[5/3] w-full overflow-hidden">
+        <div className="relative aspect-[5/3] w-full shrink-0 overflow-hidden bg-[#16213E]">
           <GameThumb
             src={details?.bannerUrl ?? game.thumbnailUrl}
             alt={displayName}
@@ -152,7 +173,7 @@ function GamePreviewBody({
           </button>
         </div>
 
-        <div className="px-5 pb-8">
+        <div className="sheet-body px-5 pt-1">
           {provider && (
             <p className="text-center text-[11px] font-bold uppercase tracking-[0.24em] text-muted">
               {provider}
@@ -169,10 +190,24 @@ function GamePreviewBody({
             ]}
           />
 
+          {/* Описания, демо-ссылок и похожих слотов в пол-экрана не бывает: они на
+              странице игры, туда же ведёт и эта ссылка. */}
+          <Link
+            href={`/casino/${game.slug}`}
+            onClick={closeGamePreview}
+            className="mt-4 block text-center text-xs font-semibold text-brand-light"
+          >
+            Полное описание и похожие игры →
+          </Link>
+        </div>
+
+        {/* Кнопки вне прокрутки: пол-экрана, и запуск должен оставаться в поле
+            зрения, когда характеристик влезло больше, чем помещается. */}
+        <div className="sheet-actions border-t border-[#2A2A4A]/70 bg-[#1A1A2E] px-5 pt-4">
           <button
             type="button"
             onClick={play}
-            className="btn mt-5 w-full bg-gradient-to-r from-brand to-brand-light py-3.5 text-base font-bold"
+            className="btn w-full bg-gradient-to-r from-brand to-brand-light py-3.5 text-base font-bold"
           >
             {/* Треугольник запуска — только когда кнопка реально запускает игру. */}
             {user && <Play size={18} className="fill-current" aria-hidden />}
