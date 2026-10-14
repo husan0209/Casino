@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { type ConfigService } from '@nestjs/config'
 import { describe, expect, it } from 'vitest'
 
@@ -56,5 +59,27 @@ describe('house-провайдер: Aztec в каталоге', () => {
       'https://example.test/house/treasuresofaztec/index.html' +
         '?token=demo_treasuresofaztec_abcd&currency=USDT_TRC20',
     )
+  })
+})
+
+/**
+ * Обложка — то, чем игрок отличает одну игру от другой. Донорский экспорт
+ * Construct кладёт в `icons/icon-512.png` заглушку движка: один и тот же знак на
+ * всех одиннадцати слотах, и витрина превращается в ряд одинаковых плиток.
+ * Настоящая обложка — `cover.jpg`, она в индексе.
+ */
+describe('house-провайдер: обложки каталога', () => {
+  it('каждая строка ведёт на cover.jpg игры, и файл лежит в apps/web/public', async () => {
+    const rows = await makeAdapter('http://localhost:3000').fetchGameList()
+    const publicDir = join(process.cwd(), '..', 'web', 'public')
+
+    expect(rows.length).toBeGreaterThan(10)
+    for (const row of rows) {
+      expect(row.thumbnailUrl, `у ${row.externalGameId} нет обложки каталога`).toBe(
+        `/house/${row.externalGameId}/cover.jpg`,
+      )
+      const file = join(publicDir, (row.thumbnailUrl ?? '').replace(/^\//, ''))
+      expect(existsSync(file), `файл обложки не найден: ${file}`).toBe(true)
+    }
   })
 })

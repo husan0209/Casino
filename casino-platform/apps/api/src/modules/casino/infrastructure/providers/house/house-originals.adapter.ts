@@ -66,7 +66,10 @@ export class HouseOriginalsAdapter implements GameProviderAdapter {
         name: config.displayName,
         type: 'slot',
         category: 'slots',
-        thumbnailUrl: `/house/${config.externalGameId}/icons/icon-512.png`,
+        // `cover.jpg` — обложка игры, она в индексе. `icons/icon-512.png` из
+        // донорского экспорта Construct — это заглушка движка (один и тот же знак
+        // на всех слотах), на витрине все 11 игр выглядели одинаково.
+        thumbnailUrl: `/house/${config.externalGameId}/cover.jpg`,
         hasDemo: true,
         rtp: Number(config.defaultRtp),
       })),
