@@ -347,7 +347,10 @@ payment_callbacks    (raw callbacks от провайдеров)
 - Фильтрация/поиск игр
 - Favorites (избранные игры пользователя)
 - Game launch (запуск iframe)
-- Demo mode (без авторизации)
+- Demo mode (без авторизации) — включая лицевой счёт демо-сессии: порт
+  `IDemoBalanceStore` (`domain/demo-balance.ts`), остаток живёт в Redis под
+  `demo_balance:<sessionToken>`; ставка списывается с него, а не пересчитывается
+  от стартового кредита на каждый спин (`94cf6ecb`, 2026-10-14)
 
 ### 7.2. Key Use Cases
 
@@ -364,6 +367,10 @@ payment_callbacks    (raw callbacks от провайдеров)
 
 - `wallet` (WalletFacade — активный кошелёк при launch; debit/credit в callbacks)
 - `auth` (AuthGuard/RolesGuard — на плеерских эндпоинтах каталога)
+- Redis напрямую (`infrastructure/demo/demo-balance.redis.ts`, `REDIS_URL`) —
+  hot-path демо-игры. Единственный потребитель Redis в запросе пользователя:
+  остальные (`geo`, `maintenance`, очереди) фоновые. Долг контура —
+  GAP-78/GAP-79/GAP-81 (`IMPLEMENTATION_GAPS.md` §2.12)
 - `admin` (AdminAuthGuard — на admin-endpoints каталога: /admin/games,
   /admin/providers, /admin/game-sessions*, /admin/game-transactions; §13.2.1.
   2026-10-04: переведены с плеерского AuthGuard — тот проверяет aud='user' и
