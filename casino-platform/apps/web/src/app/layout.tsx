@@ -33,6 +33,11 @@ export const metadata: Metadata = {
     template: '%s | Casino',
   },
   description: 'Mobile-first слоты для СНГ',
+  // RuKassa сверяет этот тег с главной страницей перед тем, как отдать кассу
+  // мерчанту («Подтвердить проект» в карточке магазина).
+  other: {
+    verification: 'e910a63844df7022c9b194d39b2686bf',
+  },
   openGraph: {
     title: 'Casino — слоты онлайн',
     description: 'Mobile-first слоты для СНГ',
