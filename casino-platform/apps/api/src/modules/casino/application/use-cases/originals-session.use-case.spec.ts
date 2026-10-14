@@ -4,6 +4,7 @@ import { type WalletFacade } from '@modules/wallet/facade/wallet.facade'
 
 import { OriginalsSessionLoader, buildDemoSessionToken } from './originals-session-loader'
 import { OriginalsSessionUseCase, TIGER_DEMO_START_CREDIT } from './originals-session.use-case'
+import { type IDemoBalanceStore } from '../../domain/demo-balance'
 import { OriginalsGameNotSupportedError, SessionInvalidError } from '../../domain/errors'
 import {
   type GameSessionWithGame,
@@ -76,11 +77,23 @@ function makeSession(externalGameId: string, status = 'active'): GameSessionWith
   } as unknown as GameSessionWithGame
 }
 
+/**
+ * Двойник демо-счёта: этот путь только читает остаток, списаний в нём нет.
+ */
+function makeDemoBalance(overrides: Record<string, string> = {}): IDemoBalanceStore {
+  return {
+    settle: async () => ({ accepted: true, balance: '0' }),
+    peek: async (sessionToken: string, startCredit: string) =>
+      overrides[sessionToken] ?? startCredit,
+  }
+}
+
 describe('OriginalsSessionUseCase', () => {
   it('демо берёт idle-блок игры из токена, а не единственной игры каталога', async () => {
     const useCase = new OriginalsSessionUseCase(
       new OriginalsSessionLoader(makePlayRepository(null).repository, makeSlotGames()),
       makeWallet('0.00'),
+      makeDemoBalance(),
     )
 
     const data = await useCase.execute(buildDemoSessionToken('queenofbounty'))
@@ -92,11 +105,26 @@ describe('OriginalsSessionUseCase', () => {
     expect(data.user_name).toBe('Guest')
   })
 
+  it('демо показывает наигранный остаток, а не стартовые 1000 при каждой перезаходе', async () => {
+    const token = buildDemoSessionToken('fortunetiger')
+    const useCase = new OriginalsSessionUseCase(
+      new OriginalsSessionLoader(makePlayRepository(null).repository, makeSlotGames()),
+      makeWallet('0.00'),
+      makeDemoBalance({ [token]: '1470.50' }),
+    )
+
+    const data = await useCase.execute(token)
+
+    expect(data.credit).toBe(1470.5)
+    expect(data.credit).not.toBe(Number(TIGER_DEMO_START_CREDIT))
+  })
+
   it('бой: кредит из кошелька с двумя знаками, имя — короткий ID, линии — из игры сессии', async () => {
     const play = makePlayRepository(makeSession('fortunetiger'))
     const useCase = new OriginalsSessionUseCase(
       new OriginalsSessionLoader(play.repository, makeSlotGames()),
       makeWallet('12.3456'),
+      makeDemoBalance(),
     )
 
     const data = await useCase.execute(SESSION_TOKEN)
@@ -113,6 +141,7 @@ describe('OriginalsSessionUseCase', () => {
     const useCase = new OriginalsSessionUseCase(
       new OriginalsSessionLoader(play.repository, makeSlotGames()),
       makeWallet('100.00'),
+      makeDemoBalance(),
     )
 
     await expect(useCase.execute(SESSION_TOKEN)).rejects.toBeInstanceOf(SessionInvalidError)
@@ -121,7 +150,7 @@ describe('OriginalsSessionUseCase', () => {
 
   it('ответ не делит массивы с таблицами реестра: правка ответа не трогает следующую сессию', async () => {
     const loader = new OriginalsSessionLoader(makePlayRepository(null).repository, makeSlotGames())
-    const useCase = new OriginalsSessionUseCase(loader, makeWallet('0.00'))
+    const useCase = new OriginalsSessionUseCase(loader, makeWallet('0.00'), makeDemoBalance())
     const token = buildDemoSessionToken('fortunetiger')
 
     const first = await useCase.execute(token)
@@ -139,6 +168,7 @@ describe('OriginalsSessionUseCase', () => {
     const useCase = new OriginalsSessionUseCase(
       new OriginalsSessionLoader(makePlayRepository(null).repository, makeSlotGames()),
       makeWallet('0.00'),
+      makeDemoBalance(),
     )
 
     await expect(useCase.execute(buildDemoSessionToken('aztec'))).rejects.toBeInstanceOf(

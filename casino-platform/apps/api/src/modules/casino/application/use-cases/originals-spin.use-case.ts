@@ -17,7 +17,8 @@ import {
 } from './house-slot-lottery'
 import { DEMO_TOKEN_PREFIX, OriginalsSessionLoader } from './originals-session-loader'
 import { TIGER_DEMO_START_CREDIT } from './originals-session.use-case'
-import { InvalidBetRequestError } from '../../domain/errors'
+import { DEMO_BALANCE_STORE, type IDemoBalanceStore } from '../../domain/demo-balance'
+import { InsufficientFundsError, InvalidBetRequestError } from '../../domain/errors'
 import {
   type DonorAmount,
   houseRowBaseLinesPayout,
@@ -127,6 +128,7 @@ export class OriginalsSpinUseCase {
     @Inject(WalletFacade) private readonly wallet: WalletFacade,
     @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
     @Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository,
+    @Inject(DEMO_BALANCE_STORE) private readonly demoBalance: IDemoBalanceStore,
   ) {}
 
   async execute(request: TigerSpinRequest): Promise<TigerSpinData> {
@@ -187,9 +189,19 @@ export class OriginalsSpinUseCase {
     const card = await this.catalog.findByExternalGameId(game.externalGameId)
     const outcome = this.drawOutcome(game, demoRtpFor(game, paylines, card?.rtpDemo), paylines)
     const winTotal = this.winTotalFor(game, parsed, outcome)
-    const displayCredit = money.add(money.subtract(TIGER_DEMO_START_CREDIT, betTotal), winTotal)
+    // Остаток ведётся на счёту сессии: без этого спин считался бы от стартовых
+    // 1000, выигрыши не копились, а ставка больше старта уводила демо в минус.
+    const settled = await this.demoBalance.settle({
+      sessionToken,
+      startCredit: TIGER_DEMO_START_CREDIT,
+      bet: betTotal,
+      win: winTotal,
+    })
+    if (!settled.accepted) {
+      throw new InsufficientFundsError(betTotal, settled.balance)
+    }
     return this.buildSpinData({
-      credit: displayCredit,
+      credit: settled.balance,
       game,
       parsed,
       betTotal,

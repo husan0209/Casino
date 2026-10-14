@@ -8,6 +8,7 @@ import { money } from '@casino/shared-utils'
 
 import { OriginalsSessionLoader } from './originals-session-loader'
 import { OriginalsSpinSchema, OriginalsSpinUseCase } from './originals-spin.use-case'
+import { type IDemoBalanceStore } from '../../domain/demo-balance'
 import {
   type GameSessionWithGame,
   type GameTransactionRow,
@@ -254,6 +255,28 @@ function makeCatalog(rtpDemo: string | null): IGameCatalogRepository {
   } as unknown as IGameCatalogRepository
 }
 
+/**
+ * Двойник демо-счёта: те же правила, что у Redis-скрипта (списать можно
+ * только если ставки хватает), только остаток живёт в Map.
+ */
+function makeDemoBalance(): IDemoBalanceStore & { balances: Map<string, string> } {
+  const balances = new Map<string, string>()
+  return {
+    balances,
+    settle: async ({ sessionToken, startCredit, bet, win }) => {
+      const current = balances.get(sessionToken) ?? startCredit
+      if (money.isGreaterThan(bet, current)) {
+        return { accepted: false, balance: current }
+      }
+      const next = money.add(money.subtract(current, bet), win)
+      balances.set(sessionToken, next)
+      return { accepted: true, balance: next }
+    },
+    peek: async (sessionToken: string, startCredit: string) =>
+      balances.get(sessionToken) ?? startCredit,
+  }
+}
+
 describe('OriginalsSpinUseCase demo', () => {
   function makeDemoUseCase(rtpDemo: string | null = null): {
     useCase: OriginalsSpinUseCase
@@ -269,6 +292,7 @@ describe('OriginalsSpinUseCase demo', () => {
         wallet.facade,
         play.repository,
         makeCatalog(rtpDemo),
+        makeDemoBalance(),
       ),
       wallet,
     }
@@ -280,7 +304,9 @@ describe('OriginalsSpinUseCase demo', () => {
     let win = 0
     for (let index = 0; index < spins; index += 1) {
       const result = await useCase.execute({
-        sessionToken: 'demo_fortunetiger_pilot',
+        // Отдельная демо-сессия на спин: остаток теперь копится, и серия на одном
+        // счёте на бедном rtp просто обнулилась бы до конца прогона.
+        sessionToken: `demo_fortunetiger_trial_${index}`,
         betamount: '2',
         numline: '5',
         cpl: '1',
@@ -361,7 +387,13 @@ describe('OriginalsSpinUseCase real', () => {
     wallet = makeWalletFacade('500.00')
     slotGames = makeSlotGames()
     const loader = new OriginalsSessionLoader(play.repository, slotGames)
-    useCase = new OriginalsSpinUseCase(loader, wallet.facade, play.repository, makeCatalog(null))
+    useCase = new OriginalsSpinUseCase(
+      loader,
+      wallet.facade,
+      play.repository,
+      makeCatalog(null),
+      makeDemoBalance(),
+    )
   })
 
   it('debits the bet once and keeps money consistent', async () => {
@@ -423,6 +455,7 @@ describe('OriginalsSpinUseCase real', () => {
       wallet.facade,
       closedPlay.repository,
       makeCatalog(null),
+      makeDemoBalance(),
     )
 
     await expect(
@@ -443,6 +476,7 @@ describe('OriginalsSpinUseCase real', () => {
       wallet.facade,
       foreignPlay.repository,
       makeCatalog(null),
+      makeDemoBalance(),
     )
 
     await expect(

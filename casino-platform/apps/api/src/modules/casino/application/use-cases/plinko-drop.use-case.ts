@@ -15,7 +15,8 @@ import {
   PLINKO_EXTERNAL_GAME_ID,
 } from './originals-session-loader'
 import { TIGER_DEMO_START_CREDIT } from './originals-session.use-case'
-import { InvalidBetRequestError } from '../../domain/errors'
+import { DEMO_BALANCE_STORE, type IDemoBalanceStore } from '../../domain/demo-balance'
+import { InsufficientFundsError, InvalidBetRequestError } from '../../domain/errors'
 import {
   GAME_CATALOG_REPOSITORY,
   GAME_PLAY_REPOSITORY,
@@ -84,6 +85,28 @@ type WalletTransaction = Parameters<Parameters<WalletFacade['runInTransaction']>
 
 const DEFAULT_MIN_BET = '1'
 const DEFAULT_MAX_BET = '10000'
+
+/** Карточка игры из каталога (тип выводится из репозитория: prisma в application не импортируем). */
+type PlinkoGameCard = Awaited<ReturnType<IGameCatalogRepository['findByExternalGameId']>>
+
+/** Лимиты ставки игры; своей карточки (демо без строки каталога) — дефолты пилота. */
+function betLimitsOf(game: PlinkoGameCard): { min: string; max: string } {
+  return {
+    min:
+      game?.minBet === null || game?.minBet === undefined ? DEFAULT_MIN_BET : String(game.minBet),
+    max:
+      game?.maxBet === null || game?.maxBet === undefined ? DEFAULT_MAX_BET : String(game.maxBet),
+  }
+}
+
+/**
+ * Комплект демо: `rtp_demo` карточки, а если админ её не выставил — щедрые 120
+ * из общей политики. Фолбэком раньше был донорский комплект (~99 %), то есть
+ * демо платило как казино, а не как демо.
+ */
+function demoPack(game: PlinkoGameCard): PlinkoMultipliers {
+  return plinkoPackFor(demoRtpValue(game?.rtpDemo, PLINKO_RTP_LIMITS.max))
+}
 
 /**
  * Путь шарика серверным CSPRNG: по одному биту на ряд.
@@ -188,6 +211,7 @@ export class PlinkoDropUseCase {
     @Inject(WalletFacade) private readonly wallet: WalletFacade,
     @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
     @Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository,
+    @Inject(DEMO_BALANCE_STORE) private readonly demoBalance: IDemoBalanceStore,
   ) {}
 
   /**
@@ -196,7 +220,7 @@ export class PlinkoDropUseCase {
    */
   async resolvePack(sessionToken: string): Promise<PlinkoMultipliers> {
     if (this.sessionLoader.isDemoToken(sessionToken)) {
-      return plinkoPackFor(await this.demoTargetRtp())
+      return demoPack(await this.catalog.findByExternalGameId(PLINKO_EXTERNAL_GAME_ID))
     }
     const session = await this.sessionLoader.loadActiveHouseSession(
       sessionToken,
@@ -213,24 +237,33 @@ export class PlinkoDropUseCase {
       rows: request.rows,
     })
     if (request.sessionToken.startsWith(DEMO_TOKEN_PREFIX)) {
-      return this.executeDemoDrop(parsed, plinkoPackFor(await this.demoTargetRtp()))
+      return this.executeDemoDrop(request.sessionToken, parsed)
     }
     return this.executeRealDrop(request.sessionToken, parsed)
   }
 
   /**
-   * Цель демо: `rtp_demo` карточки, а если админ её не выставил — щедрые 120
-   * из общей политики. Фолбэком раньше был донорский комплект (~99 %), то есть
-   * демо платило как казино, а не как демо.
+   * Демо: комплект — по `rtp_demo` карточки, остаток — на счёту сессии, лимит
+   * ставки — тот же, что у боевой игры. Раньше остаток пересчитывался от
+   * стартового кредита на каждый бросок: выигрыши не копились, а ставка больше
+   * старта уводила счёт в минус, и игрок называл это «можно играть на минус».
    */
-  private async demoTargetRtp(): Promise<number> {
+  private async executeDemoDrop(
+    sessionToken: string,
+    parsed: PlinkoDropInput,
+  ): Promise<PlinkoDropData> {
     const game = await this.catalog.findByExternalGameId(PLINKO_EXTERNAL_GAME_ID)
-    return demoRtpValue(game?.rtpDemo, PLINKO_RTP_LIMITS.max)
-  }
-
-  private executeDemoDrop(parsed: PlinkoDropInput, pack: PlinkoMultipliers): PlinkoDropData {
-    const outcome = rollPlinkoOutcome(parsed, pack)
-    const balance = money.add(money.subtract(TIGER_DEMO_START_CREDIT, parsed.bet), outcome.win)
+    this.assertBetRange(betLimitsOf(game), parsed.bet)
+    const outcome = rollPlinkoOutcome(parsed, demoPack(game))
+    const settled = await this.demoBalance.settle({
+      sessionToken,
+      startCredit: TIGER_DEMO_START_CREDIT,
+      bet: parsed.bet,
+      win: outcome.win,
+    })
+    if (!settled.accepted) {
+      throw new InsufficientFundsError(parsed.bet, settled.balance)
+    }
     return {
       dropId: parsed.dropId,
       roundId: null,
@@ -241,7 +274,7 @@ export class PlinkoDropUseCase {
       slotIndex: outcome.slotIndex,
       multiplier: outcome.multiplier,
       win: toMoneyString(outcome.win),
-      balance: toMoneyString(balance),
+      balance: toMoneyString(settled.balance),
       currency: 'RUB',
       outcomeHash: outcome.outcomeHash,
       duplicate: false,
@@ -256,7 +289,7 @@ export class PlinkoDropUseCase {
       sessionToken,
       PLINKO_EXTERNAL_GAME_ID,
     )
-    this.assertBetLimits(session, parsed.bet)
+    this.assertBetRange(betLimitsOf(session.game), parsed.bet)
     const pack = plinkoPackFor(moneyRtpValue(session.game.rtp))
     const providerId = session.providerId
     const betExternalId = `plinko_${parsed.dropId}_bet`
@@ -271,11 +304,9 @@ export class PlinkoDropUseCase {
     )
   }
 
-  /** Лимиты ставки из карточки игры (minBet/maxBet), по умолчанию 1..10000. */
-  private assertBetLimits(session: GameSessionWithGame, bet: string): void {
-    const minBet = session.game.minBet === null ? DEFAULT_MIN_BET : String(session.game.minBet)
-    const maxBet = session.game.maxBet === null ? DEFAULT_MAX_BET : String(session.game.maxBet)
-    if (money.isGreaterThan(minBet, bet) || money.isGreaterThan(bet, maxBet)) {
+  /** Лимит ставки — из карточки игры (minBet/maxBet), по умолчанию 1..10000. */
+  private assertBetRange(limits: { min: string; max: string }, bet: string): void {
+    if (money.isGreaterThan(limits.min, bet) || money.isGreaterThan(bet, limits.max)) {
       throw new InvalidBetRequestError()
     }
   }

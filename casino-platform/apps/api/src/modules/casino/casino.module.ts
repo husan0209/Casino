@@ -19,6 +19,7 @@ import { OriginalsSessionUseCase } from './application/use-cases/originals-sessi
 import { OriginalsSpinUseCase } from './application/use-cases/originals-spin.use-case'
 import { PlinkoDropUseCase } from './application/use-cases/plinko-drop.use-case'
 import { PROVIDER_ADAPTER_FACTORY } from './domain/casino.ports'
+import { DEMO_BALANCE_STORE } from './domain/demo-balance'
 import { HOUSE_SLOT_GAMES } from './domain/house-slot-game'
 import {
   GAME_CATALOG_REPOSITORY,
@@ -26,6 +27,7 @@ import {
   GAME_PLAY_REPOSITORY,
   GAME_PROVIDER_REPOSITORY,
 } from './domain/repositories/casino.repository'
+import { DemoBalanceRedisStore } from './infrastructure/demo/demo-balance.redis'
 import { DemoProviderAdapter } from './infrastructure/providers/demo/demo-provider.adapter'
 import { HouseSlotGamesRegistry } from './infrastructure/providers/house/house-slot-games.registry'
 import { ProviderAdapterFactory } from './infrastructure/providers/provider-adapter.factory'
@@ -69,6 +71,9 @@ import { ProviderCallbackController } from './presentation/controllers/provider-
     { provide: GAME_PLAY_REPOSITORY, useClass: PrismaGamePlayRepository },
     // В3: мутации админ-контура (enable/disable, gameCount, правки каталога)
     { provide: GAME_PROVIDER_REPOSITORY, useClass: PrismaGameProviderRepository },
+    // Лицевой счёт демо-сессии: ставка списывается с него, а не пересчитывается
+    // от стартового кредита на каждый бросок.
+    { provide: DEMO_BALANCE_STORE, useClass: DemoBalanceRedisStore },
     GameCallbackService,
     LaunchGameUseCase,
     ListGamesUseCase,

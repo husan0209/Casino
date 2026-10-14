@@ -877,7 +877,7 @@ async function placeBet() {
   if (isNaN(bet) || bet <= 0) {
     return;
   }
-  if (bet > state.balance + 1e-9) {
+  if (bet > availableToBet() + 1e-9) {
     return;
   }
   dropInFlight = true;
@@ -958,6 +958,13 @@ function pendingWin() {
   return pending;
 }
 
+/* Чем игрок реально может ставить. Серверный баланс уже включает выигрыши
+   шаров в полёте, и ставка с него = переставка ещё не сыгравших денег:
+   экран при этом уходит в минус. Разрешаем только то, что уже видно. */
+function availableToBet() {
+  return state.balance - pendingWin();
+}
+
 /* ============================================================
    UI UPDATES
    ============================================================ */
@@ -979,7 +986,7 @@ function updateBetButton() {
     !state.serverReady ||
     dropInFlight ||
     bet <= 0 ||
-    bet > state.balance + 1e-9;
+    bet > availableToBet() + 1e-9;
 }
 
 const RISK_LABELS = { low: 'низкий', medium: 'средний', high: 'высокий' };
@@ -1152,7 +1159,7 @@ document.querySelectorAll('[data-bet-mult]').forEach((btn) => {
   btn.addEventListener('click', () => {
     const input = document.getElementById('betAmount');
     const current = parseFloat(input.value) || 0;
-    const cap = Math.min(state.balance, state.maxBet);
+    const cap = Math.min(availableToBet(), state.maxBet);
     let value = btn.dataset.betMult === 'max' ? cap : current * parseFloat(btn.dataset.betMult);
     value = Math.max(state.minBet, Math.min(cap, value));
     input.value = value.toFixed(2);
