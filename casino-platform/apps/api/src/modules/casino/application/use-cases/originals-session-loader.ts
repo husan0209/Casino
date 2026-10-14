@@ -20,6 +20,13 @@ export const TIGER_EXTERNAL_GAME_ID = 'fortunetiger'
 /** External ID Plinko (второй пилот, свой протокол — не через реестр слотов). */
 export const PLINKO_EXTERNAL_GAME_ID = 'plinko'
 
+/**
+ * External ID Aztec: третья house-игра со своим клиентом. Её таблицы не
+ * перенесены из донора, а написаны заново (domain/aztec-game), поэтому она
+ * не в реестре слотов, а рядом с Plinko.
+ */
+export const AZTEC_EXTERNAL_GAME_ID = 'treasuresofaztec'
+
 /** Префикс токенов демо-запуска (launch без сессии, см. LaunchGameUseCase). */
 export const DEMO_TOKEN_PREFIX = 'demo_'
 
