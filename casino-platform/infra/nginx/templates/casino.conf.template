@@ -63,6 +63,43 @@ server {
     proxy_set_header X-Forwarded-Proto https;
     proxy_set_header X-Request-Id $request_id;
   }
+  # Клиенты house-оригиналов просят API без `v1`: у Construct-слотов путь зашит в
+  # data.json донора (`/api/vgames`), самописные Plinko и Aztec идут тем же приёмом.
+  # В dev это дописывает Next (rewrites в apps/web/next.config.js), но на стенде
+  # префикс /api/ перехватывает nginx и до Next запрос не доходит вообще.
+  location /api/vgames/ {
+    limit_req zone=api_general burst=40 nodelay;
+    limit_req_status 429;
+    rewrite ^/api/vgames/(.*)$ /api/v1/vgames/$1 break;
+    proxy_pass http://api:3001;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Request-Id $request_id;
+  }
+  location /api/plinko/ {
+    limit_req zone=api_general burst=40 nodelay;
+    limit_req_status 429;
+    rewrite ^/api/plinko/(.*)$ /api/v1/plinko/$1 break;
+    proxy_pass http://api:3001;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Request-Id $request_id;
+  }
+  location /api/aztec/ {
+    limit_req zone=api_general burst=40 nodelay;
+    limit_req_status 429;
+    rewrite ^/api/aztec/(.*)$ /api/v1/aztec/$1 break;
+    proxy_pass http://api:3001;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Request-Id $request_id;
+  }
   # auth rate limit — пер-IP барьер 10r/m; per-account lockout (10 неудач/15мин → 30мин,
   # SECURITY_BASELINE §2.3) — на app-уровне, см. комментарий к зонам в nginx.conf
   location ~ ^/api/v1/auth/(login|register|forgot-password) {
