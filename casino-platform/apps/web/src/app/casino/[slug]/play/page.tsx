@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect } from 'react'
 
 import { formatBalance } from '@/lib/format/currency'
+import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
 
@@ -27,6 +28,7 @@ export default function GamePlayPage(): React.JSX.Element {
   const url = params.get('url')
   const { getActiveWallet, activeCurrency, refreshActive } = useWalletStore()
   const { openDeposit } = useUIStore()
+  const { user } = useAuth()
   const wallet = getActiveWallet()
 
   // §8.3: баланс на планке живой — refetch по возврату фокуса окна
@@ -57,16 +59,22 @@ export default function GamePlayPage(): React.JSX.Element {
         >
           ×
         </button>
-        <span className="text-sm font-medium">
-          {formatBalance(wallet?.available ?? '0', activeCurrency)}
-        </span>
-        <button
-          type="button"
-          className="btn-money px-3 py-1 text-sm"
-          onClick={() => openDeposit(activeCurrency)}
-        >
-          +
-        </button>
+        {/* Гостю показывать реальный кошелёк нельзя: в демо он играет виртуальными
+            деньгами, и «0 ₽» рядом с игрой читается как «у тебя нет денег». */}
+        {user && (
+          <>
+            <span className="text-sm font-medium">
+              {formatBalance(wallet?.available ?? '0', activeCurrency)}
+            </span>
+            <button
+              type="button"
+              className="btn-money px-3 py-1 text-sm"
+              onClick={() => openDeposit(activeCurrency)}
+            >
+              +
+            </button>
+          </>
+        )}
       </div>
       {/* decodeURIComponent: url приезжает закодированным из launch-flow */}
       <GameFrame url={decodeURIComponent(url)} />

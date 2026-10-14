@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * Открытие демо-игры (GAP-21): в Telegram Mini App нет новых вкладок, поэтому
- * игра обязана ехать в этом же документе на /play — иначе игрок выпадает из
- * приложения в системный браузер и теряет сессию.
+ * Открытие демо-игры (GAP-21): всегда в этом же документе на /play. В Telegram
+ * Mini App новых вкладок не существует в принципе, а в обычном браузере новая
+ * вкладка означала потерю шапки казино и отсутствие выхода из голого клиента
+ * игры — поэтому теперь оба пути идут через один маршрут.
  */
 
 import { demoGameHref, openDemoGame } from '@/lib/open-game'
@@ -36,18 +37,16 @@ afterEach(() => {
 })
 
 describe('openDemoGame', () => {
-  it('обычный браузер — новая вкладка с noopener, навигация не тронута', () => {
+  it('обычный браузер — та же вкладка, маршрут /play с планкой выхода', () => {
     openDemoGame('book-of-adel', 'https://provider.test/demo?token=abc', navigateSpy)
 
-    expect(openSpy).toHaveBeenCalledWith(
-      'https://provider.test/demo?token=abc',
-      '_blank',
-      'noopener',
+    expect(navigateSpy).toHaveBeenCalledWith(
+      '/casino/book-of-adel/play?url=https%3A%2F%2Fprovider.test%2Fdemo%3Ftoken%3Dabc',
     )
-    expect(navigateSpy).not.toHaveBeenCalled()
+    expect(openSpy).not.toHaveBeenCalled()
   })
 
-  it('Telegram Mini App — тот же документ, маршрут /play, вкладка не открывается', () => {
+  it('Telegram Mini App — так же в этом же документе, вкладка не открывается', () => {
     installBridge()
 
     openDemoGame('book-of-adel', 'https://provider.test/demo?token=abc', navigateSpy)

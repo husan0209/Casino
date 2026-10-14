@@ -442,7 +442,8 @@ function useDeckPreview(onPlayFront: () => void): {
   const openPreview = useCallback((card: DeckCard): void => setPreviewCard(card), [])
   const closePreview = useCallback((): void => setPreviewCard(null), [])
 
-  // Демо без регистрации (§4.7): launch_url провайдера в новой вкладке.
+  // Демо без регистрации (§4.7): тот же маршрут /play, что и игра на деньги,
+  // чтобы гость не выпадал из казино и мог выйти кнопкой.
   const startDemo = useCallback(async (game: GameDto): Promise<void> => {
     const wallet = useWalletStore.getState()
     const currency = wallet.getActiveWallet()?.currency ?? wallet.activeCurrency
