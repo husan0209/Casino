@@ -76,6 +76,10 @@ describe('RukassaClient — контракт lk.rukassa.io', () => {
       )
       expect(formFieldsOf(init)).toEqual({
         shop_id: SHOP,
+        // Присутствие `user_code` обязательно: без него живой /create отвечает
+        // 403 «error user_code», хотя значение они не сверяют (проверено 1 и
+        // 999999 — оба проходят). В /getPayInfo поле не нужно.
+        user_code: SHOP,
         token: TOKEN,
         order_id: '1750000000000001',
         amount: '300',
@@ -180,6 +184,8 @@ describe('RukassaClient — контракт lk.rukassa.io', () => {
       const res = await makeClient().getPaymentStatus('42')
 
       expect(fetchMock.mock.calls[0]![0]).toBe('https://lk.rukassa.io/api/v1/getPayInfo')
+      // user_code здесь не нужен — проверено живым запросом к их счёту: ответ 200
+      // и без поля. Требование на присутствие касается только /create.
       expect(formFieldsOf(fetchMock.mock.calls[0]![1] as RequestInit)).toEqual({
         shop_id: SHOP,
         token: TOKEN,
