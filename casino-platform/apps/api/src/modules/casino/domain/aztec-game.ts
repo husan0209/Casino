@@ -80,6 +80,45 @@ export const AZTEC_MAX_WIN_MULTIPLIER = 1000
 /** Дикий может прилететь в досыпку на крайнем барабане. */
 export const AZTEC_REFILL_WILD_CHANCE = 0.35
 
+/** Шаг округления выплаты при масштабе: 0,01 — тот же принцип, что у комплекта Plinko. */
+const PAYTABLE_STEP = 100
+
+/**
+ * Настройка выплат: таблица и плата скаттеров. Движок играет ПО ТАБЛИЦЕ,
+ * которую отдаёт /state, поэтому «на доске одно, платит другое» невозможно
+ * даже когда админ поднимает RTP: масштабуется именно таблица, а не деньги.
+ */
+export interface AztecTuning {
+  paytable: Record<AztecPaySymbol, readonly number[]>
+  scatterPay: readonly number[]
+}
+
+export const AZTEC_BASE_TUNING: AztecTuning = {
+  paytable: AZTEC_PAYTABLE,
+  scatterPay: AZTEC_SCATTER_PAY,
+}
+
+function scaleRow(values: readonly number[], factor: number): number[] {
+  return values.map((value) => Math.round(value * factor * PAYTABLE_STEP) / PAYTABLE_STEP)
+}
+
+/**
+ * Таблица под целевой возврат. Отдача движка линейна по платёжной таблице
+ * (проверено прогоном: scale=1 → 7,74 %, scale=12,4 → 90,5 %), поэтому цель
+ * админа превращается в один множитель базовой калибровки.
+ */
+export function aztecTuningForTarget(targetRtpPercent: number): AztecTuning {
+  if (!Number.isFinite(targetRtpPercent) || targetRtpPercent === AZTEC_TARGET_RTP) {
+    return AZTEC_BASE_TUNING
+  }
+  const factor = Math.max(0, targetRtpPercent) / AZTEC_TARGET_RTP
+  const paytable = {} as Record<AztecPaySymbol, readonly number[]>
+  for (const symbol of AZTEC_PAY_SYMBOLS) {
+    paytable[symbol] = scaleRow(AZTEC_PAYTABLE[symbol], factor)
+  }
+  return { paytable, scatterPay: scaleRow(AZTEC_SCATTER_PAY, factor) }
+}
+
 /** Один шаг цепочки: доска ДО розыгрыша и то, что на ней дало выплату. */
 // type, а не interface: значение кладётся в prisma metadata, а индексы у
 // interface TS не считает совместимыми с InputJsonObject.
@@ -217,8 +256,12 @@ export function buildAztecGrid(rng: () => number): AztecSymbol[][] {
   })
 }
 
-function tierPayout(symbol: AztecPaySymbol, match: number): number {
-  const table = AZTEC_PAYTABLE[symbol]
+function tierPayout(
+  symbol: AztecPaySymbol,
+  match: number,
+  paytable: Record<AztecPaySymbol, readonly number[]>,
+): number {
+  const table = paytable[symbol]
   let payout = 0
   for (let tier = 0; tier < AZTEC_TIERS.length; tier += 1) {
     const threshold = AZTEC_TIERS[tier]
@@ -234,11 +277,11 @@ function countScatters(grid: AztecSymbol[][]): number {
   return grid.reduce((acc, cells) => acc + cells.filter((cell) => cell === AZTEC_SCATTER).length, 0)
 }
 
-function scatterPayout(scatters: number): number {
+function scatterPayout(scatters: number, scatterPay: readonly number[]): number {
   if (scatters < AZTEC_SCATTER_MIN) {
     return 0
   }
-  return AZTEC_SCATTER_PAY[Math.min(scatters, 6) - AZTEC_SCATTER_MIN] ?? 0
+  return scatterPay[Math.min(scatters, 6) - AZTEC_SCATTER_MIN] ?? 0
 }
 
 /**
@@ -246,7 +289,10 @@ function scatterPayout(scatters: number): number {
  * 34 ячейках «хотя бы одна связка из трёх барабанов» почти достоверна, и выплата
  * по всем группам сразу дала бы выигрыш на 99% спинов.
  */
-export function evaluateAztecGrid(grid: AztecSymbol[][]): AztecEvaluation {
+export function evaluateAztecGrid(
+  grid: AztecSymbol[][],
+  tuning: AztecTuning = AZTEC_BASE_TUNING,
+): AztecEvaluation {
   let best: AztecEvaluation = {
     payout: 0,
     symbol: null,
@@ -274,7 +320,7 @@ export function evaluateAztecGrid(grid: AztecSymbol[][]): AztecEvaluation {
       reels += 1
       reelHits.forEach((position) => hits.push([reel, position]))
     }
-    const payout = reels >= AZTEC_MIN_REELS ? tierPayout(symbol, match) : 0
+    const payout = reels >= AZTEC_MIN_REELS ? tierPayout(symbol, match, tuning.paytable) : 0
     if (payout <= best.payout) {
       continue
     }
@@ -332,19 +378,26 @@ function winCells(removed: boolean[][]): [number, number][] {
  * надбавку, не зависящую от платёжной таблицы, и хвост распределения переставал
  * калиброваться (это и ловилось на прототипе).
  */
+/** Всё, чем одна цепочка отличается от другой: политика множителя и таблица выплат. */
+interface AztecChainContext {
+  policy: MultiplierPolicy
+  tuning: AztecTuning
+}
+
 function runChain(
   grid: AztecSymbol[][],
   rng: () => number,
-  policy: MultiplierPolicy,
+  context: AztecChainContext,
 ): AztecChainResult {
+  const { policy, tuning } = context
   const steps: AztecChainStep[] = []
   let payout = 0
   let multiplier = policy.start
   let current = grid
 
   for (let cascade = 0; cascade < AZTEC_MAX_CASCADES; cascade += 1) {
-    const evaluated = evaluateAztecGrid(current)
-    const scatter = cascade === 0 ? scatterPayout(countScatters(current)) : 0
+    const evaluated = evaluateAztecGrid(current, tuning)
+    const scatter = cascade === 0 ? scatterPayout(countScatters(current), tuning.scatterPay) : 0
     const win = evaluated.payout + scatter
     if (win <= 0) {
       break
@@ -371,7 +424,10 @@ function runChain(
   return { steps, payout, capped: false }
 }
 
-function playFreeSpins(rng: () => number): {
+function playFreeSpins(
+  rng: () => number,
+  tuning: AztecTuning,
+): {
   plays: AztecPlay[]
   payout: number
   capped: boolean
@@ -385,7 +441,7 @@ function playFreeSpins(rng: () => number): {
 
   while (budget > 0 && spinsPlayed < AZTEC_FREE_SPINS_HARD_LIMIT) {
     const grid = buildAztecGrid(rng)
-    const chain = runChain(grid, rng, FREE_MULTIPLIER)
+    const chain = runChain(grid, rng, { policy: FREE_MULTIPLIER, tuning })
     spinsPlayed += 1
     plays.push({ spin: spinsPlayed, grid, steps: chain.steps })
     payout += chain.payout
@@ -407,12 +463,15 @@ function playFreeSpins(rng: () => number): {
  * Каждый заход — отдельный элемент `plays`, включая пустой: игрок обязан
  * видеть все сыгранные фриспины, а не только те, что дали связку.
  */
-export function playAztecSpin(rng: () => number): AztecSpin {
+export function playAztecSpin(
+  rng: () => number,
+  tuning: AztecTuning = AZTEC_BASE_TUNING,
+): AztecSpin {
   const grid = buildAztecGrid(rng)
   const triggered = countScatters(grid) >= AZTEC_SCATTER_MIN
-  const base = runChain(grid, rng, BASE_MULTIPLIER)
+  const base = runChain(grid, rng, { policy: BASE_MULTIPLIER, tuning })
   const plays: AztecPlay[] = [{ spin: 0, grid, steps: base.steps }]
-  const free = triggered ? playFreeSpins(rng) : null
+  const free = triggered ? playFreeSpins(rng, tuning) : null
 
   const total = base.payout + (free ? free.payout : 0)
   if (free) {

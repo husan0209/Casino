@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 
+import { Decimal } from 'decimal.js'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { type WalletFacade } from '@modules/wallet/facade/wallet.facade'
@@ -13,11 +14,12 @@ import {
   type AztecSpinInput,
 } from './aztec-spin.use-case'
 import { type OriginalsSessionLoader } from './originals-session-loader'
-import { flattenAztecPlays } from '../../domain/aztec-game'
+import { AZTEC_BASE_TUNING, flattenAztecPlays } from '../../domain/aztec-game'
 import { InvalidBetRequestError } from '../../domain/errors'
 import {
   type GameSessionWithGame,
   type GameTransactionRow,
+  type IGameCatalogRepository,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
 
@@ -44,6 +46,7 @@ function spinInput(overrides: Partial<AztecSpinInput> = {}): AztecSpinInput {
 function makeSession(
   minBet: number | null = 1,
   maxBet: number | null = 10000,
+  rtp: string | null = null,
 ): GameSessionWithGame {
   return {
     id: SESSION_ID,
@@ -53,7 +56,7 @@ function makeSession(
     sessionToken: SESSION_TOKEN,
     currency: 'RUB',
     status: 'active',
-    game: { externalGameId: 'treasuresofaztec', minBet, maxBet },
+    game: { externalGameId: 'treasuresofaztec', minBet, maxBet, rtp },
   } as unknown as GameSessionWithGame
 }
 
@@ -137,10 +140,18 @@ function makeLoader(session: GameSessionWithGame | null): OriginalsSessionLoader
   } as unknown as OriginalsSessionLoader
 }
 
+/** Карточка игры из каталога: демо-ветке нужен только rtp_demo. */
+function makeCatalog(rtpDemo: string | null): IGameCatalogRepository {
+  const card = rtpDemo === null ? null : { rtpDemo: new Decimal(rtpDemo) }
+  return {
+    findByExternalGameId: () => Promise.resolve(card),
+  } as unknown as IGameCatalogRepository
+}
+
 describe('rollAztecOutcome', () => {
   it('выплата равна ставка × множитель и не зависит от порядка вызовов', () => {
     const parsed = spinInput({ bet: '10' })
-    const outcome = rollAztecOutcome(parsed, mulberry32(31337))
+    const outcome = rollAztecOutcome(parsed, AZTEC_BASE_TUNING, mulberry32(31337))
 
     expect(Number(outcome.multiplier)).toBeGreaterThanOrEqual(0)
     expect(outcome.win).toBe(money.multiply('10', outcome.multiplier))
@@ -149,8 +160,8 @@ describe('rollAztecOutcome', () => {
 
   it('хеш фиксирует цепочку: другой исход — другой хеш', () => {
     const parsed = spinInput()
-    const first = rollAztecOutcome(parsed, mulberry32(1))
-    const second = rollAztecOutcome(parsed, mulberry32(2))
+    const first = rollAztecOutcome(parsed, AZTEC_BASE_TUNING, mulberry32(1))
+    const second = rollAztecOutcome(parsed, AZTEC_BASE_TUNING, mulberry32(2))
     const steps = flattenAztecPlays(first.plays)
 
     expect(hashAztecOutcome(parsed.spinId, steps)).toBe(first.outcomeHash)
@@ -161,7 +172,12 @@ describe('rollAztecOutcome', () => {
 describe('AztecSpinUseCase: демо', () => {
   it('не трогает кошелёк и считает баланс от 1000', async () => {
     const wallet = makeWallet('0')
-    const useCase = new AztecSpinUseCase(makeLoader(null), wallet.facade, makePlay(null).repository)
+    const useCase = new AztecSpinUseCase(
+      makeLoader(null),
+      wallet.facade,
+      makePlay(null).repository,
+      makeCatalog(null),
+    )
 
     const data = await useCase.execute({
       sessionToken: 'demo_treasuresofaztec_token',
@@ -180,6 +196,7 @@ describe('AztecSpinUseCase: демо', () => {
       makeLoader(null),
       makeWallet('0').facade,
       makePlay(null).repository,
+      makeCatalog(null),
     )
     const spinId = spinInput().spinId
 
@@ -210,7 +227,12 @@ describe('AztecSpinUseCase: бой', () => {
   beforeEach(() => {
     play = makePlay(makeSession())
     wallet = makeWallet('1000.00')
-    useCase = new AztecSpinUseCase(makeLoader(makeSession()), wallet.facade, play.repository)
+    useCase = new AztecSpinUseCase(
+      makeLoader(makeSession()),
+      wallet.facade,
+      play.repository,
+      makeCatalog(null),
+    )
   })
 
   it('списывает ставку и проводит раунд с внешним ключом спина', async () => {
@@ -296,6 +318,7 @@ describe('AztecSpinUseCase: state', () => {
       makeLoader(null),
       makeWallet('0').facade,
       makePlay(null).repository,
+      makeCatalog(null),
     )
 
     const state = await useCase.state('demo_treasuresofaztec_token')
@@ -316,6 +339,7 @@ describe('AztecSpinUseCase: state', () => {
       makeLoader(makeSession(5, 500)),
       makeWallet('77.00').facade,
       makePlay(makeSession(5, 500)).repository,
+      makeCatalog(null),
     )
 
     const state = await useCase.state(SESSION_TOKEN)
@@ -324,5 +348,54 @@ describe('AztecSpinUseCase: state', () => {
     expect(state.minBet).toBe('5')
     expect(state.maxBet).toBe('500')
     expect(state.balance).toBe('77.00')
+  })
+})
+
+describe('AztecSpinUseCase: цель возврата из админки', () => {
+  function makeUseCase(rtpDemo: string | null, rtp: string | null = null): AztecSpinUseCase {
+    const session = makeSession(1, 10000, rtp)
+    return new AztecSpinUseCase(
+      makeLoader(session),
+      makeWallet('1000.00').facade,
+      makePlay(session).repository,
+      makeCatalog(rtpDemo),
+    )
+  }
+
+  /** Фактическая отдача серии демо-спинов: сумма выигрышей / сумма ставок. */
+  async function demoRtp(useCase: AztecSpinUseCase, spins: number): Promise<number> {
+    let bet = 0
+    let win = 0
+    for (let index = 0; index < spins; index += 1) {
+      const data = await useCase.execute({
+        sessionToken: 'demo_treasuresofaztec_token',
+        spinId: randomUUID(),
+        bet: '10',
+      })
+      bet += 10
+      win += Number(data.win)
+    }
+    return (win / bet) * 100
+  }
+
+  it('правила в /state растут вместе с целью: таблица = то, чем платят', async () => {
+    const tight = await makeUseCase('96').state('demo_treasuresofaztec_token')
+    const generous = await makeUseCase('200').state('demo_treasuresofaztec_token')
+
+    expect(generous.rules.paytable.M[0] ?? 0).toBeGreaterThan(tight.rules.paytable.M[0] ?? 0)
+  })
+
+  it('демо играет по rtp_demo: 150 % платит вдвое больше, чем 60 %', async () => {
+    const tight = await demoRtp(makeUseCase('60'), 3000)
+    const generous = await demoRtp(makeUseCase('150'), 3000)
+
+    expect(generous).toBeGreaterThan(tight * 1.6)
+  }, 120000)
+
+  it('на деньги цель берётся из rtp сессии, а не из демо-поля', async () => {
+    const low = await makeUseCase('200', '50').state(SESSION_TOKEN)
+    const high = await makeUseCase('200', '100').state(SESSION_TOKEN)
+
+    expect(high.rules.paytable.M[0] ?? 0).toBeGreaterThan(low.rules.paytable.M[0] ?? 0)
   })
 })

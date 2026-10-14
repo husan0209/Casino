@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  AZTEC_BASE_TUNING,
   AZTEC_FREE_SPINS,
   AZTEC_FREE_SPINS_HARD_LIMIT,
   AZTEC_MAX_WIN_MULTIPLIER,
@@ -9,6 +10,7 @@ import {
   AZTEC_TARGET_RTP,
   AZTEC_TIERS,
   buildAztecGrid,
+  aztecTuningForTarget,
   evaluateAztecGrid,
   flattenAztecPlays,
   playAztecSpin,
@@ -287,6 +289,42 @@ describe('азтек: заходы для клиента', () => {
       expect(spin.plays.length).toBe(1 + spin.freeSpinsPlayed)
       expect(spin.freeSpinsPlayed).toBeLessThanOrEqual(AZTEC_FREE_SPINS_HARD_LIMIT)
     }
+  })
+})
+
+describe('азтек: настройка выплат под цель админки', () => {
+  it('цель равна калибровке — базовая таблица без изменений', () => {
+    expect(aztecTuningForTarget(AZTEC_TARGET_RTP)).toBe(AZTEC_BASE_TUNING)
+  })
+
+  it('масштаб линейен цели и округлён до 0,01: доска показывает то, что платится', () => {
+    const doubled = aztecTuningForTarget(AZTEC_TARGET_RTP * 2)
+
+    expect(doubled.paytable.M[0]).toBe(52)
+    for (const row of Object.values(doubled.paytable)) {
+      for (const value of row) {
+        expect(Math.abs(value * 100 - Math.round(value * 100))).toBeLessThan(1e-6)
+      }
+    }
+  })
+
+  it('нулевая цель гасит выплаты, а не роняет движок', () => {
+    const zero = aztecTuningForTarget(0)
+
+    expect(zero.paytable.J.every((value) => value === 0)).toBe(true)
+    expect(zero.scatterPay.every((value) => value === 0)).toBe(true)
+  })
+
+  it('выплаты играют по переданной таблице, а не по константе модуля', () => {
+    const rng = mulberry32(20261014)
+    const doubled = aztecTuningForTarget(AZTEC_TARGET_RTP * 2)
+    const payouts: number[] = []
+    for (let index = 0; index < 4000; index += 1) {
+      payouts.push(playAztecSpin(rng, doubled).payout)
+    }
+    const mean = payouts.reduce((acc, value) => acc + value, 0) / payouts.length
+
+    expect(mean).toBeGreaterThan((AZTEC_TARGET_RTP / 100) * 1.5)
   })
 })
 
