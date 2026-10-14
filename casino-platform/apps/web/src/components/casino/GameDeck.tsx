@@ -24,12 +24,10 @@ interface GameDeckProps {
   onToggleFavorite?: (game: GameDto) => void
 }
 
-export interface DeckCard {
+interface DeckCard {
   game: GameDto
   tag: string
   tagColor: string
-  /** Личные карты (продолжить / избранное) не участвуют в жеребьёвке. */
-  pinned: boolean
 }
 
 interface DeckInput {
@@ -105,32 +103,6 @@ const INITIAL_DRAG_STATE: DragState = {
   startTime: 0,
 }
 
-/**
- * Раздача колоды. Личные карты закреплены в начале, остальной пул перемешивается
- * Fisher-Yates, и ТОЛЬКО после этого берётся `size` карт. Порядок важен: если
- * обрезать пул до перемешивания, «кубик» меняет лишь порядок одних и тех же
- * десяти, а игра за пределами первых десяти не выпадает никогда.
- */
-export function dealDeck(built: DeckCard[], shuffleNonce: number, size = DECK_SIZE): DeckCard[] {
-  const pinned = built.filter((card) => card.pinned)
-  const draw = built.filter((card) => !card.pinned)
-
-  if (shuffleNonce > 0) {
-    for (let tailIndex = draw.length - 1; tailIndex > 0; tailIndex -= 1) {
-      const swapIndex = Math.floor(Math.random() * (tailIndex + 1))
-      const dropped = draw[tailIndex]
-      const lifted = draw[swapIndex]
-      if (!dropped || !lifted) {
-        continue
-      }
-      draw[tailIndex] = lifted
-      draw[swapIndex] = dropped
-    }
-  }
-
-  return [...pinned, ...draw].slice(0, size)
-}
-
 // Формируем колоду по ТЗ §4.4: свой (последнее) → избранное → хайп → новинки → остальные.
 function buildDeckCards({ games, recentGames, favoriteSlugs, user }: DeckInput): DeckCard[] {
   const list: DeckCard[] = []
@@ -140,12 +112,7 @@ function buildDeckCards({ games, recentGames, favoriteSlugs, user }: DeckInput):
     for (const recentGame of recentGames.slice(0, 2)) {
       if (!seen.has(recentGame.slug)) {
         seen.add(recentGame.slug)
-        list.push({
-          game: recentGame,
-          tag: 'Продолжи',
-          tagColor: 'bg-[#6C63FF]/30 text-white',
-          pinned: true,
-        })
+        list.push({ game: recentGame, tag: 'Продолжи', tagColor: 'bg-[#6C63FF]/30 text-white' })
       }
     }
   }
@@ -153,12 +120,7 @@ function buildDeckCards({ games, recentGames, favoriteSlugs, user }: DeckInput):
   for (const game of games) {
     if (favoriteSlugs.has(game.slug) && !seen.has(game.slug)) {
       seen.add(game.slug)
-      list.push({
-        game,
-        tag: 'Твоё избранное',
-        tagColor: 'bg-[#FF3D71]/30 text-[#FF3D71]',
-        pinned: true,
-      })
+      list.push({ game, tag: 'Твоё избранное', tagColor: 'bg-[#FF3D71]/30 text-[#FF3D71]' })
       if (list.length >= 4) {
         break
       }
@@ -168,43 +130,25 @@ function buildDeckCards({ games, recentGames, favoriteSlugs, user }: DeckInput):
   for (const game of games) {
     if (game.isPopular && !seen.has(game.slug)) {
       seen.add(game.slug)
-      list.push({
-        game,
-        tag: 'Хайп',
-        tagColor: 'bg-[#FFB300]/30 text-[#FFB300]',
-        pinned: false,
-      })
+      list.push({ game, tag: 'Хайп', tagColor: 'bg-[#FFB300]/30 text-[#FFB300]' })
     }
   }
 
   for (const game of games) {
     if (game.isNew && !seen.has(game.slug)) {
       seen.add(game.slug)
-      list.push({
-        game,
-        tag: 'Новинка',
-        tagColor: 'bg-[#00D2FF]/30 text-[#00D2FF]',
-        pinned: false,
-      })
+      list.push({ game, tag: 'Новинка', tagColor: 'bg-[#00D2FF]/30 text-[#00D2FF]' })
     }
   }
 
   for (const game of games) {
     if (!seen.has(game.slug)) {
       seen.add(game.slug)
-      list.push({
-        game,
-        tag: 'Популярное',
-        tagColor: 'bg-white/10 text-white/80',
-        pinned: false,
-      })
+      list.push({ game, tag: 'Популярное', tagColor: 'bg-white/10 text-white/80' })
     }
   }
 
-  // Не режем до DECK_SIZE здесь: отрезанная ДО перемешивания колода означала бы,
-  // что «кубик» меняет только порядок одних и тех же карт, а игры за пределами
-  // первых десяти не выпадают никогда.
-  return list
+  return list.slice(0, DECK_SIZE)
 }
 
 /** Launch-переход фронта: улетает вверх и «разворачивается» в слот (§4.4). */
@@ -715,9 +659,24 @@ function useSwipeDeck({
   const flyingRef = useRef<HTMLDivElement>(null)
   const flyingLockRef = useRef(false)
 
-  // Пересдача «кубиком»: жеребьёвка по всему пулу (см. dealDeck), первый расклад
-  // детерминированный.
-  const deck = useMemo(() => dealDeck(builtDeck, shuffleNonce), [builtDeck, shuffleNonce])
+  // Пересдача «кубиком»: первый расклад детерминированный (хайп → …), дальше Fisher-Yates.
+  const deck = useMemo(() => {
+    if (shuffleNonce === 0) {
+      return builtDeck
+    }
+    const cards = [...builtDeck]
+    for (let tailIndex = cards.length - 1; tailIndex > 0; tailIndex -= 1) {
+      const swapIndex = Math.floor(Math.random() * (tailIndex + 1))
+      const dropped = cards[tailIndex]
+      const lifted = cards[swapIndex]
+      if (!dropped || !lifted) {
+        continue
+      }
+      cards[tailIndex] = lifted
+      cards[swapIndex] = dropped
+    }
+    return cards
+  }, [builtDeck, shuffleNonce])
 
   // Улёт карты: дуга (translateX + подъём) с доворотом и fade в конце (§4.4).
   useEffect(() => {
