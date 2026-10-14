@@ -3,8 +3,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowDownLeft, ArrowUpRight, Check, Plus, ShieldCheck, Wallet } from 'lucide-react'
 import Link from 'next/link'
+import { Suspense } from 'react'
 
 import { CurrencyIcon } from '@/components/ui/CurrencyIcon'
+import { DepositOutcome } from '@/components/wallet/DepositOutcome'
 import { apiGet } from '@/lib/api'
 import {
   currencyFullName,
@@ -177,6 +179,10 @@ export default function WalletPage(): React.JSX.Element {
           <h1 className="text-2xl font-black text-white md:text-3xl">Мои кошельки</h1>
         </div>
       </div>
+
+      <Suspense fallback={null}>
+        <DepositOutcome onRetry={() => openDeposit(activeCurrency)} />
+      </Suspense>
 
       <ActiveWalletCard
         wallet={activeWallet}
