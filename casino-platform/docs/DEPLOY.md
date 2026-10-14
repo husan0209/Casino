@@ -157,6 +157,44 @@ SEED_ADMIN_PASSWORD=<сгенерированный пароль>
 (первый деплой не поднимается). Mount убирается в отдельной ветке (не этим файлом); до его мержа —
 не поднимать прод с пустым `pgdata`. Проверка после первого ночного прогона: `ls -lh /opt/casino-backups`.
 
+### Клиенты house-оригиналов — `apps/web/public/house/**`
+
+```bash
+10 2 * * * bash /opt/casino-platform/infra/scripts/house-backup.sh
+```
+
+Эта папка намеренно **вне git** (`.gitignore`: ~320 МБ клиентов Construct, лицензия на ассеты не
+проверена; наружу из папки игры идёт только `cover.jpg`). Значит репозиторий её не восстанавливает,
+а git-выкатка — не обновляет и не удаляет: единственный экземпляр лежит там, куда её положили
+копией. Отсюда и то, что донорский php-бэкенд дожил до продакшена: он приехал вместе с папкой, и
+авто-выкатка его не снимает. Наружу он больше не отдаётся (`apps/web/src/lib/static-denylist.ts` в
+middleware Next + `location ~*` в nginx), но на диске файлы остаются — они первоисточник математики
+выплат, на который ссылаются комментарии в `house-slot-games.registry.ts`.
+
+Скрипт пишет `house_<stamp>.tar.gz` + `.sha256` + `.manifest.txt` в `/opt/casino-backups` (на машине
+разработчика — `HOUSE_BACKUP_DIR=/d/backups/casino-house bash infra/scripts/house-backup.sh`), держит
+14 дней и **падает**, если файлов меньше `HOUSE_BACKUP_MIN_FILES` (по умолчанию 100) либо если в
+архив село меньше записей, чем лежит на диске: молча спакнуть удалённую или переехавшую папку —
+не бэкап, а иллюзия бэкапа.
+
+Проверка после ночного прогона:
+
+```bash
+ls -lh /opt/casino-backups/house_* | tail -3
+sed -n '1,6p' /opt/casino-backups/house_*.manifest.txt
+```
+
+Восстановление на чистую машину — распаковать рядом с `apps/web/public`, архив содержит корень
+`house/`:
+
+```bash
+cd /opt/casino-platform/apps/web/public
+tar -xzf /opt/casino-backups/house_<stamp>.tar.gz
+```
+
+⚠️ Копия на той же машине от потери диска не спасает. Вторая (S3 или `rclone copy`) — открытый
+вопрос, в скрипте оставлено место в последней строке.
+
 ## Rollback
 
 Кода-откат: `bash infra/scripts/rollback.sh` (= `git checkout HEAD~1` → rebuild api/web/admin → up → health-check; GAP-56 — docker compose, без pm2), или вручную:
