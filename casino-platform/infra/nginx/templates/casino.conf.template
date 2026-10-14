@@ -52,6 +52,17 @@ server {
   # отключил бы и 'self', и 'unsafe-inline' (дефект d201c1e — не исполнялся ни
   # один скрипт). Подробности — в докблоке apps/web/src/middleware.ts.
 
+  # Донорские сборки кладут в папку игр исходники своего бэкенда: api/endpoints/*.php,
+  # api/inc/conf.inc.php (подключение к их базе), web.php с роутами Laravel. PHP в
+  # нашем стеке не исполняется, поэтому без этого блока nginx отдал бы их как обычный
+  # текст — вместе с таблицей выплат чужой игры и чужими реквизитами. Второй слой —
+  # тот же список в apps/web/src/lib/static-denylist.ts (middleware Next), чтобы
+  # работало и вне nginx: на dev-сервере и на любой другой выкатке.
+  location ~* \.(php[0-9]?|phtml|phar|inc|sql|env|ini|conf|log|bak|old|save|swp|sh|bash|py|pl|rb)$ {
+    access_log off;
+    return 404;
+  }
+
   # /api -> api:3001
   location /api/ {
     limit_req zone=api_general burst=40 nodelay;
