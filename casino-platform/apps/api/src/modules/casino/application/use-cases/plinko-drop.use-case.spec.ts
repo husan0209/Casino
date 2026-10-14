@@ -22,6 +22,8 @@ import {
   type IGameCatalogRepository,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
+import { DEMO_RTP_DEFAULT_PERCENT } from '../../domain/rtp-policy'
+import { plinkoPackFor } from '../../infrastructure/providers/house/spin-data/plinko.rtp-pack'
 import {
   PLINKO_MULTIPLIERS,
   PLINKO_RISK_VALUES,
@@ -45,7 +47,7 @@ function decimalValue(raw: string | number | object): Prisma.Decimal {
   return new Decimal(String(raw)) as unknown as Prisma.Decimal
 }
 
-function makeSession(rtpOverride?: string): GameSessionWithGame {
+function makeSession(rtpOverride?: string | null): GameSessionWithGame {
   return {
     id: SESSION_ID,
     userId: USER_ID,
@@ -81,7 +83,7 @@ function makeSession(rtpOverride?: string): GameSessionWithGame {
       isNew: false,
       isPopular: false,
       hasDemo: true,
-      rtp: decimalValue(rtpOverride ?? '99'),
+      rtp: rtpOverride === null ? null : decimalValue(rtpOverride ?? '99'),
       rtpDemo: decimalValue('99'),
       volatility: null,
       maxWinMultiplier: null,
@@ -215,7 +217,10 @@ function makeCatalog(rtpDemo: string | null): IGameCatalogRepository {
   return { findByExternalGameId } as unknown as IGameCatalogRepository
 }
 
-function makeUseCase(args: { rtpDemo?: string | null; sessionRtp?: string }): PlinkoDropUseCase {
+function makeUseCase(args: {
+  rtpDemo?: string | null
+  sessionRtp?: string | null
+}): PlinkoDropUseCase {
   const play = makePlayRepository(makeSession(args.sessionRtp))
   const wallet = makeWalletFacade('500.00')
   const loader = new OriginalsSessionLoader(play.repository, makeSlotGames())
@@ -397,10 +402,23 @@ describe('PlinkoDropUseCase resolvePack — RTP из карточки игры',
     expect(plinkoExpectedRtp(16, 'medium', pack)).toBeCloseTo(0.9, 2)
   })
 
-  it('без значения в карточке — донорский профиль', async () => {
+  it('игра на деньги без значения поля — цель политики, а не донорский комплект', async () => {
+    const pack = await makeUseCase({ sessionRtp: null }).resolvePack(SESSION_TOKEN)
+
+    /* Раньше пустое поле отдавало донорский профиль (~99 %); теперь дефолт
+       один на все движки — 96 из rtp-policy. Разница в 3 п.п. заметна игроку,
+       поэтому она зафиксирована тестом, а не молча сменена. */
+    expect(plinkoExpectedRtp(16, 'medium', pack)).toBeCloseTo(0.96, 2)
+    expect(pack).not.toBe(PLINKO_MULTIPLIERS)
+  })
+
+  it('без значения в карточке демо играет по щедрой цели политики, а не по донорской', async () => {
     const useCase = makeUseCase({ rtpDemo: null })
+
     const pack = await useCase.resolvePack('demo_plinko_token')
-    expect(pack).toBe(PLINKO_MULTIPLIERS)
+
+    expect(pack).toEqual(plinkoPackFor(DEMO_RTP_DEFAULT_PERCENT))
+    expect(pack).not.toBe(PLINKO_MULTIPLIERS)
   })
 
   it('демо и деньги на одной цели дают один и тот же комплект', async () => {

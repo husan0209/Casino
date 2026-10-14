@@ -145,8 +145,9 @@ function assertPayouts(gameCode: string, payouts: readonly number[]): void {
 
 /**
  * Потолок RTP, который отдают таблицы игры любым решателем. Нужен демо-режиму:
- * там нет строки игры в БД, и просить 96% для узких таблиц (Ox/Panda ~90%) —
- * значит ловить ошибку на каждом спине.
+ * там нет строки игры в БД, и просить у узких таблиц (Ox/Panda ~90%) щедрые
+ * 120% — значит ловить ошибку на каждом спине. 100 здесь не ограничиваем:
+ * щедрое демо намеренно выше единицы, а деньги режет политика, а не таблицы.
  */
 export function houseSlotRtpCeiling(payouts: readonly number[], paylines: number): number {
   const byTilt = rtpPercentOf(
@@ -159,7 +160,7 @@ export function houseSlotRtpCeiling(payouts: readonly number[], paylines: number
     HOUSE_SLOT_MAX_HIT_PROBABILITY,
     paylines,
   ).toNumber()
-  return Math.min(100, Math.max(byTilt, byHit))
+  return Math.max(byTilt, byHit)
 }
 
 export function buildHouseSlotLottery(args: {

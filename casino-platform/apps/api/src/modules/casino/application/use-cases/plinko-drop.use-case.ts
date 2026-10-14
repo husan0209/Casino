@@ -24,6 +24,7 @@ import {
   type IGameCatalogRepository,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
+import { demoRtpValue, moneyRtpValue } from '../../domain/rtp-policy'
 import {
   PlinkoRiskSchema,
   PlinkoRowsSchema,
@@ -32,7 +33,10 @@ import {
   type PlinkoRisk,
   type PlinkoRows,
 } from '../../infrastructure/providers/house/spin-data/plinko-row'
-import { plinkoPackFor } from '../../infrastructure/providers/house/spin-data/plinko.rtp-pack'
+import {
+  PLINKO_RTP_LIMITS,
+  plinkoPackFor,
+} from '../../infrastructure/providers/house/spin-data/plinko.rtp-pack'
 import { PLINKO_MULTIPLIERS } from '../../infrastructure/providers/house/spin-data/plinko.tables'
 
 /**
@@ -152,15 +156,6 @@ function toMoneyString(raw: string): string {
   return new Decimal(raw).toString()
 }
 
-/** RTP в каталоге — Decimal(5,2); генератору нужны проценты числом или null. */
-function toRtpPercent(rtp: Decimal | number | string | null | undefined): number | null {
-  if (rtp === null || rtp === undefined) {
-    return null
-  }
-  const value = Number(String(rtp))
-  return Number.isFinite(value) ? value : null
-}
-
 /**
  * Исход дропа целиком: путь шарика, лунка, множитель, выплата и хеш.
  * Считается один раз и в демо, и в боевом пути.
@@ -207,7 +202,7 @@ export class PlinkoDropUseCase {
       sessionToken,
       PLINKO_EXTERNAL_GAME_ID,
     )
-    return plinkoPackFor(toRtpPercent(session.game.rtp))
+    return plinkoPackFor(moneyRtpValue(session.game.rtp))
   }
 
   async execute(request: PlinkoDropRequest): Promise<PlinkoDropData> {
@@ -223,10 +218,14 @@ export class PlinkoDropUseCase {
     return this.executeRealDrop(request.sessionToken, parsed)
   }
 
-  /** Цель демо берётся из карточки игры; без значения — донорский профиль. */
-  private async demoTargetRtp(): Promise<number | null> {
+  /**
+   * Цель демо: `rtp_demo` карточки, а если админ её не выставил — щедрые 120
+   * из общей политики. Фолбэком раньше был донорский комплект (~99 %), то есть
+   * демо платило как казино, а не как демо.
+   */
+  private async demoTargetRtp(): Promise<number> {
     const game = await this.catalog.findByExternalGameId(PLINKO_EXTERNAL_GAME_ID)
-    return toRtpPercent(game?.rtpDemo)
+    return demoRtpValue(game?.rtpDemo, PLINKO_RTP_LIMITS.max)
   }
 
   private executeDemoDrop(parsed: PlinkoDropInput, pack: PlinkoMultipliers): PlinkoDropData {
@@ -258,7 +257,7 @@ export class PlinkoDropUseCase {
       PLINKO_EXTERNAL_GAME_ID,
     )
     this.assertBetLimits(session, parsed.bet)
-    const pack = plinkoPackFor(toRtpPercent(session.game.rtp))
+    const pack = plinkoPackFor(moneyRtpValue(session.game.rtp))
     const providerId = session.providerId
     const betExternalId = `plinko_${parsed.dropId}_bet`
     const stored = await this.play.findTransactionByExternal(providerId, betExternalId)

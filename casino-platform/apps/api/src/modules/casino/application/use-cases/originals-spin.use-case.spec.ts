@@ -7,15 +7,12 @@ import { type WalletFacade } from '@modules/wallet/facade/wallet.facade'
 import { money } from '@casino/shared-utils'
 
 import { OriginalsSessionLoader } from './originals-session-loader'
-import {
-  OriginalsSpinSchema,
-  OriginalsSpinUseCase,
-  resolveTargetRtpPercent,
-} from './originals-spin.use-case'
+import { OriginalsSpinSchema, OriginalsSpinUseCase } from './originals-spin.use-case'
 import {
   type GameSessionWithGame,
   type GameTransactionRow,
   type GameRow,
+  type IGameCatalogRepository,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
 import { FORTUNE_TIGER_TABLES } from '../../infrastructure/providers/house/spin-data/fortune-tiger.tables'
@@ -216,21 +213,6 @@ function makeWalletFacade(startBalance: string): {
   return { facade, calls, currentBalance: () => balance }
 }
 
-describe('resolveTargetRtpPercent', () => {
-  it('берёт процент из записи игры, по умолчанию витринные 96', () => {
-    expect(resolveTargetRtpPercent('70')).toBe('70')
-    expect(resolveTargetRtpPercent('96.5')).toBe('96.5')
-    expect(resolveTargetRtpPercent(null)).toBe('96')
-    expect(resolveTargetRtpPercent('0')).toBe('0')
-  })
-
-  it('обрезает до 0..100 и не падает на мусор', () => {
-    expect(resolveTargetRtpPercent('140')).toBe('100')
-    expect(resolveTargetRtpPercent('-5')).toBe('0')
-    expect(resolveTargetRtpPercent('garbage')).toBe('96')
-  })
-})
-
 describe('донорская форма таблицы', () => {
   it('каждая строка хранит 6 колонок донора', () => {
     const allRows: TigerSpinRow[] = [
@@ -264,8 +246,16 @@ describe('OriginalsSpinSchema', () => {
   })
 })
 
+/** Карточка игры из каталога: демо-ветке нужен только rtp_demo. */
+function makeCatalog(rtpDemo: string | null): IGameCatalogRepository {
+  const card = rtpDemo === null ? null : { rtpDemo: new Decimal(rtpDemo) }
+  return {
+    findByExternalGameId: () => Promise.resolve(card),
+  } as unknown as IGameCatalogRepository
+}
+
 describe('OriginalsSpinUseCase demo', () => {
-  function makeDemoUseCase(): {
+  function makeDemoUseCase(rtpDemo: string | null = null): {
     useCase: OriginalsSpinUseCase
     wallet: ReturnType<typeof makeWalletFacade>
   } {
@@ -274,10 +264,39 @@ describe('OriginalsSpinUseCase demo', () => {
     const slotGames = makeSlotGames()
     const loader = new OriginalsSessionLoader(play.repository, slotGames)
     return {
-      useCase: new OriginalsSpinUseCase(loader, wallet.facade, play.repository),
+      useCase: new OriginalsSpinUseCase(
+        loader,
+        wallet.facade,
+        play.repository,
+        makeCatalog(rtpDemo),
+      ),
       wallet,
     }
   }
+
+  /** Фактическая отдача серии демо-спинов: сумма выигрышей / сумма ставок. */
+  async function realizedRtp(useCase: OriginalsSpinUseCase, spins: number): Promise<number> {
+    let bet = 0
+    let win = 0
+    for (let index = 0; index < spins; index += 1) {
+      const result = await useCase.execute({
+        sessionToken: 'demo_fortunetiger_pilot',
+        betamount: '2',
+        numline: '5',
+        cpl: '1',
+      })
+      bet += result.bet_amount
+      win += result.pull.WinAmount
+    }
+    return win / bet
+  }
+
+  it('демо играет по rtp_demo карточки, а не по витринным 96', async () => {
+    const tight = await realizedRtp(makeDemoUseCase('60').useCase, 1500)
+    const generous = await realizedRtp(makeDemoUseCase('150').useCase, 1500)
+
+    expect(generous).toBeGreaterThan(tight * 1.5)
+  }, 120000)
 
   it('spins without touching the wallet', async () => {
     const { useCase, wallet } = makeDemoUseCase()
@@ -342,7 +361,7 @@ describe('OriginalsSpinUseCase real', () => {
     wallet = makeWalletFacade('500.00')
     slotGames = makeSlotGames()
     const loader = new OriginalsSessionLoader(play.repository, slotGames)
-    useCase = new OriginalsSpinUseCase(loader, wallet.facade, play.repository)
+    useCase = new OriginalsSpinUseCase(loader, wallet.facade, play.repository, makeCatalog(null))
   })
 
   it('debits the bet once and keeps money consistent', async () => {
@@ -403,6 +422,7 @@ describe('OriginalsSpinUseCase real', () => {
       closedLoader,
       wallet.facade,
       closedPlay.repository,
+      makeCatalog(null),
     )
 
     await expect(
@@ -422,6 +442,7 @@ describe('OriginalsSpinUseCase real', () => {
       foreignLoader,
       wallet.facade,
       foreignPlay.repository,
+      makeCatalog(null),
     )
 
     await expect(
