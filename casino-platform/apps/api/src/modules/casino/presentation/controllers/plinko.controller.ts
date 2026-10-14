@@ -24,10 +24,12 @@ import {
   OriginalsSessionLoader,
   PLINKO_EXTERNAL_GAME_ID,
 } from '../../application/use-cases/originals-session-loader'
+import { TIGER_DEMO_START_CREDIT } from '../../application/use-cases/originals-session.use-case'
 import {
   PlinkoDropSchema,
   PlinkoDropUseCase,
 } from '../../application/use-cases/plinko-drop.use-case'
+import { DEMO_BALANCE_STORE, type IDemoBalanceStore } from '../../domain/demo-balance'
 import {
   PLINKO_RISK_VALUES,
   PLINKO_ROWS_VALUES,
@@ -51,6 +53,7 @@ export class PlinkoController {
     @Inject(PlinkoDropUseCase) private readonly dropUseCase: PlinkoDropUseCase,
     @Inject(OriginalsSessionLoader) private readonly sessionLoader: OriginalsSessionLoader,
     @Inject(WalletFacade) private readonly wallet: WalletFacade,
+    @Inject(DEMO_BALANCE_STORE) private readonly demoBalance: IDemoBalanceStore,
   ) {}
 
   @Get(':token/state')
@@ -60,10 +63,13 @@ export class PlinkoController {
       // числа, по которым идёт расчёт выплаты после смены RTP в админке.
       const tables = await this.dropUseCase.resolvePack(sessionToken)
       if (this.sessionLoader.isDemoToken(sessionToken)) {
+        // Остаток — с того же счёта, с которого /drop списывает ставку: токен демо
+        // живёт в URL игры, поэтому F5 обязан показать наигранное, а не стартовые 1000.
+        const balance = await this.demoBalance.peek(sessionToken, TIGER_DEMO_START_CREDIT)
         return response.json({
           success: true,
           data: {
-            balance: '1000.00',
+            balance,
             currency: 'RUB',
             minBet: '1',
             maxBet: '10000',
