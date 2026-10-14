@@ -15,6 +15,7 @@ import {
 } from './aztec-spin.use-case'
 import { type OriginalsSessionLoader } from './originals-session-loader'
 import { AZTEC_BASE_TUNING, flattenAztecPlays } from '../../domain/aztec-game'
+import { type IDemoBalanceStore } from '../../domain/demo-balance'
 import { InvalidBetRequestError } from '../../domain/errors'
 import {
   type GameSessionWithGame,
@@ -169,6 +170,28 @@ describe('rollAztecOutcome', () => {
   })
 })
 
+/**
+ * Двойник демо-счёта: те же правила, что у Redis-скрипта (списать можно
+ * только если ставки хватает), только остаток живёт в Map.
+ */
+function makeDemoBalance(): IDemoBalanceStore & { balances: Map<string, string> } {
+  const balances = new Map<string, string>()
+  return {
+    balances,
+    settle: async ({ sessionToken, startCredit, bet, win }) => {
+      const current = balances.get(sessionToken) ?? startCredit
+      if (money.isGreaterThan(bet, current)) {
+        return { accepted: false, balance: current }
+      }
+      const next = money.add(money.subtract(current, bet), win)
+      balances.set(sessionToken, next)
+      return { accepted: true, balance: next }
+    },
+    peek: async (sessionToken: string, startCredit: string) =>
+      balances.get(sessionToken) ?? startCredit,
+  }
+}
+
 describe('AztecSpinUseCase: демо', () => {
   it('не трогает кошелёк и считает баланс от 1000', async () => {
     const wallet = makeWallet('0')
@@ -177,6 +200,7 @@ describe('AztecSpinUseCase: демо', () => {
       wallet.facade,
       makePlay(null).repository,
       makeCatalog(null),
+      makeDemoBalance(),
     )
 
     const data = await useCase.execute({
@@ -197,6 +221,7 @@ describe('AztecSpinUseCase: демо', () => {
       makeWallet('0').facade,
       makePlay(null).repository,
       makeCatalog(null),
+      makeDemoBalance(),
     )
     const spinId = spinInput().spinId
 
@@ -232,6 +257,7 @@ describe('AztecSpinUseCase: бой', () => {
       wallet.facade,
       play.repository,
       makeCatalog(null),
+      makeDemoBalance(),
     )
   })
 
@@ -319,6 +345,7 @@ describe('AztecSpinUseCase: state', () => {
       makeWallet('0').facade,
       makePlay(null).repository,
       makeCatalog(null),
+      makeDemoBalance(),
     )
 
     const state = await useCase.state('demo_treasuresofaztec_token')
@@ -340,6 +367,7 @@ describe('AztecSpinUseCase: state', () => {
       makeWallet('77.00').facade,
       makePlay(makeSession(5, 500)).repository,
       makeCatalog(null),
+      makeDemoBalance(),
     )
 
     const state = await useCase.state(SESSION_TOKEN)
@@ -359,6 +387,7 @@ describe('AztecSpinUseCase: цель возврата из админки', () =
       makeWallet('1000.00').facade,
       makePlay(session).repository,
       makeCatalog(rtpDemo),
+      makeDemoBalance(),
     )
   }
 
@@ -368,7 +397,9 @@ describe('AztecSpinUseCase: цель возврата из админки', () =
     let win = 0
     for (let index = 0; index < spins; index += 1) {
       const data = await useCase.execute({
-        sessionToken: 'demo_treasuresofaztec_token',
+        // Отдельная демо-сессия на спин: остаток копится, и серия на бедном rtp
+        // обнулила бы счёт до конца прогона.
+        sessionToken: `demo_treasuresofaztec_trial_${index}`,
         spinId: randomUUID(),
         bet: '10',
       })

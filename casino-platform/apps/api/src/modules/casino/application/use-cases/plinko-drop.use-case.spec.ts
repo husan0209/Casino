@@ -7,6 +7,7 @@ import { type WalletFacade } from '@modules/wallet/facade/wallet.facade'
 import { money } from '@casino/shared-utils'
 
 import { OriginalsSessionLoader } from './originals-session-loader'
+import { TIGER_DEMO_START_CREDIT } from './originals-session.use-case'
 import {
   PlinkoDropSchema,
   PlinkoDropUseCase,
@@ -15,6 +16,7 @@ import {
   plinkoExpectedRtp,
   plinkoMultiplier,
 } from './plinko-drop.use-case'
+import { type IDemoBalanceStore } from '../../domain/demo-balance'
 import {
   type GameSessionWithGame,
   type GameTransactionRow,
@@ -217,9 +219,44 @@ function makeCatalog(rtpDemo: string | null): IGameCatalogRepository {
   return { findByExternalGameId } as unknown as IGameCatalogRepository
 }
 
+/** Карточка с лимитами ставки — проверка, что демо их тоже исполняет. */
+function makeLimitedCatalog(minBet: string, maxBet: string): IGameCatalogRepository {
+  const findByExternalGameId = async (): Promise<Game | null> =>
+    ({
+      rtpDemo: null,
+      minBet: decimalValue(minBet),
+      maxBet: decimalValue(maxBet),
+    }) as unknown as Game
+  return { findByExternalGameId } as unknown as IGameCatalogRepository
+}
+
+/**
+ * Фейк демо-счёта: те же правила, что у Redis-скрипта, — списать можно только
+ * если ставки хватает, и остаток хранится между бросками одной сессии.
+ */
+function makeDemoBalance(): IDemoBalanceStore & { balances: Map<string, string> } {
+  const balances = new Map<string, string>()
+  return {
+    balances,
+    settle: async ({ sessionToken, startCredit, bet, win }) => {
+      const current = balances.get(sessionToken) ?? startCredit
+      if (money.isGreaterThan(bet, current)) {
+        return { accepted: false, balance: current }
+      }
+      const next = money.add(money.subtract(current, bet), win)
+      balances.set(sessionToken, next)
+      return { accepted: true, balance: next }
+    },
+    peek: async (sessionToken: string, startCredit: string) =>
+      balances.get(sessionToken) ?? startCredit,
+  }
+}
+
 function makeUseCase(args: {
   rtpDemo?: string | null
   sessionRtp?: string | null
+  catalog?: IGameCatalogRepository
+  demoBalance?: IDemoBalanceStore
 }): PlinkoDropUseCase {
   const play = makePlayRepository(makeSession(args.sessionRtp))
   const wallet = makeWalletFacade('500.00')
@@ -228,7 +265,8 @@ function makeUseCase(args: {
     loader,
     wallet.facade,
     play.repository,
-    makeCatalog(args.rtpDemo ?? null),
+    args.catalog ?? makeCatalog(args.rtpDemo ?? null),
+    args.demoBalance ?? makeDemoBalance(),
   )
 }
 
@@ -294,7 +332,13 @@ describe('PlinkoDropUseCase demo', () => {
     const play = makePlayRepository(makeSession())
     const wallet = makeWalletFacade('1000.00')
     const loader = new OriginalsSessionLoader(play.repository, makeSlotGames())
-    const useCase = new PlinkoDropUseCase(loader, wallet.facade, play.repository, makeCatalog(null))
+    const useCase = new PlinkoDropUseCase(
+      loader,
+      wallet.facade,
+      play.repository,
+      makeCatalog(null),
+      makeDemoBalance(),
+    )
     const debitSpy = vi.spyOn(wallet.facade, 'debit')
     const creditSpy = vi.spyOn(wallet.facade, 'credit')
 
@@ -312,6 +356,76 @@ describe('PlinkoDropUseCase demo', () => {
     expect(result.slotIndex).toBe(result.path.reduce((sum, step) => sum + step, 0))
     expect(result.outcomeHash.length).toBe(64)
   })
+
+  it('копит остаток между бросками, а не пересчитывает его от старта', async () => {
+    const demoBalance = makeDemoBalance()
+    const useCase = makeUseCase({ demoBalance })
+    const first = await useCase.execute({
+      sessionToken: 'demo_plinko_token',
+      dropId: DROP_ID,
+      bet: '10.00',
+      risk: 'medium',
+      rows: 16,
+    })
+    const second = await useCase.execute({
+      sessionToken: 'demo_plinko_token',
+      dropId: '11111111-1111-4111-8111-111111111111',
+      bet: '10.00',
+      risk: 'medium',
+      rows: 16,
+    })
+
+    const expectedAfterFirst = new Decimal(TIGER_DEMO_START_CREDIT)
+      .minus(first.bet)
+      .plus(first.win)
+      .toString()
+    expect(first.balance).toBe(expectedAfterFirst)
+    // Второй бросок обязан считаться от остатка первого, а не от старта:
+    // ровно на этом стоял баг «баланс не поднимается».
+    const expectedAfterSecond = new Decimal(first.balance).minus(second.bet).plus(second.win)
+    expect(new Decimal(second.balance).equals(expectedAfterSecond)).toBe(true)
+    expect(demoBalance.balances.get('demo_plinko_token')).toBe(second.balance)
+  })
+
+  it('отказывает, когда демо-остатка не хватает, и не меняет счёт', async () => {
+    const demoBalance = makeDemoBalance()
+    demoBalance.balances.set('demo_plinko_token', '5.00')
+    const useCase = makeUseCase({ demoBalance })
+
+    await expect(
+      useCase.execute({
+        sessionToken: 'demo_plinko_token',
+        dropId: DROP_ID,
+        bet: '10.00',
+        risk: 'medium',
+        rows: 16,
+      }),
+    ).rejects.toMatchObject({ code: 'INSUFFICIENT_FUNDS' })
+    expect(demoBalance.balances.get('demo_plinko_token')).toBe('5.00')
+  })
+
+  it('исполняет лимиты ставки карточки и в демо', async () => {
+    const useCase = makeUseCase({ catalog: makeLimitedCatalog('1', '1000') })
+
+    await expect(
+      useCase.execute({
+        sessionToken: 'demo_plinko_token',
+        dropId: DROP_ID,
+        bet: '0.50',
+        risk: 'medium',
+        rows: 16,
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_BET_REQUEST' })
+    await expect(
+      useCase.execute({
+        sessionToken: 'demo_plinko_token',
+        dropId: '22222222-2222-4222-8222-222222222222',
+        bet: '5000.00',
+        risk: 'medium',
+        rows: 16,
+      }),
+    ).rejects.toMatchObject({ code: 'INVALID_BET_REQUEST' })
+  })
 })
 
 describe('PlinkoDropUseCase real', () => {
@@ -323,7 +437,13 @@ describe('PlinkoDropUseCase real', () => {
     play = makePlayRepository(makeSession())
     wallet = makeWalletFacade('500.00')
     const loader = new OriginalsSessionLoader(play.repository, makeSlotGames())
-    useCase = new PlinkoDropUseCase(loader, wallet.facade, play.repository, makeCatalog(null))
+    useCase = new PlinkoDropUseCase(
+      loader,
+      wallet.facade,
+      play.repository,
+      makeCatalog(null),
+      makeDemoBalance(),
+    )
   })
 
   it('debits once, credits on win, keeps money consistent', async () => {

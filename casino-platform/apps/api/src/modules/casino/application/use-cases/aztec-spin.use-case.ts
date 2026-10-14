@@ -35,7 +35,8 @@ import {
   flattenAztecPlays,
   playAztecSpin,
 } from '../../domain/aztec-game'
-import { InvalidBetRequestError } from '../../domain/errors'
+import { DEMO_BALANCE_STORE, type IDemoBalanceStore } from '../../domain/demo-balance'
+import { InsufficientFundsError, InvalidBetRequestError } from '../../domain/errors'
 import {
   GAME_CATALOG_REPOSITORY,
   GAME_PLAY_REPOSITORY,
@@ -191,6 +192,7 @@ export class AztecSpinUseCase {
     @Inject(WalletFacade) private readonly wallet: WalletFacade,
     @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
     @Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository,
+    @Inject(DEMO_BALANCE_STORE) private readonly demoBalance: IDemoBalanceStore,
   ) {}
 
   /**
@@ -205,7 +207,7 @@ export class AztecSpinUseCase {
   async execute(request: AztecSpinRequest): Promise<AztecSpinData> {
     const parsed = AztecSpinSchema.parse({ spinId: request.spinId, bet: request.bet })
     if (this.sessionLoader.isDemoToken(request.sessionToken)) {
-      return this.executeDemoSpin(parsed, await this.demoTuning())
+      return this.executeDemoSpin(request.sessionToken, parsed, await this.demoTuning())
     }
     return this.executeRealSpin(request.sessionToken, parsed)
   }
@@ -215,7 +217,7 @@ export class AztecSpinUseCase {
     if (this.sessionLoader.isDemoToken(sessionToken)) {
       const tuning = await this.demoTuning()
       return {
-        balance: TIGER_DEMO_START_CREDIT,
+        balance: await this.demoBalance.peek(sessionToken, TIGER_DEMO_START_CREDIT),
         currency: 'RUB',
         minBet: DEFAULT_MIN_BET,
         maxBet: DEFAULT_MAX_BET,
@@ -245,15 +247,27 @@ export class AztecSpinUseCase {
     }
   }
 
-  private executeDemoSpin(parsed: AztecSpinInput, tuning: AztecTuning): AztecSpinData {
+  private async executeDemoSpin(
+    sessionToken: string,
+    parsed: AztecSpinInput,
+    tuning: AztecTuning,
+  ): Promise<AztecSpinData> {
     const outcome = rollAztecOutcome(parsed, tuning)
-    const balance = money.add(money.subtract(TIGER_DEMO_START_CREDIT, parsed.bet), outcome.win)
+    const settled = await this.demoBalance.settle({
+      sessionToken,
+      startCredit: TIGER_DEMO_START_CREDIT,
+      bet: parsed.bet,
+      win: outcome.win,
+    })
+    if (!settled.accepted) {
+      throw new InsufficientFundsError(parsed.bet, settled.balance)
+    }
     return this.assemble({
       spinId: parsed.spinId,
       roundId: null,
       parsed,
       outcome,
-      balance,
+      balance: settled.balance,
       currency: 'RUB',
     })
   }

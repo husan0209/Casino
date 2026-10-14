@@ -6,6 +6,7 @@ import { WalletFacade } from '@modules/wallet/facade/wallet.facade'
 import { type Currency } from '@casino/shared-types'
 
 import { OriginalsSessionLoader } from './originals-session-loader'
+import { DEMO_BALANCE_STORE, type IDemoBalanceStore } from '../../domain/demo-balance'
 import { type DonorAmount, type HouseSlotGameConfig } from '../../domain/house-slot-game'
 
 /**
@@ -58,6 +59,7 @@ export class OriginalsSessionUseCase {
   constructor(
     @Inject(OriginalsSessionLoader) private readonly sessionLoader: OriginalsSessionLoader,
     @Inject(WalletFacade) private readonly wallet: WalletFacade,
+    @Inject(DEMO_BALANCE_STORE) private readonly demoBalance: IDemoBalanceStore,
   ) {}
 
   async execute(sessionToken: string): Promise<TigerSessionData> {
@@ -65,7 +67,7 @@ export class OriginalsSessionUseCase {
       const game = this.sessionLoader.loadDemoSlotGame(sessionToken)
       return this.buildSessionData(game, {
         displayName: 'Guest',
-        credit: TIGER_DEMO_START_CREDIT,
+        credit: await this.demoBalance.peek(sessionToken, TIGER_DEMO_START_CREDIT),
         currencyLabel: 'RUB',
       })
     }
