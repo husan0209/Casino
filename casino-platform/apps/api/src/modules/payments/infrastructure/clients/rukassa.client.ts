@@ -30,10 +30,12 @@ const TIMEOUT_MS = 30_000 // TZ part 3 §5.3
  * Rukassa HTTP client — TZ part 3 §5 (UC-PAY-01/02).
  *
  * Контракт — официальная страница «Разработчикам» (их документация API):
- *   POST https://lk.rukassa.io/api/v1/create     shop_id, token, order_id, amount, data
+ *   POST https://lk.rukassa.io/api/v1/create     shop_id, user_code, token, order_id, amount, data
  *   POST https://lk.rukassa.io/api/v1/getPayInfo shop_id, token, id
  * Оба принимают form-urlencoded; авторизация — полями `shop_id` + `token` в теле,
  * НЕ заголовками. Ответ create: `{ id, hash, url }`, при отказе `{ error, message }`.
+ * Про присутствие `user_code` в их примере на странице нет, но без него /create
+ * отвечает 403 «error user_code» — см. createPayment.
  *
  * Env:
  *   RUKASSA_SHOP_ID / RUKASSA_API_KEY — обязательны в production (fail-closed);
@@ -84,6 +86,11 @@ export class RukassaClient implements IRukassaClient {
     const { base, shopId, token } = this.assertConfigured()
     const form = new URLSearchParams({
       shop_id: shopId,
+      // RuKassa требует присутствие `user_code` в /create: без него — 403
+      // «error user_code», хотя значение они не проверяют (1 и 999999 проходят
+      // одинаково). Отдаём код магазина: отдельная настройка под это не нужна,
+      // а в /getPayInfo поле не требуется вовсе.
+      user_code: shopId,
       token,
       order_id: params.orderId,
       amount: params.amount,
