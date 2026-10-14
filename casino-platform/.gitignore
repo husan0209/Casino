@@ -33,10 +33,9 @@ apps/api/uploads/
 
 # Клиенты Construct house-оригиналов (~320 МБ) в гите не живут: их кладёт копия
 # из донора, лицензия на ассеты не проверена (pilot/REPORT.md, открытые вопросы).
-# Наружу из папки игры — только обложка. У Plinko и Aztec клиенты самописные
-# (своя математика, донорской графики нет), поэтому они в индексе.
+# Наружу из папки игры — только обложка. Исключение — Plinko: её клиент самописный
+# (своя математика, донорской графики нет), поэтому он в индексе.
 apps/web/public/house/**
 !apps/web/public/house/*/
 !apps/web/public/house/*/cover.jpg
 !apps/web/public/house/plinko/index.html
-!apps/web/public/house/treasuresofaztec/index.html
