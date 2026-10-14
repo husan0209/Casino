@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { ConfigService } from '@nestjs/config'
 import { describe, expect, it } from 'vitest'
 
@@ -36,6 +39,22 @@ describe('демо-каталог', () => {
       expect(row?.rtp).toBe(game.rtp)
       expect(row?.hasDemo).toBe(true)
       expect(row?.category).toBe('slots')
+      expect(row?.thumbnailUrl).toBe(game.thumbnailUrl)
+    }
+  })
+
+  /**
+   * Обложка — часть данных каталога: карточка без картинки выглядит сломанной,
+   * а `thumbnailUrl` из сида ведёт в `apps/web/public`, где файл никто, кроме
+   * этой спеки, не проверяет.
+   */
+  it('у каждой демо-игры обложка лежит в apps/web/public', () => {
+    const publicDir = join(process.cwd(), '..', 'web', 'public')
+
+    for (const game of DEMO_GAMES) {
+      expect(game.thumbnailUrl, `нет thumbnailUrl у ${game.slug}`).toMatch(/^\/demo\/.+\.jpg$/)
+      const file = join(publicDir, game.thumbnailUrl.replace(/^\//, ''))
+      expect(existsSync(file), `файл обложки не найден: ${file}`).toBe(true)
     }
   })
 })
