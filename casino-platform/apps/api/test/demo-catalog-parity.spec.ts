@@ -4,25 +4,24 @@ import { describe, expect, it } from 'vitest'
 import { DEMO_GAMES } from '@casino/database'
 
 /**
- * Демо-каталог теперь один на два места: и сид, и адаптер читают `DEMO_GAMES`
- * из @casino/database. Спека держит то, что после этого всё ещё можно сломать:
- * размер витрины (колода на главной показывает ровно столько карт) и маппинг
- * полей строки сида в строку провайдера.
+ * Демо-провайдер больше НЕ заводится сидом: десять карточек-пустышек, которые
+ * ставились «чтобы витрина не выглядела пустой», из проекта убраны — игрок видит
+ * только реальные игры. Сам адаптер остаётся: на нём держатся тесты запуска,
+ * синхронизации и жизненного цикла игрока, где нужен провайдер без внешних
+ * вызовов. Спека сторожит именно это — что список заглушки стабилен и поля
+ * доходят до строки провайдера без потерь.
  */
 
 import { DemoProviderAdapter } from '../src/modules/casino/infrastructure/providers/demo/demo-provider.adapter'
 
-/** Столько же, сколько показывает колода на главной (DECK_SIZE в GameDeck). */
-const DECK_SIZE = 10
-
-describe('демо-каталог', () => {
-  it('витрина заполняет колоду целиком, slug не повторяются', async () => {
+describe('демо-адаптер (тестовая подставка)', () => {
+  it('список непустой и slug не повторяются', async () => {
     const adapter = new DemoProviderAdapter(new ConfigService({}))
     const rows = await adapter.fetchGameList()
 
-    expect(DEMO_GAMES).toHaveLength(DECK_SIZE)
-    expect(rows).toHaveLength(DECK_SIZE)
-    expect(new Set(rows.map((row) => row.externalGameId)).size).toBe(DECK_SIZE)
+    expect(DEMO_GAMES.length).toBeGreaterThan(0)
+    expect(rows).toHaveLength(DEMO_GAMES.length)
+    expect(new Set(rows.map((row) => row.externalGameId)).size).toBe(DEMO_GAMES.length)
   })
 
   it('строка сида маппится в строку провайдера без потерь', async () => {

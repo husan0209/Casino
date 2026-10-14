@@ -1,7 +1,6 @@
 import * as argon2 from 'argon2'
 
 import { prisma } from './index'
-import { DEMO_GAMES } from './seed-demo-games'
 import { assertSeedAdminConfig } from './seed-guard'
 
 /**
@@ -55,49 +54,6 @@ async function seedAdmin(): Promise<void> {
     },
   })
   log(`Seeded admin ${admin.email}`)
-}
-
-/** Демо-провайдер + витрина из десяти игр. Идемпотентно по slug. */
-async function seedDemoGames(): Promise<void> {
-  const demoProvider = await prisma.gameProvider.upsert({
-    where: { slug: 'demo-provider' },
-    update: {},
-    create: {
-      slug: 'demo-provider',
-      name: 'Demo Provider',
-      type: 'slots',
-      isEnabled: true,
-      sortOrder: 0,
-    },
-  })
-
-  for (const game of DEMO_GAMES) {
-    await prisma.game.upsert({
-      where: { slug: game.slug },
-      update: {},
-      create: {
-        providerId: demoProvider.id,
-        externalGameId: game.slug,
-        slug: game.slug,
-        name: game.name,
-        nameRu: game.nameRu,
-        type: 'slot',
-        category: 'slots',
-        isEnabled: true,
-        isFeatured: true,
-        isPopular: true,
-        hasDemo: true,
-        rtp: game.rtp,
-        supportedCurrencies: ['RUB', 'USDT_TRC20'],
-      },
-    })
-  }
-
-  await prisma.gameProvider.update({
-    where: { id: demoProvider.id },
-    data: { gameCount: DEMO_GAMES.length },
-  })
-  log('Seeded demo games')
 }
 
 /**
@@ -180,7 +136,6 @@ async function seedSettings(): Promise<void> {
 async function main(): Promise<void> {
   assertSafeToSeed()
   await seedAdmin()
-  await seedDemoGames()
   await seedHouseProvider()
   await seedSettings()
 }
