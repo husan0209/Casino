@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 
 import { API_BASE_URL } from '@/lib/api-base'
 import { buildWebCsp } from '@/lib/csp'
+import { isDeniedPublicPath } from '@/lib/static-denylist'
 
 /**
  * P1 #11 (остаток): CSP на каждый запрос. Политика живёт в lib/csp.ts — чистой
@@ -13,6 +14,11 @@ import { buildWebCsp } from '@/lib/csp'
  * политику должен задавать ровно один источник.
  */
 export function middleware(request: NextRequest): NextResponse {
+  // Служебные файлы донорских сборок наружу не идут — см. lib/static-denylist.ts.
+  if (isDeniedPublicPath(request.nextUrl.pathname)) {
+    return new NextResponse(null, { status: 404 })
+  }
+
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
   const cspHeader = buildWebCsp({
     apiBaseUrl: API_BASE_URL,
