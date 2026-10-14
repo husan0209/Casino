@@ -9,7 +9,6 @@ import { AdminSetGameFlagsUseCase } from './application/use-cases/admin-set-game
 import { AdminSetProviderEnabledUseCase } from './application/use-cases/admin-set-provider-enabled.use-case'
 import { AdminSyncProviderGamesUseCase } from './application/use-cases/admin-sync-provider-games.use-case'
 import { AdminUpdateGameUseCase } from './application/use-cases/admin-update-game.use-case'
-import { AztecSpinUseCase } from './application/use-cases/aztec-spin.use-case'
 import { FavoritesUseCase } from './application/use-cases/favorites.use-case'
 import { LaunchGameUseCase } from './application/use-cases/launch-game.use-case'
 import { ListGamesUseCase } from './application/use-cases/list-games.use-case'
@@ -37,7 +36,6 @@ import {
   PrismaGamePlayRepository,
   PrismaGameProviderRepository,
 } from './infrastructure/repositories/casino.prisma.repository'
-import { AztecController } from './presentation/controllers/aztec.controller'
 import { CasinoAdminController } from './presentation/controllers/casino-admin.controller'
 import { CasinoController } from './presentation/controllers/casino.controller'
 import { OriginalsController } from './presentation/controllers/originals.controller'
@@ -52,7 +50,6 @@ import { ProviderCallbackController } from './presentation/controllers/provider-
     CasinoAdminController,
     OriginalsController,
     PlinkoController,
-    AztecController,
   ],
   providers: [
     // Класс-токен остаётся: presentation-контроллер provider-callback и
@@ -83,7 +80,6 @@ import { ProviderCallbackController } from './presentation/controllers/provider-
     OriginalsIconsUseCase,
     OriginalsSpinUseCase,
     PlinkoDropUseCase,
-    AztecSpinUseCase,
     AdminSetProviderEnabledUseCase,
     AdminSyncProviderGamesUseCase,
     AdminUpdateGameUseCase,

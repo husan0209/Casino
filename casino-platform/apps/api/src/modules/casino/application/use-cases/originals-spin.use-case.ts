@@ -44,9 +44,9 @@ import {
 /**
  * Вход спина от фронта Construct 3 (x-www-form-urlencoded):
  * betamount/numline/cpl. Деньги — строками, целые — строками целых.
- * Потолок numline = HOUSE_SLOT_MAX_PAYLINES: клиент сам решает линиями (Tiger 5,
- * потолок 20 — максимум из наблюдаемых клиентов донора (Tiger шлёт 5, Jack Frost и
- * Aztec — 20); калибровка RTP идёт по этому же числу.
+ * Потолок numline = HOUSE_SLOT_MAX_PAYLINES: клиент сам решает, сколько линий
+ * играть, 20 — максимум из наблюдаемых клиентов донора (Tiger шлёт 5, Jack
+ * Frost — 20); калибровка RTP идёт по этому же числу.
  */
 export const OriginalsSpinSchema = z.object({
   betamount: z

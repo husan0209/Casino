@@ -61,8 +61,8 @@ export const TIGER_ROW_INDEX = {
  * Откуда в строке берётся выплата:
  * - `single` — поле [5] (Fortune Tiger и вся «пятилинейная» ветка донора);
  * - `lines`  — сумма по линиям [2] плюс линии каскадов [3] (3x5 игры:
- *   Queen of Bounty, Treasures of Aztec). У донора у них [5] = null, то есть
- *   в его же рантайме эти игры платят 0; расчёт взялся из статического API
+ *   Queen of Bounty). У донора у неё [5] = null, то есть в его же рантайме
+ *   игра платит 0; расчёт взялся из статического API
  *   фронта (`public/originals/queenofbounty/api/endpoints/spin.php`).
  */
 export type HouseSlotPayoutModel = 'single' | 'lines'
@@ -142,7 +142,7 @@ export interface HouseSlotTables {
 
 /**
  * Верхняя граница линий одного спина. Клиент Construct сам решает, сколько
- * линий играть: Tiger шлёт 5, Jack Frost и Treasures of Aztec — 20. Потолок
+ * линий играть: Tiger шлёт 5, Jack Frost — 20. Потолок
  * ограничивает только размер ставки, потому что RTP калибруется по этому же
  * числу (см. OriginalsSpinUseCase.drawOutcome).
  */
