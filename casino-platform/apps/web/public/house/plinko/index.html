@@ -867,10 +867,27 @@ function roundRect(ctx, x, y, w, h, r) {
 /* ============================================================
    GAME FLOW — исход решает сервер, анимация его визуализирует
    ============================================================ */
+/* На сервер ставки уходят строго по одной: ответы приходят в разном порядке, а
+   каждый несёт «баланс после этого спуска», и при параллельных запросах экран
+   начал бы прыгать назад. Но кнопка от этого не гаснет — тапы складываются в
+   очередь, поэтому быстрые «тык-тык-тык» работают и на дальнобойном стенде. */
+const MAX_QUEUED_BETS = 5;
+const betQueue = [];
 let dropInFlight = false;
+let inFlightBet = 0;
+
+/* Ставки, за которые сервер ещё не ответил: они уже «потрачены» с точки зрения
+   игрока, но в state.balance ещё не отражены. */
+function outstandingBets() {
+  let sum = inFlightBet;
+  for (const queued of betQueue) {
+    sum += queued;
+  }
+  return sum;
+}
 
 async function placeBet() {
-  if (dropInFlight || !state.serverReady) {
+  if (!state.serverReady) {
     return;
   }
   const bet = parseFloat(document.getElementById('betAmount').value);
@@ -880,8 +897,22 @@ async function placeBet() {
   if (bet > availableToBet() + 1e-9) {
     return;
   }
+  if (betQueue.length >= MAX_QUEUED_BETS) {
+    return;
+  }
+  betQueue.push(bet);
+  updateBalance();
+  pumpBetQueue();
+}
+
+async function pumpBetQueue() {
+  if (dropInFlight || betQueue.length === 0) {
+    return;
+  }
+  const bet = betQueue.shift();
   dropInFlight = true;
-  updateBetButton();
+  inFlightBet = bet;
+  updateBalance();
   try {
     const res = await fetch('/api/plinko/' + encodeURIComponent(SESSION_TOKEN) + '/drop', {
       method: 'POST',
@@ -909,10 +940,17 @@ async function placeBet() {
     updateBalance();
     updateProfitDisplay();
   } catch (error) {
+    // Отказ сервера: неотправленные ставки снимаем — деньги по ним не списаны,
+    // и слать их дальше Meaningless (ставка та же, отказ повторится).
+    betQueue.length = 0;
     showDropError(error);
   } finally {
     dropInFlight = false;
-    updateBetButton();
+    inFlightBet = 0;
+    updateBalance();
+    if (betQueue.length > 0) {
+      pumpBetQueue();
+    }
   }
 }
 
@@ -960,16 +998,19 @@ function pendingWin() {
 
 /* Чем игрок реально может ставить. Серверный баланс уже включает выигрыши
    шаров в полёте, и ставка с него = переставка ещё не сыгравших денег:
-   экран при этом уходит в минус. Разрешаем только то, что уже видно. */
+   экран при этом уходит в минус. Разрешаем только то, что уже видно, минус
+   ставки, которые ещё не ушли на сервер или в полёте. */
 function availableToBet() {
-  return state.balance - pendingWin();
+  return state.balance - pendingWin() - outstandingBets();
 }
 
 /* ============================================================
    UI UPDATES
    ============================================================ */
 function updateBalance() {
-  document.getElementById('balance').textContent = formatMoney(state.balance - pendingWin());
+  document.getElementById('balance').textContent = formatMoney(
+    state.balance - pendingWin() - outstandingBets(),
+  );
   updateBetButton();
 }
 
@@ -982,11 +1023,13 @@ function updateProfitDisplay() {
 function updateBetButton() {
   const btn = document.getElementById('betBtn');
   const bet = parseFloat(document.getElementById('betAmount').value) || 0;
+  // dropInFlight сюда не входит: кнопка живёт, пока есть очередь. Блокировать
+  // её на время round-trip — значит на стенде превратить «тык-тык-тык» в лаг.
   btn.disabled =
     !state.serverReady ||
-    dropInFlight ||
     bet <= 0 ||
-    bet > availableToBet() + 1e-9;
+    bet > availableToBet() + 1e-9 ||
+    betQueue.length >= MAX_QUEUED_BETS;
 }
 
 const RISK_LABELS = { low: 'низкий', medium: 'средний', high: 'высокий' };
