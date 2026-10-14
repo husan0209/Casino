@@ -32,13 +32,16 @@ export const metadata: Metadata = {
 
 export default async function Home(): Promise<React.JSX.Element> {
   const [popular, fresh, categories, providers] = await Promise.all([
-    fetchGamesServer({ per_page: 12, sort: 'popular' }),
+    // Пул колоды. Раньше стоял per_page: 12 — ровно размер колоды, поэтому
+    // «кубик» физически не мог вытащить ни одну игру из-за первых двенадцати,
+    // и Plinko не выпадал никогда. 60 = потолок variety без раздувания SSR,
+    // провайдерским слотам из агрегатора пул тоже откроется сам: фильтра по
+    // провайдеру здесь нет.
+    fetchGamesServer({ per_page: 60, sort: 'popular' }),
     fetchGamesServer({ per_page: 12, sort: 'new' }),
     fetchCategoriesServer(),
     fetchProvidersServer(),
   ])
 
-  return (
-    <HomeView popular={popular} fresh={fresh} categories={categories} providers={providers} />
-  )
+  return <HomeView popular={popular} fresh={fresh} categories={categories} providers={providers} />
 }
