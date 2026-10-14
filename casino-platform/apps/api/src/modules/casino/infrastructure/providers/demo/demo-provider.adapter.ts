@@ -34,7 +34,6 @@ export class DemoProviderAdapter implements GameProviderAdapter {
       category: 'slots',
       hasDemo: true,
       rtp: game.rtp,
-      thumbnailUrl: game.thumbnailUrl,
     }))
   }
   verifyCallback(): boolean {

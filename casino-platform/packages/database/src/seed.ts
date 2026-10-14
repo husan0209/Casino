@@ -88,7 +88,6 @@ async function seedDemoGames(): Promise<void> {
         isPopular: true,
         hasDemo: true,
         rtp: game.rtp,
-        thumbnailUrl: game.thumbnailUrl,
         supportedCurrencies: ['RUB', 'USDT_TRC20'],
       },
     })
