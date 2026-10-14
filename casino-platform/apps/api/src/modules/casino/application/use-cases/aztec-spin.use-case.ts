@@ -22,27 +22,30 @@ import {
   AZTEC_MAX_MULTIPLIER_FREE,
   AZTEC_MAX_WIN_MULTIPLIER,
   AZTEC_MIN_REELS,
-  AZTEC_PAYTABLE,
   AZTEC_REEL_ROWS,
   AZTEC_SCATTER_MIN,
-  AZTEC_SCATTER_PAY,
   AZTEC_TIERS,
   type AztecChainStep,
   type AztecPaySymbol,
   type AztecPlay,
   type AztecSymbol,
+  type AztecTuning,
+  aztecTuningForTarget,
   buildAztecGrid,
   flattenAztecPlays,
   playAztecSpin,
 } from '../../domain/aztec-game'
 import { InvalidBetRequestError } from '../../domain/errors'
 import {
+  GAME_CATALOG_REPOSITORY,
   GAME_PLAY_REPOSITORY,
   type GameRow,
   type GameSessionWithGame,
   type GameTransactionRow,
+  type IGameCatalogRepository,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
+import { DEMO_RTP_MAX_PERCENT, demoRtpValue, moneyRtpValue } from '../../domain/rtp-policy'
 
 /**
  * Вход спина Aztec от собственного клиента: spinId — uuid от фронта
@@ -113,19 +116,22 @@ export interface AztecStateData {
   demo: boolean
 }
 
-const AZTEC_RULES: AztecRulesData = {
-  paytable: AZTEC_PAYTABLE,
-  tiers: AZTEC_TIERS,
-  scatterPay: AZTEC_SCATTER_PAY,
-  scatterMin: AZTEC_SCATTER_MIN,
-  freeSpins: AZTEC_FREE_SPINS,
-  freeMultiplierStart: AZTEC_FREE_MULTIPLIER_START,
-  freeRetriggerMin: AZTEC_FREE_RETRIGGER_MIN,
-  freeRetriggerSpins: AZTEC_FREE_RETRIGGER,
-  freeSpinsHardLimit: AZTEC_FREE_SPINS_HARD_LIMIT,
-  minReels: AZTEC_MIN_REELS,
-  maxMultiplierBase: AZTEC_MAX_MULTIPLIER_BASE,
-  maxMultiplierFree: AZTEC_MAX_MULTIPLIER_FREE,
+/** Правила под фактическую таблицу: клиент показывает те же числа, по которым платит сервер. */
+function aztecRulesFor(tuning: AztecTuning): AztecRulesData {
+  return {
+    paytable: tuning.paytable,
+    scatterPay: tuning.scatterPay,
+    tiers: AZTEC_TIERS,
+    scatterMin: AZTEC_SCATTER_MIN,
+    freeSpins: AZTEC_FREE_SPINS,
+    freeMultiplierStart: AZTEC_FREE_MULTIPLIER_START,
+    freeRetriggerMin: AZTEC_FREE_RETRIGGER_MIN,
+    freeRetriggerSpins: AZTEC_FREE_RETRIGGER,
+    freeSpinsHardLimit: AZTEC_FREE_SPINS_HARD_LIMIT,
+    minReels: AZTEC_MIN_REELS,
+    maxMultiplierBase: AZTEC_MAX_MULTIPLIER_BASE,
+    maxMultiplierFree: AZTEC_MAX_MULTIPLIER_FREE,
+  }
 }
 
 /** Тип Prisma-транзакции из фасада кошелька (прямой импорт prisma в application запрещён). */
@@ -157,12 +163,13 @@ export function hashAztecOutcome(spinId: string, steps: AztecChainStep[]): strin
   return createHash('sha256').update(`${spinId}:${canonical}`).digest('hex')
 }
 
-/** Один спин: движок решает цепочку, выплата = ставка × множитель. */
+/** Один спин: движок решает цепочку по таблице настройки, выплата = ставка × множитель. */
 export function rollAztecOutcome(
   parsed: AztecSpinInput,
+  tuning: AztecTuning,
   randomSource: () => number = cryptoRandom,
 ): AztecOutcome {
-  const spin = playAztecSpin(randomSource)
+  const spin = playAztecSpin(randomSource, tuning)
   return {
     plays: spin.plays,
     freeSpinsPlayed: spin.freeSpinsPlayed,
@@ -183,19 +190,30 @@ export class AztecSpinUseCase {
     @Inject(OriginalsSessionLoader) private readonly sessionLoader: OriginalsSessionLoader,
     @Inject(WalletFacade) private readonly wallet: WalletFacade,
     @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
+    @Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository,
   ) {}
+
+  /**
+   * Таблица демо: цель берётся из `rtp_demo` карточки игры (политика —
+   * в domain/rtp-policy), а платёжная таблица масштабуется под неё.
+   */
+  private async demoTuning(): Promise<AztecTuning> {
+    const card = await this.catalog.findByExternalGameId(AZTEC_EXTERNAL_GAME_ID)
+    return aztecTuningForTarget(demoRtpValue(card?.rtpDemo, DEMO_RTP_MAX_PERCENT))
+  }
 
   async execute(request: AztecSpinRequest): Promise<AztecSpinData> {
     const parsed = AztecSpinSchema.parse({ spinId: request.spinId, bet: request.bet })
     if (this.sessionLoader.isDemoToken(request.sessionToken)) {
-      return this.executeDemoSpin(parsed)
+      return this.executeDemoSpin(parsed, await this.demoTuning())
     }
     return this.executeRealSpin(request.sessionToken, parsed)
   }
 
-  /** Состояние для клиента: баланс и правила доски. */
+  /** Состояние для клиента: баланс, геометрия и правила фактической таблицы. */
   async state(sessionToken: string): Promise<AztecStateData> {
     if (this.sessionLoader.isDemoToken(sessionToken)) {
+      const tuning = await this.demoTuning()
       return {
         balance: TIGER_DEMO_START_CREDIT,
         currency: 'RUB',
@@ -204,7 +222,7 @@ export class AztecSpinUseCase {
         reelRows: AZTEC_REEL_ROWS,
         maxWinMultiplier: AZTEC_MAX_WIN_MULTIPLIER,
         grid: buildAztecGrid(cryptoRandom),
-        rules: AZTEC_RULES,
+        rules: aztecRulesFor(tuning),
         demo: true,
       }
     }
@@ -213,6 +231,7 @@ export class AztecSpinUseCase {
       AZTEC_EXTERNAL_GAME_ID,
     )
     const balance = await this.wallet.getBalance(session.userId, session.currency as Currency)
+    const tuning = aztecTuningForTarget(moneyRtpValue(session.game.rtp))
     return {
       balance: balance.available,
       currency: session.currency,
@@ -221,13 +240,13 @@ export class AztecSpinUseCase {
       reelRows: AZTEC_REEL_ROWS,
       maxWinMultiplier: AZTEC_MAX_WIN_MULTIPLIER,
       grid: buildAztecGrid(cryptoRandom),
-      rules: AZTEC_RULES,
+      rules: aztecRulesFor(tuning),
       demo: false,
     }
   }
 
-  private executeDemoSpin(parsed: AztecSpinInput): AztecSpinData {
-    const outcome = rollAztecOutcome(parsed)
+  private executeDemoSpin(parsed: AztecSpinInput, tuning: AztecTuning): AztecSpinData {
+    const outcome = rollAztecOutcome(parsed, tuning)
     const balance = money.add(money.subtract(TIGER_DEMO_START_CREDIT, parsed.bet), outcome.win)
     return this.assemble({
       spinId: parsed.spinId,
@@ -255,7 +274,15 @@ export class AztecSpinUseCase {
     }
     return this.wallet.runInTransaction(
       { userId: session.userId, currency: session.currency as Currency },
-      (transaction) => this.applySpin({ session, providerId, parsed, betExternalId, transaction }),
+      (transaction) =>
+        this.applySpin({
+          session,
+          providerId,
+          parsed,
+          betExternalId,
+          transaction,
+          tuning: aztecTuningForTarget(moneyRtpValue(session.game.rtp)),
+        }),
     )
   }
 
@@ -274,13 +301,14 @@ export class AztecSpinUseCase {
     parsed: AztecSpinInput
     betExternalId: string
     transaction: WalletTransaction
+    tuning: AztecTuning
   }): Promise<AztecSpinData> {
-    const { session, providerId, parsed, betExternalId, transaction } = args
+    const { session, providerId, parsed, betExternalId, transaction, tuning } = args
     const race = await this.play.findTransactionByExternal(providerId, betExternalId, transaction)
     if (race) {
       return this.rebuildDuplicateSpin(session, providerId, parsed.spinId)
     }
-    const outcome = rollAztecOutcome(parsed)
+    const outcome = rollAztecOutcome(parsed, tuning)
     const round = await this.openSpinRound({ session, providerId, parsed, transaction })
     const balance = await this.settleSpin({
       session,

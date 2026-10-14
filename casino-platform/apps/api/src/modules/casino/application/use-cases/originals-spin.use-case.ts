@@ -26,11 +26,14 @@ import {
   type HouseSlotGameConfig,
 } from '../../domain/house-slot-game'
 import {
+  GAME_CATALOG_REPOSITORY,
   GAME_PLAY_REPOSITORY,
   type GameRow,
   type GameSessionWithGame,
+  type IGameCatalogRepository,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
+import { demoRtpPercent, moneyRtpPercent } from '../../domain/rtp-policy'
 import {
   TIGER_ROW_INDEX,
   TigerSpinRowSchema,
@@ -103,37 +106,18 @@ export interface TigerSpinData {
 /** Тип Prisma-транзакции из фасада кошелька (прямой импорт prisma в application запрещён). */
 type WalletTransaction = Parameters<Parameters<WalletFacade['runInTransaction']>[1]>[0]
 
-/**
- * RTP записи игры (Decimal из БД) в проценты для калибровки лотереи.
- * Значение по умолчанию — витринные 96: поле rtp у house-игр означает
- * фактическую отдачу, а не «долю win-строк в нарезке», как у донора.
- */
-export const DEFAULT_GAME_RTP_PERCENT = '96'
-
-/** Демо-котёл пилота крутится на витринном RTP (сессии и её rtp в демо нет). */
-export const HOUSE_SLOT_DEMO_RTP_PERCENT = DEFAULT_GAME_RTP_PERCENT
-
-export function resolveTargetRtpPercent(rawRtp: unknown): string {
-  const parsed = Number(String(rawRtp ?? DEFAULT_GAME_RTP_PERCENT))
-  if (!Number.isFinite(parsed)) {
-    return DEFAULT_GAME_RTP_PERCENT
-  }
-  return String(Math.min(100, Math.max(0, parsed)))
-}
-
 function toFrontMoney(amount: string): number {
   return new Decimal(amount).toDecimalPlaces(2).toNumber()
 }
 
 /**
- * RTP демо-спина: витринные 96, но не выше потолка таблиц игры. В демо нет
- * строки games и цели админской витрины, а просить у узких таблиц (Ox ~90%)
- * 96% означало бы ошибку на каждом спине.
+ * RTP демо-спина: цель админа из `rtp_demo` (или щедрые 120 по умолчанию),
+ * но не выше потолка таблиц игры. В демо нет строки сессии, а просить у узких
+ * таблиц (Ox/Panda ~90 %) 120 % означало бы ошибку на каждом спине.
  */
-function demoRtpFor(game: HouseSlotGameConfig, paylines: number): string {
+function demoRtpFor(game: HouseSlotGameConfig, paylines: number, rtpDemo: unknown): string {
   const winPayouts = game.winRows.map((row) => houseRowPayout(row, game.payoutModel))
-  const ceiling = Math.floor(houseSlotRtpCeiling(winPayouts, paylines))
-  return String(Math.min(Number(HOUSE_SLOT_DEMO_RTP_PERCENT), ceiling))
+  return demoRtpPercent(rtpDemo, houseSlotRtpCeiling(winPayouts, paylines))
 }
 
 @Injectable()
@@ -142,6 +126,7 @@ export class OriginalsSpinUseCase {
     @Inject(OriginalsSessionLoader) private readonly sessionLoader: OriginalsSessionLoader,
     @Inject(WalletFacade) private readonly wallet: WalletFacade,
     @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
+    @Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository,
   ) {}
 
   async execute(request: TigerSpinRequest): Promise<TigerSpinData> {
@@ -192,14 +177,15 @@ export class OriginalsSpinUseCase {
     return money.multiply(money.multiply(parsed.betamount, parsed.cpl), String(payout))
   }
 
-  private executeDemoSpin(
+  private async executeDemoSpin(
     sessionToken: string,
     parsed: OriginalsSpinInput,
     betTotal: string,
-  ): TigerSpinData {
+  ): Promise<TigerSpinData> {
     const game = this.sessionLoader.loadDemoSlotGame(sessionToken)
     const paylines = Number(parsed.numline)
-    const outcome = this.drawOutcome(game, demoRtpFor(game, paylines), paylines)
+    const card = await this.catalog.findByExternalGameId(game.externalGameId)
+    const outcome = this.drawOutcome(game, demoRtpFor(game, paylines, card?.rtpDemo), paylines)
     const winTotal = this.winTotalFor(game, parsed, outcome)
     const displayCredit = money.add(money.subtract(TIGER_DEMO_START_CREDIT, betTotal), winTotal)
     return this.buildSpinData({
@@ -260,7 +246,7 @@ export class OriginalsSpinUseCase {
       return this.buildDuplicateSpinData(session, game, parsed, betTotal)
     }
     const paylines = Number(parsed.numline)
-    const outcome = this.drawOutcome(game, resolveTargetRtpPercent(session.game.rtp), paylines)
+    const outcome = this.drawOutcome(game, moneyRtpPercent(session.game.rtp), paylines)
     const winTotal = this.winTotalFor(game, parsed, outcome)
     const round = await this.openRound({ session, providerId, roundExternalId, transaction })
     const settled = await this.settleBet({
