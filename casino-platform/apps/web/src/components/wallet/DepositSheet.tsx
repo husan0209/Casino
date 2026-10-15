@@ -17,7 +17,7 @@ import { CurrencyIcon } from '@/components/ui/CurrencyIcon'
 import { toast } from '@/components/ui/toaster'
 import { CryptoDepositTicketPanel } from '@/components/wallet/CryptoDepositTicket'
 import { saveDepositContext } from '@/components/wallet/DepositReturnHandler'
-import { errText } from '@/lib/api'
+import { errCode, errText } from '@/lib/api'
 import {
   createCryptoDeposit,
   createFiatDeposit,
@@ -322,7 +322,14 @@ export function DepositSheet(): React.JSX.Element | null {
         toast.error('Не получен URL оплаты')
       }
     } catch (e) {
-      toast.error(errText(e))
+      // Отказ платёжной системы приходит английским «Rukassa error» /
+      // «NOWPayments error»: игроку оно не говорит ничего, а внутренности PSP
+      // наружу и не должны. Смысл один — деньги не списаны, это не тупик.
+      toast.error(
+        errCode(e) === 'PAYMENT_PROVIDER_ERROR'
+          ? 'Платёжная система отклонила платёж. Деньги не списаны — попробуйте другой способ или позже.'
+          : errText(e) || 'Не удалось пополнить',
+      )
     } finally {
       setLoading(false)
     }
