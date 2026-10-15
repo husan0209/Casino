@@ -320,5 +320,11 @@ describe('Отказ платёжной системы', () => {
       ),
     )
     expect(toast.error).not.toHaveBeenCalledWith('Rukassa error')
+
+    // Второй клик подряд = ещё один отказ = RuKassa морозит клиента игрока
+    // навсегда. Кнопка обязана исчезнуть сама, а не ждать совести игрока.
+    const cta = screen.getByRole('button', { name: /Повторить через \d+ с/ }) as HTMLButtonElement
+    expect(cta.disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: /Перейти к оплате/ })).toBeNull()
   })
 })

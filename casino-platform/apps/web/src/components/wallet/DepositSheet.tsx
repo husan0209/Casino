@@ -32,6 +32,9 @@ import { useWalletStore } from '@/stores/wallet'
     Крипта — настоящие логотипы монет; карта/P2P — нейтральные глифы
     (категории без одного бренда). Логотип СБП с wordmark в плитке 40px
     читается плохо — вернулись к нейтральной молнии (fast payments). */
+/** Пауза перед новой попыткой после отказа провайдера (см. `retryAfter`). */
+const PROVIDER_RETRY_COOLDOWN_S = 60
+
 function methodIcon(label: string): React.JSX.Element {
   const lower = label.toLowerCase()
   if (lower.includes('сбп')) {
@@ -246,6 +249,12 @@ export function DepositSheet(): React.JSX.Element | null {
   const [amountError, setAmountError] = useState('')
   const [method, setMethod] = useState('')
   const [loading, setLoading] = useState(false)
+  // RuKassa держит «клиента» по нашему user_code и замораживает его после серии
+  // отказов — навсегда, размораживает только поддержка. Значит второй клик по той
+  // же кнопке стоит игроку аккаунта: после отказа провайдера даём новую попытку не
+  // сразу, а с паузой.
+  const [retryAfter, setRetryAfter] = useState(0)
+  const [, forceTick] = useState(0)
   const [showCrypto, setShowCrypto] = useState(false)
   const [mode, setMode] = useState<'fiat' | 'crypto'>('fiat')
   const [ticket, setTicket] = useState<CryptoDepositTicket | null>(null)
@@ -275,6 +284,20 @@ export function DepositSheet(): React.JSX.Element | null {
       setMethod(first.id)
     }
   }, [config, depositSheet, currency])
+
+  // Обратный отсчёт живёт на тиках, а не на дедлайне в тексте: без перерисовки
+  // кнопка так и показала бы «через 60 с», когда уже можно пробовать.
+  useEffect(() => {
+    if (retryAfter <= Date.now()) {
+      return
+    }
+    const timer = setInterval(() => forceTick((n) => n + 1), 1000)
+    return () => {
+      clearInterval(timer)
+    }
+  }, [retryAfter])
+
+  const cooldownLeft = Math.max(0, Math.ceil((retryAfter - Date.now()) / 1000))
 
   const presets = config?.depositPresets ?? ['1000', '2000', '5000', '10000']
   const fiatMethods = config?.paymentMethods ?? []
@@ -330,6 +353,9 @@ export function DepositSheet(): React.JSX.Element | null {
           ? 'Платёжная система отклонила платёж. Деньги не списаны — попробуйте другой способ или позже.'
           : errText(e) || 'Не удалось пополнить',
       )
+      if (errCode(e) === 'PAYMENT_PROVIDER_ERROR') {
+        setRetryAfter(Date.now() + PROVIDER_RETRY_COOLDOWN_S * 1000)
+      }
     } finally {
       setLoading(false)
     }
@@ -404,12 +430,16 @@ export function DepositSheet(): React.JSX.Element | null {
             <button
               type="button"
               className="btn-money mt-5 w-full py-3.5 text-base"
-              disabled={loading}
+              disabled={loading || cooldownLeft > 0}
               onClick={() => {
                 void pay()
               }}
             >
-              {loading ? 'Переход к оплате…' : 'Перейти к оплате'}
+              {loading
+                ? 'Переход к оплате…'
+                : cooldownLeft > 0
+                  ? `Повторить через ${cooldownLeft} с`
+                  : 'Перейти к оплате'}
               {!loading && <ArrowRight size={16} aria-hidden />}
             </button>
 
