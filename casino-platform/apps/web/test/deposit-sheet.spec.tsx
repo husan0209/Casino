@@ -38,6 +38,7 @@ vi.mock('@/lib/api/wallet.api', () => ({
 
 vi.mock('@/lib/api', () => ({
   errText: (e: unknown): string => String(e),
+  errCode: (e: unknown): string | undefined => (e as { code?: string } | null)?.code ?? undefined,
   apiGet: vi.fn(),
   apiPost: vi.fn(),
 }))
@@ -113,6 +114,7 @@ vi.mock('@/stores/auth', () => ({
   useAuthStore: { getState: () => ({ user: userMock }) },
 }))
 
+import { toast } from '@/components/ui/toaster'
 import { DepositSheet } from '@/components/wallet/DepositSheet'
 
 function renderSheet(): void {
@@ -292,5 +294,31 @@ describe('GAP-59: DepositSheet (крипта) — активный кошелё�
     expect(screen.queryByText('1 000.00 USDT')).toBeNull()
     expect(screen.queryByText('10 000.00 USDT')).toBeNull()
     expect(screen.queryByText(/Минимум/)).toBeNull()
+  })
+})
+
+describe('Отказ платёжной системы', () => {
+  /**
+   * PSP отвечает по-английски и про свои внутренности («Rukassa error»), а игрок
+   * остаётся один на один с 502 в консоли. Ему нужен вывод: деньги не списаны.
+   */
+  it('вместо текста провайдера говорит, что деньги не списаны', async () => {
+    kycMock.mockResolvedValue({ status: 'approved' })
+    depositMock.mockRejectedValue({
+      code: 'PAYMENT_PROVIDER_ERROR',
+      message: 'Rukassa error',
+    })
+    renderSheet()
+
+    fireEvent.change(screen.getByPlaceholderText('2000'), { target: { value: '5000' } })
+    fireEvent.click(screen.getByRole('button', { name: /Перейти к оплате/ }))
+
+    await waitFor(() => expect(depositMock).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        'Платёжная система отклонила платёж. Деньги не списаны — попробуйте другой способ или позже.',
+      ),
+    )
+    expect(toast.error).not.toHaveBeenCalledWith('Rukassa error')
   })
 })
