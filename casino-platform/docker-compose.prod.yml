@@ -71,6 +71,12 @@ services:
   # (grace 45s) — письма доразбираются до SIGKILL.
   worker:
     image: casino-platform-api
+    # Образ локальный: его собирает сервис api (тот же `image` выше). Без этого
+    # `compose build --pull` гоняет в реестр за `casino-platform-api` и падает,
+    # когда очередь на pull достаётся worker, а не api: 15.10 выкатка встала ровно
+    # на этом («pull access denied for casino-platform-api»), накануне тот же шаг
+    # ограничился предупреждением — то есть лотерея по порядку сервисов.
+    pull_policy: never
     command: ['node', 'apps/api/dist/worker.js']
     env_file: [.env.production]
     environment:
