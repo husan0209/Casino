@@ -8,11 +8,46 @@ export class KycRequiredError extends AppError {
   }
 }
 export class PaymentProviderError extends AppError {
-  readonly code = 'PAYMENT_PROVIDER_ERROR'
+  // : string, а не литерал — иначе подкласс не сможет подставить свой код.
+  readonly code: string = 'PAYMENT_PROVIDER_ERROR'
   readonly httpStatus = 502
   constructor(m = 'Payment provider error', ctx?: Record<string, unknown>) {
     super(m, ctx)
   }
+}
+
+/**
+ * Отказ провайдера — это не одна «502». «Твой счёт приостановлен» и «такого
+ * способа нет» требуют от игрока разных действий, а общая фраза отправляет его
+ * долбить кнопку: RuKassa ведёт клиента по нашему `user_code` и после серии
+ * отказов замораживает его навсегда. Поэтому у каждого отказа свой стабильный
+ * код, а текст провайдера наружу по-прежнему не уходит — он в БД и в логе.
+ *
+ * Классифицируем по тексту, а не по коду: у RuKassa `error: 300` общий и для
+ * замороженного клиента, и для неактивированного метода.
+ */
+export class PaymentProviderAccountFrozenError extends PaymentProviderError {
+  override readonly code: string = 'PAYMENT_PROVIDER_ACCOUNT_FROZEN'
+  constructor() {
+    super('Payment provider suspended this account')
+  }
+}
+
+export class PaymentProviderMethodUnavailableError extends PaymentProviderError {
+  override readonly code: string = 'PAYMENT_PROVIDER_METHOD_UNAVAILABLE'
+  constructor() {
+    super('Payment provider has no such method enabled')
+  }
+}
+
+export function providerRefusalError(reason: string): PaymentProviderError {
+  if (/client is frozen/i.test(reason)) {
+    return new PaymentProviderAccountFrozenError()
+  }
+  if (/method is not activated/i.test(reason)) {
+    return new PaymentProviderMethodUnavailableError()
+  }
+  return new PaymentProviderError('Payment provider error')
 }
 export class AmountTooSmallError extends AppError {
   readonly code = 'AMOUNT_TOO_SMALL'

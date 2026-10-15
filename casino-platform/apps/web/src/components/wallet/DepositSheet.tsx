@@ -35,6 +35,20 @@ import { useWalletStore } from '@/stores/wallet'
 /** Пауза перед новой попыткой после отказа провайдера (см. `retryAfter`). */
 const PROVIDER_RETRY_COOLDOWN_S = 60
 
+/**
+ * Игрок получает вывод и следующий шаг, а не строку от RuKassa: у «счёт
+ * приостановлен» и «такого способа нет» разные действия, и путать их нельзя —
+ * в первом случае повторные клики только закапывают аккаунт глубже.
+ */
+const PROVIDER_REFUSAL_TEXT: Record<string, string> = {
+  PAYMENT_PROVIDER_ACCOUNT_FROZEN:
+    'Платёжная система приостановила операции по вашему счёту. Деньги не списаны. Напишите в поддержку — разберёмся.',
+  PAYMENT_PROVIDER_METHOD_UNAVAILABLE:
+    'Этот способ оплаты сейчас недоступен. Выберите другой или попробуйте позже.',
+  PAYMENT_PROVIDER_ERROR:
+    'Платёжная система отклонила платёж. Деньги не списаны — попробуйте другой способ или позже.',
+}
+
 function methodIcon(label: string): React.JSX.Element {
   const lower = label.toLowerCase()
   if (lower.includes('сбп')) {
@@ -348,12 +362,10 @@ export function DepositSheet(): React.JSX.Element | null {
       // Отказ платёжной системы приходит английским «Rukassa error» /
       // «NOWPayments error»: игроку оно не говорит ничего, а внутренности PSP
       // наружу и не должны. Смысл один — деньги не списаны, это не тупик.
-      toast.error(
-        errCode(e) === 'PAYMENT_PROVIDER_ERROR'
-          ? 'Платёжная система отклонила платёж. Деньги не списаны — попробуйте другой способ или позже.'
-          : errText(e) || 'Не удалось пополнить',
-      )
-      if (errCode(e) === 'PAYMENT_PROVIDER_ERROR') {
+      const code = errCode(e)
+      const refusal = code ? PROVIDER_REFUSAL_TEXT[code] : undefined
+      toast.error(refusal ?? (errText(e) || 'Не удалось пополнить'))
+      if (refusal) {
         setRetryAfter(Date.now() + PROVIDER_RETRY_COOLDOWN_S * 1000)
       }
     } finally {
