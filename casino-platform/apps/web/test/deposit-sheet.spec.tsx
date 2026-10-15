@@ -327,4 +327,26 @@ describe('Отказ платёжной системы', () => {
     expect(cta.disabled).toBe(true)
     expect(screen.queryByRole('button', { name: /Перейти к оплате/ })).toBeNull()
   })
+
+  /**
+   * «Заморожен счёт» и «отклонено» — разные следующие шаги. Если показать им
+   * один текст, игрок жмёт кнопку снова и получает всё более длинную блокировку.
+   */
+  it('приостановленный счёт подсказывает поддержку, а не «попробуй ещё»', async () => {
+    kycMock.mockResolvedValue({ status: 'approved' })
+    depositMock.mockRejectedValue({
+      code: 'PAYMENT_PROVIDER_ACCOUNT_FROZEN',
+      message: 'Payment provider suspended this account',
+    })
+    renderSheet()
+
+    fireEvent.change(screen.getByPlaceholderText('2000'), { target: { value: '5000' } })
+    fireEvent.click(screen.getByRole('button', { name: /Перейти к оплате/ }))
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        'Платёжная система приостановила операции по вашему счёту. Деньги не списаны. Напишите в поддержку — разберёмся.',
+      ),
+    )
+  })
 })
