@@ -15,6 +15,8 @@ import { RukassaClient } from '../src/modules/payments/infrastructure/clients/ru
 
 const TOKEN = 'test-token-123'
 const SHOP = '777'
+/** Игрок: RuKassa держит «клиента» по `user_code` и может его заморозить. */
+const USER = 'u-5f2a'
 
 /** form-urlencoded тело запроса -> объект для утверждений по полям. */
 function formFieldsOf(init: RequestInit): Record<string, string> {
@@ -64,6 +66,7 @@ describe('RukassaClient — контракт lk.rukassa.io', () => {
         amount: '300',
         orderId: '1750000000000001',
         data: '{"payment_request_id":"pr-1"}',
+        userCode: USER,
         method: 'sbp',
         currency: 'RUB',
       })
@@ -76,10 +79,11 @@ describe('RukassaClient — контракт lk.rukassa.io', () => {
       )
       expect(formFieldsOf(init)).toEqual({
         shop_id: SHOP,
-        // Присутствие `user_code` обязательно: без него живой /create отвечает
-        // 403 «error user_code», хотя значение они не сверяют (проверено 1 и
-        // 999999 — оба проходят). В /getPayInfo поле не нужно.
-        user_code: SHOP,
+        // `user_code` обязателен и обязан быть персональным: без поля живой /create
+        // отвечает 403 «error user_code», а под общим id магазина RuKassa заводит
+        // ОДНОГО клиента и морозит его (замер 15.10: 4104 → «client is frozen»,
+        // любой новый id → 200 со ссылкой). В /getPayInfo поле не нужно.
+        user_code: USER,
         token: TOKEN,
         order_id: '1750000000000001',
         amount: '300',
@@ -97,6 +101,7 @@ describe('RukassaClient — контракт lk.rukassa.io', () => {
         amount: '100',
         orderId: '1',
         data: '{}',
+        userCode: USER,
         method: 'p2p',
       })
 
@@ -107,7 +112,7 @@ describe('RukassaClient — контракт lk.rukassa.io', () => {
     it('не подставляет метод по умолчанию, если он не передан', async () => {
       fetchMock.mockResolvedValue(jsonResponse({ id: 44, url: 'u' }))
 
-      await makeClient().createPayment({ amount: '100', orderId: '2', data: '{}' })
+      await makeClient().createPayment({ amount: '100', orderId: '2', data: '{}', userCode: USER })
 
       const fields = formFieldsOf(fetchMock.mock.calls[0]![1] as RequestInit)
       expect(fields.method).toBeUndefined()
@@ -118,7 +123,7 @@ describe('RukassaClient — контракт lk.rukassa.io', () => {
       fetchMock.mockResolvedValue(jsonResponse({ error: 403, message: 'Метод отключён' }))
 
       await expect(
-        makeClient().createPayment({ amount: '100', orderId: '3', data: '{}' }),
+        makeClient().createPayment({ amount: '100', orderId: '3', data: '{}', userCode: USER }),
       ).rejects.toThrow(/Метод отключён/)
     })
 
@@ -127,12 +132,22 @@ describe('RukassaClient — контракт lk.rukassa.io', () => {
         jsonResponse({ id: 55, url: 'https://lk.rukassa.io/pay/55', error: 0 }),
       )
       expect(
-        await makeClient().createPayment({ amount: '100', orderId: '30', data: '{}' }),
+        await makeClient().createPayment({
+          amount: '100',
+          orderId: '30',
+          data: '{}',
+          userCode: USER,
+        }),
       ).toEqual({ paymentId: '55', paymentUrl: 'https://lk.rukassa.io/pay/55' })
 
       fetchMock.mockResolvedValue(jsonResponse({ id: 56, url: 'u', error: false }))
       expect(
-        await makeClient().createPayment({ amount: '100', orderId: '31', data: '{}' }),
+        await makeClient().createPayment({
+          amount: '100',
+          orderId: '31',
+          data: '{}',
+          userCode: USER,
+        }),
       ).toEqual({ paymentId: '56', paymentUrl: 'u' })
     })
 
@@ -140,7 +155,7 @@ describe('RukassaClient — контракт lk.rukassa.io', () => {
       fetchMock.mockResolvedValue(jsonResponse({ status: 'ok' }))
 
       await expect(
-        makeClient().createPayment({ amount: '100', orderId: '4', data: '{}' }),
+        makeClient().createPayment({ amount: '100', orderId: '4', data: '{}', userCode: USER }),
       ).rejects.toThrow(/unexpected response shape/)
     })
 
@@ -148,7 +163,7 @@ describe('RukassaClient — контракт lk.rukassa.io', () => {
       fetchMock.mockResolvedValue(new Response('gateway blocked', { status: 403 }))
 
       await expect(
-        makeClient().createPayment({ amount: '100', orderId: '5', data: '{}' }),
+        makeClient().createPayment({ amount: '100', orderId: '5', data: '{}', userCode: USER }),
       ).rejects.toThrow(/HTTP 403/)
     })
 
@@ -156,7 +171,7 @@ describe('RukassaClient — контракт lk.rukassa.io', () => {
       fetchMock.mockResolvedValue(new Response(`notice: token=${TOKEN} invalid`, { status: 400 }))
 
       const error = await makeClient()
-        .createPayment({ amount: '100', orderId: '7', data: '{}' })
+        .createPayment({ amount: '100', orderId: '7', data: '{}', userCode: USER })
         .then(() => null)
         .catch((e: Error) => e)
 
@@ -167,7 +182,12 @@ describe('RukassaClient — контракт lk.rukassa.io', () => {
     it('в dev без ключей — стаб, без обращения к провайдеру', async () => {
       const client = makeClient({ NODE_ENV: 'development', RUKASSA_SHOP_ID: undefined })
 
-      const res = await client.createPayment({ amount: '100', orderId: '6', data: '{}' })
+      const res = await client.createPayment({
+        amount: '100',
+        orderId: '6',
+        data: '{}',
+        userCode: USER,
+      })
 
       expect(fetchMock).not.toHaveBeenCalled()
       expect(res.paymentId).toBe('rk_6')

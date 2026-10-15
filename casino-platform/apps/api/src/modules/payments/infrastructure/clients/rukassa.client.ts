@@ -86,11 +86,12 @@ export class RukassaClient implements IRukassaClient {
     const { base, shopId, token } = this.assertConfigured()
     const form = new URLSearchParams({
       shop_id: shopId,
-      // RuKassa требует присутствие `user_code` в /create: без него — 403
-      // «error user_code», хотя значение они не проверяют (1 и 999999 проходят
-      // одинаково). Отдаём код магазина: отдельная настройка под это не нужна,
-      // а в /getPayInfo поле не требуется вовсе.
-      user_code: shopId,
+      // `user_code` — их ключ КЛИЕНТА: под ним живёт запись плательщика, и её
+      // можно заморозить. Кодом магазина сюда лезть нельзя (я так и сделал в #253
+      // и получил «client is frozen» на 4104 уже через сутки — все игроки и все
+      // мои пробные заявки были одним клиентом). Требуется САМО field, значение
+      // они не валидируют; в /getPayInfo поле не нужно вовсе.
+      user_code: params.userCode,
       token,
       order_id: params.orderId,
       amount: params.amount,

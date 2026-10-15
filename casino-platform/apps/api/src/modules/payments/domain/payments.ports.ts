@@ -66,6 +66,11 @@ export interface RukassaCreatePayment {
   amount: string
   orderId: string
   data: string
+  /**
+   * Код плательщика на их стороне (`user_code`): под ним RuKassa держит клиента
+   * и может его заморозить, поэтому это должен быть id игрока, а не общий на всех.
+   */
+  userCode: string
   method?: string
   currency?: string
 }
