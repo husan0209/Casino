@@ -114,6 +114,9 @@ describe('CreateFiatDepositUseCase', () => {
     expect(call.method).toBe('card')
     expect(String(call.orderId)).toMatch(/^\d{13,18}$/)
     expect(call.data).toBe('{"payment_request_id":"pr-1"}')
+    // `user_code` — их ключ КЛИЕНТА. Общий на всех (кодом магазина) RuKassa
+    // замораживает суточным лимитом «client is frozen», поэтому — id игрока.
+    expect(call.userCode).toBe('u-1')
   })
 
   it('order_id числовой и не повторяется в пределах одного запуска', async () => {

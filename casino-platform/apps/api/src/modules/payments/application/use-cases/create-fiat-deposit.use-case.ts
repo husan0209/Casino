@@ -88,6 +88,10 @@ export class CreateFiatDepositUseCase {
         orderId: rukassaOrderId(),
         currency,
         method,
+        // Их «клиент» = `user_code`. Общий на всех id магазина RuKassa замораживает
+        // (проверено живьём: 4104 → «client is frozen», любой свежий id → 200),
+        // поэтому код игрока.
+        userCode: userId,
         // Сквозной JSON: Rukassa возвращает его в уведомлении без изменений,
         // поэтому платёжку находим по нашему id, а не по их номерам.
         data: JSON.stringify({ payment_request_id: pr.id }),

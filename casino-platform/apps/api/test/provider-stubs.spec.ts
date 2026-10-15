@@ -45,6 +45,7 @@ describe('Provider Stubs Security', () => {
           amount: '100',
           orderId: '1750000000000001',
           data: '{"payment_request_id":"pr-1"}',
+          userCode: 'u-1',
           method: 'card',
         }),
       ).rejects.toThrow(/обязательные ключи/)
