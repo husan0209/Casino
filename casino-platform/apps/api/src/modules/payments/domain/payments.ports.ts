@@ -98,6 +98,20 @@ export interface IPaymentRequestRepository {
       amountRub?: string | undefined
     },
   ): Promise<PaymentRequest>
+  /**
+   * Сколько заявок на пополнение игрок создал с `since` и не довёл до оплаты.
+   *
+   * Нужен суточному самолимиту фиата: RuKassa ведёт плательщика по нашему
+   * `user_code` и, как подтвердил их саппорт, замораживает клиента после серии
+   * неоплаченных заявок. Порог измерен на стенде 16.10: три неоплаченных счёта,
+   * и на четвёртом — `403 client is frozen`. Самостоятельно разморозить клиента
+   * мы не можем (API-метода нет), поэтому останавливаться надо ДО их порога.
+   */
+  countUnfinishedDeposits(args: {
+    userId: string
+    provider: PaymentProvider
+    since: Date
+  }): Promise<number>
   listUser(args: {
     userId: string
     type?: 'deposit' | 'withdrawal'

@@ -9,9 +9,15 @@
  */
 import {
   CreateFiatDepositUseCase,
+  FIAT_UNPAID_ATTEMPTS_PER_DAY,
   rukassaOrderId,
+  startOfMoscowDay,
 } from '../src/modules/payments/application/use-cases/create-fiat-deposit.use-case'
-import { AmountTooSmallError, PaymentProviderError } from '../src/modules/payments/domain/errors'
+import {
+  AmountTooSmallError,
+  FiatDepositAttemptLimitError,
+  PaymentProviderError,
+} from '../src/modules/payments/domain/errors'
 
 import type {
   IPaymentRequestRepository,
@@ -25,15 +31,20 @@ const INPUT = { amount: '1000', currency: 'RUB', method: 'card' }
 type CreatedRow = Record<string, unknown>
 type StatusUpdate = { id: string; status: string; extra: Record<string, unknown> | undefined }
 
-function makeDeps(over: { rukassaError?: Error } = {}) {
+function makeDeps(over: { rukassaError?: Error; unfinished?: number } = {}) {
   const created: CreatedRow[] = []
   const statusUpdates: StatusUpdate[] = []
   const geoCalls: Array<{ fn: string; args: unknown[] }> = []
+  const countCalls: Array<Record<string, unknown>> = []
 
   const repo = {
     create: async (data: CreatedRow) => {
       created.push(data)
       return { id: 'pr-1' } as unknown as PaymentRequest
+    },
+    countUnfinishedDeposits: async (args: Record<string, unknown>) => {
+      countCalls.push(args)
+      return over.unfinished ?? 0
     },
     updateStatus: async (id: string, status: string, extra?: Record<string, unknown>) => {
       statusUpdates.push({ id, status, extra })
@@ -67,7 +78,7 @@ function makeDeps(over: { rukassaError?: Error } = {}) {
   const users = { getGeoContext: async () => ({ country: 'RU' }) } as never
 
   const uc = new CreateFiatDepositUseCase(repo, rukassa, geo, users)
-  return { uc, created, statusUpdates, geoCalls, rukassaCalls }
+  return { uc, created, statusUpdates, geoCalls, rukassaCalls, countCalls }
 }
 
 describe('CreateFiatDepositUseCase', () => {
@@ -188,6 +199,47 @@ describe('CreateFiatDepositUseCase', () => {
     for (const [reason, code] of cases) {
       const d = makeDeps({ rukassaError: new Error(reason) })
       await expect(d.uc.execute('u-1', INPUT)).rejects.toMatchObject({ code })
+    }
+  })
+
+  /**
+   * Суточный самолимит. Смысл не в «не спамить кнопкой», а в том, что каждая
+   * неоплаченная заявка стоит игрока у RuKassa: порог измерен на стенде 16.10
+   * (три неоплаченных счёта проходят, на четвёртом — `client is frozen`), а
+   * разморозки через API нет ни у нас, ни у мерчанта.
+   */
+  it('двух неоплаченных заявок за сутки достаточно: наружу 422, до RuKassa не дошло', async () => {
+    const d = makeDeps({ unfinished: FIAT_UNPAID_ATTEMPTS_PER_DAY })
+
+    await expect(d.uc.execute('u-1', INPUT)).rejects.toThrow(FiatDepositAttemptLimitError)
+    expect(d.created).toHaveLength(0)
+    expect(d.rukassaCalls).toHaveLength(0)
+  })
+
+  it('окно самолимита — текущие сутки по МСК, считаем только фиатные пополнения', async () => {
+    const d = makeDeps({ unfinished: 1 })
+    await d.uc.execute('u-1', INPUT)
+
+    expect(d.countCalls).toHaveLength(1)
+    const args = d.countCalls[0]!
+    expect(args.userId).toBe('u-1')
+    expect(args.provider).toBe('rukassa')
+    const since = args.since as Date
+    expect(since.getTime()).toBeLessThanOrEqual(Date.now())
+    // полночь по МСК = 21:00 UTC ⇒ (since + 3 ч) кратно суткам
+    expect((since.getTime() + 3 * 3_600_000) % 86_400_000).toBe(0)
+  })
+
+  describe('startOfMoscowDay', () => {
+    const boundaries: Array<[string, string]> = [
+      ['2026-10-16T00:10:00.000Z', '2026-10-15T21:00:00.000Z'],
+      ['2026-10-16T20:00:00.000Z', '2026-10-15T21:00:00.000Z'],
+      ['2026-10-16T21:30:00.000Z', '2026-10-16T21:00:00.000Z'],
+    ]
+    for (const [now, expected] of boundaries) {
+      it(`${now} → ${expected}`, () => {
+        expect(startOfMoscowDay(new Date(now)).toISOString()).toBe(expected)
+      })
     }
   })
 })

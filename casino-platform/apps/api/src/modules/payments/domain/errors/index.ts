@@ -49,6 +49,22 @@ export function providerRefusalError(reason: string): PaymentProviderError {
   }
   return new PaymentProviderError('Payment provider error')
 }
+
+/**
+ * Суточный самолимит фиатного пополнения (422, наше правило, а не отказ PSP).
+ *
+ * Отличается от `PAYMENT_PROVIDER_*` тем, что до провайдера запрос не дошёл:
+ * Игрок уже исчерпал неоплаченные заявки, и следующая могла бы стоить ему
+ * аккаунта у RuKassa. Кода хватает, чтобы фронт показал «завтра после 00:00»,
+ * а не «платёжная система отклонила платёж».
+ */
+export class FiatDepositAttemptLimitError extends AppError {
+  readonly code = 'FIAT_DEPOSIT_ATTEMPT_LIMIT'
+  readonly httpStatus = 422
+  constructor(m = 'Daily limit of unpaid deposit requests reached') {
+    super(m)
+  }
+}
 export class AmountTooSmallError extends AppError {
   readonly code = 'AMOUNT_TOO_SMALL'
   readonly httpStatus = 422

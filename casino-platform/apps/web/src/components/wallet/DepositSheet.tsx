@@ -49,6 +49,16 @@ const PROVIDER_REFUSAL_TEXT: Record<string, string> = {
     'Платёжная система отклонила платёж. Деньги не списаны — попробуйте другой способ или позже.',
 }
 
+/**
+ * Отказ НЕ провайдера, а наш: суточный самолимит на неоплаченные заявки.
+ * Кулдаун сюда не навешиваем — блокировка до полуночи, «повтори через минуту»
+ * было бы ложным обещанием.
+ */
+const LOCAL_LIMIT_TEXT: Record<string, string> = {
+  FIAT_DEPOSIT_ATTEMPT_LIMIT:
+    'Ты несколько раз не завершил оплату — пополнение рублями доступно снова завтра после 00:00. Нужно сейчас: USDT TRC20 или BTC.',
+}
+
 function methodIcon(label: string): React.JSX.Element {
   const lower = label.toLowerCase()
   if (lower.includes('сбп')) {
@@ -364,7 +374,8 @@ export function DepositSheet(): React.JSX.Element | null {
       // наружу и не должны. Смысл один — деньги не списаны, это не тупик.
       const code = errCode(e)
       const refusal = code ? PROVIDER_REFUSAL_TEXT[code] : undefined
-      toast.error(refusal ?? (errText(e) || 'Не удалось пополнить'))
+      const localLimit = code ? LOCAL_LIMIT_TEXT[code] : undefined
+      toast.error(refusal ?? localLimit ?? (errText(e) || 'Не удалось пополнить'))
       if (refusal) {
         setRetryAfter(Date.now() + PROVIDER_RETRY_COOLDOWN_S * 1000)
       }
