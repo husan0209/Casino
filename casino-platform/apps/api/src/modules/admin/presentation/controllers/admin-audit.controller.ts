@@ -21,7 +21,7 @@ export class AdminAuditController {
   constructor(@Inject(AuditLogService) private readonly audit: AuditLogService) {}
 
   @Get()
-  @UsePipes(new ZodValidationPipe(AuditListQuerySchema))
+  @UsePipes(new ZodValidationPipe(AuditListQuerySchema, ['query']))
   async list(@Query() q: AuditListQueryDto): Promise<{
     items: AuditLog[]
     meta: { page: number; perPage: number; total: number }

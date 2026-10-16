@@ -80,7 +80,7 @@ export class AdminFinanceController {
 
   // UC-PAY-16 transactions
   @Get('transactions')
-  @UsePipes(new ZodValidationPipe(AdminTransactionsQuerySchema))
+  @UsePipes(new ZodValidationPipe(AdminTransactionsQuerySchema, ['query']))
   async transactions(@Query() q: AdminTransactionsQueryDto): Promise<{
     items: LedgerEntryAdminRow[]
     meta: { page: number; perPage: number; total: number }
@@ -97,7 +97,7 @@ export class AdminFinanceController {
 
   // UC-PAY-17 payment_requests
   @Get('payment-requests')
-  @UsePipes(new ZodValidationPipe(AdminPaymentRequestsQuerySchema))
+  @UsePipes(new ZodValidationPipe(AdminPaymentRequestsQuerySchema, ['query']))
   async paymentRequests(@Query() q: AdminPaymentRequestsQueryDto): Promise<{
     items: PaymentRequestAdminRow[]
     meta: { page: number; perPage: number; total: number }
@@ -126,7 +126,7 @@ export class AdminFinanceController {
 
   // UC-PAY-10 withdrawals list
   @Get('withdrawals')
-  @UsePipes(new ZodValidationPipe(AdminWithdrawalsQuerySchema))
+  @UsePipes(new ZodValidationPipe(AdminWithdrawalsQuerySchema, ['query']))
   async withdrawals(@Query() q: AdminWithdrawalsQueryDto): Promise<{
     items: PaymentRequestAdminRow[]
     meta: { page: number; perPage: number; total: number }
