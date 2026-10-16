@@ -45,6 +45,26 @@ export function moneyRtpPercent(rawRtp: unknown): string {
   return String(moneyRtpValue(rawRtp))
 }
 
+/**
+ * ТЗ ч.9 §7.2 — RTP спина под управлением движка вовлечения.
+ *
+ * Это явное исключение из `MONEY_RTP_MAX_PERCENT = 100`: базовое значение
+ * `games.rtp` по-прежнему режется политикой выше, а движок подставляет свою
+ * цель по фазе (ONBOARDING 105–110 %, REACTIVATION 103–108 %), и именно на
+ * этом держится «медовый месяц» §4.1. Значение приходит из движка, а не из
+ * админского поля, поэтому политику витрины тут не применяем — но верх
+ * отсекается теми же границами §7.1/§17 (90…110) и потолком таблицы выплат.
+ *
+ * Отдельная функция вместо флага в `moneyRtpPercent` — чтобы появление
+ * значений больше 100 % в денежном контуре всегда было видно в диффе.
+ */
+export function engagementRtpPercent(adjustedPercent: number, min = 90, max = 110): string {
+  if (!Number.isFinite(adjustedPercent)) {
+    return moneyRtpPercent(null)
+  }
+  return String(Math.min(max, Math.max(min, adjustedPercent)))
+}
+
 /** Цель в демо: поле админа либо 120, и никогда выше потолка таблиц игры.
  * Без этого узкая игра (Fortune Ox/Panda умеют ~90 %) ловила бы
  * ORIGINALS_RTP_UNREACHABLE на каждом спине вместо щедрого показа.

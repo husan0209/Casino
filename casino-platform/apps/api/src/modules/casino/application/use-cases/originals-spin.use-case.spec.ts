@@ -18,6 +18,7 @@ import {
 } from '../../domain/repositories/casino.repository'
 import { FORTUNE_TIGER_TABLES } from '../../infrastructure/providers/house/spin-data/fortune-tiger.tables'
 import { type TigerSpinRow } from '../../infrastructure/providers/house/spin-data/tiger-spin-row'
+import { type EngagementEngineService } from '../services/engagement-engine.service'
 
 import type { HouseSlotGameConfig, IHouseSlotGames } from '../../domain/house-slot-game'
 
@@ -277,6 +278,19 @@ function makeDemoBalance(): IDemoBalanceStore & { balances: Map<string, string> 
   }
 }
 
+/**
+ * Двойник движка вовлечения (ТЗ ч.9) с выключенным флагом: спин идёт по
+ * базовой ветке. Тесты самого движака живут в domain/engagement/*.spec.ts.
+ */
+function makeEngagement(): EngagementEngineService {
+  return {
+    isEnabledFor: () => false,
+    prepare: async () => null,
+    applyMechanics: () => ({ row: null, isLdw: false, isNearMiss: false, pendingEvents: [] }),
+    track: async () => {},
+  } as unknown as EngagementEngineService
+}
+
 describe('OriginalsSpinUseCase demo', () => {
   function makeDemoUseCase(rtpDemo: string | null = null): {
     useCase: OriginalsSpinUseCase
@@ -293,6 +307,7 @@ describe('OriginalsSpinUseCase demo', () => {
         play.repository,
         makeCatalog(rtpDemo),
         makeDemoBalance(),
+        makeEngagement(),
       ),
       wallet,
     }
@@ -393,6 +408,7 @@ describe('OriginalsSpinUseCase real', () => {
       play.repository,
       makeCatalog(null),
       makeDemoBalance(),
+      makeEngagement(),
     )
   })
 
@@ -456,6 +472,7 @@ describe('OriginalsSpinUseCase real', () => {
       closedPlay.repository,
       makeCatalog(null),
       makeDemoBalance(),
+      makeEngagement(),
     )
 
     await expect(
@@ -477,6 +494,7 @@ describe('OriginalsSpinUseCase real', () => {
       foreignPlay.repository,
       makeCatalog(null),
       makeDemoBalance(),
+      makeEngagement(),
     )
 
     await expect(

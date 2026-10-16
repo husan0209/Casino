@@ -4,12 +4,20 @@ import { ConfigModule } from '@nestjs/config'
 import { AdminModule } from '../admin/admin.module'
 import { AuthModule } from '../auth/auth.module'
 import { WalletModule } from '../wallet/wallet.module'
+import { EngagementEngineService } from './application/services/engagement-engine.service'
+import { EngagementMetricsService } from './application/services/engagement-metrics.service'
 import { GameCallbackService } from './application/services/game-callback.service'
 import { AdminSetGameFlagsUseCase } from './application/use-cases/admin-set-game-flags.use-case'
 import { AdminSetProviderEnabledUseCase } from './application/use-cases/admin-set-provider-enabled.use-case'
 import { AdminSyncProviderGamesUseCase } from './application/use-cases/admin-sync-provider-games.use-case'
 import { AdminUpdateGameUseCase } from './application/use-cases/admin-update-game.use-case'
 import { AztecSpinUseCase } from './application/use-cases/aztec-spin.use-case'
+import { AdjustRtpUseCase } from './application/use-cases/engagement/adjust-rtp.use-case'
+import { CalculateEngagementUseCase } from './application/use-cases/engagement/calculate-engagement.use-case'
+import { CheckReactivationUseCase } from './application/use-cases/engagement/check-reactivation.use-case'
+import { GenerateNearMissUseCase } from './application/use-cases/engagement/generate-near-miss.use-case'
+import { SelectLdwUseCase } from './application/use-cases/engagement/select-ldw.use-case'
+import { TrackBehaviorUseCase } from './application/use-cases/engagement/track-behavior.use-case'
 import { FavoritesUseCase } from './application/use-cases/favorites.use-case'
 import { LaunchGameUseCase } from './application/use-cases/launch-game.use-case'
 import { ListGamesUseCase } from './application/use-cases/list-games.use-case'
@@ -27,6 +35,9 @@ import {
   GAME_PLAY_REPOSITORY,
   GAME_PROVIDER_REPOSITORY,
 } from './domain/repositories/casino.repository'
+import { ENGAGEMENT_CACHE } from './domain/repositories/engagement-cache.port'
+import { ENGAGEMENT_REPOSITORY } from './domain/repositories/engagement.repository'
+import { RedisEngagementCache } from './infrastructure/cache/engagement-cache.adapter'
 import { DemoBalanceRedisStore } from './infrastructure/demo/demo-balance.redis'
 import { DemoProviderAdapter } from './infrastructure/providers/demo/demo-provider.adapter'
 import { HouseSlotGamesRegistry } from './infrastructure/providers/house/house-slot-games.registry'
@@ -37,6 +48,7 @@ import {
   PrismaGamePlayRepository,
   PrismaGameProviderRepository,
 } from './infrastructure/repositories/casino.prisma.repository'
+import { PrismaEngagementRepository } from './infrastructure/repositories/engagement.prisma.repository'
 import { AztecController } from './presentation/controllers/aztec.controller'
 import { CasinoAdminController } from './presentation/controllers/casino-admin.controller'
 import { CasinoController } from './presentation/controllers/casino.controller'
@@ -74,6 +86,20 @@ import { ProviderCallbackController } from './presentation/controllers/provider-
     // Лицевой счёт демо-сессии: ставка списывается с него, а не пересчитывается
     // от стартового кредита на каждый бросок.
     { provide: DEMO_BALANCE_STORE, useClass: DemoBalanceRedisStore },
+    // ТЗ ч.9: хранилище состояния/журнала движка и кэш Score (§6.4).
+    { provide: ENGAGEMENT_REPOSITORY, useClass: PrismaEngagementRepository },
+    { provide: ENGAGEMENT_CACHE, useClass: RedisEngagementCache },
+    // UC-ENG-01…06 и движок §9.1. Выключается флагом ENGAGEMENT_ENABLED
+    // (по умолчанию false — см. domain/engagement/engagement-config.ts).
+    CalculateEngagementUseCase,
+    AdjustRtpUseCase,
+    CheckReactivationUseCase,
+    SelectLdwUseCase,
+    GenerateNearMissUseCase,
+    TrackBehaviorUseCase,
+    EngagementEngineService,
+    // §11.1 — счётчики процесса и периодический снапшот в Pino (§11.2).
+    EngagementMetricsService,
     GameCallbackService,
     LaunchGameUseCase,
     ListGamesUseCase,

@@ -19,7 +19,7 @@ Online casino платформа для рынка СНГ. MVP на русско
 3. `docs/CONVENTIONS.md` — coding conventions
 4. `docs/MODULE_BOUNDARIES.md` — карта модулей и их границ
 5. `docs/MODULE_TEMPLATE.md` — пошаговый шаблон создания модуля
-6. Релевантная TZ-часть (`docs/tz-part-1-foundation.md` … `docs/tz-part-7-devops-security-qa.md`)
+6. Релевантная TZ-часть (`docs/tz-part-1-foundation.md` … `docs/tz-part-9-player-engagement-engine.md`)
 7. `packages/shared-types/src/` — существующие типы и enum-ы
 8. `packages/database/prisma/schema.prisma` — текущая структура БД
 

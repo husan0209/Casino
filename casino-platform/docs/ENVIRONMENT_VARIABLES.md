@@ -594,4 +594,31 @@ CAPTCHA_AFTER_FAILED_ATTEMPTS=
 
 # ── CORS ───────────────────────────────────────────────────
 CORS_ORIGINS=http://localhost:3000,http://localhost:3002
+
+# ─── Движок вовлечения (ТЗ ч.9) ─────────────────────────────────────────
+# Мастер-выключатель: движок меняет RTP спина (в ONBOARDING — до 110 %) и
+# кредитует бонус реактивации. По умолчанию выключен; включение и откат —
+# этим же флагом без выката кода. Подробно: docs/PLAYER_ENGAGEMENT_OVERVIEW.md
+ENGAGEMENT_ENABLED=false
+ENGAGEMENT_ONBOARDING_SPIN_THRESHOLD=15
+ENGAGEMENT_ONBOARDING_TARGET_RATIO=1.25
+ENGAGEMENT_MAX_REACTIVATIONS=4
+ENGAGEMENT_MIN_SPINS_BETWEEN_REACTIVATIONS=10
+ENGAGEMENT_REACTIVATION_TARGET_MIN=0.7
+ENGAGEMENT_REACTIVATION_TARGET_MAX=0.8
+ENGAGEMENT_REACTIVATION_PHASE_SPINS=3
+ENGAGEMENT_RTP_MIN=90
+ENGAGEMENT_RTP_MAX=110
+ENGAGEMENT_MAX_RTP_CHANGE=2
+ENGAGEMENT_DRIFT_THRESHOLD=2
+ENGAGEMENT_LDW_ENABLED=true
+ENGAGEMENT_LDW_MIN_RATIO=0.3
+ENGAGEMENT_LDW_MAX_RATIO=0.6
+ENGAGEMENT_NEAR_MISS_ENABLED=true
+ENGAGEMENT_DITHER=0.05
+ENGAGEMENT_SCORE_TTL_SECONDS=300
+# A/B §12: соль раскладки и доля трафика (0 — выкл, 0…1 — сплит на пять
+# групп, 1 — полный роллаут: все в группе D).
+ENGAGEMENT_EXPERIMENT_SALT=engagement-v1
+ENGAGEMENT_EXPERIMENT_TRAFFIC_SHARE=1
 ```

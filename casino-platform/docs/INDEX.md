@@ -48,19 +48,20 @@ last_updated: 2026-08-28
 
 ---
 
-## 2. Техническое задание (7 частей)
+## 2. Техническое задание (9 частей)
 
-| #   | Часть             | Документ                                                                       | Описание                                                                         |
-| --- | ----------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| 1   | Foundation        | [tz-part-1-foundation.md](./tz-part-1-foundation.md)                           | Monorepo, стек, architecture, conventions                                        |
-| 2   | Backend Core      | [tz-part-2-auth-users-kyc-rbac.md](./tz-part-2-auth-users-kyc-rbac.md)         | Auth, Users, KYC, RBAC                                                           |
-| 3   | Wallet & Payments | [tz-part-3-payments-wallet.md](./tz-part-3-payments-wallet.md)                 | Wallet ledger, Rukassa, NOWPayments                                              |
-| 4   | Casino Providers  | [tz-part-4-casino-providers.md](./tz-part-4-casino-providers.md)               | Seamless Wallet, providers, Demo                                                 |
-| 5   | Frontend Web      | [tz-part-5-frontend-web.md](./tz-part-5-frontend-web.md)                       | Next.js: mobile-first витрина, касса, geo, мультивалютный UI                     |
-| 5.1 | Frontend Design   | [tz-part-5.1-frontend-design.md](./tz-part-5.1-frontend-design.md)             | **Дополнение к Части 5:** гибридный UI, визуальные решения, GameDeck, тон голоса |
-| 6   | Admin & Support   | [tz-part-6-admin-support-referrals.md](./tz-part-6-admin-support-referrals.md) | Admin panel, support, referrals                                                  |
-| 7   | DevOps            | [tz-part-7-devops-security-qa.md](./tz-part-7-devops-security-qa.md)           | VPS, Docker, CI/CD, security, QA                                                 |
-| 8   | Affiliate Program | [tz-part-8-affiliate-program.md](./tz-part-8-affiliate-program.md)             | **Партнёрская программа:** трекинг-ссылки, RevShare % от NGR, clawback, антифрод |
+| #   | Часть             | Документ                                                                         | Описание                                                                           |
+| --- | ----------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 1   | Foundation        | [tz-part-1-foundation.md](./tz-part-1-foundation.md)                             | Monorepo, стек, architecture, conventions                                          |
+| 2   | Backend Core      | [tz-part-2-auth-users-kyc-rbac.md](./tz-part-2-auth-users-kyc-rbac.md)           | Auth, Users, KYC, RBAC                                                             |
+| 3   | Wallet & Payments | [tz-part-3-payments-wallet.md](./tz-part-3-payments-wallet.md)                   | Wallet ledger, Rukassa, NOWPayments                                                |
+| 4   | Casino Providers  | [tz-part-4-casino-providers.md](./tz-part-4-casino-providers.md)                 | Seamless Wallet, providers, Demo                                                   |
+| 5   | Frontend Web      | [tz-part-5-frontend-web.md](./tz-part-5-frontend-web.md)                         | Next.js: mobile-first витрина, касса, geo, мультивалютный UI                       |
+| 5.1 | Frontend Design   | [tz-part-5.1-frontend-design.md](./tz-part-5.1-frontend-design.md)               | **Дополнение к Части 5:** гибридный UI, визуальные решения, GameDeck, тон голоса   |
+| 6   | Admin & Support   | [tz-part-6-admin-support-referrals.md](./tz-part-6-admin-support-referrals.md)   | Admin panel, support, referrals                                                    |
+| 7   | DevOps            | [tz-part-7-devops-security-qa.md](./tz-part-7-devops-security-qa.md)             | VPS, Docker, CI/CD, security, QA                                                   |
+| 8   | Affiliate Program | [tz-part-8-affiliate-program.md](./tz-part-8-affiliate-program.md)               | **Партнёрская программа:** трекинг-ссылки, RevShare % от NGR, clawback, антифрод   |
+| 9   | Player Engagement | [tz-part-9-player-engagement-engine.md](./tz-part-9-player-engagement-engine.md) | **Движок вовлечения:** адаптивный RTP по фазе, LDW, Near-Miss, реактивация баланса |
 
 ### Продуктовый user-flow (не часть ТЗ, но контракт приёмки)
 

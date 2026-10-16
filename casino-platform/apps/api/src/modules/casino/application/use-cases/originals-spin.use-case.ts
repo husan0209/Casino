@@ -34,12 +34,17 @@ import {
   type IGameCatalogRepository,
   type IGamePlayRepository,
 } from '../../domain/repositories/casino.repository'
-import { demoRtpPercent, moneyRtpPercent } from '../../domain/rtp-policy'
+import { demoRtpPercent, engagementRtpPercent, moneyRtpPercent } from '../../domain/rtp-policy'
 import {
   TIGER_ROW_INDEX,
   TigerSpinRowSchema,
   type TigerSpinRow,
 } from '../../infrastructure/providers/house/spin-data/tiger-spin-row'
+import {
+  EngagementEngineService,
+  type MechanicsResult,
+  type PreparedSpin,
+} from '../services/engagement-engine.service'
 
 /**
  * Вход спина от фронта Construct 3 (x-www-form-urlencoded):
@@ -129,6 +134,7 @@ export class OriginalsSpinUseCase {
     @Inject(GAME_PLAY_REPOSITORY) private readonly play: IGamePlayRepository,
     @Inject(GAME_CATALOG_REPOSITORY) private readonly catalog: IGameCatalogRepository,
     @Inject(DEMO_BALANCE_STORE) private readonly demoBalance: IDemoBalanceStore,
+    @Inject(EngagementEngineService) private readonly engagement: EngagementEngineService,
   ) {}
 
   async execute(request: TigerSpinRequest): Promise<TigerSpinData> {
@@ -258,43 +264,264 @@ export class OriginalsSpinUseCase {
       return this.buildDuplicateSpinData(session, game, parsed, betTotal)
     }
     const paylines = Number(parsed.numline)
-    const outcome = this.drawOutcome(game, moneyRtpPercent(session.game.rtp), paylines)
+    // §9.1 шаги 1–2: состояние движка и решение о реактивации — до лотереи,
+    // потому что кредит реактивации меняет баланс, а RTP выбирается под фазу.
+    const prepared = await this.prepareEngagement(session, game, paylines)
+
+    // §9.1 шаги 3–6: RTP спина, розыгрыш, затем подмена исхода механиками.
+    const spin = this.applyEngagementMechanics({ session, game, paylines, prepared })
+    const { outcome, isLdw, isNearMiss } = spin
+
     const winTotal = this.winTotalFor(game, parsed, outcome)
     const round = await this.openRound({ session, providerId, roundExternalId, transaction })
-    const settled = await this.settleBet({
+    const balanceAfter = await this.settleRound({
       session,
       game,
       providerId,
       betTotal,
       betExternalId,
+      winTotal,
       round,
+      roundExternalId,
       transaction,
     })
-    const balanceAfter = money.isPositive(winTotal)
-      ? await this.settleWin({
-          session,
-          game,
-          providerId,
-          betTotal,
-          winTotal,
-          round,
-          roundExternalId,
-          transaction,
-        })
-      : await this.closeLosingRound({
-          betTotal,
-          round,
-          transaction,
-          settledBalance: settled.balanceAfter,
-        })
+
+    // §4.3 и §6.2: кредит реактивации и запись состояния — после проводок,
+    // когда итоговый баланс известен. Обе операции в той же транзакции.
+    const finalBalance = await this.finishEngagement({
+      session,
+      game,
+      providerId,
+      round,
+      roundExternalId,
+      prepared,
+      betTotal,
+      winTotal,
+      isLdw,
+      isNearMiss,
+      mechanicsEvents: spin.pendingEvents,
+      balanceAfter,
+      transaction,
+    })
+
     return this.buildSpinData({
-      credit: balanceAfter,
+      credit: finalBalance,
       game,
       parsed,
       betTotal,
       winTotal,
       outcome,
     })
+  }
+
+  /** Раунд целиком: списание ставки и зачисление выигрыша (или закрытие пустого). */
+  private async settleRound(args: {
+    session: GameSessionWithGame
+    game: HouseSlotGameConfig
+    providerId: string
+    betTotal: string
+    betExternalId: string
+    winTotal: string
+    round: GameRow
+    roundExternalId: string
+    transaction: WalletTransaction
+  }): Promise<string> {
+    const settled = await this.settleBet({
+      session: args.session,
+      game: args.game,
+      providerId: args.providerId,
+      betTotal: args.betTotal,
+      betExternalId: args.betExternalId,
+      round: args.round,
+      transaction: args.transaction,
+    })
+    if (money.isPositive(args.winTotal)) {
+      return this.settleWin({
+        session: args.session,
+        game: args.game,
+        providerId: args.providerId,
+        betTotal: args.betTotal,
+        winTotal: args.winTotal,
+        round: args.round,
+        roundExternalId: args.roundExternalId,
+        transaction: args.transaction,
+      })
+    }
+    return this.closeLosingRound({
+      betTotal: args.betTotal,
+      round: args.round,
+      transaction: args.transaction,
+      settledBalance: settled.balanceAfter,
+    })
+  }
+
+  /**
+   * §9.1 шаги 3–6 — RTP спина под фазу, розыгрыш и подмена исхода механиками.
+   * Движок выключен или недоступен — спин идёт по базовой ветке без изменений.
+   */
+  private applyEngagementMechanics(args: {
+    session: GameSessionWithGame
+    game: HouseSlotGameConfig
+    paylines: number
+    prepared: PreparedSpin | null
+  }): {
+    outcome: TigerSpinRow
+    isLdw: boolean
+    isNearMiss: boolean
+    pendingEvents: MechanicsResult['pendingEvents']
+  } {
+    const { session, game, paylines, prepared } = args
+    const targetRtp =
+      prepared?.rtpPercent !== null && prepared?.rtpPercent !== undefined
+        ? engagementRtpPercent(prepared.rtpPercent)
+        : moneyRtpPercent(session.game.rtp)
+    const drawn = this.drawOutcome(game, targetRtp, paylines)
+    if (!prepared) {
+      return { outcome: drawn, isLdw: false, isNearMiss: false, pendingEvents: [] }
+    }
+    const mechanics = this.engagement.applyMechanics({
+      prepared,
+      winRows: game.winRows,
+      payoutModel: game.payoutModel,
+    })
+    if (!mechanics.row) {
+      return {
+        outcome: drawn,
+        isLdw: false,
+        isNearMiss: false,
+        pendingEvents: mechanics.pendingEvents,
+      }
+    }
+    return {
+      outcome: mechanics.row,
+      isLdw: mechanics.isLdw,
+      isNearMiss: mechanics.isNearMiss,
+      pendingEvents: mechanics.pendingEvents,
+    }
+  }
+
+  /**
+   * Кредит реактивации (§4.3) и запись состояния движка (§6.2).
+   * Кредит идёт с идемпотентным ключом от `roundExternalId` — иначе повторный
+   * запрос по токену удвоил бы бонус.
+   */
+  private async finishEngagement(args: {
+    session: GameSessionWithGame
+    game: HouseSlotGameConfig
+    providerId: string
+    round: GameRow
+    roundExternalId: string
+    prepared: PreparedSpin | null
+    betTotal: string
+    winTotal: string
+    isLdw: boolean
+    isNearMiss: boolean
+    /** §11.3 — события механик спина (`ldw_applied` / `near_miss_applied`). */
+    mechanicsEvents: MechanicsResult['pendingEvents']
+    balanceAfter: string
+    transaction: WalletTransaction
+  }): Promise<string> {
+    const { session, game, providerId, round, roundExternalId, prepared, transaction } = args
+    if (!prepared) {
+      return args.balanceAfter
+    }
+    const credit = prepared.reactivation?.trigger ? prepared.reactivation.creditAmount : '0'
+    let balance = args.balanceAfter
+    if (money.isPositive(credit)) {
+      balance = await this.settleReactivation({
+        session,
+        game,
+        providerId,
+        round,
+        roundExternalId,
+        amount: credit,
+        transaction,
+      })
+    }
+    await this.engagement.track({
+      prepared,
+      sessionId: session.id,
+      bet: args.betTotal,
+      win: args.winTotal,
+      currentBalance: balance,
+      isLdw: args.isLdw,
+      isNearMiss: args.isNearMiss,
+      reactivationCredit: credit,
+      mechanicsEvents: args.mechanicsEvents,
+    })
+    return balance
+  }
+
+  /**
+   * §9.1 шаг 1–2 — состояние и реактивация. Движок выключен по умолчанию
+   * (ENGAGEMENT_ENABLED), в демо не включается никогда (§17), тогда весь шаг
+   * возвращает null и спин идёт по базовой ветке без изменений.
+   */
+  private async prepareEngagement(
+    session: GameSessionWithGame,
+    game: HouseSlotGameConfig,
+    paylines: number,
+  ): Promise<PreparedSpin | null> {
+    if (!this.engagement.isEnabledFor(session.userId, session.isDemo)) {
+      return null
+    }
+    const currency = session.currency as Currency
+    const balance = await this.wallet.getBalance(session.userId, currency)
+    const winPayouts = game.winRows.map((row) => houseRowPayout(row, game.payoutModel))
+    return this.engagement.prepare({
+      userId: session.userId,
+      gameId: session.gameId,
+      sessionId: session.id,
+      currency,
+      currentBalance: balance.balance,
+      baseRtpPercent: Number(moneyRtpPercent(session.game.rtp)),
+      tableCeilingPercent: winPayouts.length > 0 ? houseSlotRtpCeiling(winPayouts, paylines) : null,
+    })
+  }
+
+  /**
+   * §4.3 — кредит бонуса реактивации. Проводка BONUS в ledger и game-транзакция
+   * типа win, привязанные к тому же раунду: бонус — это выплата казино, поэтому
+   * он должен попадать в отчётность по игре, а не висеть отдельной строкой.
+   */
+  private async settleReactivation(args: {
+    session: GameSessionWithGame
+    game: HouseSlotGameConfig
+    providerId: string
+    round: GameRow
+    roundExternalId: string
+    amount: string
+    transaction: WalletTransaction
+  }): Promise<string> {
+    const { session, game, providerId, round, roundExternalId, amount, transaction } = args
+    const externalId = `${roundExternalId}_reactivation`
+    const credit = await this.wallet.credit({
+      userId: session.userId,
+      currency: session.currency as Currency,
+      amount,
+      type: 'BONUS',
+      idempotencyKey: `${game.externalGameId}reactivation_${providerId}_${externalId}`,
+      description: `Бонус реактивации ${game.displayName}`,
+      metadata: { provider_id: providerId, game_id: session.gameId, round_id: round.id },
+      tx: transaction,
+    })
+    await this.play.createTransaction(
+      {
+        roundId: round.id,
+        sessionId: session.id,
+        userId: session.userId,
+        providerId,
+        type: 'win',
+        externalTransactionId: externalId,
+        amount,
+        currency: session.currency,
+        balanceAfter: credit.balanceAfter,
+        ledgerEntryId: credit.ledgerEntryId,
+        metadata: { game: game.externalGameId, source: 'engagement_reactivation' },
+      },
+      transaction,
+    )
+    return credit.balanceAfter
   }
 
   /** Открытие раунда до проводок (вынос из applySpin, лимит 60 строк). */

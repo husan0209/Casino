@@ -40,6 +40,9 @@ model User {
   gameRounds       GameRound[]
   gameTransactions GameTransaction[]
   gameFavorites    GameFavorite[]
+  // ТЗ ч.9 §3.1: состояние движка вовлечения по паре (игрок, игра) и журнал событий.
+  engagementStates PlayerEngagementState[]
+  engagementEvents EngagementEvent[]
   supportTickets   SupportTicket[]
   notifications    Notification[]
   termsAcceptances TermsAcceptance[]
@@ -460,6 +463,7 @@ model Game {
   gameSessions     GameSession[]
   gameRounds       GameRound[]
   gameFavorites    GameFavorite[]
+  engagementStates PlayerEngagementState[]
   @@unique([providerId, externalGameId])
   @@index([slug])
   @@index([category])
@@ -859,4 +863,84 @@ enum SystemSettingType {
   number
   boolean
   json
+}
+/// ТЗ ч.9 §5 — фаза вовлечения игрока. Порядок переходов и guard-условия живут
+/// в домене (casino/domain/engagement/phase-fsm.ts), здесь только хранение.
+enum EngagementPhase {
+  onboarding
+  retention
+  risk
+  reactivation
+  cooldown
+  dormant
+}
+/// ТЗ ч.9 §11.3 — события движка для аналитики и расследований.
+enum EngagementEventType {
+  phase_changed
+  rtp_adjusted
+  ldw_applied
+  near_miss_applied
+  reactivation_credited
+}
+/// ТЗ ч.9 §3.1 — состояние движка вовлечения по паре (игрок, игра).
+/// Один ряд на пару: уникальный индекс + читается по (userId, gameId) на каждом спине.
+model PlayerEngagementState {
+  id                    String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String          @map("user_id") @db.Uuid
+  gameId                String          @map("game_id") @db.Uuid
+  phase                 EngagementPhase @default(onboarding)
+  /// §7.1 — накопленный дрейф RTP в процентных пунктах: cumulativeRtp − плановый RTP фазы.
+  rtpDrift              Decimal         @default(0) @map("rtp_drift") @db.Decimal(20, 8)
+  totalSpins            Int             @default(0) @map("total_spins")
+  totalBet              Decimal         @default(0) @map("total_bet") @db.Decimal(20, 8)
+  totalWin              Decimal         @default(0) @map("total_win") @db.Decimal(20, 8)
+  /// §3.1 — окно выплат и счётчики для правил §8.1/§8.2.
+  lastWinAmount         Decimal         @default(0) @map("last_win_amount") @db.Decimal(20, 8)
+  maxWinInSession       Decimal         @default(0) @map("max_win_in_session") @db.Decimal(20, 8)
+  ldwCount              Int             @default(0) @map("ldw_count")
+  nearMissCount         Int             @default(0) @map("near_miss_count")
+  lastLdwSpin           Int             @default(0) @map("last_ldw_spin")
+  /// §4.3 — номер спина последней реактивации (нумерация с нуля, как last_ldw_spin).
+  /// NULL = реактиваций ещё не было; 0 — легальный номер (кредит возможен и на первом спине).
+  /// Пауза «в N спинов» выводится как total_spins − last_reactivation_spin.
+  lastReactivationSpin  Int?            @map("last_reactivation_spin")
+  reactivationCount     Int             @default(0) @map("reactivation_count")
+  currentBalance        Decimal         @default(0) @map("current_balance") @db.Decimal(20, 8)
+  /// §3.1 — база виртуальной подушки (депозит на момент старта сессии, §4.1).
+  initialDeposit        Decimal         @default(0) @map("initial_deposit") @db.Decimal(20, 8)
+  /// §3.1 — пик баланса сессии; обновляется на каждом спине и попадает в снапшот §3.2.
+  peakBalance           Decimal         @default(0) @map("peak_balance") @db.Decimal(20, 8)
+  /// §6.2 — кольцевые буферы {winHistory, betHistory, spinGapHistory, volatilitySignals}.
+  behavior              Json            @default("{}") @db.JsonB
+  /// §3.2 — снапшот для metadata активной сессии (пишется на смене фазы, не на каждом спине).
+  sessionMetadata       Json            @default("{}") @map("session_metadata") @db.JsonB
+  lastEngagementSpinAt  DateTime?       @map("last_engagement_spin_at") @db.Timestamptz
+  /// §10.1 — сессия последней записи движка; смена значения = новая сессия (resetState):
+  /// цикл §4.1 и лимит реактиваций §4.2 считаются «за сессию».
+  lastSessionId         String?         @map("last_session_id") @db.Uuid
+  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+  user                  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  game                  Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  @@unique([userId, gameId])
+  @@index([userId, updatedAt])
+  @@map("player_engagement_states")
+}
+/// ТЗ ч.9 §11.3 — append-only журнал решений движка (аудит и метрики §11.2).
+model EngagementEvent {
+  id        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String              @map("user_id") @db.Uuid
+  gameId    String              @map("game_id") @db.Uuid
+  /// Ссылка на game_sessions.id для расследований; ссылочной связи намеренно нет —
+  /// журнал живёт дольше сессии и не должен блокировать её удаление.
+  sessionId String?             @map("session_id") @db.Uuid
+  eventType EngagementEventType @map("event_type")
+  spinIndex Int?                @map("spin_index")
+  phase     EngagementPhase?
+  payload   Json                @default("{}") @db.JsonB
+  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, gameId, createdAt])
+  @@index([eventType, createdAt])
+  @@map("engagement_events")
 }

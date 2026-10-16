@@ -124,6 +124,42 @@ export const envSchema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((value) => value === 'true'),
+    // ─── ТЗ ч.9: движок вовлечения (§10.2) ───────────────────────────────
+    // Мастер-выключатель. По умолчанию false: движок меняет RTP спина и
+    // кредитует бонус реактивации, поэтому включается оператором явно.
+    // Первый уровень отката §15.2 — здесь же, без выката кода.
+    ENGAGEMENT_ENABLED: z
+      .enum(['true', 'false'])
+      .optional()
+      .transform((value) => value === 'true'),
+    ENGAGEMENT_SCORE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+    ENGAGEMENT_ONBOARDING_SPIN_THRESHOLD: z.coerce.number().int().positive().default(15),
+    ENGAGEMENT_ONBOARDING_TARGET_RATIO: z.coerce.number().positive().default(1.25),
+    ENGAGEMENT_MAX_REACTIVATIONS: z.coerce.number().int().min(0).default(4),
+    ENGAGEMENT_MIN_SPINS_BETWEEN_REACTIVATIONS: z.coerce.number().int().min(0).default(10),
+    ENGAGEMENT_REACTIVATION_TARGET_MIN: z.coerce.number().positive().default(0.7),
+    ENGAGEMENT_REACTIVATION_TARGET_MAX: z.coerce.number().positive().default(0.8),
+    ENGAGEMENT_REACTIVATION_PHASE_SPINS: z.coerce.number().int().min(1).default(3),
+    ENGAGEMENT_RTP_MIN: z.coerce.number().positive().default(90),
+    ENGAGEMENT_RTP_MAX: z.coerce.number().positive().default(110),
+    ENGAGEMENT_MAX_RTP_CHANGE: z.coerce.number().positive().default(2),
+    ENGAGEMENT_DRIFT_THRESHOLD: z.coerce.number().positive().default(2),
+    ENGAGEMENT_LDW_ENABLED: z
+      .enum(['true', 'false'])
+      .optional()
+      .transform((value) => value !== 'false'),
+    ENGAGEMENT_LDW_MIN_RATIO: z.coerce.number().positive().default(0.3),
+    ENGAGEMENT_LDW_MAX_RATIO: z.coerce.number().positive().default(0.6),
+    ENGAGEMENT_NEAR_MISS_ENABLED: z
+      .enum(['true', 'false'])
+      .optional()
+      .transform((value) => value !== 'false'),
+    ENGAGEMENT_DITHER: z.coerce.number().min(0).default(0.05),
+    ENGAGEMENT_EXPERIMENT_SALT: z.string().default('engagement-v1'),
+    // §12.5: 0 — эксперимент выключен, 0…1 — сплит на пять групп, 1 — полный
+    // роллаут (все в группе D). Дефолт — полный роллаут: сплит включается
+    // осознанным понижением доли — так же, как в DEFAULT_ENGAGEMENT_CONFIG.
+    ENGAGEMENT_EXPERIMENT_TRAFFIC_SHARE: z.coerce.number().min(0).max(1).default(1),
     SMTP_HOST: z.string().optional(),
     // GAP-50: DSN опционален — без него Sentry no-op (dev/CI)
     SENTRY_DSN: z.string().url().optional(),
