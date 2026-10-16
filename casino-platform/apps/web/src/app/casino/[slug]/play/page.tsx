@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect } from 'react'
 
-import { formatBalance } from '@/lib/format/currency'
 import { isCloseRequest, leaveGame } from '@/lib/ui/game-exit'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
@@ -28,20 +27,19 @@ export default function GamePlayPage(): React.JSX.Element {
   const params = useSearchParams()
   const router = useRouter()
   const url = params.get('url')
-  const { getActiveWallet, activeCurrency, refreshActive } = useWalletStore()
+  const { activeCurrency, refreshActive } = useWalletStore()
   const { openDeposit } = useUIStore()
   const { user } = useAuth()
-  const wallet = getActiveWallet()
 
-  // §8.3: баланс на планке живой — refetch по возврату фокуса окна
-  // (Socket.IO в релизе запрещён §2.1)
-  useEffect(() => {
-    const onFocus = (): void => {
-      void refreshActive()
-    }
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [refreshActive])
+  /**
+   * Баланс на планке не показываем (решение владельца 2026-10-16). Свою сумму
+   * игра рисует сама и берёт её у того же сервера: `originals-session.use-case.ts`
+   * отдаёт в клиент `credit = balance.available`. Вторая цифра рядом с ней —
+   * это либо противоречие в демо (0 ₽ рядом со 1 000 ₽ виртуальных), либо
+   * отставание в деньги: без WebSocket (§2.1) шапка узнала бы о ставке только
+   * по возврату фокуса. Refetch остаётся при выходе — чтобы лобби показывало
+   * свежий кошелёк.
+   */
 
   /**
    * Выход из игры. Это единственная дверь наружу для клиентов, которые свою
@@ -91,21 +89,15 @@ export default function GamePlayPage(): React.JSX.Element {
           <ChevronLeft size={20} aria-hidden />
           Выйти
         </button>
-        {/* Гостю показывать реальный кошелёк нельзя: в демо он играет виртуальными
-            деньгами, и «0 ₽» рядом с игрой читается как «у тебя нет денег». */}
         {user && (
-          <>
-            <span className="text-sm font-medium">
-              {formatBalance(wallet?.available ?? '0', activeCurrency)}
-            </span>
-            <button
-              type="button"
-              className="btn-money px-3 py-1 text-sm"
-              onClick={() => openDeposit(activeCurrency)}
-            >
-              +
-            </button>
-          </>
+          <button
+            type="button"
+            aria-label="Пополнить баланс"
+            className="btn-money flex min-h-[44px] min-w-[44px] items-center justify-center px-3 text-sm"
+            onClick={() => openDeposit(activeCurrency)}
+          >
+            +
+          </button>
         )}
       </div>
       {/* decodeURIComponent: url приезжает закодированным из launch-flow */}
