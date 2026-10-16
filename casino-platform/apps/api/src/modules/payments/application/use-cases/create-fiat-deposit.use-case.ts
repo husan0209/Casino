@@ -10,7 +10,11 @@ import { UsersFacade } from '@modules/users/facade/users.facade'
 import type { DisplayCurrency } from '@casino/shared-config'
 import { money } from '@casino/shared-utils'
 
-import { AmountTooSmallError, providerRefusalError } from '../../domain/errors'
+import {
+  AmountTooSmallError,
+  FiatDepositAttemptLimitError,
+  providerRefusalError,
+} from '../../domain/errors'
 import {
   type IRukassaClient,
   type IPaymentRequestRepository,
@@ -42,6 +46,28 @@ export function rukassaOrderId(now = Date.now()): string {
   return String(now * 1000 + orderCounter)
 }
 
+/**
+ * Сколько неоплаченных заявок на пополнение игрок имеет право создать за сутки.
+ *
+ * Порог заморозки у RuKassa измерен на стенде 16.10: три неоплаченных счёта
+ * проходят, четвёртый — `403 client is frozen`. Берём два, чтобы между нашим
+ * «стоп» и их блокировкой оставался один шаг запаса: разморозить клиента мы
+ * не можем, API-метода у них нет.
+ */
+export const FIAT_UNPAID_ATTEMPTS_PER_DAY = 2
+
+/**
+ * Начало текущих «суток» по МСК. RuKassa обнуляет счётчик неоплаченных заявок
+ * в 00:00 (сказал их саппорт), а рынок у нас RU. MSK = UTC+3 без перевода
+ * часов с 2014 года, поэтому смещение константой, а не tz-бблиотекой.
+ */
+const MOSCOW_OFFSET_MS = 3 * 60 * 60 * 1000
+const DAY_MS = 24 * 60 * 60 * 1000
+export function startOfMoscowDay(now = new Date()): Date {
+  const local = now.getTime() + MOSCOW_OFFSET_MS
+  return new Date(Math.floor(local / DAY_MS) * DAY_MS - MOSCOW_OFFSET_MS)
+}
+
 @Injectable()
 export class CreateFiatDepositUseCase {
   constructor(
@@ -67,6 +93,18 @@ export class CreateFiatDepositUseCase {
     // приходит отказом провайдера; наш предельный контроль стоит на выводе.
 
     const amountRub = this.geo.toRubEquivalent(amount, currency as DisplayCurrency)
+
+    // Самолимит ДО обращения к провайдеру: заявка, которую игрок не оплатил,
+    // считается у RuKassa и приближает заморозку его клиента (наш `user_code` =
+    // id игрока, навсегда). Отказ здесь — наш 422, а не их 502.
+    const unfinished = await this.repo.countUnfinishedDeposits({
+      userId,
+      provider: 'rukassa',
+      since: startOfMoscowDay(),
+    })
+    if (unfinished >= FIAT_UNPAID_ATTEMPTS_PER_DAY) {
+      throw new FiatDepositAttemptLimitError()
+    }
 
     const idempotencyKey = `dep_${randomUUID()}`
     const pr = await this.repo.create({

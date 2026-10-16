@@ -18,6 +18,18 @@ import type {
 
 export type { PaymentRequest, PaymentProvider, PaymentStatus, PaymentType } from '@casino/database'
 
+/**
+ * Статусы «счёт создан, денег нет»: их RuKassa считает как неоплаченные заявки
+ * и по ним замораживает клиента. `completed` и `cancelled` не считаем;
+ * `expired` — считаем, потому что счёт на их стороне висел неоплаченным.
+ */
+const UNFINISHED_DEPOSIT_STATUSES: PaymentStatus[] = [
+  'pending',
+  'processing',
+  'expired',
+  'failed',
+]
+
 @Injectable()
 export class PaymentRequestRepository implements IPaymentRequestRepository {
   create(data: Prisma.PaymentRequestUncheckedCreateInput): Promise<PaymentRequest> {
@@ -56,6 +68,21 @@ export class PaymentRequestRepository implements IPaymentRequestRepository {
         ...(extra.externalId !== undefined && { externalId: extra.externalId }),
         ...(extra.paymentUrl !== undefined && { paymentUrl: extra.paymentUrl }),
         ...(extra.amountRub !== undefined && { amountRub: extra.amountRub }),
+      },
+    })
+  }
+  countUnfinishedDeposits(args: {
+    userId: string
+    provider: PaymentProvider
+    since: Date
+  }): Promise<number> {
+    return prisma.paymentRequest.count({
+      where: {
+        userId: args.userId,
+        provider: args.provider,
+        type: 'deposit',
+        createdAt: { gte: args.since },
+        status: { in: UNFINISHED_DEPOSIT_STATUSES },
       },
     })
   }
