@@ -401,7 +401,7 @@ export class AffiliateAdminController {
   /** Атрибуции с фильтрами — ручной разбор спорных случаев (ТЗ ч.8 §13.3). */
   @Get('attributions')
   @Roles('admin', 'superadmin')
-  @UsePipes(new ZodValidationPipe(AttributionListQuerySchema))
+  @UsePipes(new ZodValidationPipe(AttributionListQuerySchema, ['query']))
   async listAttributions(@Query() query: AttributionListQueryDto): Promise<{
     data: Array<{
       id: string
