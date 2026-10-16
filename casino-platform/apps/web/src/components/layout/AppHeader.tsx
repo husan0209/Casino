@@ -76,7 +76,7 @@ export function AppHeader(): React.JSX.Element {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Поиск игр и провайдеров…"
             aria-label="Поиск"
-            className="input pl-9"
+            className="input input-icon"
           />
         </form>
 

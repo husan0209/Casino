@@ -82,6 +82,15 @@ body {
   @apply w-full rounded-xl border border-[#2A2A4A] bg-[#1A1A2E] px-3 py-2.5 text-sm outline-none transition placeholder:text-muted/70 focus:border-brand focus:ring-2 focus:ring-brand/25;
 }
 
+/* Поле с иконкой внутри слева. Утилиту `pl-9` поверх `.input` применить нельзя:
+   компонентные классы в этом файле объявлены вне @layer, их `px-3` идёт позже
+   utilities и побеждает той же специфичностью — замер 16.10 на десктопе:
+   padding-left оставался 12 px при иконке, занимающей место до 28 px, и лупа
+   вставала поверх текста. Собственный класс после `.input` решает это по порядку. */
+.input-icon {
+  @apply pl-9;
+}
+
 /* Подпись поля вне placeholder (ТЗ ч.5.1 §4): класс уже стоит в affiliate-страницах,
    но определения в сборке не было. */
 .field-label {
