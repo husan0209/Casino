@@ -112,9 +112,13 @@ export const GEO_PROFILES: Record<LegalCountry, GeoProfileDef> = {
     enabledFiat: ['RUB'],
     enabledCrypto: ['USDT_TRC20', 'BTC'],
     fiatMethods: [
-      { id: 'sbp', label: 'СБП', currency: 'RUB', type: 'fiat' },
-      { id: 'card', label: 'Карта', currency: 'RUB', type: 'fiat' },
-      { id: 'p2p', label: 'P2P', currency: 'RUB', type: 'fiat' },
+      // Одна позиция вместо «СБП / Карта / P2P». Причина не в экономии мест, а в
+      // том, что выбор здесь ничего не решал: RuKassa на своей странице показывает
+      // все включённые в кабинете способы и не отмечает переданный `method` как
+      // выбранный (замер 15.10: заявка с method=sbp открыла кассу с двумя плитками
+      // и без выделения), а P2P у неё как способа нет вовсе — он и не уезжал
+      // провайдеру. То есть игрок выбирал СБП, а на кассе выбирал заново.
+      { id: 'fiat', label: 'Оплатить фиатом', currency: 'RUB', type: 'fiat' },
     ],
   },
   KZ: {
@@ -163,9 +167,13 @@ export const GEO_PROFILES: Record<LegalCountry, GeoProfileDef> = {
     enabledFiat: ['RUB'],
     enabledCrypto: ['USDT_TRC20', 'BTC'],
     fiatMethods: [
-      { id: 'sbp', label: 'СБП', currency: 'RUB', type: 'fiat' },
-      { id: 'card', label: 'Карта', currency: 'RUB', type: 'fiat' },
-      { id: 'p2p', label: 'P2P', currency: 'RUB', type: 'fiat' },
+      // Одна позиция вместо «СБП / Карта / P2P». Причина не в экономии мест, а в
+      // том, что выбор здесь ничего не решал: RuKassa на своей странице показывает
+      // все включённые в кабинете способы и не отмечает переданный `method` как
+      // выбранный (замер 15.10: заявка с method=sbp открыла кассу с двумя плитками
+      // и без выделения), а P2P у неё как способа нет вовсе — он и не уезжал
+      // провайдеру. То есть игрок выбирал СБП, а на кассе выбирал заново.
+      { id: 'fiat', label: 'Оплатить фиатом', currency: 'RUB', type: 'fiat' },
     ],
   },
 }
