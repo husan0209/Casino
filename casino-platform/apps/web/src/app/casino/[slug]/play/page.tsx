@@ -1,10 +1,12 @@
 'use client'
 
+import { ChevronLeft } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 
 import { formatBalance } from '@/lib/format/currency'
+import { isCloseRequest, leaveGame } from '@/lib/ui/game-exit'
 import { useAuth } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import { useWalletStore } from '@/stores/wallet'
@@ -41,6 +43,38 @@ export default function GamePlayPage(): React.JSX.Element {
     return () => window.removeEventListener('focus', onFocus)
   }, [refreshActive])
 
+  /**
+   * Выход из игры. Это единственная дверь наружу для клиентов, которые свою
+   * кнопку не рисуют — все одиннадцать донорских слотов и Plinko, — поэтому
+   * она обязана быть крупной: прежняя «×» была 13×28 px при норме 44×44 для
+   * пальца, и на телефоне в неё промахивались.
+   */
+  const exitGame = useCallback((): void => {
+    void refreshActive()
+    leaveGame({
+      referrer: document.referrer,
+      origin: window.location.origin,
+      historyLength: window.history.length,
+      back: () => window.history.back(),
+      home: () => router.push('/'),
+    })
+  }, [refreshActive, router])
+
+  /**
+   * Просьба фрейма закрыться (`PROVIDER_INTEGRATION_STRATEGY.md` §6.1, шаг 3
+   * «Listen for events from iframe») — без неё внутренняя кнопка игры стучится
+   * в пустоту. Источник проверяется: иначе любой фрейм командовал бы навигацией.
+   */
+  useEffect((): (() => void) => {
+    const onMessage = (event: MessageEvent): void => {
+      if (isCloseRequest(event, window.location.origin)) {
+        exitGame()
+      }
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [exitGame])
+
   if (!url) {
     return <div className="container-1 py-8 text-muted">Игра не найдена</div>
   }
@@ -50,14 +84,12 @@ export default function GamePlayPage(): React.JSX.Element {
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-[#2A2A4A] px-3">
         <button
           type="button"
-          onClick={() => {
-            void refreshActive()
-            router.push('/')
-          }}
+          onClick={exitGame}
           aria-label="Выйти из игры"
-          className="text-xl"
+          className="-ml-2 flex min-h-[44px] items-center gap-1 rounded-xl px-3 text-sm font-medium text-white/90 active:bg-white/10"
         >
-          ×
+          <ChevronLeft size={20} aria-hidden />
+          Выйти
         </button>
         {/* Гостю показывать реальный кошелёк нельзя: в демо он играет виртуальными
             деньгами, и «0 ₽» рядом с игрой читается как «у тебя нет денег». */}
