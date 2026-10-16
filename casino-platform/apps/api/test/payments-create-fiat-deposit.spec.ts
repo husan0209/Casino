@@ -169,4 +169,25 @@ describe('CreateFiatDepositUseCase', () => {
       { id: 'pr-1', status: 'failed', extra: { errorMessage: 'psp down' } },
     ])
   })
+
+  /**
+   * Код обязан различать причины: на «счёт приостановлен» повторный клик только
+   * закапывает игрока (RuKassa морозит клиента по `user_code` навсегда), на
+   * «такого способа нет» достаточно выбрать другой. Оба отказа у провайдера
+   * идут под одним `error: 300`, поэтому различаем по сообщению.
+   */
+  it('код отказа следует за текстом провайдера', async () => {
+    const cases: Array<[string, string]> = [
+      ['HTTP 403: {"error":"300","message":"client is frozen"}', 'PAYMENT_PROVIDER_ACCOUNT_FROZEN'],
+      [
+        'HTTP 403: {"error":"300","message":"method is not activated"}',
+        'PAYMENT_PROVIDER_METHOD_UNAVAILABLE',
+      ],
+      ['HTTP 403: {"error":"300","message":"shop not found"}', 'PAYMENT_PROVIDER_ERROR'],
+    ]
+    for (const [reason, code] of cases) {
+      const d = makeDeps({ rukassaError: new Error(reason) })
+      await expect(d.uc.execute('u-1', INPUT)).rejects.toMatchObject({ code })
+    }
+  })
 })

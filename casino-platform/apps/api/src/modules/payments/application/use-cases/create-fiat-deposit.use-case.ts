@@ -10,7 +10,7 @@ import { UsersFacade } from '@modules/users/facade/users.facade'
 import type { DisplayCurrency } from '@casino/shared-config'
 import { money } from '@casino/shared-utils'
 
-import { AmountTooSmallError, PaymentProviderError } from '../../domain/errors'
+import { AmountTooSmallError, providerRefusalError } from '../../domain/errors'
 import {
   type IRukassaClient,
   type IPaymentRequestRepository,
@@ -104,8 +104,10 @@ export class CreateFiatDepositUseCase {
     } catch (e) {
       // Полный текст провайдера — только в БД (его читает админ) и в лог. В
       // HTTP-ответ он уходить не должен: context AppError фильтр кладёт в details.
-      await this.repo.updateStatus(pr.id, 'failed', { errorMessage: errorMessage(e) })
-      throw new PaymentProviderError('Rukassa error')
+      // Но и молчать отказ не вправе: код ниже говорит игроку, что делать.
+      const reason = errorMessage(e)
+      await this.repo.updateStatus(pr.id, 'failed', { errorMessage: reason })
+      throw providerRefusalError(reason)
     }
   }
 }
