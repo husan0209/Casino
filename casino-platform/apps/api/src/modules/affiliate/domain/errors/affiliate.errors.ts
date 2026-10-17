@@ -229,3 +229,51 @@ export class AffiliateJwtSecretInvalidError extends AppError {
     super(`AFFILIATE_JWT_SECRET is missing or too weak: configured length ${configuredLength}`)
   }
 }
+
+/**
+ * Токен восстановления не найден — включая «ссылку уже сожгли»: активный токен
+ * ровно один и лежит колонкой на партнёре, а успешный сброс её обнуляет, так
+ * что «нет такого» и «уже использован» физически неразличимы.
+ */
+export class AffiliateResetTokenInvalidError extends AppError {
+  readonly code = 'AFFILIATE_TOKEN_INVALID'
+  readonly httpStatus = 400
+
+  constructor() {
+    super('Password reset link is invalid or has been used')
+  }
+}
+
+/** Токен на месте, но его час истёк. */
+export class AffiliateResetTokenExpiredError extends AppError {
+  readonly code = 'AFFILIATE_TOKEN_EXPIRED'
+  readonly httpStatus = 400
+
+  constructor() {
+    super('Password reset link has expired')
+  }
+}
+
+/** Текущий пароль при смене не совпал с хешем. */
+export class AffiliatePasswordInvalidCurrentError extends AppError {
+  readonly code = 'AFFILIATE_PASSWORD_INVALID_CURRENT'
+  readonly httpStatus = 400
+
+  constructor() {
+    super('Current password does not match')
+  }
+}
+
+/**
+ * Пароль слабее минимума. Держим и в Zod, и здесь: схема отсекает форму, а это
+ * — вызывающего, который минует presentation (тот же приём, что в
+ * `auth/application/use-cases/reset-password.use-case.ts`).
+ */
+export class AffiliatePasswordWeakError extends AppError {
+  readonly code = 'WEAK_PASSWORD'
+  readonly httpStatus = 422
+
+  constructor(public readonly minLength: number) {
+    super(`Password must be at least ${minLength} characters`)
+  }
+}

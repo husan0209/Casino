@@ -179,6 +179,8 @@ export const envSchema = z
     THROTTLE_AFFILIATE_TRACKING_LIMIT: z.coerce.number().int().positive().optional(),
     THROTTLE_AFFILIATE_REGISTER_LIMIT: z.coerce.number().int().positive().optional(),
     THROTTLE_AFFILIATE_LOGIN_LIMIT: z.coerce.number().int().positive().optional(),
+    THROTTLE_AFFILIATE_FORGOT_LIMIT: z.coerce.number().int().positive().optional(),
+    THROTTLE_AFFILIATE_RESET_LIMIT: z.coerce.number().int().positive().optional(),
     UPLOAD_DIR: z.string().optional(),
     UPLOAD_MAX_SIZE_MB: z.coerce.number().int().positive().optional(),
     UPLOAD_ALLOWED_TYPES: z.string().optional(),

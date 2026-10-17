@@ -694,6 +694,13 @@ model Affiliate {
   userId             String            @unique @map("user_id") @db.Uuid
   email              String            @unique @db.VarChar(255)
   passwordHash       String            @map("password_hash") @db.Text
+  /// Токен восстановления доступа партнёра (ТЗ ч.8 §658). Активен один: новый
+  /// запрос перезаписывает старый, использование — обнуляет оба поля. Отдельная
+  /// таблица не заведена намеренно: `password_resets` принадлежит auth-модулю и
+  /// привязана к `users`, а партнёрский хеш живёт здесь (игровой компаньон
+  /// заведён с `email: null`, почтой туда не достучаться).
+  passwordResetToken     String?   @unique @map("password_reset_token") @db.VarChar(128)
+  passwordResetExpiresAt DateTime? @map("password_reset_expires_at") @db.Timestamptz
   status             AffiliateStatus   @default(active)
   trackingCode       String            @unique @map("tracking_code") @db.VarChar(32)
   displayName        String?           @map("display_name") @db.VarChar(128)

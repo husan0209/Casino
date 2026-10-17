@@ -12,13 +12,19 @@ import { Throttle } from '@nestjs/throttler'
 import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe'
 
 import { AffiliateSettingsService } from '../../application/affiliate-settings.service'
+import { ForgotAffiliatePasswordUseCase } from '../../application/use-cases/forgot-affiliate-password.use-case'
 import { LoginAffiliateUseCase } from '../../application/use-cases/login-affiliate.use-case'
 import { RegisterAffiliateUseCase } from '../../application/use-cases/register-affiliate.use-case'
+import { ResetAffiliatePasswordUseCase } from '../../application/use-cases/reset-affiliate-password.use-case'
 import {
+  ForgotAffiliatePasswordSchema,
   LoginAffiliateSchema,
   RegisterAffiliateSchema,
+  ResetAffiliatePasswordSchema,
+  type ForgotAffiliatePasswordDto,
   type LoginAffiliateDto,
   type RegisterAffiliateDto,
+  type ResetAffiliatePasswordDto,
 } from '../dto/affiliate.dto'
 
 @Controller('affiliate')
@@ -26,6 +32,10 @@ export class AffiliateAuthController {
   constructor(
     @Inject(RegisterAffiliateUseCase) private readonly registerUseCase: RegisterAffiliateUseCase,
     @Inject(LoginAffiliateUseCase) private readonly loginUseCase: LoginAffiliateUseCase,
+    @Inject(ForgotAffiliatePasswordUseCase)
+    private readonly forgotPasswordUseCase: ForgotAffiliatePasswordUseCase,
+    @Inject(ResetAffiliatePasswordUseCase)
+    private readonly resetPasswordUseCase: ResetAffiliatePasswordUseCase,
     @Inject(AffiliateSettingsService) private readonly settings: AffiliateSettingsService,
   ) {}
 
@@ -110,5 +120,35 @@ export class AffiliateAuthController {
       status: result.status,
       access_token: result.accessToken,
     }
+  }
+
+  /**
+   * Ссылка на восстановление пароля (ТЗ ч.8 §658). Ответ не различает
+   * «адрес есть» и «адреса нет» — форма входа партнёра иначе стала бы
+   * оракулом по базе партнёров.
+   */
+  @Post('auth/forgot-password')
+  @Throttle({
+    default: {
+      limit: Number(process.env['THROTTLE_AFFILIATE_FORGOT_LIMIT'] ?? 5),
+      ttl: Number(process.env['THROTTLE_TTL_MS'] ?? 60_000),
+    },
+  })
+  @UsePipes(new ZodValidationPipe(ForgotAffiliatePasswordSchema))
+  async forgotPassword(@Body() body: ForgotAffiliatePasswordDto): Promise<{ message: string }> {
+    return this.forgotPasswordUseCase.execute(body.email)
+  }
+
+  /** Сброс по ссылке. Токен одноразовый и живёт час — см. use-case. */
+  @Post('auth/reset-password')
+  @Throttle({
+    default: {
+      limit: Number(process.env['THROTTLE_AFFILIATE_RESET_LIMIT'] ?? 10),
+      ttl: Number(process.env['THROTTLE_TTL_MS'] ?? 60_000),
+    },
+  })
+  @UsePipes(new ZodValidationPipe(ResetAffiliatePasswordSchema))
+  async resetPassword(@Body() body: ResetAffiliatePasswordDto): Promise<{ ok: true }> {
+    return this.resetPasswordUseCase.execute(body.token, body.new_password)
   }
 }

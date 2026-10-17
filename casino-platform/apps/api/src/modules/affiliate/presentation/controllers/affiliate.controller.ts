@@ -19,6 +19,7 @@ import { type AffiliateProfileRow } from '@casino/shared-types'
 
 import { WalletFacade } from '../../../wallet/facade/wallet.facade'
 import { AffiliateSettingsService } from '../../application/affiliate-settings.service'
+import { ChangeAffiliatePasswordUseCase } from '../../application/use-cases/change-affiliate-password.use-case'
 import { LeaveAffiliateProgramUseCase } from '../../application/use-cases/leave-affiliate-program.use-case'
 import { UpdateAffiliateProfileUseCase } from '../../application/use-cases/update-affiliate-profile.use-case'
 import { AffiliateNotFoundError } from '../../domain/errors/affiliate.errors'
@@ -36,9 +37,11 @@ import { revShareRateToPercent } from '../../domain/value-objects/revshare-rate.
 import {
   ClickQuerySchema,
   CommissionListQuerySchema,
+  UpdateAffiliatePasswordSchema,
   UpdateAffiliateSelfSchema,
   type ClickQueryDto,
   type CommissionListQueryDto,
+  type UpdateAffiliatePasswordDto,
   type UpdateAffiliateSelfDto,
 } from '../dto/affiliate.dto'
 import { AffiliateAuthGuard } from '../guards/affiliate-auth.guard'
@@ -69,6 +72,8 @@ export class AffiliateController {
     private readonly updateProfileUseCase: UpdateAffiliateProfileUseCase,
     @Inject(LeaveAffiliateProgramUseCase)
     private readonly leaveProgramUseCase: LeaveAffiliateProgramUseCase,
+    @Inject(ChangeAffiliatePasswordUseCase)
+    private readonly changePasswordUseCase: ChangeAffiliatePasswordUseCase,
   ) {}
 
   /**
@@ -285,6 +290,21 @@ export class AffiliateController {
   }
 
   /** Самостоятельное изменение только контактов. Ставку и статус — нельзя. */
+  /**
+   * Смена пароля партнёром (ТЗ ч.8 §787). Требует текущий пароль: без проверки
+   * украденный токен кабинета перекрывал бы учётку, через которую идут выплаты.
+   */
+  @Post('me/password')
+  async changePassword(
+    @Body(new ZodValidationPipe(UpdateAffiliatePasswordSchema)) body: UpdateAffiliatePasswordDto,
+    @CurrentUser() actor: AffiliateActor,
+  ): Promise<{ ok: true }> {
+    return this.changePasswordUseCase.execute(actor.affiliateId, {
+      currentPassword: body.current_password,
+      newPassword: body.new_password,
+    })
+  }
+
   @Patch('me')
   async updateMe(
     @Body(new ZodValidationPipe(UpdateAffiliateSelfSchema)) body: UpdateAffiliateSelfDto,

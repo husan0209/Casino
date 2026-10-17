@@ -27,11 +27,19 @@ export interface AffiliateAuthState {
     website?: string | undefined
     telegram?: string | undefined
   }) => Promise<AffiliateAuthDto>
+  /**
+   * Запрос ссылки на восстановление. Успешен всегда: сервер не различает
+   * известный и неизвестный email (анти-перебор), поэтому и здесь ветвления нет.
+   */
+  forgotPassword: (email: string) => Promise<void>
+  resetPassword: (token: string, newPassword: string) => Promise<void>
+  /** Смена пароля внутри сессии: после успеха сессия локально гасится. */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>
   logout: () => void
   setSession: (token: string, affiliateId: string) => void
 }
 
-export const useAffiliateAuth = create<AffiliateAuthState>()((set) => ({
+export const useAffiliateAuth = create<AffiliateAuthState>()((set, get) => ({
   token: null,
   affiliateId: null,
   hydrated: true,
@@ -53,6 +61,31 @@ export const useAffiliateAuth = create<AffiliateAuthState>()((set) => ({
     setAffiliateToken(res.access_token)
     set({ token: res.access_token, affiliateId: res.affiliate_id })
     return res
+  },
+  forgotPassword: async (email) => {
+    // Ответ всегда 200 и всегда одна и та же фраза — в том числе когда такого
+    // партнёрского email нет. Различия здесь намеренно нет: любая ветка
+    // «не нашли» вернула бы обратно канал перебора аккаунтов, который закрыт
+    // на сервере (партнёрские креды живут в таблице affiliates, их не видно
+    // через игровую форму сброса).
+    await affiliatePost<unknown>('/affiliate/auth/forgot-password', { email })
+  },
+  resetPassword: async (token, newPassword) => {
+    // Пароль — строка: уходит как есть, без нормализации и без приведений типов.
+    await affiliatePost<unknown>('/affiliate/auth/reset-password', {
+      token,
+      new_password: newPassword,
+    })
+  },
+  changePassword: async (currentPassword, newPassword) => {
+    await affiliatePost<unknown>('/affiliate/me/password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    })
+    // Сервер при смене пароля отзывает ВСЕ сессии партнёра. Локальную гасим
+    // здесь, а не на странице: иначе любой следующий вызов этой операции
+    // оставил бы кабинет работать мёртвым токеном до первого 401.
+    get().logout()
   },
   logout: () => {
     setAffiliateToken('')

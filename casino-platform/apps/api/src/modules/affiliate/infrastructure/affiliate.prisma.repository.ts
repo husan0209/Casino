@@ -18,6 +18,7 @@ import {
   type AffiliateClickRepository,
   type AffiliateCommissionRepository,
   type AffiliateCommissionTotals,
+  type AffiliatePasswordResetRecord,
   type AffiliateRepository,
   type AttributionForCalc,
   type CreateAffiliateInput,
@@ -193,6 +194,28 @@ export class PrismaAffiliateRepository implements AffiliateRepository {
 
   async updatePasswordHash(id: string, passwordHash: string): Promise<void> {
     await prisma.affiliate.update({ where: { id }, data: { passwordHash } })
+  }
+
+  async setPasswordResetToken(id: string, token: string, expiresAt: Date): Promise<void> {
+    await prisma.affiliate.update({
+      where: { id },
+      data: { passwordResetToken: token, passwordResetExpiresAt: expiresAt },
+    })
+  }
+
+  async findByResetToken(token: string): Promise<AffiliatePasswordResetRecord | null> {
+    const row = await prisma.affiliate.findUnique({
+      where: { passwordResetToken: token },
+      select: { id: true, passwordResetExpiresAt: true },
+    })
+    return row ? { affiliateId: row.id, tokenExpiresAt: row.passwordResetExpiresAt } : null
+  }
+
+  async clearPasswordResetToken(id: string): Promise<void> {
+    await prisma.affiliate.update({
+      where: { id },
+      data: { passwordResetToken: null, passwordResetExpiresAt: null },
+    })
   }
 
   async touchLastLogin(id: string): Promise<void> {

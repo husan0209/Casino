@@ -301,6 +301,8 @@ One Tap (вход по ID-токену, `docs/GOOGLE_ONE_TAP.md`) новых п�
 | `THROTTLE_AFFILIATE_TRACKING_LIMIT` | int          | ❌          | `120`   | Rate limit трекинг-ссылки, req/min (публичный endpoint, очень шумный)                                                                                                                                  |
 | `THROTTLE_AFFILIATE_REGISTER_LIMIT` | int          | ❌          | `5`     | Rate limit регистрации партнёра, req/min                                                                                                                                                               |
 | `THROTTLE_AFFILIATE_LOGIN_LIMIT`    | int          | ❌          | `10`    | Rate limit входа партнёра, req/min                                                                                                                                                                     |
+| `THROTTLE_AFFILIATE_FORGOT_LIMIT`  | int          | ❌          | `5`     | Rate limit запроса ссылки восстановления, req/min. Ответ не различает «адрес есть/нет», поэтому перебор адресов гасится именно частотой                                                                                                                                              |
+| `THROTTLE_AFFILIATE_RESET_LIMIT`   | int          | ❌          | `10`     | Rate limit сброса по токену, req/min — токен 128 hex, но цена попытки (отправка письма) выше цены запроса                                                                                                                                                                            |
 
 ---
 
@@ -549,6 +551,8 @@ AFFILIATE_CLICK_RETENTION_DAYS=180
 # Лимиты публичных эндпоинтов партнёрки
 THROTTLE_AFFILIATE_REGISTER_LIMIT=5
 THROTTLE_AFFILIATE_LOGIN_LIMIT=10
+THROTTLE_AFFILIATE_FORGOT_LIMIT=5
+THROTTLE_AFFILIATE_RESET_LIMIT=10
 THROTTLE_AFFILIATE_TRACKING_LIMIT=120
 # Фоновые задачи партнёрки
 JOB_AFFILIATE_DAILY_EVERY_MS=86400000

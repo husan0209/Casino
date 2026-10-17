@@ -22,6 +22,7 @@
 import { Module } from '@nestjs/common'
 
 import { RESPONSIBLE_GAMING_HOOK } from '../../common/ports/responsible-gaming-hook'
+import { QueuesModule } from '../../queues/queues.module'
 import { AdminModule } from '../admin/admin.module'
 import { AuthModule } from '../auth/auth.module'
 import { UsersModule } from '../users/users.module'
@@ -30,14 +31,17 @@ import { AffiliateClicksCleanupService } from './application/affiliate-clicks-cl
 import { AffiliateSettingsService } from './application/affiliate-settings.service'
 import { AffiliateDailyRunUseCase } from './application/use-cases/affiliate-daily-run.use-case'
 import { AttributePlayerUseCase } from './application/use-cases/attribute-player.use-case'
+import { ChangeAffiliatePasswordUseCase } from './application/use-cases/change-affiliate-password.use-case'
 import { ClawbackPlayerCommissionsUseCase } from './application/use-cases/clawback-player-commissions.use-case'
 import { CreateAffiliateByAdminUseCase } from './application/use-cases/create-affiliate-by-admin.use-case'
 import { CreateCommissionUseCase } from './application/use-cases/create-commission.use-case'
 import { CreditCommissionUseCase } from './application/use-cases/credit-commission.use-case'
+import { ForgotAffiliatePasswordUseCase } from './application/use-cases/forgot-affiliate-password.use-case'
 import { LeaveAffiliateProgramUseCase } from './application/use-cases/leave-affiliate-program.use-case'
 import { LoginAffiliateUseCase } from './application/use-cases/login-affiliate.use-case'
 import { QualifyAttributionsUseCase } from './application/use-cases/qualify-attributions.use-case'
 import { RegisterAffiliateUseCase } from './application/use-cases/register-affiliate.use-case'
+import { ResetAffiliatePasswordUseCase } from './application/use-cases/reset-affiliate-password.use-case'
 import { TrackClickUseCase } from './application/use-cases/track-click.use-case'
 import { UpdateAffiliateByAdminUseCase } from './application/use-cases/update-affiliate-by-admin.use-case'
 import { UpdateAffiliateProfileUseCase } from './application/use-cases/update-affiliate-profile.use-case'
@@ -72,7 +76,7 @@ import { AffiliateController } from './presentation/controllers/affiliate.contro
 import { AffiliateAuthGuard } from './presentation/guards/affiliate-auth.guard'
 
 @Module({
-  imports: [AuthModule, WalletModule, AdminModule, UsersModule],
+  imports: [AuthModule, WalletModule, AdminModule, UsersModule, QueuesModule],
   controllers: [
     AffiliateTrackingController,
     AffiliateAuthController,
@@ -118,6 +122,9 @@ import { AffiliateAuthGuard } from './presentation/guards/affiliate-auth.guard'
     ClawbackPlayerCommissionsUseCase,
     RegisterAffiliateUseCase,
     LoginAffiliateUseCase,
+    ForgotAffiliatePasswordUseCase,
+    ResetAffiliatePasswordUseCase,
+    ChangeAffiliatePasswordUseCase,
     QualifyAttributionsUseCase,
     // В3: записи presentation-контроллеров (кабинет и admin-контур) идут
     // только через эти сценарии.
