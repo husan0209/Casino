@@ -142,9 +142,13 @@ describe('parseRevShareRate', () => {
     expect(parseRevShareRate(' 0.35 ')).toBe('0.3500')
   })
 
-  it('accepts boundaries 0 and 1', () => {
-    expect(parseRevShareRate('0')).toBe('0.0000')
-    expect(parseRevShareRate('1')).toBe('1.0000')
+  it('краи коридора включаются, а 0 и 1 — уже нет', () => {
+    expect(parseRevShareRate('0.05')).toBe('0.0500')
+    expect(parseRevShareRate('0.5')).toBe('0.5000')
+    // Прежняя граница [0, 1] пропускала и «партнёр работает бесплатно», и «100 %
+    // маржи уходит партнёру» — обе опечатки в форме админки были законными.
+    expect(() => parseRevShareRate('0')).toThrow(/out of range/i)
+    expect(() => parseRevShareRate('1')).toThrow(/out of range/i)
   })
 
   it('rejects rates above 100%', () => {

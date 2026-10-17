@@ -2,8 +2,9 @@
  * Ставка RevShare (ТЗ ч.8 §4 D6, §6.1).
  *
  * Ставка — это ДЕНЬГИ-ЗАВИСИМЫЙ параметр, поэтому хранится и считается как
- * Decimal-строка, а не number (AI_DEVELOPMENT_RULES §1). Диапазон [0, 1]:
- * 0.20 = 20% от NGR. Колонка БД — DECIMAL(5,4), т.е. шаг 0.0001.
+ * Decimal-строка, а не number (AI_DEVELOPMENT_RULES §1). Диапазон — коридор
+ * `MIN_REVSHARE_RATE`…`MAX_REVSHARE_RATE` ниже: 0.20 = 20% от NGR. Колонка БД —
+ * DECIMAL(5,4), т.е. шаг 0.0001.
  *
  * Value object, а не просто string: гарантирует, что ни один use case не
  * запишет в БД или не применит в расчёте мусорную ставку.
@@ -16,13 +17,23 @@ import { AffiliateRateOutOfRangeError } from '../errors/affiliate.errors'
 export type RevShareRate = string
 
 /** Минимальная и максимальная ставка. 1.0 = 100% от NGR (юридически невозможно, но валидно технически). */
-export const MIN_REVSHARE_RATE = '0'
-export const MAX_REVSHARE_RATE = '1'
+/**
+ * Коридор ставки. Прежний диапазон `[0, 1]` пропускал и 0 %, и 100 %: первое
+ * делает партнёра бесплатным работником, второе — отдаёт всю маржу с каждого
+ * рубля, который он привёл. Оба варианта — не «экстремум договора», а
+ * опечатка в одной клетке админки, и система молчала.
+ *
+ * 5–50 % — рыночный коридор ревшеры в iGaming (типовой розничный уровень
+ * 25–30 %, верхние партнёры до 40–45 %). За коридор выходит только осознанная
+ * правка константы, а не опечатка в форме.
+ */
+export const MIN_REVSHARE_RATE = '0.05'
+export const MAX_REVSHARE_RATE = '0.50'
 
 /**
  * Нормализует и валидирует ставку.
  *
- * @throws {AffiliateRateOutOfRangeError} если значение не число или вне [0, 1]
+ * @throws {AffiliateRateOutOfRangeError} если значение не число или вне коридора
  */
 export function parseRevShareRate(input: string | number): RevShareRate {
   let decimal: Decimal

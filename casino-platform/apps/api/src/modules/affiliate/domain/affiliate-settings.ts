@@ -11,7 +11,11 @@
  * поменял ставку в UI, а cron считает по старому env.
  */
 import { AffiliateSettingsInvalidError } from './errors/affiliate.errors'
-import { parseRevShareRate } from './value-objects/revshare-rate.value-object'
+import {
+  MAX_REVSHARE_RATE,
+  MIN_REVSHARE_RATE,
+  parseRevShareRate,
+} from './value-objects/revshare-rate.value-object'
 
 /** Тип значения настройки (совпадает с enum SystemSettingType). */
 export type AffiliateSettingType = 'string' | 'number' | 'boolean' | 'json'
@@ -150,8 +154,11 @@ export function validateSettingValue(
 }
 
 /** Диапазоны, при которых настройка имеет смысл (ТЗ ч.8 §6.5, §10.3). */
-const RATE_MIN = 0
-const RATE_MAX = 1
+// Ставка берётся из тех же констант, что и value-object: две пары границ,
+// живущие раздельно, обязательно разъезжаются (настройка прошла бы валидацию,
+// а расчёт на ней бы упал).
+const RATE_MIN = Number(MIN_REVSHARE_RATE)
+const RATE_MAX = Number(MAX_REVSHARE_RATE)
 const COOKIE_DAYS_MIN = 1
 const COOKIE_DAYS_MAX = 365
 const RETENTION_DAYS_MIN = 7
@@ -200,7 +207,7 @@ function assertNonNegative(rawValue: string, key: AffiliateSettingKey): void {
   }
 }
 
-/** Валидатор ставки RevShare: [0, 1]. */
+/** Валидатор ставки RevShare: коридор `MIN_REVSHARE_RATE`…`MAX_REVSHARE_RATE`. */
 function assertRateInRange(rawValue: string, key: AffiliateSettingKey): void {
   const rate = Number(rawValue)
   if (!Number.isFinite(rate) || rate < RATE_MIN || rate > RATE_MAX) {

@@ -61,7 +61,7 @@ export default function AffiliateSettingsPage(): React.JSX.Element {
         </div>
         <RateEditor
           label="Ставка по умолчанию"
-          hint="Доля от NGR. 0.20 = 20%. Рыночный диапазон для новых партнёров 0.20–0.25."
+          hint="Доля от NGR. 0.20 = 20%. Разрешён коридор 0.05–0.50 (5–50 %); типично для новых партнёров 0.20–0.25."
           value={read('default_revshare_rate', '0.2000')}
           isPercent
           busy={save.isPending}

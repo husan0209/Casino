@@ -104,13 +104,17 @@ export class AffiliateSelfReferralError extends AppError {
   }
 }
 
-/** Ставка RevShare вне диапазона [0, 1]. */
+/**
+ * Ставка RevShare вне разрешённого коридора. Границы в сообщении не печатаем:
+ * они живут одной парой констант в value-object, а импорт их сюда замкнул бы
+ * цикл (value-object уже импортирует этот класс).
+ */
 export class AffiliateRateOutOfRangeError extends AppError {
   readonly code = 'AFFILIATE_RATE_OUT_OF_RANGE'
   readonly httpStatus = 422
 
   constructor(public readonly rate: string) {
-    super(`RevShare rate out of range [0, 1]: ${rate}`)
+    super(`RevShare rate out of range: ${rate}`)
   }
 }
 
