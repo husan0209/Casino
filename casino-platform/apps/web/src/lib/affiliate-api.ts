@@ -3,6 +3,7 @@ import axios, { type AxiosError } from 'axios'
 
 import { type ApiResponse } from '@/lib/api'
 import { API_BASE_URL as API_URL } from '@/lib/api-base'
+import { affiliatePasswordErrorLabel } from '@/lib/ui/affiliate-password'
 
 /**
  * Клиент партнёрской программы.
@@ -42,6 +43,12 @@ export async function affiliatePatch<T>(url: string, body?: unknown): Promise<T>
   return res.data.data
 }
 
+/** Код ошибки партнёрского контура (для branch-логики, как api.errCode у игрока). */
+export function affiliateErrCode(error: unknown): string | undefined {
+  const ax = error as AxiosError<ApiResponse<unknown>> | null
+  return ax?.response?.data.error?.code
+}
+
 /** Текст ошибки партнёрского контура (тот же контракт, что у api.errText). */
 export function affiliateErrText(error: unknown): string {
   const ax = error as AxiosError<ApiResponse<unknown>> | null
@@ -65,4 +72,18 @@ export function affiliateErrText(error: unknown): string {
     }
   }
   return message
+}
+
+/**
+ * Текст ошибки для операций с паролем партнёра.
+ *
+ * Сначала стабильный код (`AFFILIATE_TOKEN_*`, `WEAK_PASSWORD`,
+ * `AFFILIATE_PASSWORD_INVALID_CURRENT`) → русская фраза из справочника. Если
+ * кода в справочнике нет (`VALIDATION_ERROR` и всё будущее), отдаём штатный
+ * разбор конверта: там уже лежит человеческий текст из Zod-схемы. Придумывать
+ * свою формулировку вместо него нельзя — сервер её не гарантирует.
+ */
+export function affiliatePasswordErrText(error: unknown): string {
+  const mapped = affiliatePasswordErrorLabel(affiliateErrCode(error))
+  return mapped ?? affiliateErrText(error)
 }

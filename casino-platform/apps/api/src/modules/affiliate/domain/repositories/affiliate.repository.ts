@@ -154,6 +154,12 @@ export interface LastClickSignals {
 // ─────────────────────────────────────────────────────────────────────────────
 // Репозиторий партнёров
 // ─────────────────────────────────────────────────────────────────────────────
+/** Пара «партнёр + срок его активного токена». См. `findByResetToken`. */
+export interface AffiliatePasswordResetRecord {
+  readonly affiliateId: string
+  readonly tokenExpiresAt: Date | null
+}
+
 export interface AffiliateRepository {
   findById(id: string): Promise<AffiliateEntity | null>
   findByEmail(email: string): Promise<AffiliateEntity | null>
@@ -164,6 +170,20 @@ export interface AffiliateRepository {
   update(id: string, input: UpdateAffiliateAdminInput): Promise<AffiliateEntity>
   updateSelf(id: string, input: UpdateAffiliateSelfInput): Promise<AffiliateEntity>
   updatePasswordHash(id: string, passwordHash: string): Promise<void>
+  /**
+   * Токен восстановления доступа (ТЗ ч.8 §658). Активен ровно один: новый
+   * запрос перезаписывает предыдущий, поэтому отдельного «отозвать старый»
+   * нет. Сброс обязан вызвать и `clearPasswordResetToken` — иначе ссылка
+   * остаётся рабочей.
+   */
+  setPasswordResetToken(id: string, token: string, expiresAt: Date): Promise<void>
+  /**
+   * Возвращает узкую запись, а не `AffiliateEntity`: срок жизни токена —
+   * деталь credentials, и раздувать ею сущность, которую читают начисление и
+   * кабинет, незачем.
+   */
+  findByResetToken(token: string): Promise<AffiliatePasswordResetRecord | null>
+  clearPasswordResetToken(id: string): Promise<void>
   touchLastLogin(id: string): Promise<void>
   touchLastClick(id: string, at: Date): Promise<void>
   /** Атомарная проверка уникальности кода: код занят ИЛИ свободен. */

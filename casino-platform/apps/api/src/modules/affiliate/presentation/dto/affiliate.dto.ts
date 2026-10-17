@@ -71,6 +71,20 @@ export const UpdateAffiliatePasswordSchema = z.object({
   new_password: AffiliatePasswordSchema,
 })
 
+/**
+ * Запрос ссылки восстановления. Форма всегда отвечает одинаково, поэтому
+ * валидация здесь — единственная защита от мусора в теле.
+ */
+export const ForgotAffiliatePasswordSchema = z.object({
+  email: AffiliateEmailSchema,
+})
+
+/** Токен — `randomBytes(64).hex`, ровно 128 символов: сверяем длиной. */
+export const ResetAffiliatePasswordSchema = z.object({
+  token: z.string().length(128, 'Некорректная ссылка восстановления'),
+  new_password: AffiliatePasswordSchema,
+})
+
 /** Ставка приходит строкой: деньги-чувствительный параметр (DECIMAL, не float). */
 export const RevShareRateSchema = z
   .string()
@@ -165,6 +179,9 @@ export const ClickQuerySchema = z.object({
 export type RegisterAffiliateDto = z.infer<typeof RegisterAffiliateSchema>
 export type LoginAffiliateDto = z.infer<typeof LoginAffiliateSchema>
 export type UpdateAffiliateSelfDto = z.infer<typeof UpdateAffiliateSelfSchema>
+export type UpdateAffiliatePasswordDto = z.infer<typeof UpdateAffiliatePasswordSchema>
+export type ForgotAffiliatePasswordDto = z.infer<typeof ForgotAffiliatePasswordSchema>
+export type ResetAffiliatePasswordDto = z.infer<typeof ResetAffiliatePasswordSchema>
 export type CreateAffiliateAdminDto = z.infer<typeof CreateAffiliateAdminSchema>
 export type UpdateAffiliateAdminDto = z.infer<typeof UpdateAffiliateAdminSchema>
 export type AffiliateListQueryDto = z.infer<typeof AffiliateListQuerySchema>

@@ -1,10 +1,24 @@
 'use client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
+import { PasswordStrengthMeter } from '@/components/auth/PasswordStrength'
+import { PasswordField } from '@/components/ui/password-field'
 import { toast } from '@/components/ui/toaster'
-import { affiliateErrText, affiliateGet, affiliatePatch, affiliatePost } from '@/lib/affiliate-api'
+import {
+  affiliateErrText,
+  affiliateGet,
+  affiliatePatch,
+  affiliatePost,
+  affiliatePasswordErrText,
+} from '@/lib/affiliate-api'
 import { formatAmount, formatRate } from '@/lib/affiliate-format'
+import {
+  AFFILIATE_PASSWORD_TOO_SHORT_TEXT,
+  affiliatePasswordProblem,
+} from '@/lib/ui/affiliate-password'
+import { type AffiliateAuthState, useAffiliateAuth } from '@/stores/affiliate'
 import { type AffiliateMeDto } from '@/types/affiliate'
 
 /**
@@ -151,6 +165,8 @@ export default function AffiliateSettingsPage(): React.JSX.Element {
         </div>
       </div>
 
+      <ChangePasswordCard />
+
       <div className="card border-[#FF3D71]/30">
         <div className="font-semibold text-[#FF3D71] mb-1">Выход из программы</div>
         <div className="text-muted text-sm mb-3">
@@ -172,6 +188,142 @@ export default function AffiliateSettingsPage(): React.JSX.Element {
             Выйти из партнёрской программы
           </button>
         )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Смена пароля партнёра внутри живущей сессии.
+ *
+ * Блок отделён от формы контактов не для красоты: контакты идут через
+ * PATCH /affiliate/me и сессия остаётся живой, а POST /affiliate/me/password
+ * закрывает ВСЕ партнёрские сессии. Поэтому после успеха локальная сессия
+ * гасится (это делает store — см. stores/affiliate.changePassword) и партнёр
+ * уходит на вход: остаться в кабинете с мёртвым токеном было бы хуже, чем
+ * принудительный logout.
+ *
+ * Поле «повтор» живёт только здесь: тело запроса — ровно два поля (схема на API
+ * `.strict()`), и третье попасть в него не должно.
+ */
+function ChangePasswordCard(): React.JSX.Element {
+  const router = useRouter()
+  const changePassword = useAffiliateAuth((state: AffiliateAuthState) => state.changePassword)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [repeatPassword, setRepeatPassword] = useState('')
+  const [hint, setHint] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const passwordChange = useMutation({
+    mutationFn: () => changePassword(currentPassword, newPassword),
+    onSuccess: () => {
+      toast.success('Пароль изменён')
+      router.replace('/affiliate/login')
+    },
+    onError: (err: unknown) => {
+      setError(affiliatePasswordErrText(err))
+    },
+  })
+
+  function submit(): void {
+    // Пустой текущий пароль отсекаем здесь: иначе сервер ответил бы
+    // «Текущий пароль указан неверно», что про поля формы было бы неправдой.
+    if (currentPassword === '') {
+      setHint('Введите текущий пароль')
+      setError(null)
+      return
+    }
+    const problem = affiliatePasswordProblem(newPassword, repeatPassword)
+    if (problem !== null) {
+      setHint(problem)
+      setError(null)
+      return
+    }
+    setHint(null)
+    setError(null)
+    passwordChange.mutate()
+  }
+
+  return (
+    <div className="card">
+      <div className="font-semibold mb-1">Смена пароля</div>
+      <div className="text-muted text-xs mb-3">
+        После смены пароля закрываются все активные сессии партнёра — во всех браузерах. Войти нужно
+        будет заново.
+      </div>
+
+      {error !== null && (
+        <div className="mb-3 rounded-xl border border-[#FF3D71]/40 p-3">
+          <div className="text-[#FF3D71] text-sm" role="alert">
+            {error}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        <div>
+          <label className="field-label" htmlFor="s-pass-current">
+            Текущий пароль
+          </label>
+          <PasswordField
+            id="s-pass-current"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(event) => {
+              setCurrentPassword(event.target.value)
+              setHint(null)
+              setError(null)
+            }}
+          />
+        </div>
+        <div>
+          <label className="field-label" htmlFor="s-pass-new">
+            Новый пароль
+          </label>
+          <PasswordField
+            id="s-pass-new"
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={(event) => {
+              setNewPassword(event.target.value)
+              setHint(null)
+              setError(null)
+            }}
+            placeholder={AFFILIATE_PASSWORD_TOO_SHORT_TEXT}
+          />
+          <PasswordStrengthMeter password={newPassword} />
+        </div>
+        <div>
+          <label className="field-label" htmlFor="s-pass-repeat">
+            Повторите пароль
+          </label>
+          <PasswordField
+            id="s-pass-repeat"
+            autoComplete="new-password"
+            value={repeatPassword}
+            onChange={(event) => {
+              setRepeatPassword(event.target.value)
+              setHint(null)
+              setError(null)
+            }}
+            aria-invalid={hint !== null}
+            placeholder="Ещё раз тот же пароль"
+          />
+          {hint !== null && (
+            <p className="mt-1 text-xs text-[#FF3D71]" role="alert">
+              {hint}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={submit}
+          disabled={passwordChange.isPending}
+          className="btn min-h-[44px]"
+        >
+          {passwordChange.isPending ? 'Меняем…' : 'Сменить пароль'}
+        </button>
       </div>
     </div>
   )

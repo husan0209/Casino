@@ -111,6 +111,7 @@ function makeController(fakes: Fakes = {}) {
     website: 'https://partner.example',
   }))
   const leaveProgram = vi.fn(async () => ({ ...AFFILIATE, status: 'suspended' }))
+  const changePassword = vi.fn(async () => ({ ok: true as const }))
 
   const controller = new AffiliateController(
     { findById } as never,
@@ -121,6 +122,7 @@ function makeController(fakes: Fakes = {}) {
     { getBalances } as never,
     { execute: updateProfile } as never,
     { execute: leaveProgram } as never,
+    { execute: changePassword } as never,
   )
 
   return {

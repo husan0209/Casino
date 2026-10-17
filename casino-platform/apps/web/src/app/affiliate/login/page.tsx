@@ -78,7 +78,18 @@ export default function AffiliateLoginPage(): React.JSX.Element {
         </button>
       </form>
 
-      <p className="text-muted text-sm mt-5 text-center">
+      {/* Партнёрский пароль восстанавливается отдельно от игрового: креды живут
+          в таблице affiliates, игровая форма сброса их не находит. */}
+      <p className="text-sm mt-4 text-center">
+        <Link
+          href="/affiliate/forgot-password"
+          className="inline-flex min-h-[44px] items-center text-brand underline"
+        >
+          Забыли пароль?
+        </Link>
+      </p>
+
+      <p className="text-muted text-sm mt-1 text-center">
         Нет аккаунта?{' '}
         <Link href="/affiliate/register" className="text-brand underline">
           Стать партнёром
