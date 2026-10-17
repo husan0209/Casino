@@ -26,7 +26,7 @@ export function LegalChrome({ children }: { children: React.ReactNode }): React.
     <div className="flex min-h-screen flex-col">
       <header className="border-b border-line/60 bg-bg">
         <div className="container-1 flex items-center justify-between gap-3 py-3">
-          <Link href="/" className="text-sm text-muted transition hover:text-white">
+          <Link href="/" className="btn-ghost text-sm">
             ← На главную
           </Link>
           <span className="caps-label mb-0">Правовые документы</span>

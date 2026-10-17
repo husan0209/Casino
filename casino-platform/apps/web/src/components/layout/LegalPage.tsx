@@ -69,11 +69,11 @@ export function LegalPage({
           ))}
         </div>
       </div>
-      <p className="text-xs text-muted mt-4 text-center">
-        <Link href="/" className="text-white">
+      <div className="mt-4 flex justify-center">
+        <Link href="/" className="btn-ghost text-sm">
           ← На главную
         </Link>
-      </p>
+      </div>
     </div>
   )
 }
