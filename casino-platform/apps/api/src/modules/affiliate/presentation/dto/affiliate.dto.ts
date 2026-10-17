@@ -7,6 +7,10 @@
 import { z } from 'zod'
 
 import { AFFILIATE_REJECT_REASONS } from '../../domain/entities/affiliate.entity'
+import {
+  MAX_REVSHARE_RATE,
+  MIN_REVSHARE_RATE,
+} from '../../domain/value-objects/revshare-rate.value-object'
 
 /** Код трекинга: 8 символов из алфавита без 0/O/1/I. */
 export const TrackingCodeSchema = z
@@ -85,15 +89,29 @@ export const ResetAffiliatePasswordSchema = z.object({
   new_password: AffiliatePasswordSchema,
 })
 
-/** Ставка приходит строкой: деньги-чувствительный параметр (DECIMAL, не float). */
+/**
+ * Ставка приходит строкой: деньги-чувствительный параметр (DECIMAL, не float).
+ *
+ * Границы — те же константы домена, что у value-object и настроек: три разных
+ * диапазона в трёх слоях обязательно разъезжаются, и тогда форма принимает
+ * значение, на котором расчёт падает.
+ */
+const RATE_MIN_PERCENT = Number(MIN_REVSHARE_RATE) * 100
+const RATE_MAX_PERCENT = Number(MAX_REVSHARE_RATE) * 100
+
 export const RevShareRateSchema = z
   .string()
   .trim()
   .regex(/^\d*\.?\d+$/, 'Ставка должна быть числом')
-  .refine((value) => {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1
-  }, 'Ставка должна быть в диапазоне 0..1')
+  .refine(
+    (value) => {
+      const parsed = Number(value)
+      return (
+        Number.isFinite(parsed) && parsed >= Number(MIN_REVSHARE_RATE) && parsed <= Number(MAX_REVSHARE_RATE)
+      )
+    },
+    `Ставка должна быть в диапазоне ${RATE_MIN_PERCENT}..${RATE_MAX_PERCENT} %`,
+  )
 
 export const CreateAffiliateAdminSchema = z.object({
   email: AffiliateEmailSchema,

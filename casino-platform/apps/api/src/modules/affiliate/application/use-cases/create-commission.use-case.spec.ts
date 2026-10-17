@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { CreateCommissionUseCase, type CreateCommissionInput } from './create-commission.use-case'
-import { parseRevShareRate } from '../../domain/value-objects/revshare-rate.value-object'
+import {
+  parseRevShareRate,
+  type RevShareRate,
+} from '../../domain/value-objects/revshare-rate.value-object'
 
 import type {
   AffiliateCommissionEntity,
@@ -294,7 +297,11 @@ describe('CreateCommissionUseCase', () => {
   })
 
   it('creates a zero-rate commission as nothing rather than a zero row', async () => {
-    affiliate = makeAffiliate({ revshareRate: parseRevShareRate('0') })
+    // Ставка 0 % больше не проходит ввод (коридор 5–50 %), но строка с ней может
+    // остаться в БД с прежних времён — чтение не валидирует, валидируется только
+    // запись. Поэтому ноль подставляем как уже хранимое значение, минуя парсер:
+    // проверяем именно «начислять нечего», а не возможность ввести 0.
+    affiliate = makeAffiliate({ revshareRate: '0.0000' as RevShareRate })
 
     const outcome = await useCase.executeForCurrency(makeInput(), 'RUB')
 

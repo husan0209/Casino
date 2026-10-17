@@ -304,6 +304,10 @@ export class AffiliateAdminController {
     @CurrentUser() admin: AdminActor,
     @Req() request: Request,
   ): Promise<{ key: string; value: string }> {
+    // Старое значение читаем ДО записи: без него аудит отвечает «поставили
+    // 0.30», а что было до — не восстановить, кроме как по бэкапу БД.
+    const previous =
+      (await this.settings.listRaw()).find((row) => row.key === body.key)?.value ?? null
     await this.settings.set({
       key: body.key as Parameters<typeof this.settings.set>[0]['key'],
       value: body.value,
@@ -316,7 +320,7 @@ export class AffiliateAdminController {
       action: 'affiliate.settings.updated',
       targetType: 'system_setting',
       targetId: body.key,
-      payload: { value: body.value },
+      payload: { previous, value: body.value },
       ipAddress: request.ip,
     })
     return { key: body.key, value: body.value }

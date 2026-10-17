@@ -60,16 +60,22 @@ describe('buildSettings', () => {
 })
 
 describe('validateSettingValue', () => {
-  it('accepts a rate inside [0, 1]', () => {
+  it('accepts a rate inside the corridor', () => {
     expect(() =>
       validateSettingValue(AFFILIATE_SETTING_KEYS.defaultRevshareRate, '0.35', 'number'),
     ).not.toThrow()
   })
 
-  it('rejects a rate above 100%', () => {
+  it('rejects a rate above the corridor', () => {
     expect(() =>
       validateSettingValue(AFFILIATE_SETTING_KEYS.defaultRevshareRate, '1.5', 'number'),
-    ).toThrow(/\[0, 1\]/)
+    ).toThrow(/\[0\.05, 0\.5\]/)
+  })
+
+  it('rejects a rate below the corridor — 0 % больше не валидная настройка', () => {
+    expect(() =>
+      validateSettingValue(AFFILIATE_SETTING_KEYS.defaultRevshareRate, '0', 'number'),
+    ).toThrow(/\[0\.05, 0\.5\]/)
   })
 
   it('rejects a non-boolean for a boolean key', () => {
@@ -178,7 +184,7 @@ describe('AffiliateSettingsService', () => {
         type: 'number',
         updatedBy: 'admin-1',
       }),
-    ).rejects.toThrow(/\[0, 1\]/)
+    ).rejects.toThrow(/\[0\.05, 0\.5\]/)
 
     expect(written).toHaveLength(0)
   })
